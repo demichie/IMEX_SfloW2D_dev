@@ -8,7 +8,7 @@
 MODULE lie_source_executor_2d
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type, &
+    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type,                                   &
         idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE domain_2d, ONLY : domain_type
@@ -39,20 +39,20 @@ CONTAINS
     !> @param[in] qp_original Pre-spatial primitive snapshot (read-only).
     !> @param[out] step_failed True when candidate group state is rejected.
     !> @param[out] failure_message Optional diagnostic describing rejected group.
-    SUBROUTINE execute_lie_source_groups(state,q,qp,time_step,domain,source_registry, &
+    SUBROUTINE execute_lie_source_groups(state,q,qp,time_step,domain,source_registry,                                  &
             stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
-        USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
-            B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
-            project_cell_field_to_vertices,assign_topography_vertices,B_vertex, &
-            comp_interfaces_x,comp_interfaces_y, B_zone, cell_source_fractions, &
+        USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                         &
+            B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
+            project_cell_field_to_vertices,assign_topography_vertices,B_vertex,                                        &
+            comp_interfaces_x,comp_interfaces_y, B_zone, cell_source_fractions,                                        &
             cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
-        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
+        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction,                                                 &
             eval_source_analytic,analytic_term_context_type
-        USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, &
+        USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT,                                   &
             SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversion_2d, ONLY : qc_to_qp
-        USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, &
+        USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                                &
             physical_cell_state_finite
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
         USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
@@ -77,7 +77,7 @@ CONTAINS
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         INTEGER, ALLOCATABLE :: group_j(:),group_k(:),newton_iterations(:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
-        REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:), &
+        REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:),                                              &
             staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
@@ -94,15 +94,15 @@ CONTAINS
         failure_reason=''
         reject_group=-1
         reject_env=''
-        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', &
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP',                                              &
             reject_env,STATUS=env_status)
         IF (env_status==0 .AND. LEN_TRIM(reject_env)>0) THEN
             READ(reject_env,*,IOSTAT=parse_status) reject_group
-            IF (parse_status/=0 .OR. reject_group<1) &
+            IF (parse_status/=0 .OR. reject_group<1)                                                                   &
                 CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
         END IF
         IF (PRESENT(failure_message)) failure_message=''
-        IF (.NOT.source_registry%is_initialized()) &
+        IF (.NOT.source_registry%is_initialized())                                                                     &
             CALL fatal_error('D19: uninitialized Lie source registry')
         groups=source_registry%groups()
         source_time=0.0_wp
@@ -115,7 +115,7 @@ CONTAINS
             qp_group=qp
             ! Validate configuration before spawning workers: fatal dispatch errors
             ! must not originate from a concurrent cell evaluation.
-            IF (.NOT.ALLOCATED(groups(group_index)%source_names)) &
+            IF (.NOT.ALLOCATED(groups(group_index)%source_names))                                                      &
                 CALL fatal_error('D20: Lie source group has no allocated source list')
             IF (SIZE(groups(group_index)%source_names)==0) CYCLE
             SELECT CASE(groups(group_index)%method)
@@ -126,21 +126,21 @@ CONTAINS
             END SELECT
             ! Darcy's inhibition polynomial must have a valid configured order
             ! before any worker evaluates its cell-local pressure source.
-            IF (ANY(groups(group_index)%source_names=='pore_pressure_dissipation') .OR. &
+            IF (ANY(groups(group_index)%source_names=='pore_pressure_dissipation') .OR.                                &
                 ANY(groups(group_index)%source_names=='pore_pressure_darcy')) THEN
-                IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR. &
+                IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR.                                                       &
                     TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
                     IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
                 END IF
             END IF
             with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
             IF (with_exchange) THEN
-                IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
+                IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                                &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
                 ALLOCATE(group_j(domain%solve_cells),group_k(domain%solve_cells))
-                ALLOCATE(staged_deposit(n_solid,domain%solve_cells), &
-                    staged_erosion(n_solid,domain%solve_cells), &
-                    staged_erodible(n_solid,domain%solve_cells), &
+                ALLOCATE(staged_deposit(n_solid,domain%solve_cells),                                                   &
+                    staged_erosion(n_solid,domain%solve_cells),                                                        &
+                    staged_erodible(n_solid,domain%solve_cells),                                                       &
                     staged_lava(domain%solve_cells),staged_bed_rate(domain%solve_cells))
                 IF (topo_change_flag) THEN
                     ALLOCATE(bed_rate_cell(comp_cells_x,comp_cells_y))
@@ -183,16 +183,16 @@ CONTAINS
 
                 ! Validate constitutive inputs before dispatch. Model/method errors
                 ! remain configuration errors, not recoverable timestep rejections.
-                IF (.NOT.physical_cell_state_finite(qpentry) .OR. &
+                IF (.NOT.physical_cell_state_finite(qpentry) .OR.                                                      &
                     .NOT.ieee_is_finite(noise)) THEN
                     cell_failure(cell)='D19: non-finite source-group physical input'
                     CYCLE cell_loop
                 END IF
-                IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR. &
-                    .NOT.ieee_is_finite(B_prime_y_geom(j,k)) .OR. &
-                    .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR. &
-                    .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR. &
-                    .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR. &
+                IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR.                                                      &
+                    .NOT.ieee_is_finite(B_prime_y_geom(j,k)) .OR.                                                      &
+                    .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR.                                                    &
+                    .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR.                                                    &
+                    .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                                    &
                     .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
                     cell_failure(cell)='D19: non-finite source-group geometry'
                     CYCLE cell_loop
@@ -200,13 +200,13 @@ CONTAINS
                 IF (with_exchange) THEN
                     ! All immobilized and erodible inventories are nonnegative.
                     ! Validate the group input before computing any exchange rate.
-                    IF (.NOT.ALL(ieee_is_finite(state%erodible(1:n_solid,j,k))) .OR. &
-                        .NOT.ALL(ieee_is_finite(state%deposit(j,k,1:n_solid))) .OR. &
-                        .NOT.ALL(ieee_is_finite(state%erosion(j,k,1:n_solid))) .OR. &
-                        .NOT.ieee_is_finite(state%lava_deposit(j,k)) .OR. &
-                        ANY(state%erodible(1:n_solid,j,k)<0.0_wp) .OR. &
-                        ANY(state%deposit(j,k,1:n_solid)<0.0_wp) .OR. &
-                        ANY(state%erosion(j,k,1:n_solid)<0.0_wp) .OR. &
+                    IF (.NOT.ALL(ieee_is_finite(state%erodible(1:n_solid,j,k))) .OR.                                   &
+                        .NOT.ALL(ieee_is_finite(state%deposit(j,k,1:n_solid))) .OR.                                    &
+                        .NOT.ALL(ieee_is_finite(state%erosion(j,k,1:n_solid))) .OR.                                    &
+                        .NOT.ieee_is_finite(state%lava_deposit(j,k)) .OR.                                              &
+                        ANY(state%erodible(1:n_solid,j,k)<0.0_wp) .OR.                                                 &
+                        ANY(state%deposit(j,k,1:n_solid)<0.0_wp) .OR.                                                  &
+                        ANY(state%erosion(j,k,1:n_solid)<0.0_wp) .OR.                                                  &
                         state%lava_deposit(j,k)<0.0_wp) THEN
                         cell_failure(cell)='D19: invalid substrate inventory before mass exchange'
                         CYCLE cell_loop
@@ -215,10 +215,10 @@ CONTAINS
 
                 SELECT CASE(groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
-                    CALL assemble_lie_explicit_transaction(qpentry,q(1:n_eqns,j,k), &
-                        time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k), &
-                        total_rate,transfers,cell_has_exchange,ok,noise,B_zone(j,k),analytic_context, &
-                        cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
+                    CALL assemble_lie_explicit_transaction(qpentry,q(1:n_eqns,j,k),                                    &
+                        time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k),                       &
+                        total_rate,transfers,cell_has_exchange,ok,noise,B_zone(j,k),analytic_context,                  &
+                        cell_source_fractions(j,k),cell_fissure_fractions(j,k,:),                                      &
                         cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k),dx*dy)
                     IF (cell_has_exchange .NEQV. with_exchange) THEN
                         cell_failure(cell)='D20: inconsistent cell exchange group metadata'
@@ -232,29 +232,29 @@ CONTAINS
                     q_candidate=q(:,j,k)
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
-                        WRITE(cell_failure(cell),'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
-                            'D19: inadmissible source candidate group=',groups(group_index)%id, &
-                            ' cell=',j,',',k,' mass=',q_candidate(idx_totMassEqn), &
+                        WRITE(cell_failure(cell),'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)')                                 &
+                            'D19: inadmissible source candidate group=',groups(group_index)%id,                        &
+                            ' cell=',j,',',k,' mass=',q_candidate(idx_totMassEqn),                                     &
                             ' components=',SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
                         CYCLE cell_loop
                     END IF
                     IF (with_exchange) THEN
-                        deposit_candidate=state%deposit(j,k,1:n_solid)+ &
+                        deposit_candidate=state%deposit(j,k,1:n_solid)+                                                &
                             time_step*transfers%solid_deposition_rate
-                        erosion_candidate=state%erosion(j,k,1:n_solid)+ &
+                        erosion_candidate=state%erosion(j,k,1:n_solid)+                                                &
                             time_step*transfers%solid_erosion_rate
-                        erodible_candidate=state%erodible(1:n_solid,j,k)- &
+                        erodible_candidate=state%erodible(1:n_solid,j,k)-                                              &
                             time_step*transfers%solid_erosion_rate
-                        IF (erodible_deposit_flag) erodible_candidate= &
+                        IF (erodible_deposit_flag) erodible_candidate=                                                 &
                             erodible_candidate+time_step*transfers%solid_deposition_rate
                         lava_candidate=state%lava_deposit(j,k)+time_step*transfers%lava_deposit_rate
-                        IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR. &
-                            .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
-                            .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
-                            .NOT.ieee_is_finite(lava_candidate) .OR. &
-                            ANY(erodible_candidate<0.0_wp) .OR. &
-                            ANY(deposit_candidate<0.0_wp) .OR. &
-                            ANY(erosion_candidate<0.0_wp) .OR. &
+                        IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR.                                           &
+                            .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR.                                           &
+                            .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR.                                          &
+                            .NOT.ieee_is_finite(lava_candidate) .OR.                                                   &
+                            ANY(erodible_candidate<0.0_wp) .OR.                                                        &
+                            ANY(deposit_candidate<0.0_wp) .OR.                                                         &
+                            ANY(erosion_candidate<0.0_wp) .OR.                                                         &
                             lava_candidate<0.0_wp) THEN
                             cell_failure(cell)='D19: invalid candidate substrate inventory'
                             CYCLE cell_loop
@@ -287,7 +287,7 @@ CONTAINS
                     analytic_input=q(:,j,k)
                     IF (groups(group_index)%id==0) analytic_input=q_original(:,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
-                    CALL eval_source_analytic(groups(group_index),analytic_input, &
+                    CALL eval_source_analytic(groups(group_index),analytic_input,                                      &
                         analytic_context,time_step,analytic_rate,status)
                     IF (status/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0)') 'D19: analytic group status ',status
@@ -302,12 +302,12 @@ CONTAINS
                     q_group(1:n_eqns,j,k)=q_group(1:n_eqns,j,k)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
                     IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
-                    CALL solve_backward_euler_group(groups(group_index), &
-                        q_group(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                    CALL solve_backward_euler_group(groups(group_index),                                               &
+                        q_group(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k),                              &
                         grav_coeff(j,k),noise,iterations,ok,linear_info,failed)
                     newton_iterations(cell)=iterations
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
-                        WRITE(cell_failure(cell),'(A,I0,A,I0)') &
+                        WRITE(cell_failure(cell),'(A,I0,A,I0)')                                                        &
                             'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
                         CYCLE cell_loop
                     END IF
@@ -346,8 +346,8 @@ CONTAINS
             END IF
             DEALLOCATE(cell_failure)
             IF (ALLOCATED(newton_iterations)) THEN
-                WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=', &
-                    groups(group_index)%id,' solved_cells=',COUNT(newton_iterations>0), &
+                WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
+                    groups(group_index)%id,' solved_cells=',COUNT(newton_iterations>0),                                &
                     ' total_iterations=',SUM(newton_iterations)
                 DEALLOCATE(newton_iterations)
             END IF
@@ -379,8 +379,8 @@ CONTAINS
                 ! A rejected geometric refresh therefore leaves both inventories
                 ! and the conserved/primitive group state unmodified.
                 IF (topo_change_flag) THEN
-                    WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=', &
-                        groups(group_index)%id,' max_abs_delta=', &
+                    WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',                                               &
+                        groups(group_index)%id,' max_abs_delta=',                                                      &
                         MAXVAL(ABS(bed_candidate-B_vertex))
                     CALL assign_topography_vertices(bed_candidate,bed_accepted)
                     IF (.NOT.bed_accepted) THEN
@@ -399,7 +399,7 @@ CONTAINS
                     state%lava_deposit(j,k)=staged_lava(cell)
                 END DO
                 CALL state%refresh_substrate_totals()
-                DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
+                DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion,                                              &
                     staged_erodible,staged_lava,staged_bed_rate)
             END IF
             q=q_group

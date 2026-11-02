@@ -30,8 +30,8 @@ MODULE output_paths
         !> \param[out] error_message Buffer receiving a diagnostic on failure.
         !> \param[in] error_size Size of the diagnostic buffer.
         !> \return Zero on success, nonzero on failure.
-        FUNCTION c_prepare_run_directory(base, run, overwrite, allow_existing, &
-                                                    error_message, error_size)             &
+        FUNCTION c_prepare_run_directory(base, run, overwrite, allow_existing,                                         &
+                                                    error_message, error_size)                                         &
             BIND(C, NAME='imex_prepare_run_directory') RESULT(status)
         IMPORT :: c_char, c_int, c_ptr, c_size_t
         TYPE(c_ptr), VALUE :: base, run, error_message
@@ -46,7 +46,7 @@ MODULE output_paths
         !> \param[out] error_message Buffer receiving a diagnostic on failure.
         !> \param[in] error_size Size of the diagnostic buffer.
         !> \return Zero on success, nonzero on failure.
-        FUNCTION c_ensure_directory(path, reject_existing, error_message, error_size) &
+        FUNCTION c_ensure_directory(path, reject_existing, error_message, error_size)                                  &
             BIND(C, NAME='imex_ensure_directory') RESULT(status)
         IMPORT :: c_int, c_ptr, c_size_t
         TYPE(c_ptr), VALUE :: path, error_message
@@ -61,7 +61,7 @@ MODULE output_paths
         !> \param[out] error_message Buffer receiving a diagnostic on failure.
         !> \param[in] error_size Size of the diagnostic buffer.
         !> \return One if a match exists, zero if not, negative on error.
-        FUNCTION c_snapshot_prefix_exists(directory, prefix, error_message, error_size) &
+        FUNCTION c_snapshot_prefix_exists(directory, prefix, error_message, error_size)                                &
             BIND(C, NAME='imex_snapshot_prefix_exists') RESULT(status)
         IMPORT :: c_char, c_int, c_ptr, c_size_t
         TYPE(c_ptr), VALUE :: directory, prefix, error_message
@@ -85,16 +85,16 @@ CONTAINS
         INTEGER(c_int) :: status
         INTEGER :: i
 
-        IF (LEN_TRIM(base_directory) == 0 .OR. LEN_TRIM(run_name) == 0) &
+        IF (LEN_TRIM(base_directory) == 0 .OR. LEN_TRIM(run_name) == 0)                                                &
             CALL fail('OUTPUT_BASE_DIRECTORY and RUN_NAME must not be empty')
 
-        IF (LEN_TRIM(base_directory) + LEN_TRIM(run_name) + 1 > &
+        IF (LEN_TRIM(base_directory) + LEN_TRIM(run_name) + 1 >                                                        &
             LEN(run_output_directory)) CALL fail('Output run path is too long')
 
-        IF (INDEX(base_directory, ACHAR(0)) /= 0 .OR. INDEX(run_name, ACHAR(0)) /= 0) &
+        IF (INDEX(base_directory, ACHAR(0)) /= 0 .OR. INDEX(run_name, ACHAR(0)) /= 0)                                  &
             CALL fail('NUL characters are not allowed in output paths')
 
-        ALLOCATE(c_base(LEN_TRIM(base_directory) + 1), &
+        ALLOCATE(c_base(LEN_TRIM(base_directory) + 1),                                                                 &
                     c_run(LEN_TRIM(run_name) + 1), c_error(LEN(error_message)))
         DO i = 1, LEN_TRIM(base_directory)
         c_base(i) = base_directory(i:i)
@@ -106,9 +106,9 @@ CONTAINS
         c_run(SIZE(c_run)) = c_null_char
         c_error = c_null_char
 
-        status = c_prepare_run_directory(c_loc(c_base(1)), c_loc(c_run(1)), &
-            MERGE(1_c_int, 0_c_int, overwrite), &
-            MERGE(1_c_int, 0_c_int, allow_existing), c_loc(c_error(1)), &
+        status = c_prepare_run_directory(c_loc(c_base(1)), c_loc(c_run(1)),                                            &
+            MERGE(1_c_int, 0_c_int, overwrite),                                                                        &
+            MERGE(1_c_int, 0_c_int, allow_existing), c_loc(c_error(1)),                                                &
             INT(SIZE(c_error), c_size_t))
         IF (status /= 0_c_int) THEN
         error_message = ''
@@ -120,7 +120,7 @@ CONTAINS
         END IF
 
         run_output_directory = TRIM(base_directory)
-        IF (run_output_directory(LEN_TRIM(run_output_directory):LEN_TRIM(run_output_directory)) &
+        IF (run_output_directory(LEN_TRIM(run_output_directory):LEN_TRIM(run_output_directory))                        &
             /= '/') run_output_directory = TRIM(run_output_directory)//'/'
         run_output_directory = TRIM(run_output_directory)//TRIM(run_name)
     END SUBROUTINE initialize_output_paths
@@ -134,7 +134,7 @@ CONTAINS
         CHARACTER(LEN=:), ALLOCATABLE :: path
 
         IF (LEN_TRIM(run_output_directory) == 0) CALL fail('Output paths are not initialized')
-        IF (LEN_TRIM(run_output_directory) + LEN_TRIM(category) + LEN_TRIM(filename) + 2 &
+        IF (LEN_TRIM(run_output_directory) + LEN_TRIM(category) + LEN_TRIM(filename) + 2                               &
             > LEN(run_output_directory)) CALL fail('Output file path is too long')
         path = TRIM(run_output_directory)//'/'//TRIM(category)//'/'//TRIM(filename)
     END FUNCTION output_file_path
@@ -167,10 +167,10 @@ CONTAINS
             time_label(i:i) = 'd'
         END SELECT
         END DO
-        IF (LEN_TRIM(run_output_directory) + LEN('/snapshots/') + LEN_TRIM(index_string) + &
-            LEN('_t_') + LEN_TRIM(time_label) > LEN(run_output_directory)) &
+        IF (LEN_TRIM(run_output_directory) + LEN('/snapshots/') + LEN_TRIM(index_string) +                             &
+            LEN('_t_') + LEN_TRIM(time_label) > LEN(run_output_directory))                                             &
             CALL fail('Snapshot directory path is too long')
-        active_snapshot_directory = TRIM(run_output_directory)//'/snapshots/'// &
+        active_snapshot_directory = TRIM(run_output_directory)//'/snapshots/'//                                        &
             TRIM(index_string)//'_t_'//TRIM(time_label)
         refuse_existing = .FALSE.
         IF (PRESENT(reject_existing)) refuse_existing = reject_existing
@@ -209,7 +209,7 @@ CONTAINS
 
         directory = TRIM(run_output_directory)//'/snapshots'
         prefix = snapshot_index_label(index)//'_t_'
-        ALLOCATE(c_directory(LEN_TRIM(directory) + 1), &
+        ALLOCATE(c_directory(LEN_TRIM(directory) + 1),                                                                 &
                     c_prefix(LEN_TRIM(prefix) + 1), c_error(LEN(error_message)))
         DO i = 1, LEN_TRIM(directory)
         c_directory(i) = directory(i:i)
@@ -221,7 +221,7 @@ CONTAINS
         c_prefix(SIZE(c_prefix)) = c_null_char
         c_error = c_null_char
 
-        status = c_snapshot_prefix_exists(c_loc(c_directory(1)), c_loc(c_prefix(1)), &
+        status = c_snapshot_prefix_exists(c_loc(c_directory(1)), c_loc(c_prefix(1)),                                   &
             c_loc(c_error(1)), INT(SIZE(c_error), c_size_t))
         IF (status < 0_c_int) THEN
         error_message = ''
@@ -231,8 +231,8 @@ CONTAINS
         END DO
         CALL fail(TRIM(error_message))
         END IF
-        IF (status > 0_c_int) &
-            CALL fail('uncommitted snapshot directory exists for restart index: '// &
+        IF (status > 0_c_int)                                                                                          &
+            CALL fail('uncommitted snapshot directory exists for restart index: '//                                    &
                     TRIM(prefix))
     END SUBROUTINE validate_snapshot_index
 
@@ -243,9 +243,9 @@ CONTAINS
         CHARACTER(LEN=*), INTENT(IN) :: filename
         CHARACTER(LEN=:), ALLOCATABLE :: path
 
-        IF (.NOT. ALLOCATED(active_snapshot_directory)) &
+        IF (.NOT. ALLOCATED(active_snapshot_directory))                                                                &
             CALL fail('Snapshot output path is not initialized')
-        IF (LEN_TRIM(active_snapshot_directory) + 1 + LEN_TRIM(filename) > &
+        IF (LEN_TRIM(active_snapshot_directory) + 1 + LEN_TRIM(filename) >                                             &
             LEN(run_output_directory)) CALL fail('Snapshot file path is too long')
         path = TRIM(active_snapshot_directory)//'/'//TRIM(filename)
     END FUNCTION snapshot_file_path
@@ -261,8 +261,8 @@ CONTAINS
         INTEGER(c_int) :: status, reject_existing_c
         INTEGER :: i
 
-        IF (LEN_TRIM(directory) == 0 .OR. LEN_TRIM(directory) > LEN(run_output_directory) .OR. &
-            INDEX(directory, ACHAR(0)) /= 0) &
+        IF (LEN_TRIM(directory) == 0 .OR. LEN_TRIM(directory) > LEN(run_output_directory) .OR.                         &
+            INDEX(directory, ACHAR(0)) /= 0)                                                                           &
             CALL fail('Invalid output directory path')
 
         ALLOCATE(c_path(LEN_TRIM(directory) + 1), c_error(LEN(error_message)))
@@ -272,9 +272,9 @@ CONTAINS
         c_path(SIZE(c_path)) = c_null_char
         c_error = c_null_char
         reject_existing_c = 0_c_int
-        IF (PRESENT(reject_existing)) &
+        IF (PRESENT(reject_existing))                                                                                  &
             reject_existing_c = MERGE(1_c_int, 0_c_int, reject_existing)
-        status = c_ensure_directory(c_loc(c_path(1)), reject_existing_c, &
+        status = c_ensure_directory(c_loc(c_path(1)), reject_existing_c,                                               &
             c_loc(c_error(1)), INT(SIZE(c_error), c_size_t))
         IF (status /= 0_c_int) THEN
         error_message = ''

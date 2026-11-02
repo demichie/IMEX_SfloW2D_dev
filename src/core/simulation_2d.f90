@@ -18,8 +18,8 @@ MODULE simulation_2d
 
     USE model_layout_2d, ONLY : model_layout_type
 
-    USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas, &
-            n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag, &
+    USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
+            n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag,                                         &
             configure_canonical_state_indices
 
 
@@ -85,7 +85,8 @@ CONTAINS
 
     !> \brief Initialize model metadata and simulation-owned numerical workspaces.
     !>
-    !> \param[in,out] this Simulation-owned state, configuration descriptors and numerical workspaces.
+    !> \param[in,out] this Simulation-owned state, configuration descriptors and numerical
+    !> workspaces.
 
     SUBROUTINE initialize_simulation(this)
 
@@ -97,7 +98,7 @@ CONTAINS
         ! conversion, including collapsing-volume initialization.
         CALL configure_canonical_state_indices()
 
-        CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
+        CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,                                          &
             n_add_gas, n_stoch_vars, n_pore_vars )
 
         CALL initialize_configured_sources(this%source_registry,source_error)
@@ -133,23 +134,24 @@ CONTAINS
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_SOURCE_WINDOWS,step_start,step_length)
 
         IF (stochastic_flag) CALL this%stochastic%prepare_timestep(this%state,step_length)
-        IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED, &
+        IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED,                                       &
             step_start,step_length)
 
-        CALL this%time_integration%advance(this%state,step_start, &
-            step_length,this%stochastic%effective_Z, &
+        CALL this%time_integration%advance(this%state,step_start,                                                      &
+            step_length,this%stochastic%effective_Z,                                                                   &
             this%source_registry,this%domain,this%spatial_operator)
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 
 
         this%runtime%t=step_start+step_length
-        IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED, &
+        IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED,                                            &
             this%runtime%t,step_length)
     END SUBROUTINE advance_simulation_timestep
 
     !> \brief Release the simulation state, metadata and solver workspaces.
     !>
-    !> \param[in,out] this Simulation-owned state, configuration descriptors and numerical workspaces.
+    !> \param[in,out] this Simulation-owned state, configuration descriptors and numerical
+    !> workspaces.
 
     SUBROUTINE finalize_simulation(this)
 

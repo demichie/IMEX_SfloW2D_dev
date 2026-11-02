@@ -186,9 +186,9 @@ CONTAINS
         USE parameters_2d, ONLY: eps_sing , eps_sing4
         USE parameters_2d, ONLY : bottom_radial_source_flag
         USE parameters_2d, ONLY : bottom_fissural_source_flag, n_fissures
-        USE parameters_2d, ONLY : x_source , y_source , r_source , r2_source ,      &
+        USE parameters_2d, ONLY : x_source , y_source , r_source , r2_source ,                                         &
             angle_source
-        USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,     &
+        USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,                                        &
                 width_fissures
         USE parameters_2d, ONLY : liquid_vaporization_flag
 
@@ -333,8 +333,8 @@ CONTAINS
 
             DO j=1,comp_cells_x
 
-                CALL interp_2d_nodata( topography_profile(1,:,:) ,                    &
-                    topography_profile(2,:,:), topography_profile(3,:,:) ,           &
+                CALL interp_2d_nodata( topography_profile(1,:,:) ,                                                     &
+                    topography_profile(2,:,:), topography_profile(3,:,:) ,                                             &
                     x_comp(j), y_comp(k) , B_nodata(j,k) )
 
             END DO
@@ -349,8 +349,8 @@ CONTAINS
 
             DO j=1,comp_interfaces_x
 
-                CALL interp_2d_scalar( topography_profile(1,:,:) ,                    &
-                    topography_profile(2,:,:), topography_profile(3,:,:) ,           &
+                CALL interp_2d_scalar( topography_profile(1,:,:) ,                                                     &
+                    topography_profile(2,:,:), topography_profile(3,:,:) ,                                             &
                     x_stag(j), y_stag(k) , B_vertex(j,k) )
 
             END DO
@@ -369,13 +369,13 @@ CONTAINS
 
         IF ( bottom_radial_source_flag ) THEN
 
-            CALL compute_cell_fract(x_source,y_source,r_source,r2_source,            &
+            CALL compute_cell_fract(x_source,y_source,r_source,r2_source,                                              &
                 angle_source,cell_source_fractions)
 
             ! The sub-cell sampling misses the ellipse area by up to a few parts in
             ! 1e5. Inject over the exact area pi*R_SOURCE*R2_SOURCE instead.
-            IF ( SUM( cell_source_fractions ) .GT. 0.0_wp )                       &
-                bottom_source_area_ratio = pi_g * r_source * r2_source /           &
+            IF ( SUM( cell_source_fractions ) .GT. 0.0_wp )                                                            &
+                bottom_source_area_ratio = pi_g * r_source * r2_source /                                               &
                 ( dx * dy * SUM( cell_source_fractions ) )
 
         END IF
@@ -383,10 +383,10 @@ CONTAINS
         IF ( bottom_fissural_source_flag ) THEN
 
             DO j = 1, n_fissures
-                CALL compute_cell_fissure_fraction(                                  &
-                    x_fissures_end_points(:,j), y_fissures_end_points(:,j),         &
+                CALL compute_cell_fissure_fraction(                                                                    &
+                    x_fissures_end_points(:,j), y_fissures_end_points(:,j),                                            &
                     width_fissures(j), cell_fissure_fractions(:,:,j))
-                cell_source_fractions = MAX(cell_source_fractions,                   &
+                cell_source_fractions = MAX(cell_source_fractions,                                                     &
                     cell_fissure_fractions(:,:,j))
             END DO
 
@@ -461,8 +461,8 @@ CONTAINS
 
         ELSE
 
-            f2 = alfa_x * ( alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1) ) &
-                + ( 1.0_wp - alfa_x ) * ( alfa_y * f1(ix+1,iy) + ( 1.0_wp - alfa_y )&
+            f2 = alfa_x * ( alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1) )                                   &
+                + ( 1.0_wp - alfa_x ) * ( alfa_y * f1(ix+1,iy) + ( 1.0_wp - alfa_y )                                   &
                 * f1(ix+1,iy+1) )
 
         END IF
@@ -534,8 +534,8 @@ CONTAINS
 
         ELSE
 
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )&
-                .OR. ( f1(ix+1,iy) .EQ. nodata_topo )                               &
+            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )                                  &
+                .OR. ( f1(ix+1,iy) .EQ. nodata_topo )                                                                  &
                 .OR. ( f1(ix+1,iy+1) .EQ. nodata_topo )
 
         END IF
@@ -551,7 +551,7 @@ CONTAINS
     !> \param[in] width Full width of the fissure rectangle [m].
     !> \param[out] cell_fraction Rectangle overlap divided by cell area, one value per cell.
 
-    SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,   &
+    SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,                                          &
             cell_fraction)
 
         IMPLICIT NONE
@@ -653,12 +653,12 @@ CONTAINS
                                 denominator = polygon_x(vertex) - polygon_x(previous_vertex)
                                 fraction = (boundary - polygon_x(previous_vertex)) / denominator
                                 intersection_x = boundary
-                                intersection_y = polygon_y(previous_vertex) + fraction * &
+                                intersection_y = polygon_y(previous_vertex) + fraction *                               &
                                     (polygon_y(vertex) - polygon_y(previous_vertex))
                             ELSE
                                 denominator = polygon_y(vertex) - polygon_y(previous_vertex)
                                 fraction = (boundary - polygon_y(previous_vertex)) / denominator
-                                intersection_x = polygon_x(previous_vertex) + fraction * &
+                                intersection_x = polygon_x(previous_vertex) + fraction *                               &
                                     (polygon_x(vertex) - polygon_x(previous_vertex))
                                 intersection_y = boundary
                             END IF
@@ -691,13 +691,13 @@ CONTAINS
                 area_twice = 0.0_wp
                 DO vertex = 1, vertex_count
                     next_vertex = MOD(vertex, vertex_count) + 1
-                    area_twice = area_twice                                          &
-                        + ( polygon_x(vertex) - x_stag(cell_x) )                    &
-                        * ( polygon_y(next_vertex) - y_stag(cell_y) )               &
-                        - ( polygon_x(next_vertex) - x_stag(cell_x) )               &
+                    area_twice = area_twice                                                                            &
+                        + ( polygon_x(vertex) - x_stag(cell_x) )                                                       &
+                        * ( polygon_y(next_vertex) - y_stag(cell_y) )                                                  &
+                        - ( polygon_x(next_vertex) - x_stag(cell_x) )                                                  &
                         * ( polygon_y(vertex) - y_stag(cell_y) )
                 END DO
-                cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                          &
+                cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                                                             &
                     0.5_wp * ABS(area_twice) / (dx * dy))
             END DO
         END DO
@@ -764,9 +764,9 @@ CONTAINS
 
             DO k=1,comp_cells_y
 
-                IF ( ( x_stag(j+1) .LT. ( xs - MAX(rs,r2s) ) ) .OR.                   &
-                    ( x_stag(j) .GT. ( xs + MAX(rs,r2s) ) ) .OR.                     &
-                    ( y_stag(k+1) .LT. ( ys - MAX(rs,r2s) ) ) .OR.                   &
+                IF ( ( x_stag(j+1) .LT. ( xs - MAX(rs,r2s) ) ) .OR.                                                    &
+                    ( x_stag(j) .GT. ( xs + MAX(rs,r2s) ) ) .OR.                                                       &
+                    ( y_stag(k+1) .LT. ( ys - MAX(rs,r2s) ) ) .OR.                                                     &
                     ( y_stag(k) .GT. ( ys + MAX(rs,r2s) ) ) ) THEN
 
                     cell_fract(j,k) = 0.0_wp
@@ -775,17 +775,17 @@ CONTAINS
 
                     check_subgrid = 0
 
-                    WHERE ( ( ( ( x_comp(j) + x_subgrid - xs )*COS(ang_rad) +          &
-                        ( y_comp(k) + y_subgrid - ys )*SIN(ang_rad) )**2 / rs**2 +   &
-                        ( - ( x_comp(j) + x_subgrid - xs )*SIN(ang_rad) +            &
-                        ( y_comp(k) + y_subgrid - ys )*COS(ang_rad) )**2 / r2s**2 )  &
+                    WHERE ( ( ( ( x_comp(j) + x_subgrid - xs )*COS(ang_rad) +                                          &
+                        ( y_comp(k) + y_subgrid - ys )*SIN(ang_rad) )**2 / rs**2 +                                     &
+                        ( - ( x_comp(j) + x_subgrid - xs )*SIN(ang_rad) +                                              &
+                        ( y_comp(k) + y_subgrid - ys )*COS(ang_rad) )**2 / r2s**2 )                                    &
                         .LE. 1.0_wp )
 
                         check_subgrid = 1
 
                     END WHERE
 
-                    cell_fract(j,k) = REAL(SUM(check_subgrid),wp) / &
+                    cell_fract(j,k) = REAL(SUM(check_subgrid),wp) /                                                    &
                         REAL(n_points2,wp)
 
                 END IF
@@ -798,7 +798,7 @@ CONTAINS
 
         IF ( VERBOSE_LEVEL .GE. 0 ) THEN
 
-            WRITE(*,*) 'Source area =',source_area,' Error =',ABS( 1.0_wp -          &
+            WRITE(*,*) 'Source area =',source_area,' Error =',ABS( 1.0_wp -                                            &
                 dx*dy*SUM(cell_fract) / ( 4.0_wp*ATAN(1.0_wp)*rs*r2s ) )
 
         END IF
@@ -937,12 +937,12 @@ CONTAINS
 
                         B_zone(j,k) = MAX( B_zone(j-1,k) , B_zone(j,k-1) )
 
-                        IF ( ( B_zone(j-1,k) .NE. B_zone(j,k-1) ) .AND.  &
+                        IF ( ( B_zone(j-1,k) .NE. B_zone(j,k-1) ) .AND.                                                &
                             (MIN( B_zone(j-1,k) , B_zone(j,k-1) ) .GT. 0 ) ) THEN
 
                             B_zone(j,k) = MIN( B_zone(j-1,k) , B_zone(j,k-1) )
 
-                            equi_list(MAX( B_zone(j-1,k) , B_zone(j,k-1) )) = &
+                            equi_list(MAX( B_zone(j-1,k) , B_zone(j,k-1) )) =                                          &
                                 MIN( B_zone(j-1,k) , B_zone(j,k-1) )
 
                         END IF
@@ -1105,13 +1105,13 @@ CONTAINS
 
                 DO k = 2,comp_cells_y-1
 
-                    IF ( ( y_stag(k) .LE. y2_source ) .AND. ( y_stag(k+1) .GE.         &
+                    IF ( ( y_stag(k) .LE. y2_source ) .AND. ( y_stag(k+1) .GE.                                         &
                         y1_source ) ) THEN
 
                         source_cell(1,k) = 2
                         sourceW(1,k) = .TRUE.
 
-                        side_fract = MIN ( MIN( (y_stag(k+1) - y1_source) , ( y2_source -     &
+                        side_fract = MIN ( MIN( (y_stag(k+1) - y1_source) , ( y2_source -                              &
                             y_stag(k) ) ) , ( y2_source - y1_source ) , dy ) / dy
 
                         WRITE(*,*) 'side_fract',side_fract
@@ -1131,13 +1131,13 @@ CONTAINS
 
                 DO k = 2,comp_cells_y-1
 
-                    IF ( ( y_stag(k) .LE. y2_source ) .AND. ( y_stag(k+1) .GE.         &
+                    IF ( ( y_stag(k) .LE. y2_source ) .AND. ( y_stag(k+1) .GE.                                         &
                         y1_source ) ) THEN
 
                         source_cell(comp_cells_x,k) = 2
                         sourceE(comp_cells_x,k) = .TRUE.
 
-                        side_fract = MIN ( MIN( (y_stag(k+1) - y1_source) , ( y2_source -     &
+                        side_fract = MIN ( MIN( (y_stag(k+1) - y1_source) , ( y2_source -                              &
                             y_stag(k) ) ) , ( y2_source - y1_source ) , dy ) / dy
 
                         sourceE_vect_x(comp_cells_x,k) = -side_fract
@@ -1155,13 +1155,13 @@ CONTAINS
 
                 DO j = 2,comp_cells_x-1
 
-                    IF ( ( x_stag(j) .LE. x2_source ) .AND. ( x_stag(j+1) .GE.         &
+                    IF ( ( x_stag(j) .LE. x2_source ) .AND. ( x_stag(j+1) .GE.                                         &
                         x1_source ) ) THEN
 
                         source_cell(j,1) = 2
                         sourceS(j,1) = .TRUE.
 
-                        side_fract = MIN ( MIN( (x_stag(j+1) - x1_source) , ( x2_source -     &
+                        side_fract = MIN ( MIN( (x_stag(j+1) - x1_source) , ( x2_source -                              &
                             x_stag(j) ) ) , ( x2_source - x1_source ) , dx ) / dx
 
                         sourceS_vect_x(j,1) = 0.0_wp
@@ -1179,13 +1179,13 @@ CONTAINS
 
                 DO j = 2,comp_cells_x-1
 
-                    IF ( ( x_stag(j) .LE. x2_source ) .AND. ( x_stag(j+1) .GE.         &
+                    IF ( ( x_stag(j) .LE. x2_source ) .AND. ( x_stag(j+1) .GE.                                         &
                         x1_source ) ) THEN
 
                         source_cell(j,comp_cells_y) = 2
                         sourceN(j,comp_cells_y) = .TRUE.
 
-                        side_fract = MIN ( MIN( (x_stag(j+1) - x1_source) , ( x2_source -     &
+                        side_fract = MIN ( MIN( (x_stag(j+1) - x1_source) , ( x2_source -                              &
                             x_stag(j) ) ) , ( x2_source - x1_source ) , dx ) / dx
 
                         sourceN_vect_x(j,comp_cells_y) = 0.0_wp
@@ -1209,44 +1209,44 @@ CONTAINS
 
             DO j = 2,comp_cells_x-1
 
-                IF ( ( x_comp(j) - x_source )**2 + ( y_comp(k) - y_source )**2 .LE.   &
+                IF ( ( x_comp(j) - x_source )**2 + ( y_comp(k) - y_source )**2 .LE.                                    &
                     r_source**2 ) THEN
 
                     ! cells where equations are not solved
                     source_cell(j,k) = 1
 
                     ! check on west cell
-                    IF ( ( x_comp(j-1) - x_source )**2 + ( y_comp(k) - y_source )**2   &
+                    IF ( ( x_comp(j-1) - x_source )**2 + ( y_comp(k) - y_source )**2                                   &
                         .GE. r_source**2 ) THEN
 
                         ! cells where radial source boundary condition are applied
                         source_cell(j-1,k) = 2
                         sourceE(j-1,k) = .TRUE.
-                        source_distance = SQRT( ( x_stag(j) - x_source )**2         &
+                        source_distance = SQRT( ( x_stag(j) - x_source )**2                                            &
                             + ( y_comp(k) - y_source )**2 )
 
-                        sourceE_vect_x(j-1,k) = ( x_stag(j) - x_source ) * r_source     &
+                        sourceE_vect_x(j-1,k) = ( x_stag(j) - x_source ) * r_source                                    &
                             / source_distance**2
 
-                        sourceE_vect_y(j-1,k) = ( y_comp(k) - y_source ) * r_source     &
+                        sourceE_vect_y(j-1,k) = ( y_comp(k) - y_source ) * r_source                                    &
                             / source_distance**2
 
                         total_source = total_source + dx * ABS( sourceE_vect_x(j-1,k) )
 
-                    ELSEIF ( ( x_comp(j+1) - x_source )**2 + ( y_comp(k)-y_source )**2 &
+                    ELSEIF ( ( x_comp(j+1) - x_source )**2 + ( y_comp(k)-y_source )**2                                 &
                         .GE. r_source**2 ) THEN
                         ! check on east cell
 
                         ! cells where radial source boundary condition are applied
                         source_cell(j+1,k) = 2
                         sourceW(j+1,k) = .TRUE.
-                        source_distance = SQRT( ( x_stag(j+1) - x_source )**2       &
+                        source_distance = SQRT( ( x_stag(j+1) - x_source )**2                                          &
                             + ( y_comp(k) - y_source )**2 )
 
-                        sourceW_vect_x(j+1,k) = ( x_stag(j+1) - x_source ) * r_source   &
+                        sourceW_vect_x(j+1,k) = ( x_stag(j+1) - x_source ) * r_source                                  &
                             / source_distance**2
 
-                        sourceW_vect_y(j+1,k) = ( y_comp(k) - y_source ) * r_source     &
+                        sourceW_vect_y(j+1,k) = ( y_comp(k) - y_source ) * r_source                                    &
                             / source_distance**2
 
                         total_source = total_source + dx * ABS( sourceW_vect_x(j+1,k) )
@@ -1254,36 +1254,36 @@ CONTAINS
                     END IF
 
                     ! check on south cell
-                    IF ( ( x_comp(j) - x_source )**2 + ( y_comp(k-1) - y_source )**2   &
+                    IF ( ( x_comp(j) - x_source )**2 + ( y_comp(k-1) - y_source )**2                                   &
                         .GE. r_source**2 ) THEN
 
                         ! cells where radial source boundary condition are applied
                         source_cell(j,k-1) = 2
                         sourceN(j,k-1) = .TRUE.
-                        source_distance = SQRT( ( x_comp(j) - x_source )**2         &
+                        source_distance = SQRT( ( x_comp(j) - x_source )**2                                            &
                             + ( y_stag(k) - y_source )**2 )
 
-                        sourceN_vect_x(j,k-1) = ( x_comp(j) - x_source ) * r_source     &
+                        sourceN_vect_x(j,k-1) = ( x_comp(j) - x_source ) * r_source                                    &
                             / source_distance**2
 
-                        sourceN_vect_y(j,k-1) = ( y_stag(k) - y_source ) * r_source     &
+                        sourceN_vect_y(j,k-1) = ( y_stag(k) - y_source ) * r_source                                    &
                             / source_distance**2
 
                         total_source = total_source + dy * ABS( sourceN_vect_y(j,k-1) )
 
-                    ELSEIF ( ( x_comp(j)-x_source )**2 + ( y_comp(k+1) - y_source )**2 &
+                    ELSEIF ( ( x_comp(j)-x_source )**2 + ( y_comp(k+1) - y_source )**2                                 &
                         .GE. r_source**2 ) THEN
 
                         ! cells where radial source boundary condition are applied
                         source_cell(j,k+1) = 2
                         sourceS(j,k+1) = .TRUE.
-                        source_distance = SQRT( ( x_comp(j) - x_source )**2         &
+                        source_distance = SQRT( ( x_comp(j) - x_source )**2                                            &
                             + ( y_stag(k+1) - y_source )**2 )
 
-                        sourceS_vect_x(j,k+1) = ( x_comp(j) - x_source ) * r_source     &
+                        sourceS_vect_x(j,k+1) = ( x_comp(j) - x_source ) * r_source                                    &
                             / source_distance**2
 
-                        sourceS_vect_y(j,k+1) = ( y_stag(k+1) - y_source ) * r_source   &
+                        sourceS_vect_y(j,k+1) = ( y_stag(k+1) - y_source ) * r_source                                  &
                             / source_distance**2
 
                         total_source = total_source + dy * ABS( sourceS_vect_y(j,k+1) )
@@ -1329,7 +1329,7 @@ CONTAINS
                             ELSE
                                 ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
                                 ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
-                                ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                                ang_diff = MOD(ABS(ang_compass - azimuth_source)                                       &
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
@@ -1356,7 +1356,7 @@ CONTAINS
                             ELSE
                                 ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
                                 ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
-                                ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                                ang_diff = MOD(ABS(ang_compass - azimuth_source)                                       &
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
@@ -1383,7 +1383,7 @@ CONTAINS
                             ELSE
                                 ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
                                 ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
-                                ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                                ang_diff = MOD(ABS(ang_compass - azimuth_source)                                       &
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
@@ -1410,7 +1410,7 @@ CONTAINS
                             ELSE
                                 ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
                                 ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
-                                ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                                ang_diff = MOD(ABS(ang_compass - azimuth_source)                                       &
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
@@ -1439,7 +1439,7 @@ CONTAINS
             END DO
 
             arc_perim_total = SUM( cell_arc_perim(1:comp_cells_x,1:comp_cells_y) )
-            WRITE(*,*) 'Radial source arc perimeter (discretized, m) = ',           &
+            WRITE(*,*) 'Radial source arc perimeter (discretized, m) = ',                                              &
                 arc_perim_total
 
             ! Rescale cell_arc_perim so that its sum equals the analytical source
@@ -1447,20 +1447,20 @@ CONTAINS
             ! the per-cell injection rho_m * h * v * cell_arc_perim / cell_area
             ! integrate to the user-prescribed MFR exactly.
             h_ell = (r_source - r2_source)**2 / (r_source + r2_source)**2
-            source_length_analytical = pi_g * (r_source + r2_source) *              &
-                ( 1.0_wp + 0.25_wp * h_ell + h_ell**2 / 64.0_wp                    &
-                    + h_ell**3 / 256.0_wp + h_ell**4 * 25.0_wp / 16384.0_wp          &
+            source_length_analytical = pi_g * (r_source + r2_source) *                                                 &
+                ( 1.0_wp + 0.25_wp * h_ell + h_ell**2 / 64.0_wp                                                        &
+                    + h_ell**3 / 256.0_wp + h_ell**4 * 25.0_wp / 16384.0_wp                                            &
                     + h_ell**5 * 49.0_wp / 65536.0_wp )
 
             IF ( arc_width_source .LT. 360.0_wp ) THEN
-                source_length_analytical = source_length_analytical                  &
+                source_length_analytical = source_length_analytical                                                    &
                     * ( arc_width_source / 360.0_wp )
             END IF
 
             IF ( arc_perim_total .GT. 0.0_wp ) THEN
                 rescale = source_length_analytical / arc_perim_total
                 cell_arc_perim(:,:) = cell_arc_perim(:,:) * rescale
-                WRITE(*,*) 'Radial source analytical arc length (m) = ',             &
+                WRITE(*,*) 'Radial source analytical arc length (m) = ',                                               &
                     source_length_analytical
                 WRITE(*,*) 'Volume-source rescale factor              = ', rescale
             END IF
@@ -1486,14 +1486,14 @@ CONTAINS
 
         IMPLICIT NONE
 
-        B_face_x(:,:) = 0.5_wp * ( B_vertex(:,1:comp_cells_y)                     &
+        B_face_x(:,:) = 0.5_wp * ( B_vertex(:,1:comp_cells_y)                                                          &
             + B_vertex(:,2:comp_interfaces_y) )
-        B_face_y(:,:) = 0.5_wp * ( B_vertex(1:comp_cells_x,:)                     &
+        B_face_y(:,:) = 0.5_wp * ( B_vertex(1:comp_cells_x,:)                                                          &
             + B_vertex(2:comp_interfaces_x,:) )
 
-        B_cent(:,:) = 0.25_wp * ( B_vertex(1:comp_cells_x,1:comp_cells_y)         &
-            + B_vertex(2:comp_interfaces_x,1:comp_cells_y)                       &
-            + B_vertex(1:comp_cells_x,2:comp_interfaces_y)                       &
+        B_cent(:,:) = 0.25_wp * ( B_vertex(1:comp_cells_x,1:comp_cells_y)                                              &
+            + B_vertex(2:comp_interfaces_x,1:comp_cells_y)                                                             &
+            + B_vertex(1:comp_cells_x,2:comp_interfaces_y)                                                             &
             + B_vertex(2:comp_interfaces_x,2:comp_interfaces_y) )
 
     END SUBROUTINE derive_topography_from_vertices
@@ -1533,7 +1533,7 @@ CONTAINS
                 k_first = MAX(1,k-1)
                 k_last = MIN(comp_cells_y,k)
                 adjacent_cells = (j_last-j_first+1) * (k_last-k_first+1)
-                vertex_field(j,k) = SUM(cell_field(j_first:j_last,k_first:k_last)) &
+                vertex_field(j,k) = SUM(cell_field(j_first:j_last,k_first:k_last))                                     &
                     / REAL(adjacent_cells,wp)
             END DO
         END DO
@@ -1550,9 +1550,9 @@ CONTAINS
 
     !> Snapshot authoritative topography and derived geometry before a transaction.
     SUBROUTINE begin_geometry_transaction
-        IF (geometry_transaction_active) &
+        IF (geometry_transaction_active)                                                                               &
             ERROR STOP 'nested geometry transaction'
-        IF (.NOT.ALLOCATED(B_vertex)) &
+        IF (.NOT.ALLOCATED(B_vertex))                                                                                  &
             ERROR STOP 'geometry transaction started before initialization'
         lie_bed_before=B_vertex
         lie_cent_before=B_cent
@@ -1571,7 +1571,7 @@ CONTAINS
 
     !> Accept geometric changes and discard the pre-transaction snapshot.
     SUBROUTINE commit_geometry_transaction
-        IF (.NOT.geometry_transaction_active) &
+        IF (.NOT.geometry_transaction_active)                                                                          &
             ERROR STOP 'no geometry transaction to commit'
         CALL clear_geometry_transaction
     END SUBROUTINE commit_geometry_transaction
@@ -1688,7 +1688,7 @@ CONTAINS
 
             k = 1
 
-            IF (comp_cells_x .LT. 5) CALL reconstruct_short_1d_line(             &
+            IF (comp_cells_x .LT. 5) CALL reconstruct_short_1d_line(                                                   &
                 B_cent(:,k),dx,B_prime_x_geom(:,k),B_second_xx_geom(:,k))
 
             ! Keep scalar stencil accumulation independent of OpenMP chunk sizes.
@@ -1721,7 +1721,7 @@ CONTAINS
         ELSEIF ( comp_cells_x .EQ. 1 ) THEN
 
             j = 1
-            IF (comp_cells_y .LT. 5) CALL reconstruct_short_1d_line(             &
+            IF (comp_cells_y .LT. 5) CALL reconstruct_short_1d_line(                                                   &
                 B_cent(j,:),dy,B_prime_y_geom(j,:),B_second_yy_geom(j,:))
             ! The rotated 1D kernel uses the same coefficients and accumulation
             ! order as x. Do not read a nonexistent third x column on this grid.
@@ -1804,12 +1804,12 @@ CONTAINS
 
             ! Interpolate the cell coefficient to the shared Cartesian faces.
             grav_coeff_stag_x(1,:) = grav_coeff(1,:)
-            grav_coeff_stag_x(2:comp_interfaces_x-1,:) = 0.5_wp *                    &
+            grav_coeff_stag_x(2:comp_interfaces_x-1,:) = 0.5_wp *                                                      &
                 ( grav_coeff(1:comp_cells_x-1,:) + grav_coeff(2:comp_cells_x,:) )
             grav_coeff_stag_x(comp_interfaces_x,:) = grav_coeff(comp_cells_x,:)
 
             grav_coeff_stag_y(:,1) = grav_coeff(:,1)
-            grav_coeff_stag_y(:,2:comp_interfaces_y-1) = 0.5_wp *                    &
+            grav_coeff_stag_y(:,2:comp_interfaces_y-1) = 0.5_wp *                                                      &
                 ( grav_coeff(:,1:comp_cells_y-1) + grav_coeff(:,2:comp_cells_y) )
             grav_coeff_stag_y(:,comp_interfaces_y) = grav_coeff(:,comp_cells_y)
 
@@ -1975,7 +1975,7 @@ CONTAINS
 
         END IF
 
-        IF ( ( alfa_x .LT. 0.0_wp ) .OR. ( alfa_x .GT. 1.0_wp )                     &
+        IF ( ( alfa_x .LT. 0.0_wp ) .OR. ( alfa_x .GT. 1.0_wp )                                                        &
             .OR. ( alfa_y .LT. 0.0_wp ) .OR. ( alfa_y .GT. 1.0_wp ) ) THEN
 
             f2 = 0.0_wp
@@ -1994,8 +1994,8 @@ CONTAINS
 
         ELSE
 
-            f2 = alfa_x * ( alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1) ) &
-                + ( 1.0_wp - alfa_x ) * ( alfa_y * f1(ix+1,iy) + ( 1.0_wp - alfa_y )&
+            f2 = alfa_x * ( alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1) )                                   &
+                + ( 1.0_wp - alfa_x ) * ( alfa_y * f1(ix+1,iy) + ( 1.0_wp - alfa_y )                                   &
                 * f1(ix+1,iy+1) )
 
         END IF

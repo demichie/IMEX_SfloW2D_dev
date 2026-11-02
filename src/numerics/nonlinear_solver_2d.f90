@@ -32,8 +32,8 @@ CONTAINS
 
     !> Solve the entire structurally affected conservative equation set.
     !> Every other conservative component remains fixed at its group input value.
-    SUBROUTINE solve_backward_euler_group(source_group, &
-            q_cell,dt,Bprime_x,Bprime_y,grav_correction,stochastic_value, &
+    SUBROUTINE solve_backward_euler_group(source_group,                                                                &
+            q_cell,dt,Bprime_x,Bprime_y,grav_correction,stochastic_value,                                              &
             iterations_used,converged,linear_info,line_search_failed)
         USE parameters_2d, ONLY : tol_abs,tol_rel
         TYPE(source_group_type), INTENT(IN) :: source_group
@@ -53,7 +53,7 @@ CONTAINS
         IF (.NOT.ALLOCATED(source_group%equation_ids)) RETURN
         n_active=SIZE(source_group%equation_ids)
         IF (n_active<1 .OR. n_active>n_eqns) RETURN
-        IF (ANY(source_group%equation_ids<1) .OR. &
+        IF (ANY(source_group%equation_ids<1) .OR.                                                                      &
             ANY(source_group%equation_ids>n_eqns)) RETURN
         DO i=1,n_active
             IF (COUNT(source_group%equation_ids==source_group%equation_ids(i))/=1) RETURN
@@ -61,7 +61,7 @@ CONTAINS
         ! Freeze the semi-implicit rate and limit its entire increment by one
         ! nonnegative factor, so neither momentum component crosses zero.
         ! Components initially at rest must not acquire a sign from friction.
-        CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y, &
+        CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y,                                            &
             grav_correction,stochastic_value,semi_rate)
         semi_scale=1.0_wp
         DO i=2,3
@@ -82,8 +82,8 @@ CONTAINS
         q_cell=q_si
         coeff_f=1.0_wp
         linear_info=0
-        CALL solve_newton_group(source_group,source_group%equation_ids,q_cell,q_si,dt, &
-            Bprime_x,Bprime_y,stochastic_value,coeff_f,tol_abs,tol_rel, &
+        CALL solve_newton_group(source_group,source_group%equation_ids,q_cell,q_si,dt,                                 &
+            Bprime_x,Bprime_y,stochastic_value,coeff_f,tol_abs,tol_rel,                                                &
             iterations_used,converged,linear_info,line_search_failed)
         IF (.NOT.converged) q_cell=q_in
     END SUBROUTINE solve_backward_euler_group
@@ -104,10 +104,10 @@ CONTAINS
     !> \param[out] converged True when the group residual meets its tolerance.
     !> \param[out] linear_info Linear solver status; zero denotes success.
     !> \param[out] line_search_failed True if backtracking cannot accept a step.
-    SUBROUTINE solve_newton_group(source_group,group_equations,   &
-            qj,q_group_input,dt_step,Bprimej_x,Bprimej_y,Zij,coeff_f, &
-            tol_abs_local,                                                         &
-            tol_rel_local, iterations_used, converged, linear_info,               &
+    SUBROUTINE solve_newton_group(source_group,group_equations,                                                        &
+            qj,q_group_input,dt_step,Bprimej_x,Bprimej_y,Zij,coeff_f,                                                  &
+            tol_abs_local,                                                                                             &
+            tol_rel_local, iterations_used, converged, linear_info,                                                    &
             line_search_failed)
 
         USE parameters_2d, ONLY : max_nl_iter
@@ -146,8 +146,8 @@ CONTAINS
 
         DO nl_iter = 1, max_nl_iter
             iterations_used = iterations_used + 1
-            CALL eval_f(qj, q_group_input, dt_step, coeff_f,       &
-                Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations, &
+            CALL eval_f(qj, q_group_input, dt_step, coeff_f,                                                           &
+                Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations,                                        &
                 source_group)
 
             IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
@@ -157,15 +157,15 @@ CONTAINS
                 EXIT
             END IF
 
-            CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f,         &
-                Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations,       &
+            CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f,                                                       &
+                Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations,                                               &
                 source_group)
             IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
 
             DO i = 1, SIZE(group_equations)
                 group_rhs(i) = -right_term(group_equations(i))
                 DO j = 1, SIZE(group_equations)
-                    group_matrix(i,j) = left_matrix(group_equations(i),            &
+                    group_matrix(i,j) = left_matrix(group_equations(i),                                                &
                         group_equations(j))
                 END DO
             END DO
@@ -190,9 +190,9 @@ CONTAINS
 
             IF (nl_iter .GT. 1) THEN
                 stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
-                CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f,   &
-                    desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
-                    check, dt_step, Bprimej_x, Bprimej_y,  &
+                CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f,                                 &
+                    desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,                                             &
+                    check, dt_step, Bprimej_x, Bprimej_y,                                                              &
                     Zij, group_equations,source_group)
                 IF (check) THEN
                     line_search_failed = .TRUE.
@@ -202,23 +202,23 @@ CONTAINS
                 qj_rel = qj_rel_old + desc_dir
                 qj_trial = qj
                 DO i = 1, SIZE(group_equations)
-                    qj_trial(group_equations(i)) =                                &
+                    qj_trial(group_equations(i)) =                                                                     &
                         qj_rel(group_equations(i))*qj_org(group_equations(i))
                 END DO
-                CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f,           &
-Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
+                CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f,                                                 &
+Bprimej_x, Bprimej_y, right_term, scal_f, Zij,                                                                         &
                     group_equations,source_group)
             END IF
 
             DO i = 1, SIZE(group_equations)
-                qj(group_equations(i)) = qj_rel(group_equations(i))*             &
+                qj(group_equations(i)) = qj_rel(group_equations(i))*                                                   &
                     qj_org(group_equations(i))
             END DO
             IF (ALL(ABS(right_term) .LE. residual_tol)) THEN
                 converged = .TRUE.
                 EXIT
             END IF
-            IF (MAXVAL(ABS(qj_rel-qj_rel_old)/MAX(ABS(qj_rel),1.0_wp)) .LT.      &
+            IF (MAXVAL(ABS(qj_rel-qj_rel_old)/MAX(ABS(qj_rel),1.0_wp)) .LT.                                            &
                 EPSILON(1.0_wp)) EXIT
         END DO
 
@@ -438,7 +438,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
         ! Back substitution.
         rhs(3) = rhs(3) / matrix(3,3)
         rhs(2) = ( rhs(2) - matrix(2,3) * rhs(3) ) / matrix(2,2)
-        rhs(1) = ( rhs(1) - matrix(1,2) * rhs(2)                         &
+        rhs(1) = ( rhs(1) - matrix(1,2) * rhs(2)                                                                       &
             - matrix(1,3) * rhs(3) ) / matrix(1,1)
 
         RETURN
@@ -457,14 +457,17 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
     !> \param[in] qj_rel_NR_old Normalized state at the start of the current line search.
     !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
     !> \param[in] q_group_input Conservative input state for the backward-Euler group residual.
-    !> \param[in] qj_fixed Non-group conservative components held bitwise fixed during the line search.
+    !> \param[in] qj_fixed Non-group conservative components held bitwise fixed during the line
+    !> search.
     !> \param[in] scal_f_old Initial value of the half-squared scaled residual norm.
     !> \param[in] grad_f Gradient of the scalar residual merit function at the starting point.
-    !> \param[in,out] desc_dir Newton descent direction, limited to the maximum permitted step length.
+    !> \param[in,out] desc_dir Newton descent direction, limited to the maximum permitted step
+    !> length.
     !> \param[in] coeff_f Per-equation scaling factors applied to the group residual.
     !> \param[out] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
     !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
-    !> \param[in,out] right_term Initial residual on entry; residual of the accepted line-search state
+    !> \param[in,out] right_term Initial residual on entry; residual of the accepted line-search
+    !> state
     !>                           on exit.
     !> \param[in] stpmax Maximum Euclidean length of the normalized trial step.
     !> \param[out] check True when the line search cannot find a usable decrease.
@@ -476,9 +479,9 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
     !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
         !******************************************************************************
 
-    SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old,      &
-            grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
-            dt_step  , Bprimej_x , Bprimej_y, Zij,           &
+    SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old,                                     &
+            grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,                                      &
+            dt_step  , Bprimej_x , Bprimej_y, Zij,                                                                     &
             active_equations,source_group )
 
         IMPLICIT NONE
@@ -543,7 +546,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
 
         ALF = 1.0e-4_wp
 
-        IF ( size(grad_f) == size(desc_dir) .AND. size(grad_f) == size(qj_rel)      &
+        IF ( size(grad_f) == size(desc_dir) .AND. size(grad_f) == size(qj_rel)                                         &
             .AND. size(qj_rel) == size(qj_rel_NR_old) ) THEN
 
             ndum = size(grad_f)
@@ -605,8 +608,8 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
                 qj(equation) = qj_rel(equation)*qj_org(equation)
             END DO
 
-            CALL eval_f( qj , q_group_input , dt_step  , coeff_f ,             &
-                Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
+            CALL eval_f( qj , q_group_input , dt_step  , coeff_f ,                                                     &
+                Bprimej_x , Bprimej_y, right_term , scal_f, Zij,                                                       &
                 active_equations,source_group )
 
             IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
@@ -717,12 +720,13 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
     !> \param[out] f_nl Scaled nonlinear group residual, one entry per equation.
     !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
     !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
-    !> \param[in] active_equations Equation indices whose residual rows and Jacobian columns are active.
+    !> \param[in] active_equations Equation indices whose residual rows and Jacobian columns are
+    !> active.
     !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
         !******************************************************************************
 
-    SUBROUTINE eval_f( qj , q_group_input , dt_step , coeff_f ,    &
-            Bprimej_x ,                                                              &
+    SUBROUTINE eval_f( qj , q_group_input , dt_step , coeff_f ,                                                        &
+            Bprimej_x ,                                                                                                &
             Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
         USE source_terms_2d, ONLY : eval_source_implicit
@@ -751,7 +755,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
         ! before subtracting equal large states and falsely report zero residual.
         REAL(wp), VOLATILE :: delta_q(n_vars)
 
-        CALL eval_source_implicit( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
+        CALL eval_source_implicit( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,                                             &
             r_nh_term_impl=nh_term_impl,group=source_group )
 
         Rj = -nh_term_impl
@@ -804,13 +808,14 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
     !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
     !> \param[in] active_equations Equation indices whose Jacobian columns are differentiated.
     !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
-        !> \details Uses complex-step perturbations of normalized conservative variables. The resulting
+        !> \details Uses complex-step perturbations of normalized conservative variables. The
+        !> resulting
     !>          imaginary derivatives form the active Jacobian columns without finite-difference
     !>          subtraction.
     !******************************************************************************
 
-    SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, coeff_f,        &
-            Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,             &
+    SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, coeff_f,                                                        &
+            Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,                                                  &
             source_group )
 
         USE source_terms_2d, ONLY : eval_source_implicit
@@ -866,17 +871,17 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
             qj_rel_cmplx(equation) = CMPLX(qj_rel(equation), complex_step_perturbation, wp)
             qj_cmplx = qj_rel_cmplx * qj_org
 
-            CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij,                   &
-                c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,               &
+            CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij,                                                       &
+                c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,                                                     &
                 group=source_group)
 
             DO j = 1, SIZE(active_equations)
-                Jacob_relax(active_equations(j),equation) =                         &
-                    coeff_f(active_equations(j)) *                                &
+                Jacob_relax(active_equations(j),equation) =                                                            &
+                    coeff_f(active_equations(j)) *                                                                     &
                     AIMAG(nh_terms_cmplx_impl(active_equations(j))) * inverse_complex_step_perturbation
             END DO
             DO j = 1, n_eqns
-                left_matrix(j,equation) = left_matrix(j,equation) -                 &
+                left_matrix(j,equation) = left_matrix(j,equation) -                                                    &
                     dt_step*Jacob_relax(j,equation)
             END DO
         END DO

@@ -12,7 +12,7 @@ MODULE domain_2d
         USE parameters_2d, ONLY : idx_totMassEqn
 
     USE parameters_2d, ONLY : wp
-    USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,   &
+    USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,                                           &
         bottom_fissural_source_flag
 
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_cells_xy
@@ -187,8 +187,8 @@ CONTAINS
         !$OMP BARRIER
 
         !$OMP WORKSHARE
-        WHERE ( ( q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
-            ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       &
+        WHERE ( ( q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.                              &
+            ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )                                       &
             this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
         !$OMP END WORKSHARE
 
@@ -234,20 +234,20 @@ CONTAINS
             this%solve_mask_temp = this%solve_mask
 
             ! solution domain is extended to neighbours of positive-mass cells
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
                 this%solve_mask_temp(1:comp_cells_x-2,2:comp_cells_y-1)
 
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
                 this%solve_mask_temp(3:comp_cells_x,2:comp_cells_y-1)
 
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
                 this%solve_mask_temp(2:comp_cells_x-1,1:comp_cells_y-2)
 
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
                 this%solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y)
 
         END DO
@@ -308,7 +308,7 @@ CONTAINS
         this%solve_cells = i
         ! This compact worklist is built by a single scan of a logical mask:
         ! no coordinate can be inserted twice. Assert the cardinality at refresh.
-        IF (this%solve_cells/=COUNT(this%solve_mask)) &
+        IF (this%solve_cells/=COUNT(this%solve_mask))                                                                  &
             CALL fatal_error('Lie OpenMP: inconsistent unique solve worklist')
 
         ! Preserve the former HP workset order: active cells, then neighbours.
@@ -335,19 +335,19 @@ CONTAINS
         DO i = 1,2
             this%solve_mask_temp = this%reconstruction_mask
             IF ( comp_cells_x .GT. 1 ) THEN
-                this%reconstruction_mask(2:comp_cells_x,:) =                       &
-                    this%reconstruction_mask(2:comp_cells_x,:) .OR.              &
+                this%reconstruction_mask(2:comp_cells_x,:) =                                                           &
+                    this%reconstruction_mask(2:comp_cells_x,:) .OR.                                                    &
                     this%solve_mask_temp(1:comp_cells_x-1,:)
-                this%reconstruction_mask(1:comp_cells_x-1,:) =                     &
-                    this%reconstruction_mask(1:comp_cells_x-1,:) .OR.            &
+                this%reconstruction_mask(1:comp_cells_x-1,:) =                                                         &
+                    this%reconstruction_mask(1:comp_cells_x-1,:) .OR.                                                  &
                     this%solve_mask_temp(2:comp_cells_x,:)
             END IF
             IF ( comp_cells_y .GT. 1 ) THEN
-                this%reconstruction_mask(:,2:comp_cells_y) =                       &
-                    this%reconstruction_mask(:,2:comp_cells_y) .OR.              &
+                this%reconstruction_mask(:,2:comp_cells_y) =                                                           &
+                    this%reconstruction_mask(:,2:comp_cells_y) .OR.                                                    &
                     this%solve_mask_temp(:,1:comp_cells_y-1)
-                this%reconstruction_mask(:,1:comp_cells_y-1) =                     &
-                    this%reconstruction_mask(:,1:comp_cells_y-1) .OR.            &
+                this%reconstruction_mask(:,1:comp_cells_y-1) =                                                         &
+                    this%reconstruction_mask(:,1:comp_cells_y-1) .OR.                                                  &
                     this%solve_mask_temp(:,2:comp_cells_y)
             END IF
         END DO
@@ -363,7 +363,7 @@ CONTAINS
             END DO
         END DO
         this%reconstruction_cells = i
-        IF (this%reconstruction_cells/=COUNT(this%reconstruction_mask)) &
+        IF (this%reconstruction_cells/=COUNT(this%reconstruction_mask))                                                &
             CALL fatal_error('Lie OpenMP: inconsistent unique reconstruction worklist')
 
         !----- check for y-interfaces where computation is needed
