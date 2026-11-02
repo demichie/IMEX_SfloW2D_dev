@@ -55,7 +55,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 | P1 | A01 | Chiudere contratti e ownership della fisica | Nessun accesso a celle globali, quattro interfacce coerenti, inventari e limiter verificati, senza wrapper ridondanti. |
 | P1 | A02 | Test fisici locali e complex-step | Tipi, rank, unità, direzione degli scambi e aggiornamento cinematico dopo variazioni di velocità. |
 | P1 | F01 | Completare conformità di formattazione, **in pausa** | Correggere checker; controllare insieme indentazione reale, spazi, larghezza 120/100, continuazioni e argomenti; garantire invarianti sintattiche e ricontrollare strict-debug/D20. |
-| P1 | N01 | Benchmark OpenMP e costo computazionale | 1/2/4/8 thread, casi rappresentativi, riproducibilità e scaling. |
+| P1 | N01 | Benchmark OpenMP e costo computazionale | Action manuale `lie-openmp-benchmark.yml` e script di timing **implementati**; risultati ancora da eseguire e verificare per 1/2/4/8 thread, con misure su macchina dedicata quando necessario. |
 | P2 | S01 | Consolidamento HP-PCCU x/y | Well-balancing, topografia Q1 evolutiva, curvatura, bordi e fronti wet/dry con test quantitativi. |
 | P2 | T01 | Controller rifiuto/retry del passo | Limiti di ammissibilità, dt minimo, rollback e diagnostica senza clipping conservativo artificiale. |
 | P2 | C01 | Build/CI/I-O/restart | Gate proporzionati al rischio, artefatti, distribuzione e output per run. |
