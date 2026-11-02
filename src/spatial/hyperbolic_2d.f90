@@ -114,7 +114,7 @@ CONTAINS
             j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y,                                                &
             source_boundary_enabled )
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
@@ -193,6 +193,7 @@ CONTAINS
                     recon,j,k,1,divFlux_iRK(2,j,k) )
                 IF ( comp_cells_y .GT. 1 ) CALL cancel_resting_roundoff(                                               &
                     recon,j,k,2,divFlux_iRK(3,j,k) )
+
             END IF
 
         END DO cells_loop
@@ -217,14 +218,18 @@ CONTAINS
 
         resting = ALL(qp_cell(2:3) .EQ. 0.0_wp)
         IF ( .NOT. resting ) RETURN
+
         IF ( comp_cells_x .GT. 1 ) THEN
             resting = ALL(recon%qp_adv_interfaceL(2:3,j:j+1,k) .EQ. 0.0_wp) .AND.                                      &
                 ALL(recon%qp_adv_interfaceR(2:3,j:j+1,k) .EQ. 0.0_wp)
             IF ( .NOT. resting ) RETURN
+
         END IF
+
         IF ( comp_cells_y .GT. 1 ) THEN
             resting = ALL(recon%qp_adv_interfaceB(2:3,j,k:k+1) .EQ. 0.0_wp) .AND.                                      &
                 ALL(recon%qp_adv_interfaceT(2:3,j,k:k+1) .EQ. 0.0_wp)
+
         END IF
     END FUNCTION exactly_resting_stencil
 
@@ -267,7 +272,9 @@ CONTAINS
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k+1),                                         &
                 recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1)) )
             inverse_spacing = one_by_dy
+
         END IF
+
         IF ( ABS(residual) .LE. 64.0_wp*EPSILON(1.0_wp)*scale*inverse_spacing )                                        &
             residual = 0.0_wp
     END SUBROUTINE cancel_resting_roundoff
@@ -278,7 +285,7 @@ CONTAINS
     !> \param[in] gravity_factor Dimensionless large-slope factor at the face.
     !> \return Absolute path arithmetic scale [kg s^-2]; zero for a dry endpoint.
     FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor) RESULT(scale)
-        USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
+    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
         REAL(wp), INTENT(IN) :: qp_face(:),eta,gravity_factor
         REAL(wp) :: scale,gamma,reduced_gravity,h
 
@@ -324,9 +331,9 @@ CONTAINS
     SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t, solve_interfaces_x, j_stag_x,                 &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
-        USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
@@ -409,6 +416,7 @@ CONTAINS
                     this%G_interface_xR(1,j,k) = 0.0_wp
                     this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
                     this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
+
                 END IF
 
             END DO
@@ -475,6 +483,7 @@ CONTAINS
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
                     this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
                     this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
+
                 END IF
 
             END DO
@@ -487,6 +496,7 @@ CONTAINS
         ! each domain boundary, after the one-way boundary treatment.
         IF (lateral_source_flag .AND. t .GE. 0.0999_wp .AND. t .LE. 0.1001_wp) THEN
             CALL GET_ENVIRONMENT_VARIABLE('IMEX_SOURCE_BOUNDARY_BUDGET', diagnostic_flag, STATUS=diagnostic_status)
+
             IF (diagnostic_status .EQ. 0 .AND. diagnostic_flag .EQ. '1') THEN
                 source_inflow = 0.0_wp
                 other_inflow = 0.0_wp
@@ -494,48 +504,64 @@ CONTAINS
                 DO l = 1, solve_interfaces_x
                     j = j_stag_x(l)
                     k = k_stag_x(l)
+
                     IF (j .EQ. 1) THEN
                         face_inflow = this%G_interface_xR(1,j,k) / one_by_dy
+
                         IF (source_cell(1,k) .EQ. 2) THEN
                             source_inflow = source_inflow + face_inflow
                         ELSE
                             other_inflow = other_inflow + face_inflow
+
                         END IF
                     ELSEIF (j .EQ. comp_interfaces_x) THEN
                         face_inflow = -this%G_interface_xL(1,j,k) / one_by_dy
+
                         IF (source_cell(comp_cells_x,k) .EQ. 2) THEN
                             source_inflow = source_inflow + face_inflow
                         ELSE
                             other_inflow = other_inflow + face_inflow
+
                         END IF
+
                     END IF
+
                 END DO
 
                 DO l = 1, solve_interfaces_y
                     j = j_stag_y(l)
                     k = k_stag_y(l)
+
                     IF (k .EQ. 1) THEN
                         face_inflow = this%G_interface_yT(1,j,k) / one_by_dx
+
                         IF (source_cell(j,1) .EQ. 2) THEN
                             source_inflow = source_inflow + face_inflow
                         ELSE
                             other_inflow = other_inflow + face_inflow
+
                         END IF
                     ELSEIF (k .EQ. comp_interfaces_y) THEN
                         face_inflow = -this%G_interface_yB(1,j,k) / one_by_dx
+
                         IF (source_cell(j,comp_cells_y) .EQ. 2) THEN
                             source_inflow = source_inflow + face_inflow
                         ELSE
                             other_inflow = other_inflow + face_inflow
+
                         END IF
+
                     END IF
+
                 END DO
 
                 WRITE (*, '(A,ES23.15,A,ES23.15,A,ES23.15)')                                                           &
                     'SOURCE_BOUNDARY_BUDGET t=', t,                                                                    &
                     ' source_kg_s=', source_inflow,                                                                    &
                     ' other_kg_s=', other_inflow
+
             END IF
+
         END IF
 
     END SUBROUTINE eval_flux_PCCU
@@ -572,16 +598,16 @@ CONTAINS
             face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                                                     &
             value_left,value_right)
 
-        USE equation_terms_2d, ONLY : eval_inertial_flux
-        USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
-        USE equation_terms_2d, ONLY : limit_component_mass_flux
-        USE state_conversion_2d, ONLY : qp_to_qc
-        USE pccu_2d, ONLY : eval_hydrostatic_path
-        USE pccu_2d, ONLY : eval_oriented_pccu_pair
-        USE pccu_2d, ONLY : pccu_speed_tolerance
-        USE nonconservative_2d, ONLY : PATH_DIR_X
+    USE equation_terms_2d, ONLY : eval_inertial_flux
+    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
+    USE equation_terms_2d, ONLY : limit_component_mass_flux
+    USE state_conversion_2d, ONLY : qp_to_qc
+    USE pccu_2d, ONLY : eval_hydrostatic_path
+    USE pccu_2d, ONLY : eval_oriented_pccu_pair
+    USE pccu_2d, ONLY : pccu_speed_tolerance
+    USE nonconservative_2d, ONLY : PATH_DIR_X
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: eta_left, eta_right, bed_face
         REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
@@ -617,20 +643,25 @@ CONTAINS
         ! momenta as h_face*u_face using the selected shared depth traces.
         qp_adv_left_use(1)=h_eta_left
         qp_adv_right_use(1)=h_eta_right
+
         IF ( h_eta_left .LE. dry_thickness_tolerance ) THEN
             qp_adv_left_use(1:3)=0.0_wp
             qp_adv_left_use(idx_u:idx_v)=0.0_wp
         ELSE
             qp_adv_left_use(2)=h_eta_left*qp_adv_left(idx_u)
             qp_adv_left_use(3)=h_eta_left*qp_adv_left(idx_v)
+
         END IF
+
         IF ( h_eta_right .LE. dry_thickness_tolerance ) THEN
             qp_adv_right_use(1:3)=0.0_wp
             qp_adv_right_use(idx_u:idx_v)=0.0_wp
         ELSE
             qp_adv_right_use(2)=h_eta_right*qp_adv_right(idx_u)
             qp_adv_right_use(3)=h_eta_right*qp_adv_right(idx_v)
+
         END IF
+
         CALL qp_to_qc(qp_adv_left_use,q_adv_left_use,                                                                  &
             'KT interface left advective trace')
         CALL qp_to_qc(qp_adv_right_use,q_adv_right_use,                                                                &
@@ -651,23 +682,27 @@ CONTAINS
         ! flux formula, but avoids subtracting nearly equal convective and
         ! dissipative terms for a passively transported quantity.
         denominator=a_plus-a_minus
+
         IF ( direction .EQ. PATH_DIR_X ) THEN
             u_normal_left=qp_adv_left_use(idx_u)
             u_normal_right=qp_adv_right_use(idx_u)
         ELSE
             u_normal_left=qp_adv_left_use(idx_v)
             u_normal_right=qp_adv_right_use(idx_v)
+
         END IF
         ! eval_inertial_flux returns a zero endpoint flux below this same
         ! threshold; represent that endpoint consistently in the factorized
         ! expression even if its conservative trace is nonzero by roundoff.
         IF ( qp_adv_left_use(1) .LE. EPSILON(1.0_wp) ) u_normal_left=0.0_wp
         IF ( qp_adv_right_use(1) .LE. EPSILON(1.0_wp) ) u_normal_right=0.0_wp
+
         IF ( denominator .GT. pccu_speed_tolerance ) THEN
             interface_flux=(a_plus*(u_normal_left-a_minus)*q_adv_left_use                                              &
                 -a_minus*(u_normal_right-a_plus)*q_adv_right_use)/denominator
         ELSE
             interface_flux=0.5_wp*(flux_left+flux_right)
+
         END IF
 
         CALL limit_component_mass_flux(interface_flux)
@@ -684,7 +719,9 @@ CONTAINS
                 (dry_donor_right .OR.                                                                                  &
                 (qp_adv_right_use(1) .LE. dry_thickness_tolerance)) ) THEN
                 interface_flux=0.0_wp
+
             END IF
+
         END IF
 
         ! Suppress only the roundoff-level mass diffusion of a hydrostatic rest
@@ -700,6 +737,7 @@ CONTAINS
             ( ABS(eta_left-eta_right) .LE. eta_roundoff ) ) THEN
             interface_flux(1) = 0.0_wp
             interface_flux(4:n_vars) = 0.0_wp
+
         END IF
 
         qp_path_left=qp_adv_left_use
@@ -708,16 +746,23 @@ CONTAINS
         eta_path_right=eta_right
         IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
         IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
+
         IF ( use_dry_donor ) THEN
+
             IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) THEN
                 qp_path_left(1)=0.0_wp
                 eta_path_left=bed_face
+
             END IF
+
             IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) THEN
                 qp_path_right(1)=0.0_wp
                 eta_path_right=bed_face
+
             END IF
+
         END IF
+
         CALL eval_hydrostatic_coefficient(qp_path_left,reduced_gravity_left,gamma_left)
         CALL eval_hydrostatic_coefficient(qp_path_right,reduced_gravity_right,gamma_right)
         CALL regularize_dry_gamma_pair(qp_path_left(1),gamma_left, qp_path_right(1),gamma_right)
@@ -732,6 +777,7 @@ CONTAINS
         IF ( use_dry_donor ) THEN
             IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) value_left=interface_flux
             IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) value_right=interface_flux
+
         END IF
 
     END SUBROUTINE eval_pccu_interface
@@ -769,6 +815,7 @@ CONTAINS
         ELSEIF ( ( h_right .LE. dry_thickness_tolerance ) .AND.                                                        &
             ( h_left .GT. dry_thickness_tolerance ) ) THEN
             gamma_right = gamma_left
+
         END IF
     END SUBROUTINE regularize_dry_gamma_pair
 
@@ -782,9 +829,9 @@ CONTAINS
     !******************************************************************************
     SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j, source_left,source_right)
 
-        USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         INTEGER, INTENT(IN) :: direction,face_i,face_j
         LOGICAL, INTENT(OUT) :: source_left,source_right
@@ -802,6 +849,7 @@ CONTAINS
             IF ( face_j .EQ. 1 ) source_left=source_cell(face_i,1) .EQ. 2
             IF ( face_j .EQ. comp_interfaces_y )                                                                       &
                 source_right=source_cell(face_i,comp_cells_y) .EQ. 2
+
         END SELECT
 
     END SUBROUTINE lateral_source_trace_sides
@@ -828,9 +876,9 @@ CONTAINS
     !> @param[in] k_cent Y indices of active cells.
     SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent )
 
-        USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
@@ -852,6 +900,7 @@ CONTAINS
                 this%P_cell_x(:,j,k)=0.0_wp
                 this%P_cell_y(:,j,k)=0.0_wp
                 CYCLE
+
             END IF
 
             IF ( comp_cells_x .GT. 1 ) THEN
@@ -864,6 +913,7 @@ CONTAINS
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),           &
                     qp_path_plus,recon%eta_cellE(j,k),                                                                 &
                     grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
+
             END IF
 
             IF ( comp_cells_y .GT. 1 ) THEN
@@ -876,6 +926,7 @@ CONTAINS
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),           &
                     qp_path_plus,recon%eta_cellN(j,k),                                                                 &
                     grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
+
             END IF
 
         END DO
@@ -898,10 +949,10 @@ CONTAINS
     !> \param[out] path Hydrostatic path contribution across the cell.
     SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path)
 
-        USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
-        USE pccu_2d, ONLY : eval_hydrostatic_path
+    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
+    USE pccu_2d, ONLY : eval_hydrostatic_path
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: qp_minus(:),eta_minus,grav_minus
         REAL(wp), INTENT(IN) :: qp_plus(:),eta_plus,grav_plus
@@ -972,9 +1023,9 @@ CONTAINS
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
         ! External procedures
-        USE equation_terms_2d, ONLY : eval_local_speeds_direction
+    USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
@@ -1088,9 +1139,9 @@ CONTAINS
     !> @param[out] speed_plus Upper characteristic bound.
     SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff, normal_velocity_index,speed_minus,speed_plus)
 
-        USE equation_terms_2d, ONLY : eval_local_speeds_direction
+    USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: qp_minus(:),qp_plus(:),grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index

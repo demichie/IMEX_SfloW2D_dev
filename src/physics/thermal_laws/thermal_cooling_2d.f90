@@ -77,16 +77,23 @@ CONTAINS
             .NOT. ieee_is_finite(convective) .OR.                                                                      &
             .NOT. ieee_is_finite(ambient)) THEN
             CALL fatal_error('Nonfinite input to exact lava cooling integrator')
+
         END IF
+
         IF (temperature .LE. 0.0_wp .OR. ambient .LE. 0.0_wp) THEN
             CALL fatal_error('Nonpositive temperature in exact lava cooling integrator')
+
         END IF
+
         IF (interval .LT. 0.0_wp .OR. heat_capacity .LE. 0.0_wp) THEN
             CALL fatal_error('Invalid time or heat capacity in exact lava cooling integrator')
+
         END IF
+
         IF (radiative .LT. 0.0_wp .OR.                                                                                 &
             convective .LT. 0.0_wp) THEN
             CALL fatal_error('Negative cooling coefficient in exact lava cooling integrator')
+
         END IF
 
         temperature_after = temperature
@@ -100,23 +107,30 @@ CONTAINS
                 ambient) * EXP(-convective *                                                                           &
                 interval / heat_capacity)
             RETURN
+
         END IF
 
         beta = convective / (radiative *                                                                               &
             ambient**3)
+
         IF (.NOT. ieee_is_finite(beta)) THEN
             CALL fatal_error('Cooling coefficient ratio overflow in lava integrator')
+
         END IF
+
         CALL lava_cooling_cubic_root(beta, cubic_root)
 
         initial_primitive = lava_cooling_time_primitive(                                                               &
             temperature / ambient, beta, cubic_root)
         elapsed_scale = radiative * ambient**3 *                                                                       &
             interval / heat_capacity
+
         IF (.NOT. ieee_is_finite(elapsed_scale)) THEN
             temperature_after = ambient
             RETURN
+
         END IF
+
         target_primitive = initial_primitive - elapsed_scale
 
         IF (temperature .GT. ambient) THEN
@@ -125,51 +139,68 @@ CONTAINS
         ELSE
             lower = temperature / ambient
             upper = 1.0_wp
+
         END IF
 
         tolerance = 8.0_wp * EPSILON(1.0_wp) *                                                                         &
             MAX(1.0_wp, ABS(lower), ABS(upper))
+
         DO iteration = 1, 256
             midpoint = lower + 0.5_wp * (upper - lower)
             IF (midpoint .EQ. lower .OR. midpoint .EQ. upper .OR.                                                      &
                 ABS(upper - lower) .LE. tolerance) EXIT
+
             IF (midpoint .EQ. 1.0_wp) THEN
+
                 IF (temperature .GT. ambient) THEN
                     lower = midpoint
                 ELSE
                     upper = midpoint
+
                 END IF
+
                 CYCLE
+
             END IF
 
             midpoint_primitive = lava_cooling_time_primitive(midpoint, beta,                                           &
                 cubic_root)
+
             IF (temperature .GT. ambient) THEN
+
                 IF (midpoint_primitive .LT. target_primitive) THEN
                     lower = midpoint
                 ELSE
                     upper = midpoint
+
                 END IF
             ELSE
                 IF (midpoint_primitive .GT. target_primitive) THEN
                     lower = midpoint
                 ELSE
                     upper = midpoint
+
                 END IF
+
             END IF
+
         END DO
+
         IF (iteration .GT. 256) THEN
             CALL fatal_error('Exact lava cooling inversion failed to converge')
+
         END IF
 
         midpoint = lower + 0.5_wp * (upper - lower)
         temperature_after = ambient * midpoint
+
         IF (temperature .GT. ambient) THEN
             temperature_after = MAX(ambient,                                                                           &
                 MIN(temperature, temperature_after))
         ELSE
             temperature_after = MIN(ambient,                                                                           &
                 MAX(temperature, temperature_after))
+
         END IF
 
     END SUBROUTINE eval_thermal_cooling_analytic
@@ -189,25 +220,33 @@ CONTAINS
         IF (beta .EQ. 0.0_wp) THEN
             root = -1.0_wp
             RETURN
+
         END IF
 
         scale = MAX(1.0_wp, (1.0_wp + beta)**(1.0_wp / 3.0_wp))
         lower = -2.0_wp
         upper = -1.0_wp / scale
+
         DO iteration = 1, 256
             midpoint = lower + 0.5_wp * (upper - lower)
             IF (midpoint .EQ. lower .OR. midpoint .EQ. upper) EXIT
             polynomial = midpoint**3 + midpoint**2/scale + midpoint/scale**2 +                                         &
                 1.0_wp
+
             IF (polynomial .LT. 0.0_wp) THEN
                 lower = midpoint
             ELSE
                 upper = midpoint
+
             END IF
+
         END DO
+
         IF (iteration .GT. 256) THEN
             CALL fatal_error('Cooling cubic root calculation failed to converge')
+
         END IF
+
         root = scale * (lower + 0.5_wp * (upper - lower))
 
     END SUBROUTINE lava_cooling_cubic_root

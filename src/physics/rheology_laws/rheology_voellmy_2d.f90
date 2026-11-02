@@ -27,7 +27,7 @@ MODULE rheology_voellmy_2d
     USE parameters_2d, ONLY : wp
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
     USE rheology_parameters_2d, ONLY : xi
-    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_QUADRATIC_POLYNOMIAL
     IMPLICIT NONE

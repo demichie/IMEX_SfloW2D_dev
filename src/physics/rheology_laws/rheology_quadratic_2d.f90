@@ -12,18 +12,18 @@
 !> velocity source and reconstructs both components along their input direction.
 !********************************************************************************
 MODULE rheology_quadratic_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 solve_exact_velocity_flow, EXACT_FLOW_QUADRATIC
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_quadratic_explicit
-        PUBLIC :: eval_rheology_quadratic_semi_implicit
-        PUBLIC :: eval_rheology_quadratic_implicit
-        PUBLIC :: eval_rheology_quadratic_analytic
-        PUBLIC :: friction_factor
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_quadratic_explicit
+    PUBLIC :: eval_rheology_quadratic_semi_implicit
+    PUBLIC :: eval_rheology_quadratic_implicit
+    PUBLIC :: eval_rheology_quadratic_analytic
+    PUBLIC :: friction_factor
         REAL(wp) :: friction_factor
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
@@ -86,9 +86,9 @@ CONTAINS
             rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
             rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
             IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
-            rate_x = -state%rho_m * (state%u / state%mod_vel_hor)                                                         &
+            rate_x = -state%rho_m * (state%u / state%mod_vel_hor)                                                      &
                         * friction_factor * state%mod_vel2
-            rate_y = -state%rho_m * (state%v / state%mod_vel_hor)                                                         &
+            rate_y = -state%rho_m * (state%v / state%mod_vel_hor)                                                      &
                         * friction_factor * state%mod_vel2
         END SUBROUTINE eval_rheology_quadratic_implicit
 

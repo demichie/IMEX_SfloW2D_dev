@@ -19,13 +19,16 @@ program kt_ritter_1d
 
     do i=0,nx
         xedge(i)=x0+real(i,wp)*dx
+
     end do
 
     ! Cell averages of the left wet reservoir/right dry bed initial state.
     do i=1,nx
         q(i,1)=h0*max(0.0_wp,min(1.0_wp,(dam_x-xedge(i-1))/dx))
         q(i,2)=0.0_wp
+
     end do
+
     mass0=sum(q(:,1))*dx
     t=0.0_wp
     dt_old=dt0
@@ -47,18 +50,22 @@ program kt_ritter_1d
         qnext=(1.0_wp/3.0_wp)*q+(2.0_wp/3.0_wp)*(q2+dt*l2)
 
         min_h=min(min_h,minval(qnext(:,1)))
+
         if (minval(qnext(:,1)) < -dry_tol) then
             i=minloc(qnext(:,1),dim=1)
             write(*,'(A,ES14.6,A,I0,A,ES14.6)')                                                                        &
                     'FAIL: negative h=',qnext(i,1),' in cell ',i,                                                      &
                     ' at t=',t+dt
             error stop 1
+
         end if
+
         q=qnext
         t=t+dt
         nstep=nstep+1
         dt_old_old=dt_old
         dt_old=dt
+
     end do
 
     h_num=q(:,1)
@@ -87,12 +94,14 @@ contains
     pure function mm3(a,b,c) result(v)
         real(wp), intent(in) :: a,b,c
         real(wp) :: v
+
         if ((a > 0.0_wp).and.(b > 0.0_wp).and.(c > 0.0_wp)) then
             v=min(a,b,c)
         else if ((a < 0.0_wp).and.(b < 0.0_wp).and.(c < 0.0_wp)) then
             v=max(a,b,c)
         else
             v=0.0_wp
+
         end if
     end function mm3
 
@@ -107,11 +116,13 @@ contains
         slope=0.0_wp
         slope(1)=(v(2)-v(1))/dx
         slope(nx)=(v(nx)-v(nx-1))/dx
+
         do j=2,nx-1
             backward=(v(j)-v(j-1))/dx
             forward=(v(j+1)-v(j))/dx
             centered=(v(j+1)-v(j-1))/(2.0_wp*dx)
             slope(j)=mm3(theta*backward,centered,theta*forward)
+
         end do
     end subroutine limited_slope
 
@@ -145,35 +156,46 @@ contains
 
         call limited_slope(state(:,1),hslope)
         ucenter=0.0_wp
+
         do j=1,nx
             if (state(j,1) > dry_tol)                                                                                  &
                 ucenter(j)=desingularized_u(state(j,1),state(j,2))
+
         end do
+
         call limited_slope(ucenter,uslope)
 
         ! Face traces follow the Python K&P reconstruction and dry correction.
         hleft(1)=state(1,1)-0.5_wp*dx*hslope(1)
         hright(nface)=state(nx,1)+0.5_wp*dx*hslope(nx)
+
         do j=1,nx
             hwest=state(j,1)-0.5_wp*dx*hslope(j)
             heast=state(j,1)+0.5_wp*dx*hslope(j)
+
             if (heast < 0.0_wp) then
                 heast=0.0_wp
                 hwest=2.0_wp*state(j,1)-heast
             else if (hwest < 0.0_wp) then
                 hwest=0.0_wp
                 heast=2.0_wp*state(j,1)-hwest
+
             end if
+
             hright(j)=max(hwest,0.0_wp)
             hleft(j+1)=max(heast,0.0_wp)
+
         end do
 
         uleft(1)=ucenter(1)-0.5_wp*dx*uslope(1)
         uright(nface)=ucenter(nx)+0.5_wp*dx*uslope(nx)
+
         do j=1,nx
             uright(j)=ucenter(j)-0.5_wp*dx*uslope(j)
             uleft(j+1)=ucenter(j)+0.5_wp*dx*uslope(j)
+
         end do
+
         do j=1,nface
             if (hleft(j) <= dry_tol) uleft(j)=0.0_wp
             if (hright(j) <= dry_tol) uright(j)=0.0_wp
@@ -185,17 +207,23 @@ contains
                 uright(j)+sqrt(grav*hright(j)),0.0_wp)
             denom=ap(j)-am(j)
             flux(j,:)=0.0_wp
+
             if (denom > 0.0_wp) then
                 fl=[mleft(j),mleft(j)*uleft(j)+0.5_wp*grav*hleft(j)**2]
                 fr=[mright(j),mright(j)*uright(j)+0.5_wp*grav*hright(j)**2]
                 ul=[hleft(j),mleft(j)]
                 ur=[hright(j),mright(j)]
                 flux(j,:)=(ap(j)*fl-am(j)*fr+ap(j)*am(j)*(ur-ul))/denom
+
             end if
+
         end do
+
         do j=1,nx
             rhs(j,:)=-(flux(j+1,:)-flux(j,:))/dx
+
         end do
+
         max_speed=max(maxval(abs(am)),maxval(abs(ap)))
     end subroutine spatial_rhs
 
@@ -223,11 +251,14 @@ contains
         real(wp) :: c0,x,xi,hpoint,total
         integer :: j,k
         c0=sqrt(grav*h0)
+
         do j=1,nx
             total=0.0_wp
+
             do k=1,12
                 x=0.5_wp*(edges(j)-edges(j-1))*xg(k)                                                                   &
                     +0.5_wp*(edges(j)+edges(j-1))
+
                 if (time <= 0.0_wp) then
                     hpoint=h0*max(0.0_wp,min(1.0_wp,(dam_x-edges(j-1))/dx))
                 else if (x <= dam_x-c0*time) then
@@ -237,10 +268,15 @@ contains
                     hpoint=((2.0_wp*c0-xi)/3.0_wp)**2/grav
                 else
                     hpoint=0.0_wp
+
                 end if
+
                 total=total+wg(k)*hpoint
+
             end do
+
             hbar(j)=0.5_wp*total
+
         end do
     end subroutine ritter_cell_averages
 

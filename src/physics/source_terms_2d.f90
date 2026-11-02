@@ -64,7 +64,7 @@ CONTAINS
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area)
-        USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(analytic_term_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -104,6 +104,7 @@ CONTAINS
                 CALL scale_mass_exchange_transfer(transfer,coverage)
 
             END IF
+
         END IF
 
         rate=physical+exchange
@@ -132,7 +133,7 @@ CONTAINS
     !> Validate every part of a coupled physical transfer before and after
     !> applying coverage and the common group limiter.
     LOGICAL FUNCTION mass_exchange_transfer_is_finite(transfer) RESULT(valid)
-        USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         TYPE(mass_exchange_rates_type), INTENT(IN) :: transfer
         valid=.FALSE.
         IF (.NOT.ALL(ieee_is_finite(transfer%solid_deposition_rate))) RETURN
@@ -155,7 +156,7 @@ CONTAINS
     !> the post-spatial Lie state; group zero rate evaluation stays at q^n.
     SUBROUTINE limit_explicit_source_rates(q_reference,inventory,dt,rate,                                              &
             solid_erosion_rate,limiter,valid)
-        USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         REAL(wp), INTENT(IN) :: q_reference(n_eqns),inventory(:),dt
         REAL(wp), INTENT(IN) :: rate(n_eqns),solid_erosion_rate(:)
         REAL(wp), INTENT(OUT) :: limiter
@@ -202,6 +203,7 @@ CONTAINS
                 limiter=NEAREST(limiter,-1.0_wp)
 
             END DO
+
         END IF
 
         valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
@@ -385,9 +387,9 @@ CONTAINS
     SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,                                                  &
             c_nh_term_impl, r_qj , r_nh_term_impl, group )
 
-        USE COMPLEXIFY
+    USE COMPLEXIFY
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: Bprimej_x
         REAL(wp), INTENT(IN) :: Bprimej_y
@@ -479,7 +481,7 @@ CONTAINS
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value )
 
-        USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,                                       &
+    USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,                                           &
             time_param , bottom_radial_source_flag,                                                                    &
             pore_pressure_flag , pore_pres_fract ,                                                                     &
             n_intervals , t_intervals , vel_intervals ,                                                                &
@@ -489,7 +491,7 @@ CONTAINS
 
 
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: Bprimej_x
         REAL(wp), INTENT(IN) :: Bprimej_y
@@ -591,6 +593,7 @@ CONTAINS
                 expl_term(4)=expl_term(4)+thermal_rate
 
             END IF
+
         END IF
 
         CALL eval_mass_injection_explicit(physical_state,time,cell_fract_jk,                                           &
