@@ -94,8 +94,7 @@ CONTAINS
         failure_reason=''
         reject_group=-1
         reject_env=''
-        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP',                                              &
-            reject_env,STATUS=env_status)
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', reject_env,STATUS=env_status)
         IF (env_status==0 .AND. LEN_TRIM(reject_env)>0) THEN
             READ(reject_env,*,IOSTAT=parse_status) reject_group
             IF (parse_status/=0 .OR. reject_group<1)                                                                   &

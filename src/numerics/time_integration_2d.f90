@@ -78,8 +78,7 @@ CONTAINS
         IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
         ! Snapshot before evaluating any operator, including the primitive halo.
         injection_value=''
-        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP',                                              &
-            injection_value,STATUS=injection_status)
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', injection_value,STATUS=injection_status)
         check_injected_rollback=injection_status==0 .AND. LEN_TRIM(injection_value)>0
         IF (check_injected_rollback) THEN
             qp_authoritative=state%qp

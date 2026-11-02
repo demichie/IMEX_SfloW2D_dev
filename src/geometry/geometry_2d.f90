@@ -369,8 +369,7 @@ CONTAINS
 
         IF ( bottom_radial_source_flag ) THEN
 
-            CALL compute_cell_fract(x_source,y_source,r_source,r2_source,                                              &
-                angle_source,cell_source_fractions)
+            CALL compute_cell_fract(x_source,y_source,r_source,r2_source, angle_source,cell_source_fractions)
 
             ! The sub-cell sampling misses the ellipse area by up to a few parts in
             ! 1e5. Inject over the exact area pi*R_SOURCE*R2_SOURCE instead.
@@ -551,8 +550,7 @@ CONTAINS
     !> \param[in] width Full width of the fissure rectangle [m].
     !> \param[out] cell_fraction Rectangle overlap divided by cell area, one value per cell.
 
-    SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,                                          &
-            cell_fraction)
+    SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width, cell_fraction)
 
         IMPLICIT NONE
 

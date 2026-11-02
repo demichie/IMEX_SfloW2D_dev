@@ -32,8 +32,7 @@ CONTAINS
 
     !> Solve the entire structurally affected conservative equation set.
     !> Every other conservative component remains fixed at its group input value.
-    SUBROUTINE solve_backward_euler_group(source_group,                                                                &
-            q_cell,dt,Bprime_x,Bprime_y,grav_correction,stochastic_value,                                              &
+    SUBROUTINE solve_backward_euler_group(source_group, q_cell,dt,Bprime_x,Bprime_y,grav_correction,stochastic_value,  &
             iterations_used,converged,linear_info,line_search_failed)
         USE parameters_2d, ONLY : tol_abs,tol_rel
         TYPE(source_group_type), INTENT(IN) :: source_group
@@ -61,8 +60,7 @@ CONTAINS
         ! Freeze the semi-implicit rate and limit its entire increment by one
         ! nonnegative factor, so neither momentum component crosses zero.
         ! Components initially at rest must not acquire a sign from friction.
-        CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y,                                            &
-            grav_correction,stochastic_value,semi_rate)
+        CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y, grav_correction,stochastic_value,semi_rate)
         semi_scale=1.0_wp
         DO i=2,3
             delta_momentum=dt*semi_rate(i)
@@ -205,8 +203,7 @@ CONTAINS
                     qj_trial(group_equations(i)) =                                                                     &
                         qj_rel(group_equations(i))*qj_org(group_equations(i))
                 END DO
-                CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f,                                                 &
-Bprimej_x, Bprimej_y, right_term, scal_f, Zij,                                                                         &
+                CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,  &
                     group_equations,source_group)
             END IF
 
@@ -608,8 +605,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij,                                  
                 qj(equation) = qj_rel(equation)*qj_org(equation)
             END DO
 
-            CALL eval_f( qj , q_group_input , dt_step  , coeff_f ,                                                     &
-                Bprimej_x , Bprimej_y, right_term , scal_f, Zij,                                                       &
+            CALL eval_f( qj , q_group_input , dt_step  , coeff_f , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,    &
                 active_equations,source_group )
 
             IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
@@ -725,8 +721,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij,                                  
     !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
         !******************************************************************************
 
-    SUBROUTINE eval_f( qj , q_group_input , dt_step , coeff_f ,                                                        &
-            Bprimej_x ,                                                                                                &
+    SUBROUTINE eval_f( qj , q_group_input , dt_step , coeff_f , Bprimej_x ,                                            &
             Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
         USE source_terms_2d, ONLY : eval_source_implicit
@@ -871,8 +866,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij,                                  
             qj_rel_cmplx(equation) = CMPLX(qj_rel(equation), complex_step_perturbation, wp)
             qj_cmplx = qj_rel_cmplx * qj_org
 
-            CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij,                                                       &
-                c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,                                                     &
+            CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij, c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,    &
                 group=source_group)
 
             DO j = 1, SIZE(active_equations)
