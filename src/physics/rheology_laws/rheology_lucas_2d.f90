@@ -22,8 +22,8 @@ MODULE rheology_lucas_2d
         USE parameters_2d, ONLY : wp
         USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
         USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
-                fatal_analytic_input_error, solve_exact_velocity_flow,                                 &
+        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+                fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_LUCAS
         IMPLICIT NONE
         PRIVATE
@@ -36,7 +36,8 @@ CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the explicit lucas momentum contribution.
         !> \details Assemble the real-valued momentum source from the model's supported physical
-        !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
+        !> treatment contributions; unused model inputs are retained for the shared dispatch
+        !> interface.
         !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
         !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
         !> \param[in] grav_coeff Dimensionless gravity correction for local topography.
@@ -50,18 +51,20 @@ CONTAINS
             LOGICAL, INTENT(IN) :: use_stochastic
             REAL(wp), INTENT(OUT) :: rate(2)
             ! The implicit component is identically zero for Lucas rheology.
-            CALL eval_rheology_lucas_semi_implicit(state, &
-                    grav_coeff, &
-                    use_stochastic, &
-                    stochastic_value, &
-                    rate(1), &
+            CALL eval_rheology_lucas_semi_implicit(state,                                                              &
+                    grav_coeff,                                                                                        &
+                    use_stochastic,                                                                                    &
+                    stochastic_value,                                                                                  &
+                    rate(1),                                                                                           &
                     rate(2))
         END SUBROUTINE eval_rheology_lucas_explicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the semi-implicit lucas momentum contribution.
-        !> \details Evaluate the contribution of the Lucas basal-friction parameterization assigned to
-        !> this treatment. The returned rates act on the conservative horizontal momenta; zero-valued
+        !> \details Evaluate the contribution of the Lucas basal-friction parameterization assigned
+        !> to
+        !> this treatment. The returned rates act on the conservative horizontal momenta;
+        !> zero-valued
         !> implementations intentionally provide no contribution.
         !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
         !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
@@ -107,7 +110,7 @@ CONTAINS
 
                 END IF
 
-                friction_stress = state%rho_m * ( friction_coefficient * state%h *                                  &
+                friction_stress = state%rho_m * ( friction_coefficient * state%h *                                     &
                             grav_coeff * ( state%red_grav + state%curvature_acceleration ) )
                 rate_x = rate_x - friction_stress * state%u / state%mod_vel_hor
                 rate_y = rate_y - friction_stress * state%v / state%mod_vel_hor
@@ -134,7 +137,8 @@ CONTAINS
 
         !> \param[in] state Shared real physical state before analytic integration.
         !> \brief Integrate the lucas velocity source over a frozen-state substep.
-        !> \details Evaluate the exact or time-integral-based decay of horizontal speed under the Lucas
+        !> \details Evaluate the exact or time-integral-based decay of horizontal speed under the
+        !> Lucas
         !> basal-friction parameterization. The velocity direction is retained and the updated
         !> components are returned without evolving the frozen thermodynamic and geometric inputs.
         !> \param[in] dt Duration of the analytic source substep [s].
@@ -146,7 +150,7 @@ CONTAINS
         !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
         !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
         !> s^-1].
-        SUBROUTINE eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, &
+        SUBROUTINE eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term,                    &
                 stochastic, stochastic_value, velocity_after)
 
             TYPE(physical_state_type), INTENT(IN) :: state
@@ -160,7 +164,7 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                              &
+            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
                         speed_ratio, speed_before, 'Lucas')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
             IF (U_w .LE. 0.0_wp) THEN
@@ -174,8 +178,8 @@ CONTAINS
             IF (stochastic) shift = stochastic_value
             shallow = 0.0_wp
             IF (state%h .LT. 0.1_wp) shallow = 1.0_wp
-            CALL solve_exact_velocity_flow(EXACT_FLOW_LUCAS,                                           &
-                        [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],                    &
+            CALL solve_exact_velocity_flow(EXACT_FLOW_LUCAS,                                                           &
+                        [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],                                &
                         dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_lucas_analytic

@@ -25,8 +25,8 @@ MODULE rheology_mui_2d
         USE constitutive_parameters_2d, ONLY : diam_s, rho_s
         USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
         USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
-                fatal_analytic_input_error, solve_exact_velocity_flow,                                 &
+        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+                fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_MUI
         IMPLICIT NONE
         PRIVATE
@@ -54,10 +54,10 @@ CONTAINS
             REAL(wp) :: curvature_accel
             curvature_accel=state%curvature_acceleration
             ! The mu(I) implicit component is identically zero.
-            CALL eval_rheology_mui_semi_implicit(state, &
-                    grav_coeff, &
-                    use_pore_pressure, &
-                    rate(1), &
+            CALL eval_rheology_mui_semi_implicit(state,                                                                &
+                    grav_coeff,                                                                                        &
+                    use_pore_pressure,                                                                                 &
+                    rate(1),                                                                                           &
                     rate(2))
         END SUBROUTINE eval_rheology_mui_explicit
 
@@ -68,7 +68,8 @@ CONTAINS
         !> velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
         !> \param[in] mod_vel Three-dimensional speed [m s^-1].
         !> \param[in] grav_coeff Local dimensionless gravitational correction.
-        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m s^-2].
+        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m
+        !> s^-2].
         !> \param[in] use_pore_pressure Enable pore-pressure correction.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
@@ -88,12 +89,12 @@ CONTAINS
             REAL(wp) :: friction_coefficient
             REAL(wp) :: friction_stress
 
-            ASSOCIATE(h => state%h, &
-                        u => state%u, &
-                        v => state%v, &
-                        rhom => state%rho_m, &
-                        red_grav => state%red_grav, &
-                        solid_fraction => state%alphas, &
+            ASSOCIATE(h => state%h,                                                                                    &
+                        u => state%u,                                                                                  &
+                        v => state%v,                                                                                  &
+                        rhom => state%rho_m,                                                                           &
+                        red_grav => state%red_grav,                                                                    &
+                        solid_fraction => state%alphas,                                                                &
                         exc_pore_pres => state%exc_pore_pres)
             rate_x = 0.0_wp
             rate_y = 0.0_wp
@@ -114,27 +115,27 @@ CONTAINS
 
             END IF
 
-            effective_vertical_stress = rhom *                                                         &
+            effective_vertical_stress = rhom *                                                                         &
                         ( red_grav + state%curvature_acceleration ) * effective_depth
             IF ( use_pore_pressure ) THEN
-                effective_vertical_stress = effective_vertical_stress -                                &
+                effective_vertical_stress = effective_vertical_stress -                                                &
                             exc_pore_pres
 
             END IF
 
             effective_vertical_stress = MAX(effective_vertical_stress, 0.0_wp)
-            effective_normal_stress = MAX(0.0_wp, effective_vertical_stress *                          &
+            effective_normal_stress = MAX(0.0_wp, effective_vertical_stress *                                          &
                         SQRT(grav_coeff))
             IF ( effective_normal_stress .LT. EPSILON(1.0_wp) ) THEN
                 effective_normal_stress = EPSILON(1.0_wp)
 
             END IF
 
-            shear_rate = 5.0_wp/2.0_wp * state%mod_vel /                                                     &
+            shear_rate = 5.0_wp/2.0_wp * state%mod_vel /                                                               &
                         (effective_depth * SQRT(grav_coeff))
-            inertial_number = particle_diameter * shear_rate /                                         &
+            inertial_number = particle_diameter * shear_rate /                                                         &
                         SQRT(effective_normal_stress / particle_density)
-            friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +                              &
+            friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +                                              &
                         muI_inf * inertial_number**2) / (I_0 + inertial_number)
             friction_stress = friction_coefficient * effective_normal_stress
             rate_x = rate_x - friction_stress * (u / state%mod_vel)
@@ -161,15 +162,17 @@ CONTAINS
         !> \param[in] state Shared real physical state before integration.
         !> \brief Integrate the mui velocity source in time.
         !> \details Advance the scalar speed under the regularized mu(I) friction law, including
-        !> effective stress and granular inertial-number dependence with model coefficients fixed over
+        !> effective stress and granular inertial-number dependence with model coefficients fixed
+        !> over
         !> dt; the horizontal direction is retained in the returned velocity vector.
         !> \param[in] dt Source integration interval [s].
         !> \param[in] speed_ratio Ratio of total to horizontal speed.
         !> \param[in] grav_coeff Local dimensionless gravitational correction.
-        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m s^-2].
+        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m
+        !> s^-2].
         !> \param[in] use_pore_pressure Enable pore-pressure correction.
         !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-        SUBROUTINE eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+        SUBROUTINE eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
                 use_pore_pressure, velocity_after)
 
             TYPE(physical_state_type), INTENT(IN) :: state
@@ -181,19 +184,19 @@ CONTAINS
             REAL(wp) :: effective_depth, vertical_stress, normal_stress
             REAL(wp) :: inertial_slope, basal_factor, sqrt_gravity
 
-            ASSOCIATE(h => state%h, &
-                        rhom => state%rho_m, &
-                        red_grav => state%red_grav, &
-                        solid_fraction => state%alphas, &
+            ASSOCIATE(h => state%h,                                                                                    &
+                        rhom => state%rho_m,                                                                           &
+                        red_grav => state%red_grav,                                                                    &
+                        solid_fraction => state%alphas,                                                                &
                         exc_pore_pres => state%exc_pore_pres)
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, h,                                              &
+            CALL validate_analytic_velocity_inputs(dt, h,                                                              &
                         speed_ratio, speed_before, 'mu(I)')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
             IF (rhom .LE. 0.0_wp .OR. grav_coeff .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error(                                                       &
+                CALL fatal_analytic_input_error(                                                                       &
                         'Nonpositive density or gravity multiplier in mu(I) analytic solver')
 
             END IF
@@ -209,7 +212,7 @@ CONTAINS
             END IF
 
             IF (particle_diameter .LE. 0.0_wp .OR. particle_density .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error(                                                       &
+                CALL fatal_analytic_input_error(                                                                       &
                         'Nonpositive particle property in mu(I) analytic solver')
 
             END IF
@@ -220,21 +223,21 @@ CONTAINS
             END IF
 
             effective_depth = MAX(h, EPSILON(1.0_wp))
-            vertical_stress = rhom *                                                                   &
+            vertical_stress = rhom *                                                                                   &
                         (red_grav + curvature_acceleration) * effective_depth
-            IF (use_pore_pressure) vertical_stress = vertical_stress -                                 &
+            IF (use_pore_pressure) vertical_stress = vertical_stress -                                                 &
                         exc_pore_pres
             vertical_stress = MAX(vertical_stress, 0.0_wp)
-            normal_stress = MAX(EPSILON(1.0_wp),                                                       &
+            normal_stress = MAX(EPSILON(1.0_wp),                                                                       &
                         vertical_stress * SQRT(grav_coeff))
             sqrt_gravity = SQRT(grav_coeff)
-            inertial_slope = 2.5_wp * particle_diameter * speed_ratio /                                &
-                        (effective_depth * sqrt_gravity *                                                  &
+            inertial_slope = 2.5_wp * particle_diameter * speed_ratio /                                                &
+                        (effective_depth * sqrt_gravity *                                                              &
                         SQRT(normal_stress/particle_density))
             basal_factor = normal_stress / (rhom*h*speed_ratio)
-            CALL solve_exact_velocity_flow(EXACT_FLOW_MUI,                                             &
-                        [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,                          &
-                        basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope],                      &
+            CALL solve_exact_velocity_flow(EXACT_FLOW_MUI,                                                             &
+                        [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,                                      &
+                        basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope],                                  &
                         dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
 

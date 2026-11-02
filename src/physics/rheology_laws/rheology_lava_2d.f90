@@ -22,7 +22,7 @@ MODULE rheology_lava_2d
         USE parameters_2d, ONLY : wp
         USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
         USE rheology_parameters_2d, ONLY : T_ref
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
+        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
                 fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
         IMPLICIT NONE
         PRIVATE
@@ -45,12 +45,12 @@ CONTAINS
             REAL(wp) :: sx, sy
             COMPLEX(wp) :: ix, iy
             TYPE(complex_physical_state_type) :: cs
-            CALL eval_rheology_lava_semi_implicit(state, &
-                    sx, &
+            CALL eval_rheology_lava_semi_implicit(state,                                                               &
+                    sx,                                                                                                &
                     sy)
             CALL complex_state_from_real(state, cs)
-            CALL eval_rheology_lava_implicit(cs, &
-                    ix, &
+            CALL eval_rheology_lava_implicit(cs,                                                                       &
+                    ix,                                                                                                &
                     iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
         END SUBROUTINE eval_rheology_lava_explicit
@@ -110,7 +110,7 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                              &
+            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
                         speed_ratio, speed_before, 'lava')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
             IF (state%rho_m .LE. 0.0_wp) THEN
@@ -119,12 +119,12 @@ CONTAINS
             END IF
 
             effective_depth = MAX(state%h, h_threshold)
-            gamma = 3.0_wp * nu_ref / effective_depth *                                                &
+            gamma = 3.0_wp * nu_ref / effective_depth *                                                                &
                         EXP(-visc_par * (state%T - T_ref))
             linear_drag = gamma / state%h
             yield_drag = tau0 / (state%rho_m * state%h * speed_ratio)
-            CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE,                                          &
-                        [yield_drag, linear_drag], dt, speed_before,                                       &
+            CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE,                                                          &
+                        [yield_drag, linear_drag], dt, speed_before,                                                   &
                         speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_lava_analytic
@@ -141,14 +141,16 @@ CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the explicit lava momentum contribution.
         !> \details Assemble the real-valued momentum source from the model's supported physical
-        !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
+        !> treatment contributions; unused model inputs are retained for the shared dispatch
+        !> interface.
         !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
         !> \param[in] moving Whether the local state is considered moving.
         !> \param[out] rate Conservative horizontal momentum source vector.
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the semi-implicit lava momentum contribution.
-        !> \details Evaluate the contribution of temperature-dependent viscous drag and a yield-stress
+        !> \details Evaluate the contribution of temperature-dependent viscous drag and a
+        !> yield-stress
         !> contribution assigned to this treatment. The returned rates act on the conservative
         !> horizontal momenta; zero-valued implementations intentionally provide no contribution.
         !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
@@ -158,7 +160,8 @@ CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the implicit lava momentum contribution.
         !> \details Evaluate the part of temperature-dependent viscous drag and a yield-stress
-        !> contribution assigned to the implicit treatment. Complex-valued arguments retain complex-step
+        !> contribution assigned to the implicit treatment. Complex-valued arguments retain
+        !> complex-step
         !> sensitivities where implemented; zero-valued implementations intentionally contribute no
         !> term.
         !> \param[in] moving Whether the local state is considered moving.
@@ -168,8 +171,10 @@ CONTAINS
         !> \param[in] state Shared real physical state before the analytic substep.
         !> \brief Integrate the lava velocity source over a frozen-state substep.
         !> \details Evaluate the exact or time-integral-based decay of horizontal speed under
-        !> temperature-dependent viscous drag and a yield-stress contribution. The velocity direction is
-        !> retained and the updated components are returned without evolving the frozen thermodynamic
+        !> temperature-dependent viscous drag and a yield-stress contribution. The velocity
+        !> direction is
+        !> retained and the updated components are returned without evolving the frozen
+        !> thermodynamic
         !> and geometric inputs.
         !> \param[in] dt Duration of the analytic source substep [s].
         !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.

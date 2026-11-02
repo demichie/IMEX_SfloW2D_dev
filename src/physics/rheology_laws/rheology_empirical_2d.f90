@@ -13,7 +13,7 @@ MODULE rheology_empirical_2d
         USE diagnostics_2d, ONLY : fatal_error
         USE parameters_2d, ONLY : wp
         USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
+        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
                 solve_exact_velocity_flow, EXACT_FLOW_LINEAR
         IMPLICIT NONE
         PRIVATE
@@ -26,7 +26,8 @@ CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the explicit empirical momentum contribution.
         !> \details Assemble the real-valued momentum source from the model's supported physical
-        !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
+        !> treatment contributions; unused model inputs are retained for the shared dispatch
+        !> interface.
         !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
         !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
         !> \param[in] moving Whether the local state is considered moving.
@@ -41,16 +42,18 @@ CONTAINS
             TYPE(complex_physical_state_type) :: cs
             CALL eval_rheology_empirical_semi_implicit(state, sx, sy)
             CALL complex_state_from_real(state, cs)
-            CALL eval_rheology_empirical_implicit(cs, &
-                    ix, &
+            CALL eval_rheology_empirical_implicit(cs,                                                                  &
+                    ix,                                                                                                &
                     iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
         END SUBROUTINE eval_rheology_empirical_explicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the semi-implicit empirical momentum contribution.
-        !> \details Evaluate the contribution of the empirical basal-friction parameterization assigned
-        !> to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued
+        !> \details Evaluate the contribution of the empirical basal-friction parameterization
+        !> assigned
+        !> to this treatment. The returned rates act on the conservative horizontal momenta;
+        !> zero-valued
         !> implementations intentionally provide no contribution.
         !> \param[out] rate_x x component of momentum source rate.
         !> \param[out] rate_y y component of momentum source rate.
@@ -65,7 +68,8 @@ CONTAINS
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the implicit empirical momentum contribution.
-        !> \details Evaluate the part of the empirical basal-friction parameterization assigned to the
+        !> \details Evaluate the part of the empirical basal-friction parameterization assigned to
+        !> the
         !> implicit treatment. Complex-valued arguments retain complex-step sensitivities where
         !> implemented; zero-valued implementations intentionally contribute no term.
         !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
@@ -92,7 +96,8 @@ CONTAINS
         !> \param[in] state Shared real physical state before the analytic substep.
         !> \brief Integrate the empirical velocity source over a frozen-state substep.
         !> \details Evaluate the exact or time-integral-based decay of horizontal speed under the
-        !> empirical basal-friction parameterization. The velocity direction is retained and the updated
+        !> empirical basal-friction parameterization. The velocity direction is retained and the
+        !> updated
         !> components are returned without evolving the frozen thermodynamic and geometric inputs.
         !> \param[in] dt Duration of the analytic source substep [s].
         !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
@@ -110,13 +115,13 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                              &
+            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
                         speed_ratio, speed_before, 'empirical')
             IF (dt .EQ. 0.0_wp) RETURN
             IF (speed_before .EQ. 0.0_wp) RETURN
-            linear_drag = 1.0E-3_wp * speed_ratio /                                                    &
+            linear_drag = 1.0E-3_wp * speed_ratio /                                                                    &
                         (state%h * (1.0_wp + 10.0_wp*state%h))
-            CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag],                           &
+            CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag],                                           &
                         dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_empirical_analytic
