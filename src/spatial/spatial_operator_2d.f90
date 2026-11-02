@@ -30,6 +30,9 @@ MODULE spatial_operator_2d
     PRIVATE
         TYPE(reconstruction_workspace_type) :: reconstruction
         TYPE(hyperbolic_workspace_type) :: hp_pccu
+        LOGICAL :: profile_enabled=.FALSE.
+        INTEGER :: profile_cfl_calls=0
+        REAL(wp) :: profile_cfl_seconds=0.0_wp
     CONTAINS
         PROCEDURE, PUBLIC :: initialize => initialize_spatial_operator
         PROCEDURE, PUBLIC :: finalize => finalize_spatial_operator
@@ -60,6 +63,13 @@ CONTAINS
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
 
+        BLOCK
+            CHARACTER(LEN=8) :: value
+            INTEGER :: status
+            value=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
+            this%profile_enabled=status==0 .AND. TRIM(value)=='1'
+        END BLOCK
         CALL this%reconstruction%initialize
         CALL this%hp_pccu%initialize
 
@@ -129,11 +139,22 @@ CONTAINS
         INTEGER :: j, k, l
         REAL(wp) :: max_a_x, max_a_y, cfl_spatial
         REAL(wp) :: dynamic_pressure, propagation_rate
+        INTEGER :: tick,tock,tick_rate
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tick,tick_rate)
+            this%profile_cfl_calls=this%profile_cfl_calls+1
+        END IF
 
         dt = max_dt
 
         ! The sentinel selects the prescribed max_dt without evaluating face speeds.
-        IF ( cfl .EQ. -1.0_wp ) RETURN
+        IF ( cfl .EQ. -1.0_wp ) THEN
+            IF (this%profile_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+            END IF
+            RETURN
+        END IF
 
         ! Refresh wet cells and the dry halo: the HP stencil reads beyond solve_cells.
         ! The end-of-loop barrier makes every cache entry available to reconstruction.
@@ -210,6 +231,10 @@ CONTAINS
 
         END SELECT
 
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
     END SUBROUTINE compute_spatial_timestep
 
     !> \brief Include all four reconstructed face speeds for one active cell.
@@ -245,6 +270,14 @@ CONTAINS
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
 
+        IF (this%profile_enabled) THEN
+            WRITE(*,'(A,I0,A,ES15.7)') 'LIE_PROFILE cfl_calls=',this%profile_cfl_calls, &
+                ' seconds=',this%profile_cfl_seconds
+            WRITE(*,'(A,I0)') 'LIE_PROFILE spatial_calls=',this%hp_pccu%profile_calls
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE reconstruction_seconds=',this%hp_pccu%profile_reconstruction
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE flux_and_paths_seconds=',this%hp_pccu%profile_flux
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE assembly_seconds=',this%hp_pccu%profile_assembly
+        END IF
         CALL this%hp_pccu%finalize
         CALL this%reconstruction%finalize
 

@@ -46,6 +46,9 @@ MODULE hyperbolic_2d
         REAL(wp), ALLOCATABLE :: G_interface_yT(:,:,:)
         REAL(wp), ALLOCATABLE :: P_cell_x(:,:,:)
         REAL(wp), ALLOCATABLE :: P_cell_y(:,:,:)
+        LOGICAL :: profile_enabled=.FALSE.
+        INTEGER :: profile_calls=0
+        REAL(wp) :: profile_reconstruction=0.0_wp,profile_flux=0.0_wp,profile_assembly=0.0_wp
     CONTAINS
         PROCEDURE :: initialize => initialize_hyperbolic
         PROCEDURE :: finalize => finalize_hyperbolic
@@ -110,6 +113,13 @@ CONTAINS
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
 
+        BLOCK
+            CHARACTER(LEN=8) :: value
+            INTEGER :: status
+            value=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
+            this%profile_enabled=status==0 .AND. TRIM(value)=='1'
+        END BLOCK
         ALLOCATE( this%a_interface_xNeg(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_xPos(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_yNeg(comp_cells_x,comp_interfaces_y) )
@@ -176,6 +186,11 @@ CONTAINS
         LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled
 
         INTEGER :: l , i, j, k      !< loop counters
+        INTEGER :: tick,tock,tick_rate
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tick,tick_rate)
+            this%profile_calls=this%profile_calls+1
+        END IF
 
         ! Linear reconstruction of the physical variables at the interfaces
         CALL recon%reconstruct( qp_expl, t, solve_cells, j_cent, k_cent, .TRUE.,                                       &
@@ -187,6 +202,11 @@ CONTAINS
         CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,                                                &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_reconstruction=this%profile_reconstruction+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+            tick=tock
+        END IF
         ! The production spatial operator is the single HP-PCCU baseline.
         CALL eval_flux_PCCU( this, recon, qp_expl,                                                                     &
             .TRUE., t,                                                                                                 &
@@ -196,6 +216,11 @@ CONTAINS
         CALL eval_cell_hydrostatic_paths( this, recon, qp_expl,                                                        &
             .TRUE., solve_cells, j_cent, k_cent )
 
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_flux=this%profile_flux+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+            tick=tock
+        END IF
         ! Assemble each cell from its outward-oriented face values, then subtract
         ! the within-cell hydrostatic path. This cancellation is essential for
         ! lake-at-rest balance; adding a separate bed-force source would count it twice.
@@ -246,9 +271,11 @@ CONTAINS
         END DO cells_loop
 
         !$OMP END PARALLEL DO
-
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_assembly=this%profile_assembly+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
         RETURN
-
     END SUBROUTINE eval_hyperbolic_terms
 
     !> \brief Require exact stationarity of a cell and every adjacent face endpoint.

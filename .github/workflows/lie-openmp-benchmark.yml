@@ -62,6 +62,7 @@ jobs:
           lscpu | grep -E "CPU\\(s\\)|Core\\(s\\)|Thread\\(s\\)" || true
       - name: Measure wall-clock OpenMP scaling
         env:
+          IMEX_PROFILE_LIE: "1"
           OMP_DYNAMIC: "FALSE"
           OMP_PROC_BIND: "CLOSE"
           OMP_PLACES: "cores"

@@ -28,6 +28,9 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: q_before(:,:,:), qp_before(:,:,:)
         !> Candidate cell states, published only after all groups succeed.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
+        LOGICAL :: profile_enabled=.FALSE.
+        INTEGER :: profile_calls=0
+        REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
     CONTAINS
         PROCEDURE :: initialize => initialize_time_integration
         PROCEDURE :: finalize => finalize_time_integration
@@ -38,6 +41,13 @@ CONTAINS
     !> @param[in,out] this Integration workspace to allocate.
     SUBROUTINE initialize_time_integration(this)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
+        BLOCK
+            CHARACTER(LEN=8) :: value
+            INTEGER :: status
+            value=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
+            this%profile_enabled=status==0 .AND. TRIM(value)=='1'
+        END BLOCK
         ALLOCATE(this%spatial_rate(n_eqns,comp_cells_x,comp_cells_y))
         ALLOCATE(this%q_before(n_vars,comp_cells_x,comp_cells_y))
         ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
@@ -65,6 +75,11 @@ CONTAINS
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         INTEGER :: l,j,k,first_failure,eq
+        INTEGER :: tick,tock,tick_rate
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tick,tick_rate)
+            this%profile_calls=this%profile_calls+1
+        END IF
         INTEGER, ALLOCATABLE :: reconstruction_status(:),spatial_status(:)
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
@@ -182,6 +197,11 @@ CONTAINS
 
         DEALLOCATE(spatial_status)
 
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_spatial=this%profile_spatial+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+            tick=tock
+        END IF
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
         ! Later groups evaluate from each predecessor's updated state.
         ! The groups may update live geometry for successor groups; retain the
@@ -229,6 +249,10 @@ CONTAINS
 
         END IF
 
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_sources=this%profile_sources+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
         state%q=this%q_trial
@@ -241,6 +265,11 @@ CONTAINS
     !> @param[in,out] this Integration workspace to release.
     SUBROUTINE finalize_time_integration(this)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
+        IF (this%profile_enabled) THEN
+            WRITE(*,'(A,I0)') 'LIE_PROFILE steps=',this%profile_calls
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE spatial_update_seconds=',this%profile_spatial
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_groups_seconds=',this%profile_sources
+        END IF
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
