@@ -47,7 +47,7 @@ CONTAINS
 
         seed_modulus = INT(HUGE(0), int64)
         DO i = 1, seed_size
-            seed_state(i) = INT(MODULO(INT(stochastic_seed, int64) +             &
+            seed_state(i) = INT(MODULO(INT(stochastic_seed, int64) +                                                   &
                 104729_int64 * INT(i, int64), seed_modulus))
         END DO
 
@@ -78,7 +78,7 @@ CONTAINS
 
         ! Box-Muller transform. RANDOM_NUMBER returns values in [0,1), so
         ! 1-uniform_samples(:,1) is strictly positive and LOG is well-defined.
-        noise = SQRT(-2.0_wp * LOG(1.0_wp - uniform_samples(:, 1))) *           &
+        noise = SQRT(-2.0_wp * LOG(1.0_wp - uniform_samples(:, 1))) *                                                  &
             COS(two_pi * uniform_samples(:, 2))
 
     END FUNCTION gaussian_noise

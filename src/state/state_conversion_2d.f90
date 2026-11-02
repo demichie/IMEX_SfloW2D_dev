@@ -8,7 +8,7 @@
 
 MODULE state_conversion_2d
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
-    USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn, &
+    USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn,                                                          &
             idx_uEqn, idx_vEqn, idx_engyEqn
 
         USE parameters_2d, ONLY : idx_h, idx_T
@@ -19,17 +19,17 @@ MODULE state_conversion_2d
     USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
     USE parameters_2d, ONLY : eps_sing, eps_sing4, dry_thickness_tolerance
     USE parameters_2d, ONLY : slope_correction_flag, curvature_term_flag
-    USE parameters_2d, ONLY : liquid_flag, gas_flag,                              &
+    USE parameters_2d, ONLY : liquid_flag, gas_flag,                                                                   &
             stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
-    USE parameters_2d, ONLY : idx_solid_first, idx_solid_last, idx_add_gas_first,  &
+    USE parameters_2d, ONLY : idx_solid_first, idx_solid_last, idx_add_gas_first,                                      &
             idx_add_gas_last, idx_stoch, idx_pore, idx_u, idx_v
 
     IMPLICIT NONE
 
     PRIVATE
 
-    REAL(wp), PARAMETER :: mass_fraction_roundoff_tolerance =                 &
+    REAL(wp), PARAMETER :: mass_fraction_roundoff_tolerance =                                                          &
             4096.0_wp * EPSILON(1.0_wp)
 
     !> Shared local physical state for non-Newton source evaluation.
@@ -120,7 +120,7 @@ CONTAINS
     !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
     !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-    SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xc,                &
+    SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xc,                                                          &
             sp_heat_c_mix, sp_heat_mix)
 
         COMPLEX(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
@@ -143,7 +143,7 @@ CONTAINS
     !> \param[out] alphas Solid volume fractions, one entry per solid class.
     !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
 
-    SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, rho_m,     &
+    SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, rho_m,                                                &
             inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
         REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
@@ -167,7 +167,7 @@ CONTAINS
     !> \param[out] alphas Solid volume fractions, one entry per solid class.
     !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
 
-    SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, rho_m,  &
+    SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, rho_m,                                             &
             inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
         COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
@@ -196,8 +196,8 @@ CONTAINS
     !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
     !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-    SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphag, alphas, &
-            rho_m, inv_rhom, rho_c, xs, xg, xc, sp_heat_c_mix,          &
+    SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphag, alphas,                                        &
+            rho_m, inv_rhom, rho_c, xs, xg, xc, sp_heat_c_mix,                                                         &
             sp_heat_mix)
 
         REAL(wp), INTENT(IN) :: T
@@ -251,9 +251,9 @@ CONTAINS
         xs = alphas * rho_s * inv_rhom
         xg = alphag * rho_g * inv_rhom
 
-        CALL eval_mixture_heat_capacity_real(                                      &
+        CALL eval_mixture_heat_capacity_real(                                                                          &
             ! IN
-            xs, xg,                                                           &
+            xs, xg,                                                                                                    &
             ! OUT
             xc, sp_heat_c_mix, sp_heat_mix)
 
@@ -267,7 +267,7 @@ CONTAINS
     !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
     !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-    SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xc, sp_heat_c_mix,     &
+    SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xc, sp_heat_c_mix,                                              &
             sp_heat_mix)
 
         REAL(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
@@ -282,14 +282,14 @@ CONTAINS
         TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: bx, by, bxx, bxy, byy
         state%w=0.0_wp
-        IF (slope_correction_flag) &
+        IF (slope_correction_flag)                                                                                     &
             state%w=state%u*bx+state%v*by
         state%mod_vel_hor=SQRT(state%u**2+state%v**2)
         state%mod_vel2=state%u**2+state%v**2+state%w**2
         state%mod_vel=SQRT(state%mod_vel2)
         state%curvature_acceleration=0.0_wp
-        IF (curvature_term_flag) &
-            state%curvature_acceleration=state%u**2*bxx+ &
+        IF (curvature_term_flag)                                                                                       &
+            state%curvature_acceleration=state%u**2*bxx+                                                               &
                     2.0_wp*state%u*state%v*bxy+state%v**2*byy
     END SUBROUTINE update_real_state_kinematics
 
@@ -297,14 +297,14 @@ CONTAINS
         TYPE(complex_physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: bx, by, bxx, bxy, byy
         state%w=CMPLX(0.0_wp,0.0_wp,wp)
-        IF (slope_correction_flag) &
+        IF (slope_correction_flag)                                                                                     &
             state%w=state%u*bx+state%v*by
         state%mod_vel_hor=SQRT(state%u**2+state%v**2)
         state%mod_vel2=state%u**2+state%v**2+state%w**2
         state%mod_vel=SQRT(state%mod_vel2)
         state%curvature_acceleration=0.0_wp
-        IF (curvature_term_flag) &
-            state%curvature_acceleration=state%u**2*bxx+ &
+        IF (curvature_term_flag)                                                                                       &
+            state%curvature_acceleration=state%u**2*bxx+                                                               &
                     2.0_wp*state%u*state%v*bxy+state%v**2*byy
     END SUBROUTINE update_complex_state_kinematics
 
@@ -319,7 +319,7 @@ CONTAINS
         REAL(wp) :: rho_c, inv_rho_c
         REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
-        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
+        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas),                                                       &
             state%xs(n_solid), state%xg(n_add_gas))
         state%xs = qp(idx_solid_first:idx_solid_last)
         state%xg = qp(idx_add_gas_first:idx_add_gas_last)
@@ -343,7 +343,7 @@ CONTAINS
             IF (PRESENT(bxx)) geometry(3)=bxx
             IF (PRESENT(bxy)) geometry(4)=bxy
             IF (PRESENT(byy)) geometry(5)=byy
-            CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+            CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                       &
                 geometry(3),geometry(4),geometry(5))
             RETURN
         END IF
@@ -352,8 +352,8 @@ CONTAINS
         CALL enforce_mass_fraction_closure(xs, xg)
         state%xs = xs
         state%xg = xg
-        CALL eval_mixture_properties_from_mass_fractions(state%T, xs, xg, &
-            state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
+        CALL eval_mixture_properties_from_mass_fractions(state%T, xs, xg,                                              &
+            state%rho_m, state%inv_rhom, rho_c, inv_rho_c,                                                             &
             state%alphas, state%alphag)
         state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
         geometry=0.0_wp
@@ -362,7 +362,7 @@ CONTAINS
         IF (PRESENT(bxx)) geometry(3)=bxx
         IF (PRESENT(bxy)) geometry(4)=bxy
         IF (PRESENT(byy)) geometry(5)=byy
-        CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+        CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                           &
             geometry(3),geometry(4),geometry(5))
     END SUBROUTINE physical_state_from_qp
 
@@ -391,7 +391,7 @@ CONTAINS
         IF (n_solid .GT. 0) THEN
             IF (ANY(xs .LT. -mass_fraction_roundoff_tolerance)) THEN
                 IF (PRESENT(accepted)) RETURN
-                CALL mass_fraction_closure_error(                                  &
+                CALL mass_fraction_closure_error(                                                                      &
                     'Material negative solid mass fraction', context)
             END IF
             xs = MAX(xs, 0.0_wp)
@@ -400,7 +400,7 @@ CONTAINS
         IF (n_add_gas .GT. 0) THEN
             IF (ANY(xg .LT. -mass_fraction_roundoff_tolerance)) THEN
                 IF (PRESENT(accepted)) RETURN
-                CALL mass_fraction_closure_error(                                &
+                CALL mass_fraction_closure_error(                                                                      &
                     'Material negative additional-gas mass fraction', context)
             END IF
             xg = MAX(xg, 0.0_wp)
@@ -443,10 +443,10 @@ CONTAINS
         REAL(wp) :: geometry(5)
         REAL(wp) :: p_dyn
 
-        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
+        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas),                                                       &
             state%xs(n_solid), state%xg(n_add_gas))
-        CALL r_phys_var(q, state%h, state%u, state%v, state%alphas, &
-            state%rho_m, state%T, state%alphag, state%red_grav, &
+        CALL r_phys_var(q, state%h, state%u, state%v, state%alphas,                                                    &
+            state%rho_m, state%T, state%alphag, state%red_grav,                                                        &
             p_dyn, state%Zs, state%exc_pore_pres)
         state%inv_rhom = 1.0_wp / state%rho_m
         state%xs = 0.0_wp
@@ -462,7 +462,7 @@ CONTAINS
         IF (PRESENT(bxx)) geometry(3)=bxx
         IF (PRESENT(bxy)) geometry(4)=bxy
         IF (PRESENT(byy)) geometry(5)=byy
-        CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+        CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                           &
             geometry(3),geometry(4),geometry(5))
     END SUBROUTINE real_physical_state_from_q
 
@@ -492,7 +492,7 @@ CONTAINS
     !>                           variable.
     !******************************************************************************
 
-    SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag,          &
+    SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag,                                                       &
             red_grav, p_dyn, Zs, exc_pore_pres)
 
         IMPLICIT NONE
@@ -528,10 +528,10 @@ CONTAINS
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         REAL(wp) :: geometry(5)
 
-        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
+        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas),                                                       &
             state%xs(n_solid), state%xg(n_add_gas))
-        CALL c_phys_var(q, state%h, state%u, state%v, state%T, state%rho_m, &
-            state%alphas, state%alphag, state%inv_rhom, state%Zs, &
+        CALL c_phys_var(q, state%h, state%u, state%v, state%T, state%rho_m,                                            &
+            state%alphas, state%alphag, state%inv_rhom, state%Zs,                                                      &
             state%exc_pore_pres)
         state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
         state%xs = CMPLX(0.0_wp,0.0_wp,wp)
@@ -546,7 +546,7 @@ CONTAINS
         IF (PRESENT(bxx)) geometry(3)=bxx
         IF (PRESENT(bxy)) geometry(4)=bxy
         IF (PRESENT(byy)) geometry(5)=byy
-        CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+        CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                           &
             geometry(3),geometry(4),geometry(5))
     END SUBROUTINE physical_state_from_q
 
@@ -576,7 +576,7 @@ CONTAINS
     !>                           variable.
     !******************************************************************************
 
-    SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs,    &
+    SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs,                                         &
             exc_pore_pres)
 
         IMPLICIT NONE
@@ -613,9 +613,9 @@ CONTAINS
         complex_state%red_grav = CMPLX(real_state%red_grav,0.0_wp,wp)
         complex_state%Zs = CMPLX(real_state%Zs,0.0_wp,wp)
         complex_state%exc_pore_pres = CMPLX(real_state%exc_pore_pres,0.0_wp,wp)
-        IF (ALLOCATED(real_state%alphas)) &
+        IF (ALLOCATED(real_state%alphas))                                                                              &
             complex_state%alphas = CMPLX(real_state%alphas,0.0_wp,wp)
-        IF (ALLOCATED(real_state%alphag)) &
+        IF (ALLOCATED(real_state%alphag))                                                                              &
             complex_state%alphag = CMPLX(real_state%alphag,0.0_wp,wp)
         complex_state%w = CMPLX(real_state%w,0.0_wp,wp)
         complex_state%mod_vel_hor = CMPLX(real_state%mod_vel_hor,0.0_wp,wp)
@@ -675,7 +675,7 @@ CONTAINS
         xs=state%xs
         xg=state%xg
         CALL enforce_mass_fraction_closure(xs,xg)
-        CALL eval_mixture_properties_from_mass_fractions(state%T,xs,xg, &
+        CALL eval_mixture_properties_from_mass_fractions(state%T,xs,xg,                                                &
             rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
         CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
         red_grav=(rho_m-rho_a_amb)/rho_m*grav
@@ -778,17 +778,17 @@ CONTAINS
         REAL(wp) :: tolerance
 
         IF (qc(idx_totMassEqn) .LE. 0.0_wp) RETURN
-        tolerance = mass_fraction_roundoff_tolerance *                         &
+        tolerance = mass_fraction_roundoff_tolerance *                                                                 &
             MAX(ABS(qc(idx_totMassEqn)),TINY(1.0_wp))
 
         IF (n_solid .GT. 0) THEN
-            WHERE ((qc(idx_solid_first:idx_solid_last) .LT. 0.0_wp) .AND.       &
+            WHERE ((qc(idx_solid_first:idx_solid_last) .LT. 0.0_wp) .AND.                                              &
                 (qc(idx_solid_first:idx_solid_last) .GE. -tolerance))
                 qc(idx_solid_first:idx_solid_last) = 0.0_wp
             END WHERE
         END IF
         IF (n_add_gas .GT. 0) THEN
-            WHERE ((qc(idx_add_gas_first:idx_add_gas_last) .LT. 0.0_wp) .AND.  &
+            WHERE ((qc(idx_add_gas_first:idx_add_gas_last) .LT. 0.0_wp) .AND.                                          &
                 (qc(idx_add_gas_first:idx_add_gas_last) .GE. -tolerance))
                 qc(idx_add_gas_first:idx_add_gas_last) = 0.0_wp
             END WHERE
@@ -823,8 +823,8 @@ CONTAINS
         xg = qp(idx_add_gas_first:idx_add_gas_last)
 
         CALL enforce_mass_fraction_closure(xs, xg)
-        CALL eval_mixture_properties_from_mass_fractions(                         &
-            qp(idx_T), xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c,               &
+        CALL eval_mixture_properties_from_mass_fractions(                                                              &
+            qp(idx_T), xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c,                                                      &
             alphas, alphag)
 
     END SUBROUTINE primitive_to_volume_fractions
@@ -895,7 +895,7 @@ CONTAINS
     !> \param[out] r_sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
     !******************************************************************************
 
-    SUBROUTINE mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,         &
+    SUBROUTINE mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,                                               &
             r_sp_heat_mix)
 
         IMPLICIT none
@@ -955,14 +955,14 @@ CONTAINS
         r_xg = qpj(idx_add_gas_first:idx_add_gas_last)
         CALL enforce_mass_fraction_closure(r_xs, r_xg)
 
-        CALL eval_mixture_properties_from_mass_fractions(                          &
+        CALL eval_mixture_properties_from_mass_fractions(                                                              &
             ! IN
-            r_T, r_xs, r_xg,                                                &
+            r_T, r_xs, r_xg,                                                                                           &
             ! OUT
-            r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                           &
+            r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                                                                 &
             r_alphas, r_alphag)
 
-        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc,                   &
+        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc,                                                              &
             r_sp_heat_c, r_sp_heat_mix)
 
         ! reduced gravity
@@ -1056,7 +1056,7 @@ CONTAINS
                 IF (ANY(qc(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
                 r_xs=qc(idx_solid_first:idx_solid_last)/qc(idx_totMassEqn)
                 r_xg=qc(idx_add_gas_first:idx_add_gas_last)/qc(idx_totMassEqn)
-                IF (.NOT.ALL(ieee_is_finite(r_xs)) .OR. &
+                IF (.NOT.ALL(ieee_is_finite(r_xs)) .OR.                                                                &
                     .NOT.ALL(ieee_is_finite(r_xg))) RETURN
                 IF (SUM(r_xs)+SUM(r_xg)>1.0_wp+mass_fraction_roundoff_tolerance) RETURN
             END IF
@@ -1064,7 +1064,7 @@ CONTAINS
 
         qp = 0.0_wp
 
-        CALL r_phys_var( qc , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,          &
+        CALL r_phys_var( qc , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,                                             &
             r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres )
 
         qp(idx_h) = r_h
@@ -1195,14 +1195,14 @@ CONTAINS
             CALL enforce_mass_fraction_closure(r_xs, r_xg)
         END IF
 
-        CALL eval_mixture_properties_from_mass_fractions(                          &
+        CALL eval_mixture_properties_from_mass_fractions(                                                              &
             ! IN
-            r_T, r_xs, r_xg,                                                &
+            r_T, r_xs, r_xg,                                                                                           &
             ! OUT
-            r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                           &
+            r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                                                                 &
             r_alphas, r_alphag)
 
-        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc, r_sp_heat_c,      &
+        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc, r_sp_heat_c,                                                 &
             r_sp_heat_mix)
 
         IF ( stoch_transport_flag) r_Zs = qp(idx_stoch)

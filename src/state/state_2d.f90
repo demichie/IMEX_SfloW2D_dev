@@ -9,7 +9,7 @@
 !********************************************************************************
 
 MODULE state_2d
-        USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, &
+        USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T,                                                        &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
     USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity
@@ -111,10 +111,10 @@ CONTAINS
 
         ALLOCATE( this%q(model_layout%n_variables,comp_cells_x,comp_cells_y) )
 
-        ALLOCATE( this%hpos(comp_cells_x,comp_cells_y),                         &
+        ALLOCATE( this%hpos(comp_cells_x,comp_cells_y),                                                                &
             this%hpos_old(comp_cells_x,comp_cells_y) )
 
-        ALLOCATE( this%qp(model_layout%n_physical_variables,comp_cells_x,        &
+        ALLOCATE( this%qp(model_layout%n_physical_variables,comp_cells_x,                                              &
             comp_cells_y) )
 
         ALLOCATE(this%deposit(comp_cells_x,comp_cells_y,n_solid))
@@ -143,7 +143,7 @@ CONTAINS
         this%pdynmax = 0.0_wp
         this%mod_vel_max = 0.0_wp
 
-        ALLOCATE( this%vuln_table(n_thickness_levels*n_dyn_pres_levels,         &
+        ALLOCATE( this%vuln_table(n_thickness_levels*n_dyn_pres_levels,                                                &
             comp_cells_x,comp_cells_y) )
 
 
@@ -177,7 +177,7 @@ CONTAINS
         DEALLOCATE( this%vuln_table )
 
 
-        DEALLOCATE(this%deposit,this%deposit_tot,this%erosion,this%erosion_tot, &
+        DEALLOCATE(this%deposit,this%deposit_tot,this%erosion,this%erosion_tot,                                        &
             this%erodible,this%lava_deposit)
         DEALLOCATE( this%qp )
 
@@ -196,7 +196,7 @@ CONTAINS
         IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
         IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
         ! All transported component masses share the same total-mixture budget.
-        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) + &
+        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) +                                                        &
             SUM(q_cell(idx_add_gas_first:idx_add_gas_last)) > q_cell(idx_totMassEqn)) RETURN
         valid=.TRUE.
     END FUNCTION conservative_mass_admissible
@@ -236,8 +236,8 @@ CONTAINS
         CLASS(state_type), INTENT(INOUT) :: this
         ! Totals include the carrier-filled pore volume of the deposited/eroded layer.
         ! A zero-solid-volume substrate (porosity=1) cannot define this conversion.
-        IF (.NOT.ieee_is_finite(erodible_porosity) .OR. &
-            erodible_porosity<0.0_wp .OR. erodible_porosity>=1.0_wp) &
+        IF (.NOT.ieee_is_finite(erodible_porosity) .OR.                                                                &
+            erodible_porosity<0.0_wp .OR. erodible_porosity>=1.0_wp)                                                   &
             ERROR STOP 'Invalid substrate porosity for aggregate thickness'
         this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-erodible_porosity)
         this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)

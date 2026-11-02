@@ -18,7 +18,7 @@ MODULE stochastic_module
 
     USE domain_2d, ONLY: domain_type
     USE state_2d, ONLY: state_type
-    USE parameters_2d, ONLY : length_spatial_corr,        &
+    USE parameters_2d, ONLY : length_spatial_corr,                                                                     &
             stochastic_flag, stoch_transport_flag
     USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
     USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
@@ -162,7 +162,7 @@ CONTAINS
                 k = domain%k_cent(l)
 
                 state%qp(idx_stoch,j,k) = this%Z(j,k)
-                state%q(idx_stoch,j,k) = state%q(idx_totMassEqn,j,k) *                         &
+                state%q(idx_stoch,j,k) = state%q(idx_totMassEqn,j,k) *                                                 &
                     this%Z(j,k)
 
             END DO
@@ -199,7 +199,7 @@ CONTAINS
 
         ! Allocate the output array
         IF (ALLOCATED(this%conv_kernel)) DEALLOCATE(this%conv_kernel)
-        ALLOCATE(this%conv_kernel(n_nodes_per_dim,                             &
+        ALLOCATE(this%conv_kernel(n_nodes_per_dim,                                                                     &
                 n_nodes_per_dim))
 
         ! Compute 2D Gaussian values (at centers of cells)
@@ -232,7 +232,7 @@ CONTAINS
 
         s = 0.5_wp * length_spatial_corr
         PI = ACOS(-1.0_wp)
-        evalGaussian2d = EXP(-0.5_wp * (((x/s)**2) + ((y/s)**2))) /             &
+        evalGaussian2d = EXP(-0.5_wp * (((x/s)**2) + ((y/s)**2))) /                                                    &
                                 (2.0_wp * PI * s**2)
 
     END FUNCTION evalGaussian2d
@@ -259,7 +259,7 @@ CONTAINS
         ! must not change the random stream associated with a fixed seed.
         ! Generate standard Gaussian noise over the entire domain: N(0,1).
         noise_size = comp_cells_x*comp_cells_y
-        noise = RESHAPE(gaussian_noise(noise_size),                              &
+        noise = RESHAPE(gaussian_noise(noise_size),                                                                    &
             [comp_cells_x, comp_cells_y])
 
         ! Convolve the gaussian noise to introduce spatial correlation if needed
@@ -277,7 +277,7 @@ CONTAINS
             DO j = 1,comp_cells_x
                 ! Update the Ornstein-Uhlenback process
                 sigma_noise = getSigmaNoise(state,j,k)
-                this%Z(j,k) = EulerMaruyamaScheme(                                &
+                this%Z(j,k) = EulerMaruyamaScheme(                                                                     &
                     this%Z(j,k), dt, sigma_noise, noise(j,k))
             END DO
         END DO
@@ -385,7 +385,7 @@ END FUNCTION VelocitySquared
         IF (state%q(idx_totMassEqn,j,k) <= EPSILON(1.0_wp)) THEN
         ! Keep fluctuations available when flow enters a previously dry cell.
         getSigmaNoise = std_max
-        ELSEIF ((TRIM(rheology_model) == 'froude') .OR.                        &
+        ELSEIF ((TRIM(rheology_model) == 'froude') .OR.                                                                &
                 (TRIM(rheology_model) == 'lucas')) THEN
         velocity_squared = VelocitySquared(state,j,k)
         getSigmaNoise = expFormNoise(velocity_squared)
@@ -420,7 +420,7 @@ END FUNCTION VelocitySquared
     REAL(wp) FUNCTION EulerMaruyamaScheme(Zij, dt, sigma, noise_ij)
         IMPLICIT NONE
         REAL(wp), INTENT(IN) :: Zij, dt, sigma, noise_ij
-        EulerMaruyamaScheme = Zij - (dt / tau_stochastic) * Zij +             &
+        EulerMaruyamaScheme = Zij - (dt / tau_stochastic) * Zij +                                                      &
                 sigma * SQRT(2.0_wp * (dt / tau_stochastic)) * noise_ij
     END FUNCTION
 
@@ -436,12 +436,12 @@ subroutine convolve_2d(input_signal, kernel, result)
     implicit none
     real(wp), dimension(:,:), intent(in) :: input_signal, kernel
     real(wp), dimension(:,:), intent(out) :: result
-    integer :: len_kernel_x, len_kernel_y, len_inp_sig_x,                 &
+    integer :: len_kernel_x, len_kernel_y, len_inp_sig_x,                                                              &
     len_inp_sig_y
     integer :: half_len_k_x, half_len_k_y
-    integer :: left_padding, right_padding, south_padding,                &
+    integer :: left_padding, right_padding, south_padding,                                                             &
     north_padding
-    integer :: inx_x, inx_y, idx_centre_x, idx_centre_y,                  &
+    integer :: inx_x, inx_y, idx_centre_x, idx_centre_y,                                                               &
     idx_k_x, idx_k_y, shift_x, shift_y
     real(wp), dimension(:,:), allocatable :: padded_signal
     real(wp) :: sum_at_position
@@ -463,12 +463,12 @@ subroutine convolve_2d(input_signal, kernel, result)
     north_padding = (len_kernel_y - 1) - south_padding
 
     ! Allocate array for padded inp signal
-    allocate(padded_signal(len_inp_sig_x + left_padding + right_padding, &
+    allocate(padded_signal(len_inp_sig_x + left_padding + right_padding,                                               &
     len_inp_sig_y + south_padding + north_padding))
 
     ! Pad the input signal with zeros
     padded_signal = 0._wp
-    padded_signal(left_padding + 1:left_padding + len_inp_sig_x,          &
+    padded_signal(left_padding + 1:left_padding + len_inp_sig_x,                                                       &
     south_padding + 1:south_padding + len_inp_sig_y) = input_signal
 
     ! Initialize to zero the result
@@ -515,8 +515,8 @@ subroutine convolve_2d(input_signal, kernel, result)
                 STOP
                 END if
 
-                sum_at_position = sum_at_position +                          &
-                padded_signal(idx_centre_x + shift_x, idx_centre_y + shift_y)&
+                sum_at_position = sum_at_position +                                                                    &
+                padded_signal(idx_centre_x + shift_x, idx_centre_y + shift_y)                                          &
                 * kernel(idx_k_x, idx_k_y)
             end do
         end do
