@@ -10,17 +10,17 @@
 !> linear-drag velocity source exactly.
 !********************************************************************************
 MODULE rheology_empirical_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 solve_exact_velocity_flow, EXACT_FLOW_LINEAR
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_empirical_explicit
-        PUBLIC :: eval_rheology_empirical_semi_implicit
-        PUBLIC :: eval_rheology_empirical_implicit
-        PUBLIC :: eval_rheology_empirical_analytic
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_empirical_explicit
+    PUBLIC :: eval_rheology_empirical_semi_implicit
+    PUBLIC :: eval_rheology_empirical_implicit
+    PUBLIC :: eval_rheology_empirical_analytic
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -42,9 +42,7 @@ CONTAINS
             TYPE(complex_physical_state_type) :: cs
             CALL eval_rheology_empirical_semi_implicit(state, sx, sy)
             CALL complex_state_from_real(state, cs)
-            CALL eval_rheology_empirical_implicit(cs,                                                                  &
-                    ix,                                                                                                &
-                    iy)
+            CALL eval_rheology_empirical_implicit(cs, ix, iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
         END SUBROUTINE eval_rheology_empirical_explicit
 
@@ -115,14 +113,12 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
-                        speed_ratio, speed_before, 'empirical')
+            CALL validate_analytic_velocity_inputs(dt, state%h, speed_ratio, speed_before, 'empirical')
             IF (dt .EQ. 0.0_wp) RETURN
             IF (speed_before .EQ. 0.0_wp) RETURN
             linear_drag = 1.0E-3_wp * speed_ratio /                                                                    &
                         (state%h * (1.0_wp + 10.0_wp*state%h))
-            CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag],                                           &
-                        dt, speed_before, speed_after)
+            CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag], dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_empirical_analytic
 

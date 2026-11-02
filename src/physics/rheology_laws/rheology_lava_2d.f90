@@ -18,19 +18,19 @@
 !> source exactly with T and other non-velocity inputs explicit.
 !********************************************************************************
 MODULE rheology_lava_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-        USE rheology_parameters_2d, ONLY : T_ref
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE rheology_parameters_2d, ONLY : T_ref
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_lava_explicit
-        PUBLIC :: eval_rheology_lava_semi_implicit
-        PUBLIC :: eval_rheology_lava_implicit
-        PUBLIC :: eval_rheology_lava_analytic
-        PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_lava_explicit
+    PUBLIC :: eval_rheology_lava_semi_implicit
+    PUBLIC :: eval_rheology_lava_implicit
+    PUBLIC :: eval_rheology_lava_analytic
+    PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
         REAL(wp) :: nu_ref
         REAL(wp) :: visc_par
         REAL(wp) :: tau0
@@ -45,13 +45,9 @@ CONTAINS
             REAL(wp) :: sx, sy
             COMPLEX(wp) :: ix, iy
             TYPE(complex_physical_state_type) :: cs
-            CALL eval_rheology_lava_semi_implicit(state,                                                               &
-                    sx,                                                                                                &
-                    sy)
+            CALL eval_rheology_lava_semi_implicit(state, sx, sy)
             CALL complex_state_from_real(state, cs)
-            CALL eval_rheology_lava_implicit(cs,                                                                       &
-                    ix,                                                                                                &
-                    iy)
+            CALL eval_rheology_lava_implicit(cs, ix, iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
         END SUBROUTINE eval_rheology_lava_explicit
 
@@ -80,6 +76,7 @@ CONTAINS
 
             rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
             rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+
             IF (REAL(state%h, wp) .GT. h_threshold) THEN
                 gamma = 3.0_wp * nu_ref / state%h * EXP(-visc_par * (state%T - T_ref))
 
@@ -110,9 +107,9 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
-                        speed_ratio, speed_before, 'lava')
+            CALL validate_analytic_velocity_inputs(dt, state%h, speed_ratio, speed_before, 'lava')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+
             IF (state%rho_m .LE. 0.0_wp) THEN
                 CALL fatal_analytic_input_error('Nonpositive mixture density in lava analytic solver')
 
@@ -123,9 +120,7 @@ CONTAINS
                         EXP(-visc_par * (state%T - T_ref))
             linear_drag = gamma / state%h
             yield_drag = tau0 / (state%rho_m * state%h * speed_ratio)
-            CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE,                                                          &
-                        [yield_drag, linear_drag], dt, speed_before,                                                   &
-                        speed_after)
+            CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE, [yield_drag, linear_drag], dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_lava_analytic
 

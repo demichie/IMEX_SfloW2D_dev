@@ -2,15 +2,15 @@
 !> \details Fixed coefficient k=0.1 s^-1. This demonstration law is intentionally
 !> independent of model-specific namelist parameters and numerical assemblers.
 MODULE rheology_newmodel_2d
-        USE parameters_2d, ONLY : wp
-        USE diagnostics_2d, ONLY : fatal_error
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_newmodel_explicit
-        PUBLIC :: eval_rheology_newmodel_semi_implicit
-        PUBLIC :: eval_rheology_newmodel_implicit
-        PUBLIC :: eval_rheology_newmodel_analytic
+    USE parameters_2d, ONLY : wp
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_newmodel_explicit
+    PUBLIC :: eval_rheology_newmodel_semi_implicit
+    PUBLIC :: eval_rheology_newmodel_implicit
+    PUBLIC :: eval_rheology_newmodel_analytic
 CONTAINS
         !> \brief Evaluate the explicit newmodel contribution to the horizontal momentum source.
         !> \param[in] state Shared physical state (complex for implicit source).
@@ -18,8 +18,7 @@ CONTAINS
         !> currently supported source treatment, using the treatment-specific velocity and
         !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
         !> \param[out] rate Two-component conservative momentum source.
-        SUBROUTINE eval_rheology_newmodel_explicit(state,                                                              &
-                rate)
+        SUBROUTINE eval_rheology_newmodel_explicit(state, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(OUT) :: rate(2)
             ! Keep the common four-treatment interface, but this fixture is Newton-only.

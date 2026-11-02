@@ -17,19 +17,19 @@
 !> velocity source in time.
 !********************************************************************************
 MODULE rheology_froude_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_FROUDE
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_froude_explicit
-        PUBLIC :: eval_rheology_froude_semi_implicit
-        PUBLIC :: eval_rheology_froude_implicit
-        PUBLIC :: eval_rheology_froude_analytic
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_froude_explicit
+    PUBLIC :: eval_rheology_froude_semi_implicit
+    PUBLIC :: eval_rheology_froude_implicit
+    PUBLIC :: eval_rheology_froude_analytic
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -50,12 +50,8 @@ CONTAINS
             LOGICAL, INTENT(IN) :: use_stochastic
             REAL(wp), INTENT(OUT) :: rate(2)
             ! The implicit component is identically zero for Froude rheology.
-            CALL eval_rheology_froude_semi_implicit(state,                                                             &
-                    grav_coeff,                                                                                        &
-                    use_stochastic,                                                                                    &
-                    stochastic_value,                                                                                  &
-                    rate(1),                                                                                           &
-                    rate(2))
+            CALL eval_rheology_froude_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value, rate(1),      &
+                rate(2))
         END SUBROUTINE eval_rheology_froude_explicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -85,8 +81,10 @@ CONTAINS
 
             rate_x = 0.0_wp
             rate_y = 0.0_wp
+
             IF ( state%mod_vel .GT. 0.0_wp .AND. state%red_grav .GT. 0.0_wp ) THEN
                 froude_number = state%mod_vel / SQRT(state%red_grav * state%h)
+
                 IF ( stochastic ) THEN
                         IF ( state%h .GT. 0.01_wp ) froude_number = froude_number + stochastic_value
                         IF ( froude_number .LT. 0.0_wp ) froude_number = 0.0_wp
@@ -134,8 +132,8 @@ CONTAINS
         !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
         !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
         !> s^-1].
-        SUBROUTINE eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_term,                   &
-                stochastic, stochastic_value, velocity_after)
+        SUBROUTINE eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,       &
+            stochastic_value, velocity_after)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_term
@@ -149,11 +147,11 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
-                        speed_ratio, speed_before, 'Froude')
+            CALL validate_analytic_velocity_inputs(dt, state%h, speed_ratio, speed_before, 'Froude')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
             IF (state%h .LE. 0.0_wp .OR. state%red_grav .LE. 0.0_wp .OR.                                               &
                         speed_ratio .LE. 0.0_wp) RETURN
+
             IF (Fr_0 .LE. 0.0_wp) THEN
                 CALL fatal_analytic_input_error('Nonpositive Fr_0 in Froude analytic solver')
 
@@ -165,9 +163,8 @@ CONTAINS
             IF (stochastic .AND. state%h .GT. 0.01_wp) shift = stochastic_value
             froude_value_slope = speed_ratio / SQRT(state%red_grav*state%h)
             froude_slope = froude_value_slope / Fr_0
-            CALL solve_exact_velocity_flow(EXACT_FLOW_FROUDE,                                                          &
-                        [base_drag, froude_slope, shift/Fr_0, mu_0, mu_inf],                                           &
-                        dt, speed_before, speed_after)
+            CALL solve_exact_velocity_flow(EXACT_FLOW_FROUDE, [base_drag, froude_slope, shift/Fr_0, mu_0, mu_inf], dt, &
+                speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_froude_analytic
 

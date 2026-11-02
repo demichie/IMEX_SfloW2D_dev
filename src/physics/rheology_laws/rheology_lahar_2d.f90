@@ -32,22 +32,22 @@
 !> velocity source with depth, T and concentration explicit.
 !********************************************************************************
 MODULE rheology_lahar_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-        USE constitutive_parameters_2d, ONLY : grav, inv_grav
-        USE rheology_parameters_2d, ONLY : T_ref
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE constitutive_parameters_2d, ONLY : grav, inv_grav
+    USE rheology_parameters_2d, ONLY : T_ref
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_QUADRATIC_POLYNOMIAL
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_lahar_explicit
-        PUBLIC :: eval_rheology_lahar_semi_implicit
-        PUBLIC :: eval_rheology_lahar_implicit
-        PUBLIC :: eval_rheology_lahar_analytic
-        PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
-        PUBLIC :: eval_lahar_fluid_viscosity
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_lahar_explicit
+    PUBLIC :: eval_rheology_lahar_semi_implicit
+    PUBLIC :: eval_rheology_lahar_implicit
+    PUBLIC :: eval_rheology_lahar_analytic
+    PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
+    PUBLIC :: eval_lahar_fluid_viscosity
         REAL(wp) :: alpha2
         REAL(wp) :: beta2
         REAL(wp) :: alpha1_coeff
@@ -78,13 +78,9 @@ CONTAINS
             REAL(wp) :: sx, sy
             COMPLEX(wp) :: ix, iy
             TYPE(complex_physical_state_type) :: cs
-            CALL eval_rheology_lahar_semi_implicit(state,                                                              &
-                    sx,                                                                                                &
-                    sy)
+            CALL eval_rheology_lahar_semi_implicit(state, sx, sy)
             CALL complex_state_from_real(state, cs)
-            CALL eval_rheology_lahar_implicit(cs,                                                                      &
-                    ix,                                                                                                &
-                    iy)
+            CALL eval_rheology_lahar_implicit(cs, ix, iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
         END SUBROUTINE eval_rheology_lahar_explicit
 
@@ -114,6 +110,7 @@ CONTAINS
             rate_y = 0.0_wp
             IF (.NOT. (state%mod_vel>0.0_wp)) RETURN
             yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
+
             IF (state%h .GT. depth_threshold) THEN
                 yield_slope = yield_strength / (grav * state%rho_m * state%h)
 
@@ -153,6 +150,7 @@ CONTAINS
 
             rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
             rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+
             IF (wp .EQ. sp) THEN
                 depth_threshold = 1.0E-10_wp
 
@@ -162,6 +160,7 @@ CONTAINS
             END IF
 
             fluid_viscosity = eval_lahar_fluid_viscosity(state%T, SUM(state%alphas))
+
             IF (REAL(state%h, wp) .GT. depth_threshold) THEN
                 inverse_depth = 1.0_wp / state%h
                 viscous_slope = Kappa * fluid_viscosity * state%mod_vel * 0.125_wp *                                   &
@@ -208,9 +207,9 @@ CONTAINS
             alphas_tot = SUM(state%alphas)
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
-                        speed_ratio, speed_before, 'lahar')
+            CALL validate_analytic_velocity_inputs(dt, state%h, speed_ratio, speed_before, 'lahar')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+
             IF (state%rho_m .LE. 0.0_wp) THEN
                 CALL fatal_analytic_input_error('Nonpositive mixture density in lahar analytic solver')
 
@@ -234,8 +233,7 @@ CONTAINS
             quadratic_drag = grav * n_td2 * speed_ratio**2 *                                                           &
                         effective_depth**neg_four_thirds
             CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                                            &
-                        [constant_drag, linear_drag, quadratic_drag], dt,                                              &
-                        speed_before, speed_after)
+                [constant_drag, linear_drag, quadratic_drag], dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_lahar_analytic
 
@@ -269,6 +267,7 @@ CONTAINS
             COMPLEX(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1
 
             temperature_celsius = T - 273.15_wp
+
             IF (REAL(temperature_celsius, wp) .LT. 20.0_wp) THEN
                 exponent_a = 1301.0_wp / (998.333_wp + 8.1855_wp *                                                     &
                             (temperature_celsius - 20.0_wp) + 0.00585_wp *                                             &

@@ -19,21 +19,21 @@
 !> rational mod_vel-dependent frozen-coefficient source in time.
 !********************************************************************************
 MODULE rheology_mui_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp, n_solid
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE constitutive_parameters_2d, ONLY : diam_s, rho_s
-        USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
-        USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp, n_solid
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE constitutive_parameters_2d, ONLY : diam_s, rho_s
+    USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
+    USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_MUI
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_mui_explicit
-        PUBLIC :: eval_rheology_mui_semi_implicit
-        PUBLIC :: eval_rheology_mui_implicit
-        PUBLIC :: eval_rheology_mui_analytic
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_mui_explicit
+    PUBLIC :: eval_rheology_mui_semi_implicit
+    PUBLIC :: eval_rheology_mui_implicit
+    PUBLIC :: eval_rheology_mui_analytic
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
         !> \param[in] state Shared real or complex physical state.
@@ -54,11 +54,7 @@ CONTAINS
             REAL(wp) :: curvature_accel
             curvature_accel=state%curvature_acceleration
             ! The mu(I) implicit component is identically zero.
-            CALL eval_rheology_mui_semi_implicit(state,                                                                &
-                    grav_coeff,                                                                                        &
-                    use_pore_pressure,                                                                                 &
-                    rate(1),                                                                                           &
-                    rate(2))
+            CALL eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, rate(1), rate(2))
         END SUBROUTINE eval_rheology_mui_explicit
 
         !> \param[in] state Shared real or complex physical state.
@@ -99,6 +95,7 @@ CONTAINS
             rate_x = 0.0_wp
             rate_y = 0.0_wp
             IF ( state%mod_vel .LE. 0.0_wp ) RETURN
+
             IF ( n_solid .GT. 1 ) THEN
                 particle_diameter = sauter_diameter(solid_fraction)
                 particle_density = average_density_solids(solid_fraction)
@@ -110,6 +107,7 @@ CONTAINS
             END IF
 
             effective_depth = h
+
             IF ( effective_depth .LT. EPSILON(1.0_wp) ) THEN
                 effective_depth = EPSILON(1.0_wp)
 
@@ -117,6 +115,7 @@ CONTAINS
 
             effective_vertical_stress = rhom *                                                                         &
                         ( red_grav + state%curvature_acceleration ) * effective_depth
+
             IF ( use_pore_pressure ) THEN
                 effective_vertical_stress = effective_vertical_stress -                                                &
                             exc_pore_pres
@@ -126,6 +125,7 @@ CONTAINS
             effective_vertical_stress = MAX(effective_vertical_stress, 0.0_wp)
             effective_normal_stress = MAX(0.0_wp, effective_vertical_stress *                                          &
                         SQRT(grav_coeff))
+
             IF ( effective_normal_stress .LT. EPSILON(1.0_wp) ) THEN
                 effective_normal_stress = EPSILON(1.0_wp)
 
@@ -173,7 +173,7 @@ CONTAINS
         !> \param[in] use_pore_pressure Enable pore-pressure correction.
         !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
         SUBROUTINE eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
-                use_pore_pressure, velocity_after)
+            use_pore_pressure, velocity_after)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration
@@ -192,12 +192,11 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, h,                                                              &
-                        speed_ratio, speed_before, 'mu(I)')
+            CALL validate_analytic_velocity_inputs(dt, h, speed_ratio, speed_before, 'mu(I)')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+
             IF (rhom .LE. 0.0_wp .OR. grav_coeff .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error(                                                                       &
-                        'Nonpositive density or gravity multiplier in mu(I) analytic solver')
+                CALL fatal_analytic_input_error('Nonpositive density or gravity multiplier in mu(I) analytic solver')
 
             END IF
 
@@ -212,8 +211,7 @@ CONTAINS
             END IF
 
             IF (particle_diameter .LE. 0.0_wp .OR. particle_density .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error(                                                                       &
-                        'Nonpositive particle property in mu(I) analytic solver')
+                CALL fatal_analytic_input_error('Nonpositive particle property in mu(I) analytic solver')
 
             END IF
 

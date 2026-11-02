@@ -18,19 +18,19 @@
 !> speed-decay law with non-velocity variables explicit.
 !********************************************************************************
 MODULE rheology_lucas_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_LUCAS
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_lucas_explicit
-        PUBLIC :: eval_rheology_lucas_semi_implicit
-        PUBLIC :: eval_rheology_lucas_implicit
-        PUBLIC :: eval_rheology_lucas_analytic
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_lucas_explicit
+    PUBLIC :: eval_rheology_lucas_semi_implicit
+    PUBLIC :: eval_rheology_lucas_implicit
+    PUBLIC :: eval_rheology_lucas_analytic
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -51,12 +51,8 @@ CONTAINS
             LOGICAL, INTENT(IN) :: use_stochastic
             REAL(wp), INTENT(OUT) :: rate(2)
             ! The implicit component is identically zero for Lucas rheology.
-            CALL eval_rheology_lucas_semi_implicit(state,                                                              &
-                    grav_coeff,                                                                                        &
-                    use_stochastic,                                                                                    &
-                    stochastic_value,                                                                                  &
-                    rate(1),                                                                                           &
-                    rate(2))
+            CALL eval_rheology_lucas_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value, rate(1),       &
+                rate(2))
         END SUBROUTINE eval_rheology_lucas_explicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -87,7 +83,9 @@ CONTAINS
 
             rate_x = 0.0_wp
             rate_y = 0.0_wp
+
             IF ( state%mod_vel .GT. 0.0_wp ) THEN
+
                 IF ( stochastic ) THEN
                         friction_speed = state%mod_vel + stochastic_value
 
@@ -150,8 +148,8 @@ CONTAINS
         !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
         !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
         !> s^-1].
-        SUBROUTINE eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term,                    &
-                stochastic, stochastic_value, velocity_after)
+        SUBROUTINE eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,        &
+            stochastic_value, velocity_after)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_term
@@ -164,9 +162,9 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
-                        speed_ratio, speed_before, 'Lucas')
+            CALL validate_analytic_velocity_inputs(dt, state%h, speed_ratio, speed_before, 'Lucas')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+
             IF (U_w .LE. 0.0_wp) THEN
                 CALL fatal_analytic_input_error('Nonpositive U_w in Lucas analytic solver')
 
@@ -179,8 +177,7 @@ CONTAINS
             shallow = 0.0_wp
             IF (state%h .LT. 0.1_wp) shallow = 1.0_wp
             CALL solve_exact_velocity_flow(EXACT_FLOW_LUCAS,                                                           &
-                        [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],                                &
-                        dt, speed_before, speed_after)
+                [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow], dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_lucas_analytic
 
