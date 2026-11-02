@@ -55,6 +55,7 @@ CONTAINS
         USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, &
             physical_cell_state_finite
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
+        USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         TYPE(mass_exchange_rates_type) :: transfers
@@ -112,6 +113,15 @@ CONTAINS
             CASE DEFAULT
                 CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
             END SELECT
+            ! Darcy's inhibition polynomial must have a valid configured order
+            ! before any worker evaluates its cell-local pressure source.
+            IF (ANY(groups(group_index)%source_names=='pore_pressure_dissipation') .OR. &
+                ANY(groups(group_index)%source_names=='pore_pressure_darcy')) THEN
+                IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR. &
+                    TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
+                    IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
+                END IF
+            END IF
             with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
             IF (with_exchange) THEN
                 IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
