@@ -47,7 +47,11 @@ def main():
             # Independent directories prevent overwritten outputs and warmup leakage.
             threads = (1, 2, 4, 8)
             schedule = [(n, k) for k in range(args.repetitions + 1) for n in threads]
-            # Validate the serial reference first, then interleave later repetitions.\n            first = [(1, 0)]\n            schedule.remove((1, 0))\n            random.Random(20261102).shuffle(schedule)\n            schedule = first + schedule
+            # Validate the serial reference first, then interleave later repetitions.
+            first = [(1, 0)]
+            schedule.remove((1, 0))
+            random.Random(20261102).shuffle(schedule)
+            schedule = first + schedule
             results = {n: [] for n in threads}
             for n, k in schedule:
                 target = root / "run" / f"t{n}-r{k}"
@@ -81,7 +85,8 @@ def main():
                 rows.append({"threads": n, "median_seconds": med,
                              "speedup": speedup, "efficiency": speedup / n,
                              "samples_seconds": results[n]})
-            report["results"] = rows\n            report["cpu_available"] = os.cpu_count()
+            report["results"] = rows
+            report["cpu_available"] = os.cpu_count()
             summary = ["# Lie OpenMP performance benchmark", "",
                        f"Commit: `{report['sha']}` · grid x={args.cells} · horizon={args.horizon}s",
                        "", "| Threads | Median wall (s) | Speedup | Efficiency |",
