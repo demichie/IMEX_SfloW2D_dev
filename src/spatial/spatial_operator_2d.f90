@@ -61,7 +61,8 @@ CONTAINS
     !> q_t + spatial_term = local_sources.
     !>
     !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
-    !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+    !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
+    !> appended
     !>               u and v.
     !> \param[out] spatial_term Complete explicit spatial term with sign
     !>                          q_t+spatial_term=local_sources.
@@ -99,7 +100,8 @@ CONTAINS
     !> \param[in] time Current simulation time [s].
     !> \param[out] dt Returned CFL-limited timestep, bounded by max_dt [s].
     !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
-    !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL evaluation.
+    !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL
+    !> evaluation.
     !******************************************************************************
 
     SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled )

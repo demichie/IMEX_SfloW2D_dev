@@ -115,7 +115,8 @@ CONTAINS
     !> \brief Burn in the OU field and initialize the transported stochastic state when configured.
     !>
     !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
-    !> \param[in,out] state Current flow state; stochastic q/qp entries are initialized after burn-in
+    !> \param[in,out] state Current flow state; stochastic q/qp entries are initialized after
+    !> burn-in
     !>                      when transport is enabled.
     !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
     !>
@@ -301,7 +302,8 @@ CONTAINS
     !> \brief Apply the OU fractional step and initialize conservative stochastic transport.
     !>
     !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
-    !> \param[in,out] state Current flow state; transported stochastic q/qp entries are updated after
+    !> \param[in,out] state Current flow state; transported stochastic q/qp entries are updated
+    !> after
     !>                      the OU step.
     !> \param[in] dt Time increment [s].
 

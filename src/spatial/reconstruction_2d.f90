@@ -136,7 +136,8 @@ CONTAINS
     !> \brief Reconstruct physical traces, apply boundary conditions and finalize HP states.
     !>
     !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
-    !> \param[in] qp_expl Cell-centered physical states at the explicit stage, including the required
+    !> \param[in] qp_expl Cell-centered physical states at the explicit stage, including the
+    !> required
     !>                    stencil halo.
     !> \param[in] t Current simulation or stage time [s].
     !> \param[in] solve_cells Number of entries in the active-cell index lists.
@@ -786,9 +787,10 @@ CONTAINS
         !> \param[in] j_cell X index of the cell appended to the parent eta workset.
         !> \param[in] k_cell Y index of the cell appended to the parent eta workset.
         !>
-        !> \note Updates the host-associated this workspace; the active-cell workset is not modified.
+        !> \note Updates the host-associated this workspace; the active-cell workset is not
+        !> modified.
 
-        SUBROUTINE append_eta_cell(j_cell,k_cell)
+    SUBROUTINE append_eta_cell(j_cell,k_cell)
 
             INTEGER, INTENT(IN) :: j_cell, k_cell
 
@@ -799,7 +801,7 @@ CONTAINS
             this%hp_eta_j(this%hp_eta_cells) = j_cell
             this%hp_eta_k(this%hp_eta_cells) = k_cell
 
-        END SUBROUTINE append_eta_cell
+    END SUBROUTINE append_eta_cell
 
     END SUBROUTINE build_hp_workset
 
@@ -1110,7 +1112,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> correction on the active target cells.
     !>
     !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
-    !> \param[in] qp_center Unmodified cell-centered physical states used by all HP candidate phases.
+    !> \param[in] qp_center Unmodified cell-centered physical states used by all HP candidate
+    !> phases.
     !> \param[in] solve_cells Number of entries in the active-cell index lists.
     !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
     !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
@@ -1476,7 +1479,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         !> \param[in] jc X index of the current cell in the parent reconstruction.
         !> \param[in] kc Y index of the current cell in the parent reconstruction.
         !>
-        !> \note Reads the host qp_center and shared face bed; writes only this cell eta candidates in
+        !> \note Reads the host qp_center and shared face bed; writes only this cell eta candidates
+        !> in
         !>       the parent workspace.
 
 
@@ -1485,7 +1489,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         !> @details A dry trace has zero momentum and velocity; wet traces use
         !>          the same selected depth for both momentum components.
         !> @param[in,out] trace Primitive face trace modified in place.
-        SUBROUTINE form_direct_face_momentum(trace)
+    SUBROUTINE form_direct_face_momentum(trace)
             REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
             trace(1) = MAX(trace(1),0.0_wp)
 
@@ -1497,7 +1501,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                 trace(3) = trace(1)*trace(idx_v)
 
             END IF
-        END SUBROUTINE form_direct_face_momentum
+    END SUBROUTINE form_direct_face_momentum
 
 
     !> @brief Select the admissible transport depth and finalize face fractions.

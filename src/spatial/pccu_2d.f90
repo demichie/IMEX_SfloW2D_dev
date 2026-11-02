@@ -46,7 +46,8 @@ CONTAINS
     !> @param[in] grav_coeff_left Large-slope factor G at the negative/left endpoint.
     !> @param[in] h_right Depth at the positive/right path endpoint [m].
     !> @param[in] gamma_right Hydrostatic coefficient Gamma at the positive/right endpoint.
-    !> @param[in] eta_right Free-surface elevation at the positive/right endpoint or stencil neighbour
+    !> @param[in] eta_right Free-surface elevation at the positive/right endpoint or stencil
+    !> neighbour
     !>                      [m].
     !> @param[in] grav_coeff_right Large-slope factor G at the positive/right endpoint.
     !> @param[out] path_contribution Integrated nonconservative path contribution, one entry per
@@ -160,7 +161,8 @@ CONTAINS
     !> @param[in] path_state Extended state evaluated at the current path quadrature coordinate.
     !> @param[in] dstate_ds Derivative of the extended path state with respect to its unit-interval
     !>                      coordinate.
-    !> @param[out] integrand Model one-form contracted with the path tangent, one entry per equation.
+    !> @param[out] integrand Model one-form contracted with the path tangent, one entry per
+    !> equation.
 
     SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds, integrand )
 

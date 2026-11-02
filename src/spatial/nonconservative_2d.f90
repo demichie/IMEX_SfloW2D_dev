@@ -28,19 +28,20 @@ MODULE nonconservative_2d
         !>
         !> @param[in] direction Cartesian path direction: PATH_DIR_X or PATH_DIR_Y.
         !> @param[in] path_state Extended state evaluated at the current path quadrature coordinate.
-        !> @param[in] dstate_ds Derivative of the extended path state with respect to its unit-interval
+        !> @param[in] dstate_ds Derivative of the extended path state with respect to its
+        !> unit-interval
         !>                      coordinate.
         !> @param[out] integrand Model one-form contracted with the path tangent, one entry per
         !>                       equation.
         !***************************************************************************
 
-        SUBROUTINE nonconservative_integrand_callback( direction, path_state, dstate_ds, integrand )
+    SUBROUTINE nonconservative_integrand_callback( direction, path_state, dstate_ds, integrand )
             IMPORT :: wp
             INTEGER, INTENT(IN) :: direction
             REAL(wp), INTENT(IN) :: path_state(:)
             REAL(wp), INTENT(IN) :: dstate_ds(:)
             REAL(wp), INTENT(OUT) :: integrand(:)
-        END SUBROUTINE nonconservative_integrand_callback
+    END SUBROUTINE nonconservative_integrand_callback
 
         !***************************************************************************
         !> @brief Declare a callback that evaluates a path state and its tangent.
@@ -48,19 +49,20 @@ MODULE nonconservative_2d
         !> @param[in] stateL Extended state at the beginning of the model path.
         !> @param[in] stateR Extended state at the end of the model path.
         !> @param[in] s Path coordinate in the unit interval [0,1].
-        !> @param[out] path_state Extended state evaluated at the current path quadrature coordinate.
+        !> @param[out] path_state Extended state evaluated at the current path quadrature
+        !> coordinate.
         !> @param[out] dstate_ds Derivative of the extended path state with respect to its
         !>                       unit-interval coordinate.
         !***************************************************************************
 
-        SUBROUTINE path_state_callback( stateL, stateR, s, path_state, dstate_ds )
+    SUBROUTINE path_state_callback( stateL, stateR, s, path_state, dstate_ds )
             IMPORT :: wp
             REAL(wp), INTENT(IN) :: stateL(:)
             REAL(wp), INTENT(IN) :: stateR(:)
             REAL(wp), INTENT(IN) :: s
             REAL(wp), INTENT(OUT) :: path_state(:)
             REAL(wp), INTENT(OUT) :: dstate_ds(:)
-        END SUBROUTINE path_state_callback
+    END SUBROUTINE path_state_callback
 
     END INTERFACE
 
@@ -75,7 +77,8 @@ CONTAINS
     !> @param[in] direction Cartesian path direction: PATH_DIR_X or PATH_DIR_Y.
     !> @param[in] stateL Extended state at the beginning of the model path.
     !> @param[in] stateR Extended state at the end of the model path.
-    !> @param[in] integrand_provider Callback evaluating all nonconservative products at a quadrature
+    !> @param[in] integrand_provider Callback evaluating all nonconservative products at a
+    !> quadrature
     !>                               state.
     !> @param[out] path_contribution Integrated nonconservative path contribution, one entry per
     !>                               equation.
