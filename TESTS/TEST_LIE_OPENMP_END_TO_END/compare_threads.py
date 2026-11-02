@@ -150,7 +150,7 @@ def run_case(solver, fixture, root, case, threads, evidence):
             raise AssertionError(f"{case}/{threads}: no actual Newton iterations; log={log_path}")
     if case == "EXAMPLE_2D_TOPO":
         witnesses = re.findall(
-            r"D20_BED_WITNESS group=[0-9]+ max_abs_delta=([0-9.Ee+-]+)",
+            r"D20_BED_WITNESS\s+group=\s*[0-9]+\s+max_abs_delta=\s*([0-9.Ee+-]+)",
             result.stdout)
         if not witnesses:
             raise AssertionError(f"{case}/{threads}: no bed-update witness (group not "
