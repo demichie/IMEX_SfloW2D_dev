@@ -22,7 +22,6 @@ MODULE lie_source_executor_2d
     TYPE :: group_profile_type
         INTEGER :: id=0,method=0,calls=0
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
-        REAL(wp) :: input_copy=0.0_wp,output_copy=0.0_wp
     END TYPE group_profile_type
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
@@ -79,7 +78,6 @@ CONTAINS
         LOGICAL, INTENT(OUT) :: step_failed
         CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
         REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
-        REAL(wp), ALLOCATABLE :: q_group(:,:,:),qp_group(:,:,:)
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         INTEGER, ALLOCATABLE :: group_j(:),group_k(:),newton_iterations(:)
@@ -96,7 +94,7 @@ CONTAINS
         CHARACTER(LEN=256) :: failure_reason
         CHARACTER(LEN=24) :: reject_env
         INTEGER :: reject_group,env_status,parse_status
-        INTEGER :: tick,tock,clock_rate,copy_tick
+        INTEGER :: tick,tock,clock_rate
         CHARACTER(LEN=8) :: profile_env
 
         step_failed=.FALSE.
@@ -141,13 +139,6 @@ CONTAINS
             IF (profiling_enabled) THEN
                 CALL SYSTEM_CLOCK(tick,clock_rate)
                 group_profile(group_index)%calls=group_profile(group_index)%calls+1
-            END IF
-            q_group=q
-            qp_group=qp
-            IF (profiling_enabled) THEN
-                CALL SYSTEM_CLOCK(tock)
-                group_profile(group_index)%input_copy=group_profile(group_index)%input_copy+ &
-                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
             END IF
             ! Validate configuration before spawning workers: fatal dispatch errors
             ! must not originate from a concurrent cell evaluation.
@@ -202,8 +193,8 @@ CONTAINS
 
             END IF
             ! q and qp remain immutable group-entry states until the serial commit.
-            ! Only q_group/qp_group candidates and per-cell staging are modified.
-            ! Each active cell owns distinct candidate slices and staging slots.
+            ! Each worker modifies only its own cell in the trial timestep state.
+            ! A failure discards the entire timestep trial, never a single group.
             IF (profiling_enabled) THEN
                 CALL SYSTEM_CLOCK(tock)
                 group_profile(group_index)%setup=group_profile(group_index)%setup+ &
@@ -344,8 +335,8 @@ CONTAINS
 
                     END IF
                     ! Commit only after the complete cell-local candidate is admissible.
-                    q_group(:,j,k)=q_candidate
-                    qp_group(:,j,k)=qp_candidate
+                    q(:,j,k)=q_candidate
+                    qp(:,j,k)=qp_candidate
 
                     IF (with_exchange) THEN
                         group_j(cell)=j
@@ -379,10 +370,10 @@ CONTAINS
                     END IF
                     ! The analytic method must update the group candidate only.
                     ! Publishing q here would bypass the atomic group commit.
-                    q_group(1:n_eqns,j,k)=q_group(1:n_eqns,j,k)+time_step*analytic_rate
+                    q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
-                    IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
-                    CALL solve_backward_euler_group(groups(group_index), q_group(:,j,k), time_step,                    &
+                    IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+                    CALL solve_backward_euler_group(groups(group_index), q(:,j,k), time_step,                    &
                         B_prime_x_geom(j,k), B_prime_y_geom(j,k), grav_coeff(j,k), noise, iterations, ok, linear_info, &
                         failed)
                     newton_iterations(cell)=iterations
@@ -401,14 +392,14 @@ CONTAINS
                 ! Explicit candidates were already validated and converted above.
                 IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE cell_loop
                 ! Only check admissibility: never clip the accepted source update.
-                IF (.NOT.conservative_mass_admissible(q_group(1:n_eqns,j,k))) THEN
+                IF (.NOT.conservative_mass_admissible(q(1:n_eqns,j,k))) THEN
                     cell_failure(cell)='D19: inadmissible conservative source group state'
                     CYCLE cell_loop
 
                 END IF
 
-                IF (q_group(idx_totMassEqn,j,k)>0.0_wp) THEN
-                    CALL qc_to_qp(q_group(:,j,k),qp_group(:,j,k),pressure,TRIM(context),conversion_ok)
+                IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
+                    CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context),conversion_ok)
 
                     IF (.NOT.conversion_ok) THEN
                         cell_failure(cell)='D19: source group conversion failed'
@@ -416,7 +407,7 @@ CONTAINS
 
                     END IF
                 ELSE
-                    CALL initialize_dry_physical_cell(qp_group(:,j,k))
+                    CALL initialize_dry_physical_cell(qp(:,j,k))
 
                 END IF
 
@@ -461,7 +452,7 @@ CONTAINS
                 RETURN
 
             END IF
-            ! Publish inventory changes only after all cells in the group succeed.
+            ! Apply substrate and geometry updates after the cell-local evaluations.
             IF (with_exchange .AND. topo_change_flag) THEN
                 ALLOCATE(bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
                 CALL record_group_bed_rates
@@ -525,14 +516,6 @@ CONTAINS
 
             END IF
 
-            IF (profiling_enabled) CALL SYSTEM_CLOCK(copy_tick)
-            q=q_group
-            qp=qp_group
-            IF (profiling_enabled) THEN
-                CALL SYSTEM_CLOCK(tock)
-                group_profile(group_index)%output_copy=group_profile(group_index)%output_copy+ &
-                    REAL(tock-copy_tick,wp)/REAL(clock_rate,wp)
-            END IF
             ! Explicit integration-test failpoint: reject only after the group
             ! has committed its candidate fluid, inventories and geometry.
             ! Never enabled in normal runs; the enclosing integrator must undo
@@ -586,9 +569,6 @@ CONTAINS
                 ' calls=',group_profile(n)%calls, &
                 ' setup/evaluate/commit=',group_profile(n)%setup, &
                 group_profile(n)%evaluate,group_profile(n)%commit
-            WRITE(*,'(A,I0,A,2(1X,ES15.7))') &
-                'LIE_GROUP_PROFILE_COPY id=',group_profile(n)%id, &
-                ' input/output=',group_profile(n)%input_copy,group_profile(n)%output_copy
         END DO
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_END'
     END SUBROUTINE report_lie_source_profile
