@@ -322,7 +322,8 @@ CONTAINS
                 CASE ('none')
                     CONTINUE
                 CASE ('rheology_voellmy')
-                    CALL eval_rheology_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    CALL eval_rheology_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff,                    &
+                        curvature_acceleration,                                                                        &
                             use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
                 CASE ('rheology_plastic')
                     CALL eval_rheology_plastic_analytic(dt, current_state, speed_ratio, velocity_after)
@@ -335,16 +336,20 @@ CONTAINS
                 CASE ('rheology_quadratic')
                     CALL eval_rheology_quadratic_analytic(dt, current_state, speed_ratio, velocity_after)
                 CASE ('rheology_froude')
-                    CALL eval_rheology_froude_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    CALL eval_rheology_froude_analytic(dt, current_state, speed_ratio, grav_coeff,                     &
+                        curvature_acceleration,                                                                        &
                             use_stochastic, stochastic_value, velocity_after)
                 CASE ('rheology_lucas')
-                    CALL eval_rheology_lucas_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration,  &
+                    CALL eval_rheology_lucas_analytic(dt, current_state, speed_ratio, grav_coeff,                      &
+                        curvature_acceleration,                                                                        &
                             use_stochastic, stochastic_value, velocity_after)
                 CASE ('rheology_mui')
-                    CALL eval_rheology_mui_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration,    &
+                    CALL eval_rheology_mui_analytic(dt, current_state, speed_ratio, grav_coeff,                        &
+                        curvature_acceleration,                                                                        &
                             use_pore_pressure, velocity_after)
                 CASE ('rheology_mui_voellmy')
-                    CALL eval_rheology_mui_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    CALL eval_rheology_mui_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff,                &
+                        curvature_acceleration,                                                                        &
                             use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
                 CASE DEFAULT
                     model_supported = .FALSE.
