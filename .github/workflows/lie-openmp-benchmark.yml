@@ -56,10 +56,13 @@ jobs:
         run: |
           /usr/bin/python3 -m py_compile TESTS/TEST_LIE_OPENMP_BENCHMARK/run_benchmark.py
           /usr/bin/python3 -m py_compile TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py
-      - name: Show runner CPU capacity
+      - name: Inspect effective runner CPU resources
         run: |
-          nproc
-          lscpu | grep -E "CPU\\(s\\)|Core\\(s\\)|Thread\\(s\\)" || true
+          mkdir -p benchmark-results
+          /usr/bin/python3 TESTS/TEST_LIE_OPENMP_BENCHMARK/inspect_cpu.py \
+            --json benchmark-results/cpu-resources.json \
+            --markdown benchmark-results/cpu-resources.md
+          cat benchmark-results/cpu-resources.md >> "$GITHUB_STEP_SUMMARY"
       - name: Measure wall-clock OpenMP scaling
         env:
           IMEX_PROFILE_LIE: "1"
