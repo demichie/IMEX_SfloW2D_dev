@@ -200,3 +200,12 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 - **Correzione race effettiva:** `assemble_lie_explicit_transaction` restituisce un `has_exchange` `INTENT(OUT)`. L'esecutore aveva passato `with_exchange`, flag condiviso fra worker; ora utilizza `cell_has_exchange` privato per thread e verifica la coerenza con il metadato del gruppo. Anche la lettura dello stato del gruppo avviene ora attraverso `q/qp` congelati, mentre `q_group/qp_group` sono esclusivamente candidati. Eliminata una conversione ripetuta per candidati espliciti già validati. Questi interventi richiedono ancora compilazione e regressione numerica.
 
 **Nota di metodo:** questo piano deriva dalla lettura del codice di produzione alla data sopra indicata. Le proprietà di thread safety transitive sono *ipotesi da validare*, non garanzie; non è stata effettuata compilazione né esecuzione dei test come parte della redazione.
+
+## 9. Consolidamento del ciclo sorgenti (2026-11-02)
+
+- **Race risolta:** in `lie_source_executor_2d` il flag `with_exchange` era condiviso ma passato a `assemble_lie_explicit_transaction` come argomento `INTENT(OUT)`. Si usa ora `cell_has_exchange` privato per worker, con controllo di corrispondenza al metadato del gruppo.
+- **Ingressi immutabili:** le valutazioni fisiche esplicite e analitiche leggono `q/qp`, cioe' il gruppo precedentemente accettato; `q_group/qp_group` rimangono candidati di uscita. Il gruppo zero mantiene `q_original/qp_original` per la valutazione dei rate, e il destinatario post-spaziale per l'incremento.
+- **Conversione esplicita unica:** il candidato esplicito gia' controllato e convertito non viene riconvertito nel controllo comune a valle. Restano invariati i controlli di ammissibilita' per i metodi analitico e Newton.
+- **Audit statico:** esaminati tutti i 34 file `.f90` sotto `src/physics` per `SAVE`, `COMMON`, RNG e I/O diretto. Due scritture di errore/STOP in `pore_pressure_darcy_2d` dipendono da `N_inh<0`; introdotta una validazione preventiva nell'esecutore per i gruppi Darcy con inibizione STATIC/DYNAMIC. Questa e' una mitigazione mirata, non una prova di thread safety completa.
+- **Gate non superati:** impossibile clonare il repository nel container per errore DNS `github.com`; dunque non e' stata eseguita la compilazione e non sono stati effettuati test multi-thread end-to-end. I nuovi commit sono implementativi, non una certificazione OpenMP.
+
