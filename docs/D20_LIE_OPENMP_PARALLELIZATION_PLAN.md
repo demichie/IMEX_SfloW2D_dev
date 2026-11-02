@@ -182,4 +182,6 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 - `lie_source_executor_2d.f90`: `PARALLEL DO` nel gruppo Lie, temporanei `PRIVATE`, diagnostiche per slot `cell_failure(cell)` e selezione deterministica della prima cella fallita; rimangono seriali gruppi, proiezione, aggiornamento degli inventari e refresh. Commit `fad351b`, correzione `f6d47e8`.
 - **Non certificato**: reentrancy dell'intera catena di chiamate (conversioni, fisica, Newton), univocità effettiva delle scritture in ogni configurazione, compilazione con `-fopenmp`, test 1/2/4/8 thread, casi di rollback e race detection. Questi restano gate obbligatori prima di considerare attiva e sicura la parallelizzazione.
 
+- Audit Newton: le scritture verbose e la pausa interattiva della line-search sono state disabilitate quando la chiamata avviene dentro una regione OpenMP, mantenendo il comportamento diagnostico nell'esecuzione seriale. Le routine non devono usare I/O interattivo concorrente. **Resta da verificare** la sicurezza di ogni chiusura transitiva e delle interfacce del convertitore. 
+
 **Nota di metodo:** questo piano deriva dalla lettura del codice di produzione alla data sopra indicata. Le proprietà di thread safety transitive sono *ipotesi da validare*, non garanzie; non è stata effettuata compilazione né esecuzione dei test come parte della redazione.

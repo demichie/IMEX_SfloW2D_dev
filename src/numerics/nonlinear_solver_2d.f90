@@ -7,6 +7,7 @@
 !********************************************************************************
 
 MODULE nonlinear_solver_2d
+    USE omp_lib, ONLY : omp_in_parallel
 
     USE diagnostics_2d, ONLY : debug_pause
 
@@ -604,7 +605,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
 
         optimal_step_search: DO
 
-            IF ( verbose_level .GE. 4 ) THEN
+            IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
                 WRITE(*,*) 'alam',alam
 
@@ -622,7 +623,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
                 Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
                 active_equations,source_group )
 
-            IF ( verbose_level .GE. 4 ) THEN
+            IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
                 WRITE(*,*) 'lnsrch: effe_old,effe',scal_f_old,scal_f
                 CALL debug_pause('nonlinear line-search iteration')
@@ -632,7 +633,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
             IF ( scal_f .LE. scal_f_old + ALF * alam * slope ) THEN
                 ! Sufficient decrease according to the Armijo condition.
 
-                IF ( verbose_level .GE. 4 ) THEN
+                IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
                     WRITE(*,*) 'sufficient function decrease'
 
@@ -643,7 +644,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
             ELSE IF ( alam < alamin ) THEN
                 ! convergence on Delta_x
 
-                IF ( verbose_level .GE. 4 ) THEN
+                IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
                     WRITE(*,*) ' convergence on Delta_x',alam,alamin
 
