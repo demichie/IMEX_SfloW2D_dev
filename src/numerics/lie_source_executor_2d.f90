@@ -80,7 +80,7 @@ CONTAINS
             staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
-        LOGICAL :: with_exchange,ok,failed,bed_accepted,conversion_ok
+        LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         CHARACTER(LEN=256), ALLOCATABLE :: cell_failure(:)
 
@@ -134,7 +134,7 @@ CONTAINS
             !$OMP& PRIVATE(cell,j,k,qpentry,q_candidate,qp_candidate,deposit_candidate, &
             !$OMP& erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
             !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
-            !$OMP& transfers,ok,failed,conversion_ok,status,iterations,linear_info,context)
+            !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context)
             cell_loop: DO cell=1,domain%solve_cells
                 j=domain%j_cent(cell)
                 k=domain%k_cent(cell)
@@ -190,9 +190,13 @@ CONTAINS
                 CASE(SOURCE_METHOD_EXPLICIT)
                     CALL assemble_lie_explicit_transaction(qpentry,q_group(1:n_eqns,j,k), &
                         time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k), &
-                        total_rate,transfers,with_exchange,ok,noise,B_zone(j,k),analytic_context, &
+                        total_rate,transfers,cell_has_exchange,ok,noise,B_zone(j,k),analytic_context, &
                         cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
                         cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k),dx*dy)
+                    IF (cell_has_exchange .NEQV. with_exchange) THEN
+                        cell_failure(cell)='D20: inconsistent cell exchange group metadata'
+                        CYCLE cell_loop
+                    END IF
                     IF (.NOT.ok) THEN
                         cell_failure(cell)='D19: physical source transaction rejected'
                         CYCLE cell_loop
@@ -274,13 +278,14 @@ CONTAINS
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0,A,I0)') &
                             'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
-                        ! Error stored in cell_failure(cell)
                         CYCLE cell_loop
                     END IF
                 CASE DEFAULT
                     cell_failure(cell)='D19: invalid group method'
                     CYCLE cell_loop
                 END SELECT
+                ! Explicit candidates were already validated and converted above.
+                IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE cell_loop
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_group(1:n_eqns,j,k))) THEN
                     cell_failure(cell)='D19: inadmissible conservative source group state'
