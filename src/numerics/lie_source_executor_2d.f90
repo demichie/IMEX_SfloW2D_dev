@@ -93,7 +93,7 @@ CONTAINS
         REAL(wp), ALLOCATABLE :: staged_bed_rate(:)
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
-        LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok,has_bed_group
+        LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok,has_bed_group,has_exchange_group
         LOGICAL, ALLOCATABLE :: exchange_group(:)
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,bed_group_id
         CHARACTER(LEN=256), ALLOCATABLE :: cell_failure(:)
@@ -198,6 +198,7 @@ CONTAINS
                 IF (profiling_enabled) group_profile(group_index)%calls=group_profile(group_index)%calls+1
             END DO
         END IF
+        has_exchange_group=ANY(exchange_group)
         ALLOCATE(cell_failure(domain%solve_cells))
         cell_failure=''
         IF (has_bed_group) THEN
@@ -230,7 +231,7 @@ CONTAINS
             k=domain%k_cent(cell)
             q_local=q(:,j,k)
             qp_local=qp(:,j,k)
-            IF (ANY(exchange_group)) THEN
+            IF (has_exchange_group) THEN
                 deposit_local=state%deposit(j,k,1:n_solid)
                 erosion_local=state%erosion(j,k,1:n_solid)
                 erodible_local=state%erodible(1:n_solid,j,k)
@@ -450,7 +451,7 @@ CONTAINS
             IF (LEN_TRIM(cell_failure(cell))==0) THEN
                 q(:,j,k)=q_local
                 qp(:,j,k)=qp_local
-                IF (ANY(exchange_group)) THEN
+                IF (has_exchange_group) THEN
                     state%deposit(j,k,1:n_solid)=deposit_local
                     state%erosion(j,k,1:n_solid)=erosion_local
                     state%erodible(1:n_solid,j,k)=erodible_local
@@ -516,7 +517,7 @@ CONTAINS
                 RETURN
             END IF
         END IF
-        IF (ANY(exchange_group)) CALL state%refresh_substrate_totals()
+        IF (has_exchange_group) CALL state%refresh_substrate_totals()
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)
