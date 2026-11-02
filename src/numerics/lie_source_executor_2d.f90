@@ -25,11 +25,13 @@ MODULE lie_source_executor_2d
     END TYPE group_profile_type
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
+    REAL(wp), SAVE :: profile_cell_sweep=0.0_wp,profile_final_commit=0.0_wp
 
 CONTAINS
 
     !> @brief Evaluate and commit each ordered Lie physical-source group.
-    !> @details In group zero evaluate source rates using the pre-spatial
+    !> @details Cell-major parallel sweep with frozen geometry. In group zero
+    !>          evaluate source rates using the pre-spatial
     !>          snapshots but apply their limited increments to the post-FV
     !>          candidate. Later groups read the previously committed group
     !>          state; an inadmissible candidate rejects the group transaction.
@@ -80,13 +82,14 @@ CONTAINS
         REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
-        INTEGER, ALLOCATABLE :: newton_iterations(:)
+        INTEGER, ALLOCATABLE :: newton_iterations(:,:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
         REAL(wp), ALLOCATABLE :: staged_bed_rate(:)
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
-        LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok
-        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
+        LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok,has_bed_group
+        LOGICAL, ALLOCATABLE :: exchange_group(:)
+        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,bed_group_id
         CHARACTER(LEN=256), ALLOCATABLE :: cell_failure(:)
 
         CHARACTER(LEN=96) :: context
@@ -135,80 +138,73 @@ CONTAINS
         IF (.NOT.ieee_is_finite(time_step)) CALL fatal_error('D19: non-finite Lie timestep')
         IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
 
+        ! The ordered Lie composition is cell-local. Shared geometry remains
+        ! frozen until the entire trial source sweep has succeeded.
+        ALLOCATE(exchange_group(SIZE(groups)))
+        exchange_group=.FALSE.
+        bed_group_id=-1
+        has_bed_group=.FALSE.
+        IF (profiling_enabled) CALL SYSTEM_CLOCK(tick,clock_rate)
         DO group_index=1,SIZE(groups)
-            IF (profiling_enabled) THEN
-                CALL SYSTEM_CLOCK(tick,clock_rate)
-                group_profile(group_index)%calls=group_profile(group_index)%calls+1
-            END IF
-            ! Validate configuration before spawning workers: fatal dispatch errors
-            ! must not originate from a concurrent cell evaluation.
             IF (.NOT.ALLOCATED(groups(group_index)%source_names))                                                      &
                 CALL fatal_error('D20: Lie source group has no allocated source list')
             IF (SIZE(groups(group_index)%source_names)==0) CYCLE
-
             SELECT CASE(groups(group_index)%method)
             CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
                 CONTINUE
             CASE DEFAULT
                 CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
-
             END SELECT
-            ! Darcy's inhibition polynomial must have a valid configured order
-            ! before any worker evaluates its cell-local pressure source.
             IF (ANY(groups(group_index)%source_names=='pore_pressure_dissipation') .OR.                                &
                 ANY(groups(group_index)%source_names=='pore_pressure_darcy')) THEN
                 IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR.                                                       &
                     TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
                     IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
-
                 END IF
-
             END IF
-
-            with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
-
-            IF (with_exchange) THEN
+            exchange_group(group_index)=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
+            IF (exchange_group(group_index)) THEN
                 IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                                &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
                 IF (topo_change_flag) THEN
-                    ALLOCATE(staged_bed_rate(domain%solve_cells))
-                    ALLOCATE(bed_rate_cell(comp_cells_x,comp_cells_y))
-                    bed_rate_cell=0.0_wp
-
+                    has_bed_group=.TRUE.
+                    bed_group_id=groups(group_index)%id
                 END IF
-
             END IF
-
-            ALLOCATE(cell_failure(domain%solve_cells))
-            cell_failure=''
-
-            IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
-                newton_witness_env=''
-                CALL GET_ENVIRONMENT_VARIABLE('IMEX_NEWTON_WITNESS',newton_witness_env)
-                IF (TRIM(newton_witness_env)=='1') THEN
-                    ALLOCATE(newton_iterations(domain%solve_cells))
-                    newton_iterations=0
-                END IF
-
+            IF (profiling_enabled) group_profile(group_index)%calls=group_profile(group_index)%calls+1
+        END DO
+        ALLOCATE(cell_failure(domain%solve_cells))
+        cell_failure=''
+        IF (has_bed_group) THEN
+            ALLOCATE(staged_bed_rate(domain%solve_cells))
+            staged_bed_rate=0.0_wp
+            ALLOCATE(bed_rate_cell(comp_cells_x,comp_cells_y))
+            bed_rate_cell=0.0_wp
+        END IF
+        newton_witness_env=''
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_NEWTON_WITNESS',newton_witness_env)
+        IF (TRIM(newton_witness_env)=='1') THEN
+            IF (ANY(groups%method==SOURCE_METHOD_NEWTON)) THEN
+                ALLOCATE(newton_iterations(domain%solve_cells,SIZE(groups)))
+                newton_iterations=0
             END IF
-            ! Only the time-step trial is updated; group rollback is unnecessary.
-            ! Each worker modifies only its own cell in the trial timestep state.
-            ! A failure discards the entire timestep trial, never a single group.
-            IF (profiling_enabled) THEN
-                CALL SYSTEM_CLOCK(tock)
-                group_profile(group_index)%setup=group_profile(group_index)%setup+ &
-                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
-                tick=tock
-            END IF
-            !$OMP PARALLEL DO DEFAULT(SHARED) &
-            !$OMP& PRIVATE(cell,j,k,qpentry,q_candidate,qp_candidate,deposit_candidate, &
-            !$OMP& erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
-            !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
-            !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context)
-            cell_loop: DO cell=1,domain%solve_cells
-                j=domain%j_cent(cell)
-                k=domain%k_cent(cell)
-
+        END IF
+        IF (profiling_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            group_profile(1)%setup=group_profile(1)%setup+REAL(tock-tick,wp)/REAL(clock_rate,wp)
+            tick=tock
+        END IF
+        !$OMP PARALLEL DO DEFAULT(SHARED) &
+        !$OMP& PRIVATE(cell,j,k,group_index,with_exchange,qpentry,q_candidate,qp_candidate, &
+        !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
+        !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
+        !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context)
+        cell_loop: DO cell=1,domain%solve_cells
+            j=domain%j_cent(cell)
+            k=domain%k_cent(cell)
+            group_loop: DO group_index=1,SIZE(groups)
+                IF (SIZE(groups(group_index)%source_names)==0) CYCLE group_loop
+                with_exchange=exchange_group(group_index)
                 IF (groups(group_index)%id==0) THEN
                     qpentry=qp_original(:,j,k)
                 ELSE
@@ -232,7 +228,7 @@ CONTAINS
                 IF (.NOT.physical_cell_state_finite(qpentry) .OR.                                                      &
                     .NOT.ieee_is_finite(noise)) THEN
                     cell_failure(cell)='D19: non-finite source-group physical input'
-                    CYCLE cell_loop
+                    EXIT group_loop
 
                 END IF
 
@@ -243,7 +239,7 @@ CONTAINS
                     .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                                    &
                     .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
                     cell_failure(cell)='D19: non-finite source-group geometry'
-                    CYCLE cell_loop
+                    EXIT group_loop
 
                 END IF
 
@@ -259,7 +255,7 @@ CONTAINS
                         ANY(state%erosion(j,k,1:n_solid)<0.0_wp) .OR.                                                  &
                         state%lava_deposit(j,k)<0.0_wp) THEN
                         cell_failure(cell)='D19: invalid substrate inventory before mass exchange'
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
 
@@ -274,13 +270,13 @@ CONTAINS
 
                     IF (cell_has_exchange .NEQV. with_exchange) THEN
                         cell_failure(cell)='D20: inconsistent cell exchange group metadata'
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
 
                     IF (.NOT.ok) THEN
                         cell_failure(cell)='D19: physical source transaction rejected'
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
                     ! Stage the entire local fluid/substrate transfer before committing it.
@@ -292,7 +288,7 @@ CONTAINS
                             'D19: inadmissible source candidate group=',groups(group_index)%id,                        &
                             ' cell=',j,',',k,' mass=',q_candidate(idx_totMassEqn),                                     &
                             ' components=',SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
 
@@ -315,7 +311,7 @@ CONTAINS
                             ANY(erosion_candidate<0.0_wp) .OR.                                                         &
                             lava_candidate<0.0_wp) THEN
                             cell_failure(cell)='D19: invalid candidate substrate inventory'
-                            CYCLE cell_loop
+                            EXIT group_loop
 
                         END IF
 
@@ -326,7 +322,7 @@ CONTAINS
 
                         IF (.NOT.conversion_ok) THEN
                             cell_failure(cell)='D19: explicit candidate conversion failed'
-                            CYCLE cell_loop
+                            EXIT group_loop
 
                         END IF
                     ELSE
@@ -342,7 +338,7 @@ CONTAINS
                         state%erosion(j,k,1:n_solid)=erosion_candidate
                         state%erodible(1:n_solid,j,k)=erodible_candidate
                         state%lava_deposit(j,k)=lava_candidate
-                        IF (topo_change_flag) staged_bed_rate(cell)=transfers%dB_dt
+                        IF (topo_change_flag) staged_bed_rate(cell)=staged_bed_rate(cell)+transfers%dB_dt
 
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
@@ -356,13 +352,13 @@ CONTAINS
 
                     IF (status/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0)') 'D19: analytic group status ',status
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
 
                     IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
                         cell_failure(cell)='D19: analytic source returned non-finite rate'
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
                     q_candidate=q(:,j,k)
@@ -373,25 +369,25 @@ CONTAINS
                     CALL solve_backward_euler_group(groups(group_index), q_candidate, time_step,                      &
                         B_prime_x_geom(j,k), B_prime_y_geom(j,k), grav_coeff(j,k), noise, iterations, ok, linear_info, &
                         failed)
-                    IF (ALLOCATED(newton_iterations)) newton_iterations(cell)=iterations
+                    IF (ALLOCATED(newton_iterations)) newton_iterations(cell,group_index)=iterations
 
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0,A,I0)')                                                        &
                             'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
                 CASE DEFAULT
                     cell_failure(cell)='D19: invalid group method'
-                    CYCLE cell_loop
+                    EXIT group_loop
 
                 END SELECT
                 ! Explicit candidates were already validated and converted above.
-                IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE cell_loop
+                IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE group_loop
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                     cell_failure(cell)='D19: inadmissible conservative source group state'
-                    CYCLE cell_loop
+                    EXIT group_loop
 
                 END IF
 
@@ -400,7 +396,7 @@ CONTAINS
 
                     IF (.NOT.conversion_ok) THEN
                         cell_failure(cell)='D19: source group conversion failed'
-                        CYCLE cell_loop
+                        EXIT group_loop
 
                     END IF
                 ELSE
@@ -411,117 +407,80 @@ CONTAINS
                 q(:,j,k)=q_candidate
                 qp(:,j,k)=qp_candidate
 
-            END DO cell_loop
-            !$OMP END PARALLEL DO
-            IF (profiling_enabled) THEN
-                CALL SYSTEM_CLOCK(tock)
-                group_profile(group_index)%evaluate=group_profile(group_index)%evaluate+ &
-                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
-                tick=tock
+
+            END DO group_loop
+        END DO cell_loop
+        !$OMP END PARALLEL DO
+        IF (profiling_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            ! With cell-major traversal this is a *whole-sweep* wall-clock time,
+            ! not an individual group evaluation. Report it separately.
+            profile_cell_sweep=profile_cell_sweep+REAL(tock-tick,wp)/REAL(clock_rate,wp)
+            tick=tock
+        END IF
+        first_failure=0
+        DO cell=1,domain%solve_cells
+            IF (LEN_TRIM(cell_failure(cell))>0) THEN
+                first_failure=cell
+                EXIT
             END IF
-            first_failure=0
-
-            DO cell=1,domain%solve_cells
-
-                IF (LEN_TRIM(cell_failure(cell))>0) THEN
-                    first_failure=cell
-                    EXIT
-
-                END IF
-
-            END DO
-
-            IF (first_failure/=0) THEN
-                step_failed=.TRUE.
-                failure_reason=cell_failure(first_failure)
-
-            END IF
-
-            DEALLOCATE(cell_failure)
-
-            IF (ALLOCATED(newton_iterations)) THEN
-                WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
-                    groups(group_index)%id,' solved_cells=',COUNT(newton_iterations>0),                                &
-                    ' total_iterations=',SUM(newton_iterations)
-                DEALLOCATE(newton_iterations)
-
-            END IF
-
-            IF (step_failed) THEN
-                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
-                RETURN
-
-            END IF
-            ! Apply substrate and geometry updates after the cell-local evaluations.
-            IF (with_exchange .AND. topo_change_flag) THEN
-                ALLOCATE(bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
-                CALL record_group_bed_rates
-                bed_accepted=ALL(ieee_is_finite(bed_rate_cell))
-
-                IF (bed_accepted) THEN
-                    CALL project_cell_field_to_vertices(bed_rate_cell,bed_rate_vertex)
-                    bed_accepted=ALL(ieee_is_finite(bed_rate_vertex))
-
-                END IF
-
-                IF (bed_accepted) THEN
-                    bed_candidate=B_vertex+time_step*bed_rate_vertex
-                    IF (.NOT.ALL(ieee_is_finite(bed_candidate))) bed_accepted=.FALSE.
-
-                END IF
-
-                IF (.NOT.bed_accepted) THEN
-                    CALL reject_cell('D19: invalid candidate projected bed')
-                    IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
-                    RETURN
-
-                END IF
-
-            END IF
-
-            IF (with_exchange) THEN
-                ! Accept the geometric projection before publishing inventory changes.
-                ! A rejected refresh rolls back the entire time-step.
-                IF (topo_change_flag) THEN
-                    WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',                                               &
-                        groups(group_index)%id,' max_abs_delta=',                                                      &
-                        MAXVAL(ABS(bed_candidate-B_vertex))
-                    CALL assign_topography_vertices(bed_candidate,bed_accepted)
-
-                    IF (.NOT.bed_accepted) THEN
-                        CALL reject_cell('D19: invalid refreshed geometry')
-                        IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
-                        RETURN
-
-                    END IF
-
-                    DEALLOCATE(bed_rate_cell,bed_rate_vertex,bed_candidate)
-
-                END IF
-
-                CALL state%refresh_substrate_totals()
-                IF (ALLOCATED(staged_bed_rate)) DEALLOCATE(staged_bed_rate)
-
-            END IF
-
-            ! Explicit integration-test failpoint: reject only after the group
-            ! has committed its candidate fluid, inventories and geometry.
-            ! Never enabled in normal runs; the enclosing integrator must undo
-            ! every preceding change using its authoritative snapshots.
-            IF (profiling_enabled) THEN
-                CALL SYSTEM_CLOCK(tock)
-                group_profile(group_index)%commit=group_profile(group_index)%commit+ &
-                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
-            END IF
-            IF (groups(group_index)%id==reject_group) THEN
-                step_failed=.TRUE.
-                failure_reason='D20_INJECTED_LATE_LIE_FAILURE'
-                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
-                RETURN
-
-            END IF
-
         END DO
+        IF (first_failure/=0) THEN
+            step_failed=.TRUE.
+            failure_reason=cell_failure(first_failure)
+            IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
+            RETURN
+        END IF
+        IF (ALLOCATED(newton_iterations)) THEN
+            DO group_index=1,SIZE(groups)
+                IF (groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
+                WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
+                    groups(group_index)%id,' solved_cells=',COUNT(newton_iterations(:,group_index)>0),                 &
+                    ' total_iterations=',SUM(newton_iterations(:,group_index))
+            END DO
+            DEALLOCATE(newton_iterations)
+        END IF
+        ! Geometry is the same for every source group in the step. Project
+        ! all mass-exchange bed rates only once, after the cell sweep.
+        IF (has_bed_group) THEN
+            ALLOCATE(bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
+            CALL record_group_bed_rates
+            bed_accepted=ALL(ieee_is_finite(bed_rate_cell))
+            IF (bed_accepted) THEN
+                CALL project_cell_field_to_vertices(bed_rate_cell,bed_rate_vertex)
+                bed_accepted=ALL(ieee_is_finite(bed_rate_vertex))
+            END IF
+            IF (bed_accepted) THEN
+                bed_candidate=B_vertex+time_step*bed_rate_vertex
+                IF (.NOT.ALL(ieee_is_finite(bed_candidate))) bed_accepted=.FALSE.
+            END IF
+            IF (.NOT.bed_accepted) THEN
+                CALL reject_cell('D19: invalid candidate projected bed')
+                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
+                RETURN
+            END IF
+            WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',bed_group_id,                                           &
+                ' max_abs_delta=',MAXVAL(ABS(bed_candidate-B_vertex))
+            CALL assign_topography_vertices(bed_candidate,bed_accepted)
+            IF (.NOT.bed_accepted) THEN
+                CALL reject_cell('D19: invalid refreshed geometry')
+                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
+                RETURN
+            END IF
+        END IF
+        CALL state%refresh_substrate_totals()
+        IF (profiling_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)
+        END IF
+        ! Inject after the deferred geometry refresh, so the D20 rollback
+        ! witness still verifies restoration of genuinely changed geometry.
+        IF (ANY(groups%id==reject_group)) THEN
+            step_failed=.TRUE.
+            failure_reason='D20_INJECTED_LATE_LIE_FAILURE'
+            IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
+            RETURN
+        END IF
 
     CONTAINS
     SUBROUTINE record_group_bed_rates
@@ -559,6 +518,8 @@ CONTAINS
                 group_profile(n)%evaluate,group_profile(n)%commit
         END DO
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_END'
+        WRITE(*,'(A,ES15.7)') 'LIE_CELL_SWEEP_PROFILE seconds=',profile_cell_sweep
+        WRITE(*,'(A,ES15.7)') 'LIE_GEOMETRY_COMMIT_PROFILE seconds=',profile_final_commit
     END SUBROUTINE report_lie_source_profile
 
 END MODULE lie_source_executor_2d
