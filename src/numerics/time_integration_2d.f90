@@ -18,7 +18,7 @@ MODULE time_integration_2d
     USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
-    USE lie_source_executor_2d, ONLY : execute_lie_source_groups,report_lie_source_profile
+    USE lie_source_executor_2d, ONLY : execute_lie_source_groups,report_lie_source_profile,lie_source_scratch_type
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: time_integration_workspace_type
@@ -30,6 +30,7 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: q_before(:,:,:), qp_before(:,:,:)
         !> Candidate cell states, published only after all groups succeed.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
+        TYPE(lie_source_scratch_type) :: lie_scratch
         TYPE(source_group_type), ALLOCATABLE :: lie_groups(:)
         LOGICAL :: lie_has_exchange=.FALSE.,lie_has_bed=.FALSE.
         LOGICAL, ALLOCATABLE :: lie_exchange_group(:)
@@ -269,7 +270,7 @@ CONTAINS
         END IF
         CALL execute_lie_source_groups(state, this%q_trial, this%qp_trial, dt, domain, source_registry,                &
             stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure, this%lie_groups, &
-            this%lie_exchange_group, this%lie_bed_group_id)
+            this%lie_exchange_group, this%lie_bed_group_id, this%lie_scratch)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
