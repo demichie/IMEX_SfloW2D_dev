@@ -5,6 +5,10 @@ Applies to all production `src/**/*.f90` and to Fortran tests when edited.
 ## Indentation and layout
 
 - Four ASCII spaces per lexical nesting level; **no TAB characters**, including in comments.
+- The indentation is **relative to the actual Fortran construct**: module-level USE/IMPLICIT/PUBLIC/PRIVATE/declarations are exactly 4 columns; module procedures and their corresponding END statements start at 4 columns; procedure declarations and top-level executable statements start at 8 columns. A multiple of four alone is not sufficient.
+- For nested IF/ELSE IF/ELSE/END IF, DO/END DO, SELECT CASE/CASE/END SELECT, WHERE/ELSEWHERE/END WHERE, BLOCK and ASSOCIATE, each nested body adds exactly 4 spaces. CASE and CASE DEFAULT align with their SELECT, and statements inside each CASE are indented one additional level.
+- Place a blank line before and after major IF, DO, SELECT, WHERE, BLOCK and ASSOCIATE constructs where adjacent executable statements would otherwise touch them. Keep CASE labels and ELSE branches attached to their associated construct; do not insert blank lines inside a continued statement or between a procedure's Doxygen header and its declaration.
+- Apply indentation, blank-line grouping, width limits, argument packing and continuation alignment as **one coherent formatting pass**, and verify all these invariants together after every formatting change.
 - Align `END IF`, `END DO`, `END SELECT`, `END BLOCK` and `END SUBROUTINE name` with their respective openers.
 - Indent continued statements consistently with spaces; preserve the semantics of free-form `&` continuation and OpenMP/compiler directives.
 - Separate declaration blocks, initialization, state conversion, source evaluation, admissibility checks, commit/rollback and cleanup with blank lines. Avoid stacked unrelated statements.
