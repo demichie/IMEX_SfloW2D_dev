@@ -73,8 +73,7 @@ CONTAINS
     !>       are already included through path terms.
     !******************************************************************************
 
-    SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain,                                        &
-            boundary_source_enabled )
+    SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, boundary_source_enabled )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
@@ -103,8 +102,7 @@ CONTAINS
     !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL evaluation.
     !******************************************************************************
 
-    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain,                                                &
-            boundary_source_enabled )
+    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -162,8 +160,7 @@ CONTAINS
             j = domain%j_cent(l)
             k = domain%k_cent(l)
 
-            CALL accumulate_directional_face_speeds(this%hp_pccu,j,k,                                                  &
-                max_a_x,max_a_y)
+            CALL accumulate_directional_face_speeds(this%hp_pccu,j,k, max_a_x,max_a_y)
         END DO
         !$OMP END PARALLEL DO
 

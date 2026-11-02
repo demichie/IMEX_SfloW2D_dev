@@ -84,8 +84,7 @@ CONTAINS
     !> @param[out] value_right Oriented face value consumed by the positive/right adjacent cell.
     !******************************************************************************
 
-    SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution,                                             &
-            a_minus, a_plus, value_left, value_right )
+    SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution, a_minus, a_plus, value_left, value_right )
 
         REAL(wp), INTENT(IN) :: numerical_flux(:), path_contribution(:)
         REAL(wp), INTENT(IN) :: a_minus, a_plus
@@ -157,8 +156,7 @@ CONTAINS
     !>                      coordinate.
     !> @param[out] integrand Model one-form contracted with the path tangent, one entry per equation.
 
-    SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds,                                                &
-            integrand )
+    SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds, integrand )
 
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(IN) :: path_state(:), dstate_ds(:)

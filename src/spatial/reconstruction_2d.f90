@@ -146,8 +146,7 @@ CONTAINS
     !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
 
 
-    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent,                                          &
-            use_kt_direct, source_boundary_enabled )
+    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, source_boundary_enabled )
 
         ! External procedures
         USE state_conversion_2d, ONLY : qp_to_qp2
@@ -235,23 +234,19 @@ CONTAINS
 
                 IF ( sourceE(j,k) ) THEN
 
-                    CALL eval_boundary_injection_explicit( t, sourceE_vect_x(j,k), sourceE_vect_y(j,k),                &
-                        source_bdry )
+                    CALL eval_boundary_injection_explicit( t, sourceE_vect_x(j,k), sourceE_vect_y(j,k), source_bdry )
 
                 ELSEIF ( sourceW(j,k) ) THEN
 
-                    CALL eval_boundary_injection_explicit( t, sourceW_vect_x(j,k), sourceW_vect_y(j,k),                &
-                        source_bdry )
+                    CALL eval_boundary_injection_explicit( t, sourceW_vect_x(j,k), sourceW_vect_y(j,k), source_bdry )
 
                 ELSEIF ( sourceS(j,k) ) THEN
 
-                    CALL eval_boundary_injection_explicit( t, sourceS_vect_x(j,k), sourceS_vect_y(j,k),                &
-                        source_bdry )
+                    CALL eval_boundary_injection_explicit( t, sourceS_vect_x(j,k), sourceS_vect_y(j,k), source_bdry )
 
                 ELSEIF ( sourceN(j,k) ) THEN
 
-                    CALL eval_boundary_injection_explicit( t, sourceN_vect_x(j,k), sourceN_vect_y(j,k),                &
-                        source_bdry )
+                    CALL eval_boundary_injection_explicit( t, sourceN_vect_x(j,k), sourceN_vect_y(j,k), source_bdry )
 
                 END IF
 
@@ -274,8 +269,7 @@ CONTAINS
 
                     qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
                     qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
-                    CALL limit( qrec_stencil , x_stencil , limiter(i) ,                                                &
-                        qrec_prime_x(i) )
+                    CALL limit( qrec_stencil , x_stencil , limiter(i) , qrec_prime_x(i) )
 
                     dq = reconstr_coeff * dx2 * qrec_prime_x(i)
                     qrecW(i) = qrec_stencil(2) - dq
@@ -283,8 +277,7 @@ CONTAINS
 
                     qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
                     qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
-                    CALL limit( qrec_stencil , y_stencil , limiter(i) ,                                                &
-                        qrec_prime_y(i) )
+                    CALL limit( qrec_stencil , y_stencil , limiter(i) , qrec_prime_y(i) )
 
                     dq = reconstr_coeff * dy2 * qrec_prime_y(i)
                     qrecS(i) = qrec_stencil(2) - dq
@@ -377,8 +370,7 @@ CONTAINS
 
                         END IF
 
-                        CALL limit( qrec_stencil , x_stencil , limiter(i) ,                                            &
-                            qrec_prime_x(i) )
+                        CALL limit( qrec_stencil , x_stencil , limiter(i) , qrec_prime_x(i) )
 
                     ENDIF check_x_boundary
 
@@ -491,8 +483,7 @@ CONTAINS
 
                         END IF
 
-                        CALL limit( qrec_stencil , y_stencil , limiter(i) ,                                            &
-                            qrec_prime_y(i) )
+                        CALL limit( qrec_stencil , y_stencil , limiter(i) , qrec_prime_y(i) )
 
                     ENDIF check_y_boundary
 
@@ -588,8 +579,7 @@ CONTAINS
 
                     END IF
 
-                    CALL limit( qrec_stencil , x_stencil , limiter(i) ,                                                &
-                        qrec_prime_x(i) )
+                    CALL limit( qrec_stencil , x_stencil , limiter(i) , qrec_prime_x(i) )
 
                     dq = reconstr_coeff*dx2*qrec_prime_x(i)
 
@@ -671,8 +661,7 @@ CONTAINS
 
                     ENDIF
 
-                    CALL limit( qrec_stencil , y_stencil , limiter(i) ,                                                &
-                        qrec_prime_y(i) )
+                    CALL limit( qrec_stencil , y_stencil , limiter(i) , qrec_prime_y(i) )
 
                     dq = reconstr_coeff*dy2*qrec_prime_y(i)
 
@@ -738,8 +727,7 @@ CONTAINS
 
         !$OMP END PARALLEL DO
 
-        CALL apply_hp_reconstruction( this, qp_expl, solve_cells, j_cent, k_cent,                                      &
-            use_kt_direct )
+        CALL apply_hp_reconstruction( this, qp_expl, solve_cells, j_cent, k_cent, use_kt_direct )
 
         RETURN
 
@@ -1088,8 +1076,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> \param[in] use_kt_direct Use direct KT traces instead of the HP dry-state projection.
     !******************************************************************************
 
-    SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,                                          &
-            k_cent, use_kt_direct )
+    SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent, k_cent, use_kt_direct )
 
         USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
 
@@ -1372,8 +1359,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         DO l=1,this%hp_eta_cells
             j=this%hp_eta_j(l)
             k=this%hp_eta_k(l)
-            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k),                                           &
-                this%eta_interfaceR(j,k),B_face_x(j,k),                                                                &
+            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), this%eta_interfaceR(j,k),B_face_x(j,k),   &
                 this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k),                                           &
                 lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2,                                              &
                 this%h_selected_interfaceR(j,k),'KT reconstruction west',kt_mode)
@@ -1382,8 +1368,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                 this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k),                                       &
                 lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2,                                   &
                 this%h_selected_interfaceL(j+1,k),'KT reconstruction east',kt_mode)
-            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k),                                           &
-                this%eta_interfaceT(j,k),B_face_y(j,k),                                                                &
+            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), this%eta_interfaceT(j,k),B_face_y(j,k),   &
                 this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k),                                           &
                 lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2,                                              &
                 this%h_selected_interfaceT(j,k),'KT reconstruction south',kt_mode)
@@ -1450,8 +1435,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[out] h_selected Accepted nonnegative transport depth [m].
     !> @param[in] context Context string used in physical closure diagnostics.
     !> @param[in] kt_mode Selected KT trace reconstruction mode.
-    SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude,                                              &
-            source_trace,h_selected,context,kt_mode)
+    SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, source_trace,h_selected,context,kt_mode)
         USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
         REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
         REAL(wp), INTENT(IN) :: eta,bed,h_minmod,h_froude

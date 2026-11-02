@@ -34,8 +34,7 @@ MODULE nonconservative_2d
         !>                       equation.
         !***************************************************************************
 
-        SUBROUTINE nonconservative_integrand_callback( direction, path_state,                                          &
-                dstate_ds, integrand )
+        SUBROUTINE nonconservative_integrand_callback( direction, path_state, dstate_ds, integrand )
             IMPORT :: wp
             INTEGER, INTENT(IN) :: direction
             REAL(wp), INTENT(IN) :: path_state(:)
@@ -54,8 +53,7 @@ MODULE nonconservative_2d
         !>                       unit-interval coordinate.
         !***************************************************************************
 
-        SUBROUTINE path_state_callback( stateL, stateR, s, path_state,                                                 &
-                dstate_ds )
+        SUBROUTINE path_state_callback( stateL, stateR, s, path_state, dstate_ds )
             IMPORT :: wp
             REAL(wp), INTENT(IN) :: stateL(:)
             REAL(wp), INTENT(IN) :: stateR(:)
@@ -124,8 +122,7 @@ CONTAINS
         DO i_quad = 1, n_quad_local
 
             IF ( PRESENT(path_provider) ) THEN
-                CALL path_provider( stateL, stateR, gauss_abscissa(i_quad),                                            &
-                    path_state, dstate_ds )
+                CALL path_provider( stateL, stateR, gauss_abscissa(i_quad), path_state, dstate_ds )
             ELSE
                 path_state = stateL + gauss_abscissa(i_quad) * (stateR - stateL)
                 dstate_ds = stateR - stateL

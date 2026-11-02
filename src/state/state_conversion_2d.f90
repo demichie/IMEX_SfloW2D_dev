@@ -120,8 +120,7 @@ CONTAINS
     !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
     !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-    SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xc,                                                          &
-            sp_heat_c_mix, sp_heat_mix)
+    SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xc, sp_heat_c_mix, sp_heat_mix)
 
         COMPLEX(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
         COMPLEX(wp), INTENT(OUT) :: xc, sp_heat_c_mix, sp_heat_mix
@@ -143,8 +142,7 @@ CONTAINS
     !> \param[out] alphas Solid volume fractions, one entry per solid class.
     !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
 
-    SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, rho_m,                                                &
-            inv_rhom, rho_c, inv_rho_c, alphas, alphag)
+    SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
         REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
         REAL(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
@@ -167,8 +165,7 @@ CONTAINS
     !> \param[out] alphas Solid volume fractions, one entry per solid class.
     !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
 
-    SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, rho_m,                                             &
-            inv_rhom, rho_c, inv_rho_c, alphas, alphag)
+    SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
         COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
         COMPLEX(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
@@ -267,8 +264,7 @@ CONTAINS
     !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
     !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-    SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xc, sp_heat_c_mix,                                              &
-            sp_heat_mix)
+    SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xc, sp_heat_c_mix, sp_heat_mix)
 
         REAL(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
         REAL(wp), INTENT(OUT) :: xc, sp_heat_c_mix, sp_heat_mix
@@ -343,8 +339,7 @@ CONTAINS
             IF (PRESENT(bxx)) geometry(3)=bxx
             IF (PRESENT(bxy)) geometry(4)=bxy
             IF (PRESENT(byy)) geometry(5)=byy
-            CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                       &
-                geometry(3),geometry(4),geometry(5))
+            CALL update_physical_state_kinematics(state,geometry(1),geometry(2), geometry(3),geometry(4),geometry(5))
             RETURN
         END IF
         xs = state%xs
@@ -362,8 +357,7 @@ CONTAINS
         IF (PRESENT(bxx)) geometry(3)=bxx
         IF (PRESENT(bxy)) geometry(4)=bxy
         IF (PRESENT(byy)) geometry(5)=byy
-        CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                           &
-            geometry(3),geometry(4),geometry(5))
+        CALL update_physical_state_kinematics(state,geometry(1),geometry(2), geometry(3),geometry(4),geometry(5))
     END SUBROUTINE physical_state_from_qp
 
     !> \brief Clip roundoff negatives and proportionally close explicit component fractions.
@@ -462,8 +456,7 @@ CONTAINS
         IF (PRESENT(bxx)) geometry(3)=bxx
         IF (PRESENT(bxy)) geometry(4)=bxy
         IF (PRESENT(byy)) geometry(5)=byy
-        CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                           &
-            geometry(3),geometry(4),geometry(5))
+        CALL update_physical_state_kinematics(state,geometry(1),geometry(2), geometry(3),geometry(4),geometry(5))
     END SUBROUTINE real_physical_state_from_q
 
     !******************************************************************************
@@ -492,8 +485,7 @@ CONTAINS
     !>                           variable.
     !******************************************************************************
 
-    SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag,                                                       &
-            red_grav, p_dyn, Zs, exc_pore_pres)
+    SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag, red_grav, p_dyn, Zs, exc_pore_pres)
 
         IMPLICIT NONE
 
@@ -546,8 +538,7 @@ CONTAINS
         IF (PRESENT(bxx)) geometry(3)=bxx
         IF (PRESENT(bxy)) geometry(4)=bxy
         IF (PRESENT(byy)) geometry(5)=byy
-        CALL update_physical_state_kinematics(state,geometry(1),geometry(2),                                           &
-            geometry(3),geometry(4),geometry(5))
+        CALL update_physical_state_kinematics(state,geometry(1),geometry(2), geometry(3),geometry(4),geometry(5))
     END SUBROUTINE physical_state_from_q
 
 
@@ -576,8 +567,7 @@ CONTAINS
     !>                           variable.
     !******************************************************************************
 
-    SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs,                                         &
-            exc_pore_pres)
+    SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs, exc_pore_pres)
 
         IMPLICIT NONE
 
@@ -675,8 +665,7 @@ CONTAINS
         xs=state%xs
         xg=state%xg
         CALL enforce_mass_fraction_closure(xs,xg)
-        CALL eval_mixture_properties_from_mass_fractions(state%T,xs,xg,                                                &
-            rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
+        CALL eval_mixture_properties_from_mass_fractions(state%T,xs,xg, rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
         CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
         red_grav=(rho_m-rho_a_amb)/rho_m*grav
         speed_squared=state%u**2+state%v**2
@@ -899,8 +888,7 @@ CONTAINS
     !> \param[out] r_sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
     !******************************************************************************
 
-    SUBROUTINE mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,                                               &
-            r_sp_heat_mix)
+    SUBROUTINE mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c, r_sp_heat_mix)
 
         IMPLICIT none
 
@@ -966,8 +954,7 @@ CONTAINS
             r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                                                                 &
             r_alphas, r_alphag)
 
-        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc,                                                              &
-            r_sp_heat_c, r_sp_heat_mix)
+        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc, r_sp_heat_c, r_sp_heat_mix)
 
         ! reduced gravity
         r_red_grav = ( r_rho_m - rho_a_amb ) / r_rho_m * grav
@@ -1210,8 +1197,7 @@ CONTAINS
             r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                                                                 &
             r_alphas, r_alphag)
 
-        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc, r_sp_heat_c,                                                 &
-            r_sp_heat_mix)
+        CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc, r_sp_heat_c, r_sp_heat_mix)
 
         IF ( stoch_transport_flag) r_Zs = qp(idx_stoch)
 

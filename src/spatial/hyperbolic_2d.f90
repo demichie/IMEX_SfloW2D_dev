@@ -321,9 +321,7 @@ CONTAINS
     !> @param[in] solve_interfaces_y Number of active y faces.
     !> @param[in] j_stag_y X indices of active y faces.
     !> @param[in] k_stag_y Y indices of active y faces.
-    SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t,                                               &
-            solve_interfaces_x,                                                                                        &
-            j_stag_x,                                                                                                  &
+    SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t, solve_interfaces_x, j_stag_x,                 &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
         USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
@@ -361,8 +359,7 @@ CONTAINS
                     qp_center(1,j-1,k) .LE. dry_thickness_tolerance
                 IF ( j .LE. comp_cells_x ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
-                CALL eval_pccu_interface( recon%eta_interfaceL(j,k),                                                   &
-                    recon%eta_interfaceR(j,k), B_face_x(j,k),                                                          &
+                CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
                         recon%h_selected_interfaceR(j,k),                                                              &
                     recon%qp_adv_interfaceL(:,j,k),                                                                    &
@@ -435,8 +432,7 @@ CONTAINS
                     qp_center(1,j,k-1) .LE. dry_thickness_tolerance
                 IF ( k .LE. comp_cells_y ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
-                CALL eval_pccu_interface( recon%eta_interfaceB(j,k),                                                   &
-                    recon%eta_interfaceT(j,k), B_face_y(j,k),                                                          &
+                CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
                         recon%h_selected_interfaceB(j,k),                                                              &
                         recon%h_selected_interfaceT(j,k),                                                              &
                     recon%qp_adv_interfaceB(:,j,k),                                                                    &
@@ -490,8 +486,7 @@ CONTAINS
         ! The oriented mass contributions are measured on the interior side of
         ! each domain boundary, after the one-way boundary treatment.
         IF (lateral_source_flag .AND. t .GE. 0.0999_wp .AND. t .LE. 0.1001_wp) THEN
-            CALL GET_ENVIRONMENT_VARIABLE('IMEX_SOURCE_BOUNDARY_BUDGET',                                               &
-                diagnostic_flag, STATUS=diagnostic_status)
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_SOURCE_BOUNDARY_BUDGET', diagnostic_flag, STATUS=diagnostic_status)
             IF (diagnostic_status .EQ. 0 .AND. diagnostic_flag .EQ. '1') THEN
                 source_inflow = 0.0_wp
                 other_inflow = 0.0_wp
@@ -571,8 +566,7 @@ CONTAINS
     !> \param[in] t Current simulation or stage time [s].
     !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
     !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
-    SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face,                                                        &
-            h_selected_left,h_selected_right,                                                                          &
+    SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face, h_selected_left,h_selected_right,                      &
             qp_adv_left,qp_adv_right,                                                                                  &
             grav_coeff,a_minus,a_plus,direction,normal_momentum_index,face_i,                                          &
             face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                                                     &
@@ -616,8 +610,7 @@ CONTAINS
 
         qp_adv_left_use=qp_adv_left
         qp_adv_right_use=qp_adv_right
-        CALL lateral_source_trace_sides(direction,face_i,face_j,                                                       &
-            source_trace_left,source_trace_right)
+        CALL lateral_source_trace_sides(direction,face_i,face_j, source_trace_left,source_trace_right)
         h_eta_left=h_selected_left
         h_eta_right=h_selected_right
         ! Reconstruct u,v separately at cell centres and form the face
@@ -727,14 +720,12 @@ CONTAINS
         END IF
         CALL eval_hydrostatic_coefficient(qp_path_left,reduced_gravity_left,gamma_left)
         CALL eval_hydrostatic_coefficient(qp_path_right,reduced_gravity_right,gamma_right)
-        CALL regularize_dry_gamma_pair(qp_path_left(1),gamma_left,                                                     &
-            qp_path_right(1),gamma_right)
+        CALL regularize_dry_gamma_pair(qp_path_left(1),gamma_left, qp_path_right(1),gamma_right)
         CALL eval_hydrostatic_path(direction,qp_path_left(1),gamma_left,eta_path_left,                                 &
             grav_coeff,qp_path_right(1),gamma_right,eta_path_right,grav_coeff,                                         &
             path_contribution)
 
-        CALL eval_oriented_pccu_pair(interface_flux,path_contribution,a_minus,                                         &
-            a_plus,value_left,value_right)
+        CALL eval_oriented_pccu_pair(interface_flux,path_contribution,a_minus, a_plus,value_left,value_right)
 
         ! A dry adjacent column receives no share of the nonconservative path;
         ! the wet side retains its own oriented contribution.
@@ -789,8 +780,7 @@ CONTAINS
     !> \param[out] source_left True when the negative-side trace is a source cell.
     !> \param[out] source_right True when the positive-side trace is a source cell.
     !******************************************************************************
-    SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j,                                                     &
-            source_left,source_right)
+    SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j, source_left,source_right)
 
         USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -836,8 +826,7 @@ CONTAINS
     !> @param[in] solve_cells Number of active cells.
     !> @param[in] j_cent X indices of active cells.
     !> @param[in] k_cent Y indices of active cells.
-    SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor,                                       &
-            solve_cells, j_cent, k_cent )
+    SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent )
 
         USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -872,8 +861,7 @@ CONTAINS
                 qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
                 IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
-                CALL eval_cell_hydrostatic_path( qp_path_minus,                                                        &
-                    recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                                                       &
+                CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),           &
                     qp_path_plus,recon%eta_cellE(j,k),                                                                 &
                     grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
             END IF
@@ -885,8 +873,7 @@ CONTAINS
                 qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
                 IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
-                CALL eval_cell_hydrostatic_path( qp_path_minus,                                                        &
-                    recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                                                       &
+                CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),           &
                     qp_path_plus,recon%eta_cellN(j,k),                                                                 &
                     grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
             END IF
@@ -909,8 +896,7 @@ CONTAINS
     !> \param[in] grav_plus Large-slope gravity factor at the positive endpoint.
     !> \param[in] direction Cartesian path orientation.
     !> \param[out] path Hydrostatic path contribution across the cell.
-    SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus,                                               &
-            qp_plus,eta_plus,grav_plus,direction,path)
+    SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path)
 
         USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
         USE pccu_2d, ONLY : eval_hydrostatic_path
@@ -925,11 +911,9 @@ CONTAINS
         REAL(wp) :: gamma_minus,gamma_plus
         REAL(wp) :: reduced_gravity_minus,reduced_gravity_plus
 
-        CALL eval_hydrostatic_coefficient(qp_minus,reduced_gravity_minus,                                              &
-            gamma_minus)
+        CALL eval_hydrostatic_coefficient(qp_minus,reduced_gravity_minus, gamma_minus)
         CALL eval_hydrostatic_coefficient(qp_plus,reduced_gravity_plus,gamma_plus)
-        CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1),                                             &
-            gamma_plus)
+        CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1), gamma_plus)
         CALL eval_hydrostatic_path(direction,qp_minus(1),gamma_minus,eta_minus,                                        &
             grav_minus,qp_plus(1),gamma_plus,eta_plus,grav_plus,path)
 
@@ -1030,8 +1014,7 @@ CONTAINS
                 qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
                 qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
                 qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
-                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,                                             &
-                    grav_coeff_stag_x(j,k),idx_u,min_r,max_r)
+                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, grav_coeff_stag_x(j,k),idx_u,min_r,max_r)
 
                 this%a_interface_xNeg(j,k) = min_r
                 this%a_interface_xPos(j,k) = max_r
@@ -1066,8 +1049,7 @@ CONTAINS
                 qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
                 qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
                 qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
-                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,                                             &
-                    grav_coeff_stag_y(j,k),idx_v,min_r,max_r)
+                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, grav_coeff_stag_y(j,k),idx_v,min_r,max_r)
 
                 this%a_interface_yNeg(j,k) = min_r
                 this%a_interface_yPos(j,k) = max_r
@@ -1104,8 +1086,7 @@ CONTAINS
     !> @param[in] normal_velocity_index Primitive normal-velocity component index.
     !> @param[out] speed_minus Lower characteristic bound.
     !> @param[out] speed_plus Upper characteristic bound.
-    SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,                                                &
-            normal_velocity_index,speed_minus,speed_plus)
+    SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff, normal_velocity_index,speed_minus,speed_plus)
 
         USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
@@ -1117,10 +1098,8 @@ CONTAINS
 
         REAL(wp) :: minus_min,minus_max,plus_min,plus_max
 
-        CALL eval_local_speeds_direction(qp_minus,grav_coeff,                                                          &
-            normal_velocity_index,minus_min,minus_max)
-        CALL eval_local_speeds_direction(qp_plus,grav_coeff,                                                           &
-            normal_velocity_index,plus_min,plus_max)
+        CALL eval_local_speeds_direction(qp_minus,grav_coeff, normal_velocity_index,minus_min,minus_max)
+        CALL eval_local_speeds_direction(qp_plus,grav_coeff, normal_velocity_index,plus_min,plus_max)
 
         speed_minus = MIN(minus_min,plus_min,0.0_wp)
         speed_plus = MAX(minus_max,plus_max,0.0_wp)
