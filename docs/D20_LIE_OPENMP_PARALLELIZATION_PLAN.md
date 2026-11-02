@@ -233,3 +233,9 @@ L'utente ha confermato verde l'intera GitHub Action D20 successivamente all'intr
 Sono stati migrati tutti i 21 file `EXAMPLES/**/IMEX_SfloW2D.inp` o `*.template` presenti nella revisione di partenza: rimosso `N_RK`, ormai estraneo alla namelist numerica Lie; i template senza `MASS_EXCHANGE_PARAMETERS` sono stati aggiornati spostando, senza cambiarne i valori, `SETTLING_FLAG`, `EROSION_COEFF` e `ENTRAINMENT_FLAG` dalla namelist di trasporto alla nuova sezione dedicata. Gli input che avevano gia' la sezione mass-exchange non sono stati duplicati. Il test end-to-end accetta direttamente gli input migrati e mantiene un adattatore soltanto per vecchi input senza la sezione. Compilazione e CI delle ultime modifiche non ancora rieseguite.
 
 **Prossimi gate:** (1) Action D20 verde sulla nuova revisione degli esempi; (2) prova di incremento non nullo della topografia quando `TOPO_CHANGE_FLAG=T`; (3) prova che Newton converga in almeno una cella; (4) rollback end-to-end in errore forzato dopo una modifica di inventario e geometria; (5) benchmark ottimizzato 1/2/4/8 thread.
+
+## 12. Gate D20 Newton e topografia (2026-11-02)
+
+I controlli end-to-end per `EXAMPLE_2D_NEWTON` e `EXAMPLE_2D_TOPO` ora richiedono **evidenza operativa**: il solver registra rispettivamente il totale delle iterazioni Newton effettive e la massima variazione del letto prima dell'assegnazione; `compare_threads.py` fallisce se le iterazioni sono zero o il letto non cambia, per ciascuno dei team 1/2/4. La precedente Action verde *non* certifica queste nuove asserzioni, da rieseguire.
+
+**Gate ancora aperto:** il test integrato del rollback atomico del passo Lie dopo un fallimento tardivo, con confronto di `q`, `qp`, tutti gli inventari e le cache geometriche. I test separati `TEST_WORKSPACE_LIFECYCLE` verificano solo il ripristino dei componenti, non un rifiuto reale dell'integratore. Non dichiarare D20 chiuso prima di questo test.
