@@ -18,7 +18,7 @@ CONTAINS
         !> currently supported source treatment, using the treatment-specific velocity and
         !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
         !> \param[out] rate Two-component conservative momentum source.
-        SUBROUTINE eval_rheology_newmodel_explicit(state, &
+        SUBROUTINE eval_rheology_newmodel_explicit(state,                                                              &
                 rate)
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(OUT) :: rate(2)

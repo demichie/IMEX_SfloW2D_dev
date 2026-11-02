@@ -15,9 +15,9 @@
 MODULE rheology_plastic_2d
         USE diagnostics_2d, ONLY : fatal_error
         USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real, &
+        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real,     &
             real_part_physical_state
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
+        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
                 solve_exact_velocity_flow, EXACT_FLOW_CONSTANT
         IMPLICIT NONE
         PRIVATE
@@ -47,8 +47,8 @@ CONTAINS
             TYPE(complex_physical_state_type) :: cs
             CALL eval_rheology_plastic_semi_implicit(state, sx, sy)
             CALL complex_state_from_real(state, cs)
-            CALL eval_rheology_plastic_implicit(cs, &
-                    ix, &
+            CALL eval_rheology_plastic_implicit(cs,                                                                    &
+                    ix,                                                                                                &
                     iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
         END SUBROUTINE eval_rheology_plastic_explicit
@@ -109,11 +109,11 @@ CONTAINS
             velocity_before = [state%u,state%v]
             velocity_after = velocity_before
             speed_before = SQRT(SUM(velocity_before**2))
-            CALL validate_analytic_velocity_inputs(dt, state%h,                                              &
+            CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
                         speed_ratio, speed_before, 'plastic')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
-            CALL solve_exact_velocity_flow(EXACT_FLOW_CONSTANT,                                        &
-                        [tau/(state%h*speed_ratio)], dt, speed_before,                                           &
+            CALL solve_exact_velocity_flow(EXACT_FLOW_CONSTANT,                                                        &
+                        [tau/(state%h*speed_ratio)], dt, speed_before,                                                 &
                         speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
         END SUBROUTINE eval_rheology_plastic_analytic
