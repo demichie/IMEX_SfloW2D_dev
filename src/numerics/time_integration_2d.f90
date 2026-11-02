@@ -44,17 +44,6 @@ CONTAINS
         ALLOCATE(this%qp_trial(n_vars+2,comp_cells_x,comp_cells_y))
     END SUBROUTINE initialize_time_integration
 
-    !> @brief Release previously allocated integration workspaces.
-    !> @param[in,out] this Integration workspace to release.
-    SUBROUTINE finalize_time_integration(this)
-        CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
-        IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
-        IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
-        IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
-        IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
-        IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
-    END SUBROUTINE finalize_time_integration
-
     !> @brief Advance one timestep with spatial update followed by Lie source groups.
     !> @details Reads group-zero physical rates from the pre-spatial snapshot,
     !>          checks spatial admissibility without limiting the spatial rate,
@@ -207,5 +196,16 @@ CONTAINS
         CALL state%refresh_substrate_totals()
         CALL commit_geometry_transaction
     END SUBROUTINE advance_lie
+
+    !> @brief Release previously allocated integration workspaces.
+    !> @param[in,out] this Integration workspace to release.
+    SUBROUTINE finalize_time_integration(this)
+        CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
+        IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
+        IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
+        IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
+        IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
+        IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
+    END SUBROUTINE finalize_time_integration
 
 END MODULE time_integration_2d

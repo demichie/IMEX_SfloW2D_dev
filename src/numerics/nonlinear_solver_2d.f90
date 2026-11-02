@@ -769,6 +769,20 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
 
     END SUBROUTINE eval_f
 
+    !> \brief Return a mask selecting residual rows in one implicit group.
+    !> \param[in] active_equations Equation indices in the group.
+    !> \return Logical mask over all equations, true for active indices.
+    PURE FUNCTION equation_is_active(active_equations) RESULT(mask)
+        INTEGER, INTENT(IN) :: active_equations(:)
+        LOGICAL :: mask(n_eqns)
+        INTEGER :: i
+
+        mask = .FALSE.
+        DO i = 1, SIZE(active_equations)
+            mask(active_equations(i)) = .TRUE.
+        END DO
+    END FUNCTION equation_is_active
+
     !******************************************************************************
     !> \brief Build the scaled backward-Euler group Jacobian using complex-step differentiation.
     !
@@ -870,20 +884,6 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
         RETURN
 
     END SUBROUTINE eval_jacobian
-
-    !> \brief Return a mask selecting residual rows in one implicit group.
-    !> \param[in] active_equations Equation indices in the group.
-    !> \return Logical mask over all equations, true for active indices.
-    PURE FUNCTION equation_is_active(active_equations) RESULT(mask)
-        INTEGER, INTENT(IN) :: active_equations(:)
-        LOGICAL :: mask(n_eqns)
-        INTEGER :: i
-
-        mask = .FALSE.
-        DO i = 1, SIZE(active_equations)
-            mask(active_equations(i)) = .TRUE.
-        END DO
-    END FUNCTION equation_is_active
 
 
 END MODULE nonlinear_solver_2d

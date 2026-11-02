@@ -398,174 +398,418 @@ CONTAINS
 
     END SUBROUTINE init_grid
 
-    !******************************************************************************
-    !> \brief Derive shared Q1 face and cell elevations from B_vertex.
+    !-----------------------------------------------------------------------------
+    !> \brief Bilinearly interpolate a scalar on a grid supplied as coordinate matrices.
     !>
-    !> B_vertex is the only authoritative bed elevation. The two cells adjacent
-    !> to an internal Cartesian face access the same stored B_face_x/B_face_y
-    !> value, so face continuity is an exact storage identity.
+    !> Scalar interpolation (2D)
+    !
+    !> This subroutine interpolate the values of the  array f1, defined on the
+    !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
+    !> \date OCTOBER 2016
     !>
-    !> \note Reads B_vertex and writes B_face_x, B_face_y and B_cent without smoothing the
-    !>       authoritative bed.
-    !******************************************************************************
+    !> \param[in] x1 X coordinates of the original interpolation grid.
+    !> \param[in] y1 Y coordinates of the original interpolation grid.
+    !> \param[in] f1 Scalar values on the original grid.
+    !> \param[in] x2 X coordinate of the requested interpolation point [m].
+    !> \param[in] y2 Y coordinate of the requested interpolation point [m].
+    !> \param[out] f2 Interpolated scalar value at (x2,y2).
+    !-----------------------------------------------------------------------------
 
-    SUBROUTINE derive_topography_from_vertices
+    SUBROUTINE interp_2d_scalar(x1, y1, f1, x2, y2, f2)
+        IMPLICIT NONE
+
+        REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
+        REAL(wp), INTENT(IN) :: x2, y2
+        REAL(wp), INTENT(OUT) :: f2
+
+        INTEGER :: ix , iy
+        REAL(wp) :: alfa_x , alfa_y
+
+        IF ( size(x1,1) .GT. 1 ) THEN
+
+            ix = FLOOR( ( x2 - x1(1,1) ) / ( x1(2,1) - x1(1,1) ) ) + 1
+            ix = MIN( ix , SIZE(x1,1)-1 )
+            alfa_x = ( x1(ix+1,1) - x2 ) / (  x1(ix+1,1) - x1(ix,1) )
+
+        ELSE
+
+            ix = 1
+            alfa_x = 0.0_wp
+
+        END IF
+
+        IF ( size(x1,2) .GT. 1 ) THEN
+
+            iy = FLOOR( ( y2 - y1(1,1) ) / ( y1(1,2) - y1(1,1) ) ) + 1
+            iy = MIN( iy , SIZE(x1,2)-1 )
+            alfa_y = ( y1(1,iy+1) - y2 ) / (  y1(1,iy+1) - y1(1,iy) )
+
+        ELSE
+
+            iy = 1
+            alfa_y = 0.0_wp
+
+        END IF
+
+        IF ( size(x1,1) .EQ. 1 ) THEN
+
+            f2 = alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1)
+
+        ELSEIF ( size(x1,2) .EQ. 1 ) THEN
+
+            f2 = alfa_x * f1(ix,iy)  + ( 1.0_wp - alfa_x ) * f1(ix+1,iy)
+
+        ELSE
+
+            f2 = alfa_x * ( alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1) ) &
+                + ( 1.0_wp - alfa_x ) * ( alfa_y * f1(ix+1,iy) + ( 1.0_wp - alfa_y )&
+                * f1(ix+1,iy+1) )
+
+        END IF
+
+    END SUBROUTINE interp_2d_scalar
+
+    !-----------------------------------------------------------------------------
+    !> \brief Check whether a bilinear interpolation stencil includes missing DEM data.
+    !>
+    !> Scalar interpolation (2D)
+    !
+    !> This subroutine interpolate the values of the  array f1, defined on the
+    !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
+    !> \date OCTOBER 2016
+    !>
+    !> \param[in] x1 X coordinates of the original interpolation grid.
+    !> \param[in] y1 Y coordinates of the original interpolation grid.
+    !> \param[in] f1 Scalar values on the original grid.
+    !> \param[in] x2 X coordinate of the requested interpolation point [m].
+    !> \param[in] y2 Y coordinate of the requested interpolation point [m].
+    !> \param[out] f2 True if any required input stencil value equals nodata_topo.
+    !-----------------------------------------------------------------------------
+
+    SUBROUTINE interp_2d_nodata(x1, y1, f1, x2, y2, f2)
+        IMPLICIT NONE
+
+        REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
+        REAL(wp), INTENT(IN) :: x2, y2
+        LOGICAL, INTENT(OUT) :: f2
+
+        INTEGER :: ix , iy
+        REAL(wp) :: alfa_x , alfa_y
+
+        IF ( size(x1,1) .GT. 1 ) THEN
+
+            ix = FLOOR( ( x2 - x1(1,1) ) / ( x1(2,1) - x1(1,1) ) ) + 1
+            ix = MIN( ix , SIZE(x1,1)-1 )
+            alfa_x = ( x1(ix+1,1) - x2 ) / (  x1(ix+1,1) - x1(ix,1) )
+
+        ELSE
+
+            ix = 1
+            alfa_x = 0.0_wp
+
+        END IF
+
+        IF ( size(x1,2) .GT. 1 ) THEN
+
+            iy = FLOOR( ( y2 - y1(1,1) ) / ( y1(1,2) - y1(1,1) ) ) + 1
+            iy = MIN( iy , SIZE(x1,2)-1 )
+            alfa_y = ( y1(1,iy+1) - y2 ) / (  y1(1,iy+1) - y1(1,iy) )
+
+        ELSE
+
+            iy = 1
+            alfa_y = 0.0_wp
+
+        END IF
+
+        f2 = .FALSE.
+
+        IF ( size(x1,1) .EQ. 1 ) THEN
+
+            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )
+
+        ELSEIF ( size(x1,2) .EQ. 1 ) THEN
+
+            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix+1,iy) .EQ. nodata_topo )
+
+        ELSE
+
+            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )&
+                .OR. ( f1(ix+1,iy) .EQ. nodata_topo )                               &
+                .OR. ( f1(ix+1,iy+1) .EQ. nodata_topo )
+
+        END IF
+
+    END SUBROUTINE interp_2d_nodata
+
+    ! Fissural rectangle/cell intersections follow the segment-and-width source
+    ! geometry introduced by Elisa Biagioli in BiElisa/IMEX_LavaFlow.
+    !> \brief Compute each cell overlap fraction with a finite-width fissure rectangle.
+    !>
+    !> \param[in] endpoints_x X coordinates of the two fissure segment endpoints [m].
+    !> \param[in] endpoints_y Y coordinates of the two fissure segment endpoints [m].
+    !> \param[in] width Full width of the fissure rectangle [m].
+    !> \param[out] cell_fraction Rectangle overlap divided by cell area, one value per cell.
+
+    SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,   &
+            cell_fraction)
 
         IMPLICIT NONE
 
-        B_face_x(:,:) = 0.5_wp * ( B_vertex(:,1:comp_cells_y)                     &
-            + B_vertex(:,2:comp_interfaces_y) )
-        B_face_y(:,:) = 0.5_wp * ( B_vertex(1:comp_cells_x,:)                     &
-            + B_vertex(2:comp_interfaces_x,:) )
+        REAL(wp), INTENT(IN) :: endpoints_x(2), endpoints_y(2), width
+        REAL(wp), INTENT(OUT) :: cell_fraction(comp_cells_x,comp_cells_y)
 
-        B_cent(:,:) = 0.25_wp * ( B_vertex(1:comp_cells_x,1:comp_cells_y)         &
-            + B_vertex(2:comp_interfaces_x,1:comp_cells_y)                       &
-            + B_vertex(1:comp_cells_x,2:comp_interfaces_y)                       &
-            + B_vertex(2:comp_interfaces_x,2:comp_interfaces_y) )
+        REAL(wp) :: polygon_x(16), polygon_y(16)
+        REAL(wp) :: clipped_x(16), clipped_y(16)
+        REAL(wp) :: segment_x, segment_y, segment_length
+        REAL(wp) :: normal_x, normal_y, half_width
+        REAL(wp) :: min_x, max_x, min_y, max_y
+        REAL(wp) :: boundary, previous_coordinate, current_coordinate
+        REAL(wp) :: fraction, intersection_x, intersection_y, area_twice
+        REAL(wp) :: denominator
+        INTEGER :: cell_x, cell_y, vertex, next_vertex, edge
+        INTEGER :: vertex_count, clipped_count, previous_vertex, axis
+        LOGICAL :: keep_greater, previous_inside, current_inside
 
-    END SUBROUTINE derive_topography_from_vertices
+        cell_fraction = 0.0_wp
+        segment_x = endpoints_x(2) - endpoints_x(1)
+        segment_y = endpoints_y(2) - endpoints_y(1)
+        segment_length = SQRT(segment_x**2 + segment_y**2)
+        IF (segment_length .LE. EPSILON(1.0_wp)) RETURN
 
-    !******************************************************************************
-    !> \brief Average adjacent cell values onto the shared vertex grid.
-    !>
-    !> Each vertex receives the arithmetic mean of all adjacent physical cells.
-    !> This is the uniform-grid Q1 mass-lumped projection. It preserves the
-    !> domain integral when the projected nodal field is averaged back to cells.
-    !>
-    !> \param[in] cell_field Cell-centered scalar proposal to be projected to the nodal grid.
-    !> \param[out] vertex_field Vertex values obtained from the adjacent cells, including one-sided
-    !>                          boundaries.
-    !******************************************************************************
+        normal_x = -segment_y / segment_length
+        normal_y = segment_x / segment_length
+        half_width = 0.5_wp * width
 
-    SUBROUTINE project_cell_field_to_vertices( cell_field, vertex_field )
+        min_x = MINVAL(endpoints_x) - half_width * ABS(normal_x)
+        max_x = MAXVAL(endpoints_x) + half_width * ABS(normal_x)
+        min_y = MINVAL(endpoints_y) - half_width * ABS(normal_y)
+        max_y = MAXVAL(endpoints_y) + half_width * ABS(normal_y)
 
-        IMPLICIT NONE
+        DO cell_y = 1, comp_cells_y
+            IF (y_stag(cell_y+1) .LT. min_y .OR. y_stag(cell_y) .GT. max_y) CYCLE
 
-        REAL(wp), INTENT(IN) :: cell_field(comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(OUT) :: vertex_field(comp_interfaces_x,comp_interfaces_y)
+            DO cell_x = 1, comp_cells_x
+                IF (x_stag(cell_x+1) .LT. min_x .OR. x_stag(cell_x) .GT. max_x) CYCLE
 
-        INTEGER :: j, k
-        INTEGER :: j_first, j_last, k_first, k_last
-        INTEGER :: adjacent_cells
+                vertex_count = 4
+                polygon_x(1) = endpoints_x(1) + normal_x * half_width
+                polygon_y(1) = endpoints_y(1) + normal_y * half_width
+                polygon_x(2) = endpoints_x(2) + normal_x * half_width
+                polygon_y(2) = endpoints_y(2) + normal_y * half_width
+                polygon_x(3) = endpoints_x(2) - normal_x * half_width
+                polygon_y(3) = endpoints_y(2) - normal_y * half_width
+                polygon_x(4) = endpoints_x(1) - normal_x * half_width
+                polygon_y(4) = endpoints_y(1) - normal_y * half_width
 
-        ! Gather at vertices instead of scattering from cells. This is race-free,
-        ! needs no temporary weights, and gives bitwise-identical results for any
-        ! OpenMP thread count because each vertex is evaluated by one iteration.
-        !$OMP PARALLEL DO COLLAPSE(2)                                             &
-        !$OMP & PRIVATE(j_first,j_last,k_first,k_last,adjacent_cells)
-        DO k = 1, comp_interfaces_y
-            DO j = 1, comp_interfaces_x
-                j_first = MAX(1,j-1)
-                j_last = MIN(comp_cells_x,j)
-                k_first = MAX(1,k-1)
-                k_last = MIN(comp_cells_y,k)
-                adjacent_cells = (j_last-j_first+1) * (k_last-k_first+1)
-                vertex_field(j,k) = SUM(cell_field(j_first:j_last,k_first:k_last)) &
-                    / REAL(adjacent_cells,wp)
+                ! Clip the fissure polygon against the cell's four axis-aligned edges.
+                DO edge = 1, 4
+                    SELECT CASE (edge)
+                    CASE (1)
+                        axis = 1
+                        boundary = x_stag(cell_x)
+                        keep_greater = .TRUE.
+                    CASE (2)
+                        axis = 1
+                        boundary = x_stag(cell_x+1)
+                        keep_greater = .FALSE.
+                    CASE (3)
+                        axis = 2
+                        boundary = y_stag(cell_y)
+                        keep_greater = .TRUE.
+                    CASE (4)
+                        axis = 2
+                        boundary = y_stag(cell_y+1)
+                        keep_greater = .FALSE.
+                    END SELECT
+
+                    clipped_count = 0
+                    previous_vertex = vertex_count
+                    IF (axis .EQ. 1) THEN
+                        previous_coordinate = polygon_x(previous_vertex)
+                    ELSE
+                        previous_coordinate = polygon_y(previous_vertex)
+                    END IF
+                    IF (keep_greater) THEN
+                        previous_inside = previous_coordinate .GE. boundary
+                    ELSE
+                        previous_inside = previous_coordinate .LE. boundary
+                    END IF
+
+                    DO vertex = 1, vertex_count
+                        IF (axis .EQ. 1) THEN
+                            current_coordinate = polygon_x(vertex)
+                        ELSE
+                            current_coordinate = polygon_y(vertex)
+                        END IF
+                        IF (keep_greater) THEN
+                            current_inside = current_coordinate .GE. boundary
+                        ELSE
+                            current_inside = current_coordinate .LE. boundary
+                        END IF
+
+                        IF (current_inside .NEQV. previous_inside) THEN
+                            IF (axis .EQ. 1) THEN
+                                denominator = polygon_x(vertex) - polygon_x(previous_vertex)
+                                fraction = (boundary - polygon_x(previous_vertex)) / denominator
+                                intersection_x = boundary
+                                intersection_y = polygon_y(previous_vertex) + fraction * &
+                                    (polygon_y(vertex) - polygon_y(previous_vertex))
+                            ELSE
+                                denominator = polygon_y(vertex) - polygon_y(previous_vertex)
+                                fraction = (boundary - polygon_y(previous_vertex)) / denominator
+                                intersection_x = polygon_x(previous_vertex) + fraction * &
+                                    (polygon_x(vertex) - polygon_x(previous_vertex))
+                                intersection_y = boundary
+                            END IF
+                            clipped_count = clipped_count + 1
+                            clipped_x(clipped_count) = intersection_x
+                            clipped_y(clipped_count) = intersection_y
+                        END IF
+
+                        IF (current_inside) THEN
+                            clipped_count = clipped_count + 1
+                            clipped_x(clipped_count) = polygon_x(vertex)
+                            clipped_y(clipped_count) = polygon_y(vertex)
+                        END IF
+
+                        previous_vertex = vertex
+                        previous_inside = current_inside
+                    END DO
+
+                    vertex_count = clipped_count
+                    IF (vertex_count .EQ. 0) EXIT
+                    polygon_x(1:vertex_count) = clipped_x(1:vertex_count)
+                    polygon_y(1:vertex_count) = clipped_y(1:vertex_count)
+                END DO
+
+                IF (vertex_count .LT. 3) CYCLE
+
+                ! Shoelace formula about the cell corner: with map coordinates of
+                ! order 1e6 m the products of absolute coordinates lose about 1e-3 m2
+                ! per cell, a few parts in 1e6 of the coverage of an oblique fissure.
+                area_twice = 0.0_wp
+                DO vertex = 1, vertex_count
+                    next_vertex = MOD(vertex, vertex_count) + 1
+                    area_twice = area_twice                                          &
+                        + ( polygon_x(vertex) - x_stag(cell_x) )                    &
+                        * ( polygon_y(next_vertex) - y_stag(cell_y) )               &
+                        - ( polygon_x(next_vertex) - x_stag(cell_x) )               &
+                        * ( polygon_y(vertex) - y_stag(cell_y) )
+                END DO
+                cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                          &
+                    0.5_wp * ABS(area_twice) / (dx * dy))
             END DO
         END DO
-        !$OMP END PARALLEL DO
 
-    END SUBROUTINE project_cell_field_to_vertices
+    END SUBROUTINE compute_cell_fissure_fraction
 
-    !******************************************************************************
-    !> \brief Recompute Q1 elevations and filtered geometric derivatives after a bed update.
+    !> \brief Estimate cell coverage by an elliptical source using subcell sampling.
     !>
-    !> \note Reads the current B_vertex and grid spacing. Updates all derived elevations, fitted
-    !>       slopes/curvatures and centre/face gravity coefficients.
-    !******************************************************************************
+    !> \param[in] xs X coordinate of the ellipse centre [m].
+    !> \param[in] ys Y coordinate of the ellipse centre [m].
+    !> \param[in] rs First semi-axis of the elliptical source [m].
+    !> \param[in] r2s Second semi-axis of the elliptical source [m].
+    !> \param[in] angles Clockwise angle of the ellipse relative to the x axis [degrees].
+    !> \param[out] cell_fract Source-covered fraction of each computational cell.
 
-    !> Snapshot authoritative topography and derived geometry before a transaction.
-    SUBROUTINE begin_geometry_transaction
-        IF (geometry_transaction_active) &
-            ERROR STOP 'nested geometry transaction'
-        IF (.NOT.ALLOCATED(B_vertex)) &
-            ERROR STOP 'geometry transaction started before initialization'
-        lie_bed_before=B_vertex
-        lie_cent_before=B_cent
-        lie_face_x_before=B_face_x
-        lie_face_y_before=B_face_y
-        lie_slope_x_before=B_prime_x_geom
-        lie_slope_y_before=B_prime_y_geom
-        lie_curvature_xx_before=B_second_xx_geom
-        lie_curvature_yy_before=B_second_yy_geom
-        lie_curvature_xy_before=B_second_xy_geom
-        lie_gravity_before=grav_coeff
-        lie_gravity_x_before=grav_coeff_stag_x
-        lie_gravity_y_before=grav_coeff_stag_y
-        geometry_transaction_active=.TRUE.
-    END SUBROUTINE begin_geometry_transaction
-
-    !> Accept geometric changes and discard the pre-transaction snapshot.
-    SUBROUTINE commit_geometry_transaction
-        IF (.NOT.geometry_transaction_active) &
-            ERROR STOP 'no geometry transaction to commit'
-        CALL clear_geometry_transaction
-    END SUBROUTINE commit_geometry_transaction
-
-    !> Restore the original bed and derived geometric fields on rejection.
-    SUBROUTINE rollback_geometry_transaction
-        IF (.NOT.geometry_transaction_active) RETURN
-        B_vertex=lie_bed_before
-        ! Restore the exact pre-step caches: reconstruction itself may have failed.
-        B_cent=lie_cent_before
-        B_face_x=lie_face_x_before
-        B_face_y=lie_face_y_before
-        B_prime_x_geom=lie_slope_x_before
-        B_prime_y_geom=lie_slope_y_before
-        B_second_xx_geom=lie_curvature_xx_before
-        B_second_yy_geom=lie_curvature_yy_before
-        B_second_xy_geom=lie_curvature_xy_before
-        grav_coeff=lie_gravity_before
-        grav_coeff_stag_x=lie_gravity_x_before
-        grav_coeff_stag_y=lie_gravity_y_before
-        CALL clear_geometry_transaction
-    END SUBROUTINE rollback_geometry_transaction
-
-    SUBROUTINE clear_geometry_transaction
-        IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
-        IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
-        IF (ALLOCATED(lie_face_x_before)) DEALLOCATE(lie_face_x_before)
-        IF (ALLOCATED(lie_face_y_before)) DEALLOCATE(lie_face_y_before)
-        IF (ALLOCATED(lie_slope_x_before)) DEALLOCATE(lie_slope_x_before)
-        IF (ALLOCATED(lie_slope_y_before)) DEALLOCATE(lie_slope_y_before)
-        IF (ALLOCATED(lie_curvature_xx_before)) DEALLOCATE(lie_curvature_xx_before)
-        IF (ALLOCATED(lie_curvature_yy_before)) DEALLOCATE(lie_curvature_yy_before)
-        IF (ALLOCATED(lie_curvature_xy_before)) DEALLOCATE(lie_curvature_xy_before)
-        IF (ALLOCATED(lie_gravity_before)) DEALLOCATE(lie_gravity_before)
-        IF (ALLOCATED(lie_gravity_x_before)) DEALLOCATE(lie_gravity_x_before)
-        IF (ALLOCATED(lie_gravity_y_before)) DEALLOCATE(lie_gravity_y_before)
-        geometry_transaction_active=.FALSE.
-    END SUBROUTINE clear_geometry_transaction
-
-    !> Validate every geometry field used by subsequent Lie groups.
-    LOGICAL FUNCTION topography_geometry_is_finite()
-        topography_geometry_is_finite=.FALSE.
-        IF (.NOT.ALL(ieee_is_finite(B_vertex))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_cent))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_face_x))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_face_y))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_prime_x_geom))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_prime_y_geom))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_second_xx_geom))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_second_yy_geom))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(B_second_xy_geom))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(grav_coeff))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(grav_coeff_stag_x))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(grav_coeff_stag_y))) RETURN
-        topography_geometry_is_finite=.TRUE.
-    END FUNCTION topography_geometry_is_finite
-
-    SUBROUTINE refresh_topography_geometry
+    SUBROUTINE compute_cell_fract(xs,ys,rs,r2s,angles,cell_fract)
 
         IMPLICIT NONE
 
-        ! Refresh shared Q1 elevations first. The derivative filter acts on the
-        ! derived bed only; it must never overwrite the authoritative B_vertex.
-        CALL derive_topography_from_vertices
-        CALL topography_reconstruction
+        REAL(wp), INTENT(IN) :: xs,ys,rs,r2s,angles
 
-    END SUBROUTINE refresh_topography_geometry
+        REAL(wp), INTENT(OUT) :: cell_fract(comp_cells_x,comp_cells_y)
+
+        REAL(wp), ALLOCATABLE :: x_subgrid(:) , y_subgrid(:)
+
+        INTEGER, ALLOCATABLE :: check_subgrid(:)
+
+        INTEGER n_points , n_points2
+
+        REAL(wp) :: source_area
+
+        INTEGER :: h ,j, k
+
+        REAL(wp) :: ang_rad
+
+        ang_rad = angles / 180.0_wp * ATAN(1.0_wp)*4.0_wp
+
+        WRITE(*,*) 'ang_rad',ang_rad
+
+        n_points = 200
+        n_points2 = n_points**2
+
+        ALLOCATE( x_subgrid(n_points2) )
+        ALLOCATE( y_subgrid(n_points2) )
+        ALLOCATE( check_subgrid(n_points2) )
+
+        x_subgrid = 0.0_wp
+        y_subgrid = 0.0_wp
+
+        DO h = 1,n_points
+
+            x_subgrid(h:n_points2:n_points) = DBLE(h)
+            y_subgrid((h-1)*n_points+1:h*n_points) = DBLE(h)
+
+        END DO
+
+        x_subgrid = ( 2.0_wp * x_subgrid - 1.0_wp ) / ( 2.0_wp * DBLE(n_points) )
+        y_subgrid = ( 2.0_wp * y_subgrid - 1.0_wp ) / ( 2.0_wp * DBLE(n_points) )
+
+        x_subgrid = ( x_subgrid - 0.5_wp ) * dx
+        y_subgrid = ( y_subgrid - 0.5_wp ) * dy
+
+        DO j=1,comp_cells_x
+
+            DO k=1,comp_cells_y
+
+                IF ( ( x_stag(j+1) .LT. ( xs - MAX(rs,r2s) ) ) .OR.                   &
+                    ( x_stag(j) .GT. ( xs + MAX(rs,r2s) ) ) .OR.                     &
+                    ( y_stag(k+1) .LT. ( ys - MAX(rs,r2s) ) ) .OR.                   &
+                    ( y_stag(k) .GT. ( ys + MAX(rs,r2s) ) ) ) THEN
+
+                    cell_fract(j,k) = 0.0_wp
+
+                ELSE
+
+                    check_subgrid = 0
+
+                    WHERE ( ( ( ( x_comp(j) + x_subgrid - xs )*COS(ang_rad) +          &
+                        ( y_comp(k) + y_subgrid - ys )*SIN(ang_rad) )**2 / rs**2 +   &
+                        ( - ( x_comp(j) + x_subgrid - xs )*SIN(ang_rad) +            &
+                        ( y_comp(k) + y_subgrid - ys )*COS(ang_rad) )**2 / r2s**2 )  &
+                        .LE. 1.0_wp )
+
+                        check_subgrid = 1
+
+                    END WHERE
+
+                    cell_fract(j,k) = REAL(SUM(check_subgrid),wp) / &
+                        REAL(n_points2,wp)
+
+                END IF
+
+            ENDDO
+
+        ENDDO
+
+        source_area = dx*dy*SUM(cell_fract)
+
+        IF ( VERBOSE_LEVEL .GE. 0 ) THEN
+
+            WRITE(*,*) 'Source area =',source_area,' Error =',ABS( 1.0_wp -          &
+                dx*dy*SUM(cell_fract) / ( 4.0_wp*ATAN(1.0_wp)*rs*r2s ) )
+
+        END IF
+
+        DEALLOCATE( x_subgrid )
+        DEALLOCATE( y_subgrid )
+        DEALLOCATE( check_subgrid )
+
+        RETURN
+
+    END SUBROUTINE compute_cell_fract
 
     !******************************************************************************
     !> \brief Start a cell-local topography update and clear prior proposals.
@@ -616,6 +860,24 @@ CONTAINS
         grav_coeff_stag_x=old_gravity_x
         grav_coeff_stag_y=old_gravity_y
     END SUBROUTINE assign_topography_vertices
+
+    !> Validate every geometry field used by subsequent Lie groups.
+    LOGICAL FUNCTION topography_geometry_is_finite()
+        topography_geometry_is_finite=.FALSE.
+        IF (.NOT.ALL(ieee_is_finite(B_vertex))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_cent))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_face_x))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_face_y))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_prime_x_geom))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_prime_y_geom))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_second_xx_geom))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_second_yy_geom))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(B_second_xy_geom))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(grav_coeff))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(grav_coeff_stag_x))) RETURN
+        IF (.NOT.ALL(ieee_is_finite(grav_coeff_stag_y))) RETURN
+        topography_geometry_is_finite=.TRUE.
+    END FUNCTION topography_geometry_is_finite
 
     !******************************************************************************
     !> \brief Release the geometry-owned topography update workspace.
@@ -779,303 +1041,6 @@ CONTAINS
         RETURN
 
     END SUBROUTINE topography_zones
-
-    !******************************************************************************
-    !> \brief Compute filtered bed slopes, curvatures and large-slope gravity coefficients.
-    !
-    !> A five-point polynomial least-squares filter computes the first and
-    !> second bed derivatives at cell centers. The two-cell boundary band uses
-    !> zero-order extrapolation from the nearest filtered interior value. The
-    !> resulting slopes define the large-slope gravity correction at centers
-    !> and shared Cartesian faces.
-    !> In 1D the inactive and mixed derivatives are zero. Lines shorter than
-    !> five cells use a degree min(2,n-1) least-squares fit over their available
-    !> centers; a single cell has no resolved slope or curvature.
-    !> @author
-    !> Mattia de' Michieli Vitturi
-    !> \date 2019/11/08
-    !>
-    !> \note Reads B_cent, grid spacing and slope_correction_flag. Writes filtered derivative arrays
-    !>       and G at cell centres/shared faces; it does not change B_vertex.
-    !******************************************************************************
-
-    SUBROUTINE topography_reconstruction
-
-        USE parameters_2d, ONLY : slope_correction_flag
-
-        IMPLICIT NONE
-
-        INTEGER :: j,k,kk,kj
-        REAL(wp) :: weighted_sum
-        ! Thread-private scalar stores preserve the 1D stencil accumulation
-        ! sequence even when -Ofast would vectorize/reassociate OpenMP chunks.
-        REAL(wp), VOLATILE :: first_derivative_sum, second_derivative_sum
-
-        ! Five-point polynomial-fit coefficients differentiate the bed without
-        ! changing the Q1 elevations used by HP-PCCU. These filtered derivatives
-        ! enter large-slope/curvature corrections and local rheology instead.
-        ! 1D Coefficients for 1st derivative: [-2, -1, 0, 1, 2]
-        REAL(wp), PARAMETER :: c1(5) = [ -2.0_wp, -1.0_wp, 0.0_wp, 1.0_wp, 2.0_wp ]
-        REAL(wp) :: norm1_x
-        REAL(wp) :: norm1_y
-
-        ! 1D Coefficients for 2nd derivative: [2, -1, -2, -1, 2]
-        REAL(wp), PARAMETER :: c2(5) = [ 2.0_wp, -1.0_wp, -2.0_wp, -1.0_wp, 2.0_wp ]
-        REAL(wp) :: norm2_x
-        REAL(wp) :: norm2_y
-
-        REAL(wp) :: norm_xy
-
-        norm1_x = 10.0_wp * dx
-        norm1_y = 10.0_wp * dy
-        norm2_x = 7.0_wp * dx**2
-        norm2_y = 7.0_wp * dy**2
-        norm_xy = (10.0_wp * dx) * (10.0_wp * dy)
-
-        ! Degenerate grids have no derivative in the inactive direction. Clear
-        ! every cache explicitly so repeated bed refreshes cannot retain old data.
-        IF ( MIN(comp_cells_x,comp_cells_y) .EQ. 1 ) THEN
-            B_prime_x_geom = 0.0_wp
-            B_prime_y_geom = 0.0_wp
-            B_second_xx_geom = 0.0_wp
-            B_second_yy_geom = 0.0_wp
-            B_second_xy_geom = 0.0_wp
-        END IF
-
-        IF ( comp_cells_y .EQ. 1 ) THEN
-
-            k = 1
-
-            IF (comp_cells_x .LT. 5) CALL reconstruct_short_1d_line(             &
-                B_cent(:,k),dx,B_prime_x_geom(:,k),B_second_xx_geom(:,k))
-
-            ! Keep scalar stencil accumulation independent of OpenMP chunk sizes.
-            ! Only the 1D accumulators are volatile; 2D kernels are unchanged.
-            !$OMP PARALLEL DO PRIVATE(j,kj,first_derivative_sum,second_derivative_sum)
-            DO j = 3, comp_cells_x - 2
-
-                first_derivative_sum = 0.0_wp
-                second_derivative_sum = 0.0_wp
-                B_prime_y_geom(j,k)   = 0.0_wp
-                B_second_yy_geom(j,k) = 0.0_wp
-
-                DO kj = 1, 5 ! Stencil in x-direction
-
-                    first_derivative_sum = first_derivative_sum + c1(kj) * B_cent(j + kj - 3, k)
-                    second_derivative_sum = second_derivative_sum + c2(kj) * B_cent(j + kj - 3, k)
-
-                END DO
-
-                B_prime_x_geom(j,k)   = first_derivative_sum / norm1_x
-                B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   / norm1_y
-                B_second_xx_geom(j,k) = second_derivative_sum / norm2_x
-                B_second_yy_geom(j,k) = B_second_yy_geom(j,k) / norm2_y
-
-                B_second_xy_geom(j,k) = 0.0_wp
-
-            END DO
-            !$OMP END PARALLEL DO
-
-        ELSEIF ( comp_cells_x .EQ. 1 ) THEN
-
-            j = 1
-            IF (comp_cells_y .LT. 5) CALL reconstruct_short_1d_line(             &
-                B_cent(j,:),dy,B_prime_y_geom(j,:),B_second_yy_geom(j,:))
-            ! The rotated 1D kernel uses the same coefficients and accumulation
-            ! order as x. Do not read a nonexistent third x column on this grid.
-            !$OMP PARALLEL DO PRIVATE(k,kk,first_derivative_sum,second_derivative_sum)
-            DO k = 3, comp_cells_y - 2
-                first_derivative_sum = 0.0_wp
-                second_derivative_sum = 0.0_wp
-                DO kk = 1, 5
-                    first_derivative_sum = first_derivative_sum + c1(kk) * B_cent(j,k+kk-3)
-                    second_derivative_sum = second_derivative_sum + c2(kk) * B_cent(j,k+kk-3)
-                END DO
-                B_prime_y_geom(j,k) = first_derivative_sum / norm1_y
-                B_second_yy_geom(j,k) = second_derivative_sum / norm2_y
-            END DO
-            !$OMP END PARALLEL DO
-
-        END IF
-
-        !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(j,k,kj,kk,weighted_sum)
-        DO k = 3, comp_cells_y - 2
-
-            DO j = 3, comp_cells_x - 2
-
-                ! --- Pure derivatives (xx and yy) ---
-                B_prime_x_geom(j,k)   = 0.0_wp
-                B_prime_y_geom(j,k)   = 0.0_wp
-                B_second_xx_geom(j,k) = 0.0_wp
-                B_second_yy_geom(j,k) = 0.0_wp
-                DO kj = 1, 5 ! Stencil in x-direction
-                    B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   + c1(kj) * B_cent(j + kj - 3, k)
-                    B_second_xx_geom(j,k) = B_second_xx_geom(j,k) + c2(kj) * B_cent(j + kj - 3, k)
-
-                END DO
-                DO kk = 1, 5 ! Stencil in y-direction
-                    B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   + c1(kk) * B_cent(j, k + kk - 3)
-                    B_second_yy_geom(j,k) = B_second_yy_geom(j,k) + c2(kk) * B_cent(j, k + kk - 3)
-                END DO
-
-                B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   / norm1_x
-                B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   / norm1_y
-                B_second_xx_geom(j,k) = B_second_xx_geom(j,k) / norm2_x
-                B_second_yy_geom(j,k) = B_second_yy_geom(j,k) / norm2_y
-
-                ! --- Mixed derivative (xy) using a 2D kernel ---
-                ! The kernel is the outer product of the 1D first derivative kernels.
-                weighted_sum = 0.0_wp
-                DO kk = 1, 5 ! Stencil in y-direction
-                    DO kj = 1, 5 ! Stencil in x-direction
-                        weighted_sum = weighted_sum + c1(kj) * c1(kk) * B_cent(j + kj - 3, k + kk - 3)
-                    END DO
-                END DO
-                B_second_xy_geom(j,k) = weighted_sum / norm_xy
-
-            END DO
-        END DO
-        !$OMP END PARALLEL DO
-
-        !=======================================================================
-        !  2. HANDLE BOUNDARY CELLS
-        !     The derivatives in the 2-cell-wide border cannot be computed with
-        !     the full 5-point stencil. A simple and robust strategy is to
-        !     extrapolate the values from the nearest valid interior cell.
-        !     This is a zero-order extrapolation (copying).
-        !=======================================================================
-
-        ! --- Handle left and right boundaries (columns j=1, 2, comp_cells_x-1, comp_cells_x) ---
-        IF (comp_cells_x .GE. 5) THEN
-            CALL copy_derivative_halo_x
-        END IF
-
-        IF ( comp_cells_y .GE. 5 ) THEN
-
-            CALL copy_derivative_halo_y
-        END IF
-
-        IF ( slope_correction_flag ) THEN
-
-            ! Calculate grav_coeff using the retained LS first derivatives.
-            grav_coeff = 1.0_wp / ( 1.0_wp + B_prime_x_geom**2 + B_prime_y_geom**2 )
-
-            ! Interpolate the cell coefficient to the shared Cartesian faces.
-            grav_coeff_stag_x(1,:) = grav_coeff(1,:)
-            grav_coeff_stag_x(2:comp_interfaces_x-1,:) = 0.5_wp *                    &
-                ( grav_coeff(1:comp_cells_x-1,:) + grav_coeff(2:comp_cells_x,:) )
-            grav_coeff_stag_x(comp_interfaces_x,:) = grav_coeff(comp_cells_x,:)
-
-            grav_coeff_stag_y(:,1) = grav_coeff(:,1)
-            grav_coeff_stag_y(:,2:comp_interfaces_y-1) = 0.5_wp *                    &
-                ( grav_coeff(:,1:comp_cells_y-1) + grav_coeff(:,2:comp_cells_y) )
-            grav_coeff_stag_y(:,comp_interfaces_y) = grav_coeff(:,comp_cells_y)
-
-        ELSE
-
-            grav_coeff = 1.0_wp
-
-            grav_coeff_stag_x = 1.0_wp
-            grav_coeff_stag_y = 1.0_wp
-
-        END IF
-
-        RETURN
-
-    END SUBROUTINE topography_reconstruction
-
-    !> \brief Fit a resolved polynomial on a one-dimensional line shorter than five cells.
-    !> \details Symmetric centered coordinates separate the linear term from the
-    !> quadratic term. One cell returns zero, two resolve a line, and three/four
-    !> resolve a quadratic. This fallback does not replace the five-point filter.
-    !> \param[in] bed Cell-center bed elevations [m], with one through four entries.
-    !> \param[in] spacing Uniform positive cell spacing [m].
-    !> \param[out] first Filtered first derivative at each available center.
-    !> \param[out] second Filtered second derivative at each available center [m^-1].
-    PURE SUBROUTINE reconstruct_short_1d_line(bed,spacing,first,second)
-        REAL(wp), INTENT(IN) :: bed(:),spacing
-        REAL(wp), INTENT(OUT) :: first(:),second(:)
-        REAL(wp) :: coordinate(SIZE(bed)),quadratic_basis(SIZE(bed))
-        REAL(wp) :: linear,quadratic
-        INTEGER :: i,n
-
-        n = SIZE(bed)
-        first = 0.0_wp; second = 0.0_wp
-        IF (n .LE. 1) RETURN
-        DO i=1,n
-            coordinate(i) = (REAL(i-1,wp)-0.5_wp*REAL(n-1,wp))*spacing
-        END DO
-        linear = SUM(coordinate*bed)/SUM(coordinate**2)
-        first = linear
-        IF (n .GE. 3) THEN
-            quadratic_basis = coordinate**2-SUM(coordinate**2)/REAL(n,wp)
-            quadratic = SUM(quadratic_basis*bed)/SUM(quadratic_basis**2)
-            first = linear+2.0_wp*quadratic*coordinate
-            second = 2.0_wp*quadratic
-        END IF
-    END SUBROUTINE reconstruct_short_1d_line
-
-    !> \brief Copy the nearest valid x-interior derivative values into both halos.
-    SUBROUTINE copy_derivative_halo_x
-        INTEGER :: k
-
-        !$OMP PARALLEL DO PRIVATE(k)
-        DO k = 1, comp_cells_y
-            B_prime_x_geom(1,k)   = B_prime_x_geom(3,k)
-            B_prime_x_geom(2,k)   = B_prime_x_geom(3,k)
-            B_prime_y_geom(1,k)   = B_prime_y_geom(3,k)
-            B_prime_y_geom(2,k)   = B_prime_y_geom(3,k)
-            B_second_xx_geom(1,k) = B_second_xx_geom(3,k)
-            B_second_xx_geom(2,k) = B_second_xx_geom(3,k)
-            B_second_yy_geom(1,k) = B_second_yy_geom(3,k)
-            B_second_yy_geom(2,k) = B_second_yy_geom(3,k)
-            B_second_xy_geom(1,k) = B_second_xy_geom(3,k)
-            B_second_xy_geom(2,k) = B_second_xy_geom(3,k)
-
-            B_prime_x_geom(comp_cells_x-1,k) = B_prime_x_geom(comp_cells_x-2,k)
-            B_prime_x_geom(comp_cells_x,k)   = B_prime_x_geom(comp_cells_x-2,k)
-            B_prime_y_geom(comp_cells_x-1,k) = B_prime_y_geom(comp_cells_x-2,k)
-            B_prime_y_geom(comp_cells_x,k)   = B_prime_y_geom(comp_cells_x-2,k)
-            B_second_xx_geom(comp_cells_x-1,k) = B_second_xx_geom(comp_cells_x-2,k)
-            B_second_xx_geom(comp_cells_x,k)   = B_second_xx_geom(comp_cells_x-2,k)
-            B_second_yy_geom(comp_cells_x-1,k) = B_second_yy_geom(comp_cells_x-2,k)
-            B_second_yy_geom(comp_cells_x,k)   = B_second_yy_geom(comp_cells_x-2,k)
-            B_second_xy_geom(comp_cells_x-1,k) = B_second_xy_geom(comp_cells_x-2,k)
-            B_second_xy_geom(comp_cells_x,k)   = B_second_xy_geom(comp_cells_x-2,k)
-        END DO
-        !$OMP END PARALLEL DO
-    END SUBROUTINE copy_derivative_halo_x
-
-    !> \brief Copy the nearest valid y-interior derivative values into both halos.
-    SUBROUTINE copy_derivative_halo_y
-        INTEGER :: j
-
-        !$OMP PARALLEL DO PRIVATE(j)
-        DO j = 1, comp_cells_x
-            B_prime_x_geom(j,1)   = B_prime_x_geom(j,3)
-            B_prime_x_geom(j,2)   = B_prime_x_geom(j,3)
-            B_prime_y_geom(j,1)   = B_prime_y_geom(j,3)
-            B_prime_y_geom(j,2)   = B_prime_y_geom(j,3)
-            B_second_xx_geom(j,1) = B_second_xx_geom(j,3)
-            B_second_xx_geom(j,2) = B_second_xx_geom(j,3)
-            B_second_yy_geom(j,1) = B_second_yy_geom(j,3)
-            B_second_yy_geom(j,2) = B_second_yy_geom(j,3)
-            B_second_xy_geom(j,1) = B_second_xy_geom(j,3)
-            B_second_xy_geom(j,2) = B_second_xy_geom(j,3)
-
-            B_prime_x_geom(j,comp_cells_y-1) = B_prime_x_geom(j,comp_cells_y-2)
-            B_prime_x_geom(j,comp_cells_y)   = B_prime_x_geom(j,comp_cells_y-2)
-            B_prime_y_geom(j,comp_cells_y-1) = B_prime_y_geom(j,comp_cells_y-2)
-            B_prime_y_geom(j,comp_cells_y)   = B_prime_y_geom(j,comp_cells_y-2)
-            B_second_xx_geom(j,comp_cells_y-1) = B_second_xx_geom(j,comp_cells_y-2)
-            B_second_xx_geom(j,comp_cells_y)   = B_second_xx_geom(j,comp_cells_y-2)
-            B_second_yy_geom(j,comp_cells_y-1) = B_second_yy_geom(j,comp_cells_y-2)
-            B_second_yy_geom(j,comp_cells_y)   = B_second_yy_geom(j,comp_cells_y-2)
-            B_second_xy_geom(j,comp_cells_y-1) = B_second_xy_geom(j,comp_cells_y-2)
-            B_second_xy_geom(j,comp_cells_y)   = B_second_xy_geom(j,comp_cells_y-2)
-        END DO
-        !$OMP END PARALLEL DO
-    END SUBROUTINE copy_derivative_halo_y
 
     !******************************************************************************
     !> \brief Identify inlet cells and build their radial/lateral emission directions.
@@ -1506,149 +1471,453 @@ CONTAINS
 
     END SUBROUTINE init_source
 
-    !-----------------------------------------------------------------------------
-    !> \brief Bilinearly interpolate a scalar on a grid supplied as coordinate matrices.
+    !******************************************************************************
+    !> \brief Derive shared Q1 face and cell elevations from B_vertex.
     !>
-    !> Scalar interpolation (2D)
-    !
-    !> This subroutine interpolate the values of the  array f1, defined on the
-    !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
-    !> \date OCTOBER 2016
+    !> B_vertex is the only authoritative bed elevation. The two cells adjacent
+    !> to an internal Cartesian face access the same stored B_face_x/B_face_y
+    !> value, so face continuity is an exact storage identity.
     !>
-    !> \param[in] x1 X coordinates of the original interpolation grid.
-    !> \param[in] y1 Y coordinates of the original interpolation grid.
-    !> \param[in] f1 Scalar values on the original grid.
-    !> \param[in] x2 X coordinate of the requested interpolation point [m].
-    !> \param[in] y2 Y coordinate of the requested interpolation point [m].
-    !> \param[out] f2 Interpolated scalar value at (x2,y2).
-    !-----------------------------------------------------------------------------
+    !> \note Reads B_vertex and writes B_face_x, B_face_y and B_cent without smoothing the
+    !>       authoritative bed.
+    !******************************************************************************
 
-    SUBROUTINE interp_2d_scalar(x1, y1, f1, x2, y2, f2)
+    SUBROUTINE derive_topography_from_vertices
+
         IMPLICIT NONE
 
-        REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
-        REAL(wp), INTENT(IN) :: x2, y2
-        REAL(wp), INTENT(OUT) :: f2
+        B_face_x(:,:) = 0.5_wp * ( B_vertex(:,1:comp_cells_y)                     &
+            + B_vertex(:,2:comp_interfaces_y) )
+        B_face_y(:,:) = 0.5_wp * ( B_vertex(1:comp_cells_x,:)                     &
+            + B_vertex(2:comp_interfaces_x,:) )
 
-        INTEGER :: ix , iy
-        REAL(wp) :: alfa_x , alfa_y
+        B_cent(:,:) = 0.25_wp * ( B_vertex(1:comp_cells_x,1:comp_cells_y)         &
+            + B_vertex(2:comp_interfaces_x,1:comp_cells_y)                       &
+            + B_vertex(1:comp_cells_x,2:comp_interfaces_y)                       &
+            + B_vertex(2:comp_interfaces_x,2:comp_interfaces_y) )
 
-        IF ( size(x1,1) .GT. 1 ) THEN
+    END SUBROUTINE derive_topography_from_vertices
 
-            ix = FLOOR( ( x2 - x1(1,1) ) / ( x1(2,1) - x1(1,1) ) ) + 1
-            ix = MIN( ix , SIZE(x1,1)-1 )
-            alfa_x = ( x1(ix+1,1) - x2 ) / (  x1(ix+1,1) - x1(ix,1) )
-
-        ELSE
-
-            ix = 1
-            alfa_x = 0.0_wp
-
-        END IF
-
-        IF ( size(x1,2) .GT. 1 ) THEN
-
-            iy = FLOOR( ( y2 - y1(1,1) ) / ( y1(1,2) - y1(1,1) ) ) + 1
-            iy = MIN( iy , SIZE(x1,2)-1 )
-            alfa_y = ( y1(1,iy+1) - y2 ) / (  y1(1,iy+1) - y1(1,iy) )
-
-        ELSE
-
-            iy = 1
-            alfa_y = 0.0_wp
-
-        END IF
-
-        IF ( size(x1,1) .EQ. 1 ) THEN
-
-            f2 = alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1)
-
-        ELSEIF ( size(x1,2) .EQ. 1 ) THEN
-
-            f2 = alfa_x * f1(ix,iy)  + ( 1.0_wp - alfa_x ) * f1(ix+1,iy)
-
-        ELSE
-
-            f2 = alfa_x * ( alfa_y * f1(ix,iy) + ( 1.0_wp - alfa_y ) * f1(ix,iy+1) ) &
-                + ( 1.0_wp - alfa_x ) * ( alfa_y * f1(ix+1,iy) + ( 1.0_wp - alfa_y )&
-                * f1(ix+1,iy+1) )
-
-        END IF
-
-    END SUBROUTINE interp_2d_scalar
-
-    !-----------------------------------------------------------------------------
-    !> \brief Check whether a bilinear interpolation stencil includes missing DEM data.
+    !******************************************************************************
+    !> \brief Average adjacent cell values onto the shared vertex grid.
     !>
-    !> Scalar interpolation (2D)
-    !
-    !> This subroutine interpolate the values of the  array f1, defined on the
-    !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
-    !> \date OCTOBER 2016
+    !> Each vertex receives the arithmetic mean of all adjacent physical cells.
+    !> This is the uniform-grid Q1 mass-lumped projection. It preserves the
+    !> domain integral when the projected nodal field is averaged back to cells.
     !>
-    !> \param[in] x1 X coordinates of the original interpolation grid.
-    !> \param[in] y1 Y coordinates of the original interpolation grid.
-    !> \param[in] f1 Scalar values on the original grid.
-    !> \param[in] x2 X coordinate of the requested interpolation point [m].
-    !> \param[in] y2 Y coordinate of the requested interpolation point [m].
-    !> \param[out] f2 True if any required input stencil value equals nodata_topo.
-    !-----------------------------------------------------------------------------
+    !> \param[in] cell_field Cell-centered scalar proposal to be projected to the nodal grid.
+    !> \param[out] vertex_field Vertex values obtained from the adjacent cells, including one-sided
+    !>                          boundaries.
+    !******************************************************************************
 
-    SUBROUTINE interp_2d_nodata(x1, y1, f1, x2, y2, f2)
+    SUBROUTINE project_cell_field_to_vertices( cell_field, vertex_field )
+
         IMPLICIT NONE
 
-        REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
-        REAL(wp), INTENT(IN) :: x2, y2
-        LOGICAL, INTENT(OUT) :: f2
+        REAL(wp), INTENT(IN) :: cell_field(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: vertex_field(comp_interfaces_x,comp_interfaces_y)
 
-        INTEGER :: ix , iy
-        REAL(wp) :: alfa_x , alfa_y
+        INTEGER :: j, k
+        INTEGER :: j_first, j_last, k_first, k_last
+        INTEGER :: adjacent_cells
 
-        IF ( size(x1,1) .GT. 1 ) THEN
+        ! Gather at vertices instead of scattering from cells. This is race-free,
+        ! needs no temporary weights, and gives bitwise-identical results for any
+        ! OpenMP thread count because each vertex is evaluated by one iteration.
+        !$OMP PARALLEL DO COLLAPSE(2)                                             &
+        !$OMP & PRIVATE(j_first,j_last,k_first,k_last,adjacent_cells)
+        DO k = 1, comp_interfaces_y
+            DO j = 1, comp_interfaces_x
+                j_first = MAX(1,j-1)
+                j_last = MIN(comp_cells_x,j)
+                k_first = MAX(1,k-1)
+                k_last = MIN(comp_cells_y,k)
+                adjacent_cells = (j_last-j_first+1) * (k_last-k_first+1)
+                vertex_field(j,k) = SUM(cell_field(j_first:j_last,k_first:k_last)) &
+                    / REAL(adjacent_cells,wp)
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
 
-            ix = FLOOR( ( x2 - x1(1,1) ) / ( x1(2,1) - x1(1,1) ) ) + 1
-            ix = MIN( ix , SIZE(x1,1)-1 )
-            alfa_x = ( x1(ix+1,1) - x2 ) / (  x1(ix+1,1) - x1(ix,1) )
+    END SUBROUTINE project_cell_field_to_vertices
 
-        ELSE
+    !******************************************************************************
+    !> \brief Recompute Q1 elevations and filtered geometric derivatives after a bed update.
+    !>
+    !> \note Reads the current B_vertex and grid spacing. Updates all derived elevations, fitted
+    !>       slopes/curvatures and centre/face gravity coefficients.
+    !******************************************************************************
 
-            ix = 1
-            alfa_x = 0.0_wp
+    !> Snapshot authoritative topography and derived geometry before a transaction.
+    SUBROUTINE begin_geometry_transaction
+        IF (geometry_transaction_active) &
+            ERROR STOP 'nested geometry transaction'
+        IF (.NOT.ALLOCATED(B_vertex)) &
+            ERROR STOP 'geometry transaction started before initialization'
+        lie_bed_before=B_vertex
+        lie_cent_before=B_cent
+        lie_face_x_before=B_face_x
+        lie_face_y_before=B_face_y
+        lie_slope_x_before=B_prime_x_geom
+        lie_slope_y_before=B_prime_y_geom
+        lie_curvature_xx_before=B_second_xx_geom
+        lie_curvature_yy_before=B_second_yy_geom
+        lie_curvature_xy_before=B_second_xy_geom
+        lie_gravity_before=grav_coeff
+        lie_gravity_x_before=grav_coeff_stag_x
+        lie_gravity_y_before=grav_coeff_stag_y
+        geometry_transaction_active=.TRUE.
+    END SUBROUTINE begin_geometry_transaction
+
+    !> Accept geometric changes and discard the pre-transaction snapshot.
+    SUBROUTINE commit_geometry_transaction
+        IF (.NOT.geometry_transaction_active) &
+            ERROR STOP 'no geometry transaction to commit'
+        CALL clear_geometry_transaction
+    END SUBROUTINE commit_geometry_transaction
+
+    !> Restore the original bed and derived geometric fields on rejection.
+    SUBROUTINE rollback_geometry_transaction
+        IF (.NOT.geometry_transaction_active) RETURN
+        B_vertex=lie_bed_before
+        ! Restore the exact pre-step caches: reconstruction itself may have failed.
+        B_cent=lie_cent_before
+        B_face_x=lie_face_x_before
+        B_face_y=lie_face_y_before
+        B_prime_x_geom=lie_slope_x_before
+        B_prime_y_geom=lie_slope_y_before
+        B_second_xx_geom=lie_curvature_xx_before
+        B_second_yy_geom=lie_curvature_yy_before
+        B_second_xy_geom=lie_curvature_xy_before
+        grav_coeff=lie_gravity_before
+        grav_coeff_stag_x=lie_gravity_x_before
+        grav_coeff_stag_y=lie_gravity_y_before
+        CALL clear_geometry_transaction
+    END SUBROUTINE rollback_geometry_transaction
+
+    SUBROUTINE clear_geometry_transaction
+        IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
+        IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
+        IF (ALLOCATED(lie_face_x_before)) DEALLOCATE(lie_face_x_before)
+        IF (ALLOCATED(lie_face_y_before)) DEALLOCATE(lie_face_y_before)
+        IF (ALLOCATED(lie_slope_x_before)) DEALLOCATE(lie_slope_x_before)
+        IF (ALLOCATED(lie_slope_y_before)) DEALLOCATE(lie_slope_y_before)
+        IF (ALLOCATED(lie_curvature_xx_before)) DEALLOCATE(lie_curvature_xx_before)
+        IF (ALLOCATED(lie_curvature_yy_before)) DEALLOCATE(lie_curvature_yy_before)
+        IF (ALLOCATED(lie_curvature_xy_before)) DEALLOCATE(lie_curvature_xy_before)
+        IF (ALLOCATED(lie_gravity_before)) DEALLOCATE(lie_gravity_before)
+        IF (ALLOCATED(lie_gravity_x_before)) DEALLOCATE(lie_gravity_x_before)
+        IF (ALLOCATED(lie_gravity_y_before)) DEALLOCATE(lie_gravity_y_before)
+        geometry_transaction_active=.FALSE.
+    END SUBROUTINE clear_geometry_transaction
+
+    SUBROUTINE refresh_topography_geometry
+
+        IMPLICIT NONE
+
+        ! Refresh shared Q1 elevations first. The derivative filter acts on the
+        ! derived bed only; it must never overwrite the authoritative B_vertex.
+        CALL derive_topography_from_vertices
+        CALL topography_reconstruction
+
+    END SUBROUTINE refresh_topography_geometry
+
+    !******************************************************************************
+    !> \brief Compute filtered bed slopes, curvatures and large-slope gravity coefficients.
+    !
+    !> A five-point polynomial least-squares filter computes the first and
+    !> second bed derivatives at cell centers. The two-cell boundary band uses
+    !> zero-order extrapolation from the nearest filtered interior value. The
+    !> resulting slopes define the large-slope gravity correction at centers
+    !> and shared Cartesian faces.
+    !> In 1D the inactive and mixed derivatives are zero. Lines shorter than
+    !> five cells use a degree min(2,n-1) least-squares fit over their available
+    !> centers; a single cell has no resolved slope or curvature.
+    !> @author
+    !> Mattia de' Michieli Vitturi
+    !> \date 2019/11/08
+    !>
+    !> \note Reads B_cent, grid spacing and slope_correction_flag. Writes filtered derivative arrays
+    !>       and G at cell centres/shared faces; it does not change B_vertex.
+    !******************************************************************************
+
+    SUBROUTINE topography_reconstruction
+
+        USE parameters_2d, ONLY : slope_correction_flag
+
+        IMPLICIT NONE
+
+        INTEGER :: j,k,kk,kj
+        REAL(wp) :: weighted_sum
+        ! Thread-private scalar stores preserve the 1D stencil accumulation
+        ! sequence even when -Ofast would vectorize/reassociate OpenMP chunks.
+        REAL(wp), VOLATILE :: first_derivative_sum, second_derivative_sum
+
+        ! Five-point polynomial-fit coefficients differentiate the bed without
+        ! changing the Q1 elevations used by HP-PCCU. These filtered derivatives
+        ! enter large-slope/curvature corrections and local rheology instead.
+        ! 1D Coefficients for 1st derivative: [-2, -1, 0, 1, 2]
+        REAL(wp), PARAMETER :: c1(5) = [ -2.0_wp, -1.0_wp, 0.0_wp, 1.0_wp, 2.0_wp ]
+        REAL(wp) :: norm1_x
+        REAL(wp) :: norm1_y
+
+        ! 1D Coefficients for 2nd derivative: [2, -1, -2, -1, 2]
+        REAL(wp), PARAMETER :: c2(5) = [ 2.0_wp, -1.0_wp, -2.0_wp, -1.0_wp, 2.0_wp ]
+        REAL(wp) :: norm2_x
+        REAL(wp) :: norm2_y
+
+        REAL(wp) :: norm_xy
+
+        norm1_x = 10.0_wp * dx
+        norm1_y = 10.0_wp * dy
+        norm2_x = 7.0_wp * dx**2
+        norm2_y = 7.0_wp * dy**2
+        norm_xy = (10.0_wp * dx) * (10.0_wp * dy)
+
+        ! Degenerate grids have no derivative in the inactive direction. Clear
+        ! every cache explicitly so repeated bed refreshes cannot retain old data.
+        IF ( MIN(comp_cells_x,comp_cells_y) .EQ. 1 ) THEN
+            B_prime_x_geom = 0.0_wp
+            B_prime_y_geom = 0.0_wp
+            B_second_xx_geom = 0.0_wp
+            B_second_yy_geom = 0.0_wp
+            B_second_xy_geom = 0.0_wp
+        END IF
+
+        IF ( comp_cells_y .EQ. 1 ) THEN
+
+            k = 1
+
+            IF (comp_cells_x .LT. 5) CALL reconstruct_short_1d_line(             &
+                B_cent(:,k),dx,B_prime_x_geom(:,k),B_second_xx_geom(:,k))
+
+            ! Keep scalar stencil accumulation independent of OpenMP chunk sizes.
+            ! Only the 1D accumulators are volatile; 2D kernels are unchanged.
+            !$OMP PARALLEL DO PRIVATE(j,kj,first_derivative_sum,second_derivative_sum)
+            DO j = 3, comp_cells_x - 2
+
+                first_derivative_sum = 0.0_wp
+                second_derivative_sum = 0.0_wp
+                B_prime_y_geom(j,k)   = 0.0_wp
+                B_second_yy_geom(j,k) = 0.0_wp
+
+                DO kj = 1, 5 ! Stencil in x-direction
+
+                    first_derivative_sum = first_derivative_sum + c1(kj) * B_cent(j + kj - 3, k)
+                    second_derivative_sum = second_derivative_sum + c2(kj) * B_cent(j + kj - 3, k)
+
+                END DO
+
+                B_prime_x_geom(j,k)   = first_derivative_sum / norm1_x
+                B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   / norm1_y
+                B_second_xx_geom(j,k) = second_derivative_sum / norm2_x
+                B_second_yy_geom(j,k) = B_second_yy_geom(j,k) / norm2_y
+
+                B_second_xy_geom(j,k) = 0.0_wp
+
+            END DO
+            !$OMP END PARALLEL DO
+
+        ELSEIF ( comp_cells_x .EQ. 1 ) THEN
+
+            j = 1
+            IF (comp_cells_y .LT. 5) CALL reconstruct_short_1d_line(             &
+                B_cent(j,:),dy,B_prime_y_geom(j,:),B_second_yy_geom(j,:))
+            ! The rotated 1D kernel uses the same coefficients and accumulation
+            ! order as x. Do not read a nonexistent third x column on this grid.
+            !$OMP PARALLEL DO PRIVATE(k,kk,first_derivative_sum,second_derivative_sum)
+            DO k = 3, comp_cells_y - 2
+                first_derivative_sum = 0.0_wp
+                second_derivative_sum = 0.0_wp
+                DO kk = 1, 5
+                    first_derivative_sum = first_derivative_sum + c1(kk) * B_cent(j,k+kk-3)
+                    second_derivative_sum = second_derivative_sum + c2(kk) * B_cent(j,k+kk-3)
+                END DO
+                B_prime_y_geom(j,k) = first_derivative_sum / norm1_y
+                B_second_yy_geom(j,k) = second_derivative_sum / norm2_y
+            END DO
+            !$OMP END PARALLEL DO
 
         END IF
 
-        IF ( size(x1,2) .GT. 1 ) THEN
+        !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(j,k,kj,kk,weighted_sum)
+        DO k = 3, comp_cells_y - 2
 
-            iy = FLOOR( ( y2 - y1(1,1) ) / ( y1(1,2) - y1(1,1) ) ) + 1
-            iy = MIN( iy , SIZE(x1,2)-1 )
-            alfa_y = ( y1(1,iy+1) - y2 ) / (  y1(1,iy+1) - y1(1,iy) )
+            DO j = 3, comp_cells_x - 2
+
+                ! --- Pure derivatives (xx and yy) ---
+                B_prime_x_geom(j,k)   = 0.0_wp
+                B_prime_y_geom(j,k)   = 0.0_wp
+                B_second_xx_geom(j,k) = 0.0_wp
+                B_second_yy_geom(j,k) = 0.0_wp
+                DO kj = 1, 5 ! Stencil in x-direction
+                    B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   + c1(kj) * B_cent(j + kj - 3, k)
+                    B_second_xx_geom(j,k) = B_second_xx_geom(j,k) + c2(kj) * B_cent(j + kj - 3, k)
+
+                END DO
+                DO kk = 1, 5 ! Stencil in y-direction
+                    B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   + c1(kk) * B_cent(j, k + kk - 3)
+                    B_second_yy_geom(j,k) = B_second_yy_geom(j,k) + c2(kk) * B_cent(j, k + kk - 3)
+                END DO
+
+                B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   / norm1_x
+                B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   / norm1_y
+                B_second_xx_geom(j,k) = B_second_xx_geom(j,k) / norm2_x
+                B_second_yy_geom(j,k) = B_second_yy_geom(j,k) / norm2_y
+
+                ! --- Mixed derivative (xy) using a 2D kernel ---
+                ! The kernel is the outer product of the 1D first derivative kernels.
+                weighted_sum = 0.0_wp
+                DO kk = 1, 5 ! Stencil in y-direction
+                    DO kj = 1, 5 ! Stencil in x-direction
+                        weighted_sum = weighted_sum + c1(kj) * c1(kk) * B_cent(j + kj - 3, k + kk - 3)
+                    END DO
+                END DO
+                B_second_xy_geom(j,k) = weighted_sum / norm_xy
+
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+
+        !=======================================================================
+        !  2. HANDLE BOUNDARY CELLS
+        !     The derivatives in the 2-cell-wide border cannot be computed with
+        !     the full 5-point stencil. A simple and robust strategy is to
+        !     extrapolate the values from the nearest valid interior cell.
+        !     This is a zero-order extrapolation (copying).
+        !=======================================================================
+
+        ! --- Handle left and right boundaries (columns j=1, 2, comp_cells_x-1, comp_cells_x) ---
+        IF (comp_cells_x .GE. 5) THEN
+            CALL copy_derivative_halo_x
+        END IF
+
+        IF ( comp_cells_y .GE. 5 ) THEN
+
+            CALL copy_derivative_halo_y
+        END IF
+
+        IF ( slope_correction_flag ) THEN
+
+            ! Calculate grav_coeff using the retained LS first derivatives.
+            grav_coeff = 1.0_wp / ( 1.0_wp + B_prime_x_geom**2 + B_prime_y_geom**2 )
+
+            ! Interpolate the cell coefficient to the shared Cartesian faces.
+            grav_coeff_stag_x(1,:) = grav_coeff(1,:)
+            grav_coeff_stag_x(2:comp_interfaces_x-1,:) = 0.5_wp *                    &
+                ( grav_coeff(1:comp_cells_x-1,:) + grav_coeff(2:comp_cells_x,:) )
+            grav_coeff_stag_x(comp_interfaces_x,:) = grav_coeff(comp_cells_x,:)
+
+            grav_coeff_stag_y(:,1) = grav_coeff(:,1)
+            grav_coeff_stag_y(:,2:comp_interfaces_y-1) = 0.5_wp *                    &
+                ( grav_coeff(:,1:comp_cells_y-1) + grav_coeff(:,2:comp_cells_y) )
+            grav_coeff_stag_y(:,comp_interfaces_y) = grav_coeff(:,comp_cells_y)
 
         ELSE
 
-            iy = 1
-            alfa_y = 0.0_wp
+            grav_coeff = 1.0_wp
+
+            grav_coeff_stag_x = 1.0_wp
+            grav_coeff_stag_y = 1.0_wp
 
         END IF
 
-        f2 = .FALSE.
+        RETURN
 
-        IF ( size(x1,1) .EQ. 1 ) THEN
+    END SUBROUTINE topography_reconstruction
 
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )
+    !> \brief Fit a resolved polynomial on a one-dimensional line shorter than five cells.
+    !> \details Symmetric centered coordinates separate the linear term from the
+    !> quadratic term. One cell returns zero, two resolve a line, and three/four
+    !> resolve a quadratic. This fallback does not replace the five-point filter.
+    !> \param[in] bed Cell-center bed elevations [m], with one through four entries.
+    !> \param[in] spacing Uniform positive cell spacing [m].
+    !> \param[out] first Filtered first derivative at each available center.
+    !> \param[out] second Filtered second derivative at each available center [m^-1].
+    PURE SUBROUTINE reconstruct_short_1d_line(bed,spacing,first,second)
+        REAL(wp), INTENT(IN) :: bed(:),spacing
+        REAL(wp), INTENT(OUT) :: first(:),second(:)
+        REAL(wp) :: coordinate(SIZE(bed)),quadratic_basis(SIZE(bed))
+        REAL(wp) :: linear,quadratic
+        INTEGER :: i,n
 
-        ELSEIF ( size(x1,2) .EQ. 1 ) THEN
-
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix+1,iy) .EQ. nodata_topo )
-
-        ELSE
-
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )&
-                .OR. ( f1(ix+1,iy) .EQ. nodata_topo )                               &
-                .OR. ( f1(ix+1,iy+1) .EQ. nodata_topo )
-
+        n = SIZE(bed)
+        first = 0.0_wp; second = 0.0_wp
+        IF (n .LE. 1) RETURN
+        DO i=1,n
+            coordinate(i) = (REAL(i-1,wp)-0.5_wp*REAL(n-1,wp))*spacing
+        END DO
+        linear = SUM(coordinate*bed)/SUM(coordinate**2)
+        first = linear
+        IF (n .GE. 3) THEN
+            quadratic_basis = coordinate**2-SUM(coordinate**2)/REAL(n,wp)
+            quadratic = SUM(quadratic_basis*bed)/SUM(quadratic_basis**2)
+            first = linear+2.0_wp*quadratic*coordinate
+            second = 2.0_wp*quadratic
         END IF
+    END SUBROUTINE reconstruct_short_1d_line
 
-    END SUBROUTINE interp_2d_nodata
+    !> \brief Copy the nearest valid x-interior derivative values into both halos.
+    SUBROUTINE copy_derivative_halo_x
+        INTEGER :: k
+
+        !$OMP PARALLEL DO PRIVATE(k)
+        DO k = 1, comp_cells_y
+            B_prime_x_geom(1,k)   = B_prime_x_geom(3,k)
+            B_prime_x_geom(2,k)   = B_prime_x_geom(3,k)
+            B_prime_y_geom(1,k)   = B_prime_y_geom(3,k)
+            B_prime_y_geom(2,k)   = B_prime_y_geom(3,k)
+            B_second_xx_geom(1,k) = B_second_xx_geom(3,k)
+            B_second_xx_geom(2,k) = B_second_xx_geom(3,k)
+            B_second_yy_geom(1,k) = B_second_yy_geom(3,k)
+            B_second_yy_geom(2,k) = B_second_yy_geom(3,k)
+            B_second_xy_geom(1,k) = B_second_xy_geom(3,k)
+            B_second_xy_geom(2,k) = B_second_xy_geom(3,k)
+
+            B_prime_x_geom(comp_cells_x-1,k) = B_prime_x_geom(comp_cells_x-2,k)
+            B_prime_x_geom(comp_cells_x,k)   = B_prime_x_geom(comp_cells_x-2,k)
+            B_prime_y_geom(comp_cells_x-1,k) = B_prime_y_geom(comp_cells_x-2,k)
+            B_prime_y_geom(comp_cells_x,k)   = B_prime_y_geom(comp_cells_x-2,k)
+            B_second_xx_geom(comp_cells_x-1,k) = B_second_xx_geom(comp_cells_x-2,k)
+            B_second_xx_geom(comp_cells_x,k)   = B_second_xx_geom(comp_cells_x-2,k)
+            B_second_yy_geom(comp_cells_x-1,k) = B_second_yy_geom(comp_cells_x-2,k)
+            B_second_yy_geom(comp_cells_x,k)   = B_second_yy_geom(comp_cells_x-2,k)
+            B_second_xy_geom(comp_cells_x-1,k) = B_second_xy_geom(comp_cells_x-2,k)
+            B_second_xy_geom(comp_cells_x,k)   = B_second_xy_geom(comp_cells_x-2,k)
+        END DO
+        !$OMP END PARALLEL DO
+    END SUBROUTINE copy_derivative_halo_x
+
+    !> \brief Copy the nearest valid y-interior derivative values into both halos.
+    SUBROUTINE copy_derivative_halo_y
+        INTEGER :: j
+
+        !$OMP PARALLEL DO PRIVATE(j)
+        DO j = 1, comp_cells_x
+            B_prime_x_geom(j,1)   = B_prime_x_geom(j,3)
+            B_prime_x_geom(j,2)   = B_prime_x_geom(j,3)
+            B_prime_y_geom(j,1)   = B_prime_y_geom(j,3)
+            B_prime_y_geom(j,2)   = B_prime_y_geom(j,3)
+            B_second_xx_geom(j,1) = B_second_xx_geom(j,3)
+            B_second_xx_geom(j,2) = B_second_xx_geom(j,3)
+            B_second_yy_geom(j,1) = B_second_yy_geom(j,3)
+            B_second_yy_geom(j,2) = B_second_yy_geom(j,3)
+            B_second_xy_geom(j,1) = B_second_xy_geom(j,3)
+            B_second_xy_geom(j,2) = B_second_xy_geom(j,3)
+
+            B_prime_x_geom(j,comp_cells_y-1) = B_prime_x_geom(j,comp_cells_y-2)
+            B_prime_x_geom(j,comp_cells_y)   = B_prime_x_geom(j,comp_cells_y-2)
+            B_prime_y_geom(j,comp_cells_y-1) = B_prime_y_geom(j,comp_cells_y-2)
+            B_prime_y_geom(j,comp_cells_y)   = B_prime_y_geom(j,comp_cells_y-2)
+            B_second_xx_geom(j,comp_cells_y-1) = B_second_xx_geom(j,comp_cells_y-2)
+            B_second_xx_geom(j,comp_cells_y)   = B_second_xx_geom(j,comp_cells_y-2)
+            B_second_yy_geom(j,comp_cells_y-1) = B_second_yy_geom(j,comp_cells_y-2)
+            B_second_yy_geom(j,comp_cells_y)   = B_second_yy_geom(j,comp_cells_y-2)
+            B_second_xy_geom(j,comp_cells_y-1) = B_second_xy_geom(j,comp_cells_y-2)
+            B_second_xy_geom(j,comp_cells_y)   = B_second_xy_geom(j,comp_cells_y-2)
+        END DO
+        !$OMP END PARALLEL DO
+    END SUBROUTINE copy_derivative_halo_y
 
 
     !-----------------------------------------------------------------------------
@@ -1950,274 +2219,5 @@ CONTAINS
         END IF
 
     END function maxmod
-
-    ! Fissural rectangle/cell intersections follow the segment-and-width source
-    ! geometry introduced by Elisa Biagioli in BiElisa/IMEX_LavaFlow.
-    !> \brief Compute each cell overlap fraction with a finite-width fissure rectangle.
-    !>
-    !> \param[in] endpoints_x X coordinates of the two fissure segment endpoints [m].
-    !> \param[in] endpoints_y Y coordinates of the two fissure segment endpoints [m].
-    !> \param[in] width Full width of the fissure rectangle [m].
-    !> \param[out] cell_fraction Rectangle overlap divided by cell area, one value per cell.
-
-    SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,   &
-            cell_fraction)
-
-        IMPLICIT NONE
-
-        REAL(wp), INTENT(IN) :: endpoints_x(2), endpoints_y(2), width
-        REAL(wp), INTENT(OUT) :: cell_fraction(comp_cells_x,comp_cells_y)
-
-        REAL(wp) :: polygon_x(16), polygon_y(16)
-        REAL(wp) :: clipped_x(16), clipped_y(16)
-        REAL(wp) :: segment_x, segment_y, segment_length
-        REAL(wp) :: normal_x, normal_y, half_width
-        REAL(wp) :: min_x, max_x, min_y, max_y
-        REAL(wp) :: boundary, previous_coordinate, current_coordinate
-        REAL(wp) :: fraction, intersection_x, intersection_y, area_twice
-        REAL(wp) :: denominator
-        INTEGER :: cell_x, cell_y, vertex, next_vertex, edge
-        INTEGER :: vertex_count, clipped_count, previous_vertex, axis
-        LOGICAL :: keep_greater, previous_inside, current_inside
-
-        cell_fraction = 0.0_wp
-        segment_x = endpoints_x(2) - endpoints_x(1)
-        segment_y = endpoints_y(2) - endpoints_y(1)
-        segment_length = SQRT(segment_x**2 + segment_y**2)
-        IF (segment_length .LE. EPSILON(1.0_wp)) RETURN
-
-        normal_x = -segment_y / segment_length
-        normal_y = segment_x / segment_length
-        half_width = 0.5_wp * width
-
-        min_x = MINVAL(endpoints_x) - half_width * ABS(normal_x)
-        max_x = MAXVAL(endpoints_x) + half_width * ABS(normal_x)
-        min_y = MINVAL(endpoints_y) - half_width * ABS(normal_y)
-        max_y = MAXVAL(endpoints_y) + half_width * ABS(normal_y)
-
-        DO cell_y = 1, comp_cells_y
-            IF (y_stag(cell_y+1) .LT. min_y .OR. y_stag(cell_y) .GT. max_y) CYCLE
-
-            DO cell_x = 1, comp_cells_x
-                IF (x_stag(cell_x+1) .LT. min_x .OR. x_stag(cell_x) .GT. max_x) CYCLE
-
-                vertex_count = 4
-                polygon_x(1) = endpoints_x(1) + normal_x * half_width
-                polygon_y(1) = endpoints_y(1) + normal_y * half_width
-                polygon_x(2) = endpoints_x(2) + normal_x * half_width
-                polygon_y(2) = endpoints_y(2) + normal_y * half_width
-                polygon_x(3) = endpoints_x(2) - normal_x * half_width
-                polygon_y(3) = endpoints_y(2) - normal_y * half_width
-                polygon_x(4) = endpoints_x(1) - normal_x * half_width
-                polygon_y(4) = endpoints_y(1) - normal_y * half_width
-
-                ! Clip the fissure polygon against the cell's four axis-aligned edges.
-                DO edge = 1, 4
-                    SELECT CASE (edge)
-                    CASE (1)
-                        axis = 1
-                        boundary = x_stag(cell_x)
-                        keep_greater = .TRUE.
-                    CASE (2)
-                        axis = 1
-                        boundary = x_stag(cell_x+1)
-                        keep_greater = .FALSE.
-                    CASE (3)
-                        axis = 2
-                        boundary = y_stag(cell_y)
-                        keep_greater = .TRUE.
-                    CASE (4)
-                        axis = 2
-                        boundary = y_stag(cell_y+1)
-                        keep_greater = .FALSE.
-                    END SELECT
-
-                    clipped_count = 0
-                    previous_vertex = vertex_count
-                    IF (axis .EQ. 1) THEN
-                        previous_coordinate = polygon_x(previous_vertex)
-                    ELSE
-                        previous_coordinate = polygon_y(previous_vertex)
-                    END IF
-                    IF (keep_greater) THEN
-                        previous_inside = previous_coordinate .GE. boundary
-                    ELSE
-                        previous_inside = previous_coordinate .LE. boundary
-                    END IF
-
-                    DO vertex = 1, vertex_count
-                        IF (axis .EQ. 1) THEN
-                            current_coordinate = polygon_x(vertex)
-                        ELSE
-                            current_coordinate = polygon_y(vertex)
-                        END IF
-                        IF (keep_greater) THEN
-                            current_inside = current_coordinate .GE. boundary
-                        ELSE
-                            current_inside = current_coordinate .LE. boundary
-                        END IF
-
-                        IF (current_inside .NEQV. previous_inside) THEN
-                            IF (axis .EQ. 1) THEN
-                                denominator = polygon_x(vertex) - polygon_x(previous_vertex)
-                                fraction = (boundary - polygon_x(previous_vertex)) / denominator
-                                intersection_x = boundary
-                                intersection_y = polygon_y(previous_vertex) + fraction * &
-                                    (polygon_y(vertex) - polygon_y(previous_vertex))
-                            ELSE
-                                denominator = polygon_y(vertex) - polygon_y(previous_vertex)
-                                fraction = (boundary - polygon_y(previous_vertex)) / denominator
-                                intersection_x = polygon_x(previous_vertex) + fraction * &
-                                    (polygon_x(vertex) - polygon_x(previous_vertex))
-                                intersection_y = boundary
-                            END IF
-                            clipped_count = clipped_count + 1
-                            clipped_x(clipped_count) = intersection_x
-                            clipped_y(clipped_count) = intersection_y
-                        END IF
-
-                        IF (current_inside) THEN
-                            clipped_count = clipped_count + 1
-                            clipped_x(clipped_count) = polygon_x(vertex)
-                            clipped_y(clipped_count) = polygon_y(vertex)
-                        END IF
-
-                        previous_vertex = vertex
-                        previous_inside = current_inside
-                    END DO
-
-                    vertex_count = clipped_count
-                    IF (vertex_count .EQ. 0) EXIT
-                    polygon_x(1:vertex_count) = clipped_x(1:vertex_count)
-                    polygon_y(1:vertex_count) = clipped_y(1:vertex_count)
-                END DO
-
-                IF (vertex_count .LT. 3) CYCLE
-
-                ! Shoelace formula about the cell corner: with map coordinates of
-                ! order 1e6 m the products of absolute coordinates lose about 1e-3 m2
-                ! per cell, a few parts in 1e6 of the coverage of an oblique fissure.
-                area_twice = 0.0_wp
-                DO vertex = 1, vertex_count
-                    next_vertex = MOD(vertex, vertex_count) + 1
-                    area_twice = area_twice                                          &
-                        + ( polygon_x(vertex) - x_stag(cell_x) )                    &
-                        * ( polygon_y(next_vertex) - y_stag(cell_y) )               &
-                        - ( polygon_x(next_vertex) - x_stag(cell_x) )               &
-                        * ( polygon_y(vertex) - y_stag(cell_y) )
-                END DO
-                cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                          &
-                    0.5_wp * ABS(area_twice) / (dx * dy))
-            END DO
-        END DO
-
-    END SUBROUTINE compute_cell_fissure_fraction
-
-    !> \brief Estimate cell coverage by an elliptical source using subcell sampling.
-    !>
-    !> \param[in] xs X coordinate of the ellipse centre [m].
-    !> \param[in] ys Y coordinate of the ellipse centre [m].
-    !> \param[in] rs First semi-axis of the elliptical source [m].
-    !> \param[in] r2s Second semi-axis of the elliptical source [m].
-    !> \param[in] angles Clockwise angle of the ellipse relative to the x axis [degrees].
-    !> \param[out] cell_fract Source-covered fraction of each computational cell.
-
-    SUBROUTINE compute_cell_fract(xs,ys,rs,r2s,angles,cell_fract)
-
-        IMPLICIT NONE
-
-        REAL(wp), INTENT(IN) :: xs,ys,rs,r2s,angles
-
-        REAL(wp), INTENT(OUT) :: cell_fract(comp_cells_x,comp_cells_y)
-
-        REAL(wp), ALLOCATABLE :: x_subgrid(:) , y_subgrid(:)
-
-        INTEGER, ALLOCATABLE :: check_subgrid(:)
-
-        INTEGER n_points , n_points2
-
-        REAL(wp) :: source_area
-
-        INTEGER :: h ,j, k
-
-        REAL(wp) :: ang_rad
-
-        ang_rad = angles / 180.0_wp * ATAN(1.0_wp)*4.0_wp
-
-        WRITE(*,*) 'ang_rad',ang_rad
-
-        n_points = 200
-        n_points2 = n_points**2
-
-        ALLOCATE( x_subgrid(n_points2) )
-        ALLOCATE( y_subgrid(n_points2) )
-        ALLOCATE( check_subgrid(n_points2) )
-
-        x_subgrid = 0.0_wp
-        y_subgrid = 0.0_wp
-
-        DO h = 1,n_points
-
-            x_subgrid(h:n_points2:n_points) = DBLE(h)
-            y_subgrid((h-1)*n_points+1:h*n_points) = DBLE(h)
-
-        END DO
-
-        x_subgrid = ( 2.0_wp * x_subgrid - 1.0_wp ) / ( 2.0_wp * DBLE(n_points) )
-        y_subgrid = ( 2.0_wp * y_subgrid - 1.0_wp ) / ( 2.0_wp * DBLE(n_points) )
-
-        x_subgrid = ( x_subgrid - 0.5_wp ) * dx
-        y_subgrid = ( y_subgrid - 0.5_wp ) * dy
-
-        DO j=1,comp_cells_x
-
-            DO k=1,comp_cells_y
-
-                IF ( ( x_stag(j+1) .LT. ( xs - MAX(rs,r2s) ) ) .OR.                   &
-                    ( x_stag(j) .GT. ( xs + MAX(rs,r2s) ) ) .OR.                     &
-                    ( y_stag(k+1) .LT. ( ys - MAX(rs,r2s) ) ) .OR.                   &
-                    ( y_stag(k) .GT. ( ys + MAX(rs,r2s) ) ) ) THEN
-
-                    cell_fract(j,k) = 0.0_wp
-
-                ELSE
-
-                    check_subgrid = 0
-
-                    WHERE ( ( ( ( x_comp(j) + x_subgrid - xs )*COS(ang_rad) +          &
-                        ( y_comp(k) + y_subgrid - ys )*SIN(ang_rad) )**2 / rs**2 +   &
-                        ( - ( x_comp(j) + x_subgrid - xs )*SIN(ang_rad) +            &
-                        ( y_comp(k) + y_subgrid - ys )*COS(ang_rad) )**2 / r2s**2 )  &
-                        .LE. 1.0_wp )
-
-                        check_subgrid = 1
-
-                    END WHERE
-
-                    cell_fract(j,k) = REAL(SUM(check_subgrid),wp) / &
-                        REAL(n_points2,wp)
-
-                END IF
-
-            ENDDO
-
-        ENDDO
-
-        source_area = dx*dy*SUM(cell_fract)
-
-        IF ( VERBOSE_LEVEL .GE. 0 ) THEN
-
-            WRITE(*,*) 'Source area =',source_area,' Error =',ABS( 1.0_wp -          &
-                dx*dy*SUM(cell_fract) / ( 4.0_wp*ATAN(1.0_wp)*rs*r2s ) )
-
-        END IF
-
-        DEALLOCATE( x_subgrid )
-        DEALLOCATE( y_subgrid )
-        DEALLOCATE( check_subgrid )
-
-        RETURN
-
-    END SUBROUTINE compute_cell_fract
 
 END MODULE geometry_2d

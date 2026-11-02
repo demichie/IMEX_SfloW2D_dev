@@ -105,13 +105,6 @@ CONTAINS
         IF (ios/=0) error='Unable to rewind after MASS_EXCHANGE_PARAMETERS'
     END SUBROUTINE read_mass_exchange_parameters
 
-    !> @brief Write the configured mass-exchange namelist to an output unit.
-    !> @param[in] output_unit Open formatted Fortran output unit.
-    SUBROUTINE write_mass_exchange_parameters(output_unit)
-        INTEGER, INTENT(IN) :: output_unit
-        WRITE(output_unit,NML=mass_exchange_parameters)
-    END SUBROUTINE write_mass_exchange_parameters
-
     !> \brief Convert ASCII lowercase letters in source input to uppercase.
     !> \param[in] text Input text.
     !> \return Same-length text with lowercase ASCII letters converted to uppercase.
@@ -126,4 +119,11 @@ CONTAINS
                 upper(i:i)=ACHAR(code-IACHAR('a')+IACHAR('A'))
         END DO
     END FUNCTION uppercase_source_text
+
+    !> @brief Write the configured mass-exchange namelist to an output unit.
+    !> @param[in] output_unit Open formatted Fortran output unit.
+    SUBROUTINE write_mass_exchange_parameters(output_unit)
+        INTEGER, INTENT(IN) :: output_unit
+        WRITE(output_unit,NML=mass_exchange_parameters)
+    END SUBROUTINE write_mass_exchange_parameters
 END MODULE source_input_2d
