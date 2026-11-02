@@ -11,19 +11,19 @@ MODULE equation_terms_2d
     USE constitutive_parameters_2d
     USE state_conversion_2d
 
-    USE parameters_2d, ONLY : wp, &
-            n_eqns, &
-            n_vars, &
-            thermal_cooling_flag, &
-            liquid_flag, &
-            gas_flag, &
-            pore_pressure_flag, &
-            idx_pore, &
-            idx_u, &
-            idx_v, &
-            idx_solidEqn_first, &
-            idx_solidEqn_last, &
-            idx_addGasEqn_first, &
+    USE parameters_2d, ONLY : wp,                                                                                      &
+            n_eqns,                                                                                                    &
+            n_vars,                                                                                                    &
+            thermal_cooling_flag,                                                                                      &
+            liquid_flag,                                                                                               &
+            gas_flag,                                                                                                  &
+            pore_pressure_flag,                                                                                        &
+            idx_pore,                                                                                                  &
+            idx_u,                                                                                                     &
+            idx_v,                                                                                                     &
+            idx_solidEqn_first,                                                                                        &
+            idx_solidEqn_last,                                                                                         &
+            idx_addGasEqn_first,                                                                                       &
             idx_addGasEqn_last
 
     IMPLICIT NONE
@@ -96,7 +96,7 @@ CONTAINS
         REAL(wp) :: Richardson, rho_m, rho_c
         REAL(wp) :: sp_heat_c, sp_heat_mix
 
-        CALL mixt_var(qpj,Richardson,rho_m,rho_c,reduced_gravity,sp_heat_c,       &
+        CALL mixt_var(qpj,Richardson,rho_m,rho_c,reduced_gravity,sp_heat_c,                                            &
             sp_heat_mix)
         gamma = rho_m * reduced_gravity
 
@@ -116,7 +116,7 @@ CONTAINS
     !> \param[out] vel_min Lower characteristic speed [m s^-1].
     !> \param[out] vel_max Upper characteristic speed [m s^-1].
     !> \note normal_velocity_index must identify one of the two Cartesian velocity components.
-    SUBROUTINE eval_local_speeds_direction(qpj,grav_coeff,normal_velocity_index, &
+    SUBROUTINE eval_local_speeds_direction(qpj,grav_coeff,normal_velocity_index,                                       &
             vel_min,vel_max)
         REAL(wp), INTENT(IN) :: qpj(n_vars+2), grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
@@ -124,7 +124,7 @@ CONTAINS
         REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, r_h, normal_velocity, celerity
 
-        CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,          &
+        CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,                                                 &
             r_sp_heat_mix)
         r_h = qpj(idx_h)
         normal_velocity = qpj(normal_velocity_index)
@@ -157,15 +157,15 @@ CONTAINS
         REAL(wp), INTENT(INOUT) :: flux(n_eqns)
         REAL(wp) :: component_flux, scale
 
-        component_flux = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))          &
+        component_flux = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))                                               &
             + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
 
-        IF ((flux(idx_totMassEqn) .GT. 0.0_wp .AND. component_flux .GT. flux(idx_totMassEqn)) .OR.          &
+        IF ((flux(idx_totMassEqn) .GT. 0.0_wp .AND. component_flux .GT. flux(idx_totMassEqn)) .OR.                     &
             (flux(idx_totMassEqn) .LT. 0.0_wp .AND. component_flux .LT. flux(idx_totMassEqn))) THEN
             scale = flux(idx_totMassEqn) / component_flux
-            flux(idx_solidEqn_first:idx_solidEqn_last) =                           &
+            flux(idx_solidEqn_first:idx_solidEqn_last) =                                                               &
                 scale * flux(idx_solidEqn_first:idx_solidEqn_last)
-            flux(idx_addGasEqn_first:idx_addGasEqn_last) =                         &
+            flux(idx_addGasEqn_first:idx_addGasEqn_last) =                                                             &
                 scale * flux(idx_addGasEqn_first:idx_addGasEqn_last)
         END IF
 

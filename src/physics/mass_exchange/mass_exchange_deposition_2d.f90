@@ -2,10 +2,10 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_deposition_2d
-        USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, sutherland_flag, &
+        USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, sutherland_flag,                                   &
             rheology_model, mass_exchange_rates_type, reset_mass_exchange_rates
-        USE constitutive_parameters_2d, ONLY : alphastot_min, coeff_porosity, rho_s, sp_heat_s, &
-            kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, sp_gas_const_a, settling_flag, grav, &
+        USE constitutive_parameters_2d, ONLY : alphastot_min, coeff_porosity, rho_s, sp_heat_s,                        &
+            kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, sp_gas_const_a, settling_flag, grav,                        &
             collective_settling_flag, A_drag, B_drag, diam_s
 
         USE diagnostics_2d, ONLY : fatal_error
@@ -53,15 +53,15 @@ CONTAINS
             END IF
 
             ! Evaluate settling before producing the conservative species, energy and bed terms.
-            CALL eval_deposition_volume_kernel(state%h,state%T,state%alphas,alpha,rho_m,rho_c, &
+            CALL eval_deposition_volume_kernel(state%h,state%T,state%alphas,alpha,rho_m,rho_c,                         &
                         dt,r%solid_deposition_rate)
             r%carrier_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
             r%solid_mass_rate=-rho_s*r%solid_deposition_rate
             r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%carrier_deposition_rate
-            r%energy_rate=state%T*(SUM(sp_heat_s*r%solid_mass_rate)- &
+            r%energy_rate=state%T*(SUM(sp_heat_s*r%solid_mass_rate)-                                                   &
                         rho_c*cp_c*r%carrier_deposition_rate)
-            IF (gas_flag .AND. n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                       &
-                        r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                           &
+            IF (gas_flag .AND. n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                                       &
+                        r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                                         &
                         state%xg/gas_phase_mass_fraction
             r%dB_dt=SUM(r%solid_deposition_rate)+r%carrier_deposition_rate
         END SUBROUTINE eval_mass_exchange_deposition_explicit
@@ -120,7 +120,7 @@ CONTAINS
         !> @param[in] r_rho_c Carrier density [kg/m3].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] deposition_rate Solid deposition thickness flux for each species [m/s].
-        SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot,                       &
+        SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot,                                       &
                     r_rho_m, r_rho_c, dt, deposition_rate)
 
             REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
@@ -138,7 +138,7 @@ CONTAINS
             ! For the gas carrier, use temperature-dependent viscosity and ideal-gas density.
             IF ( gas_flag .AND. sutherland_flag ) THEN
 
-                    dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *                              &
+                    dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *                                            &
                                 ( Tref_Suth + S_mu ) / ( r_T + S_mu )
 
                     rho_c = pres / ( sp_gas_const_a * r_T )
@@ -146,18 +146,18 @@ CONTAINS
 
             END IF
 
-            CALL eval_settling_fluid_properties(rheology_model, r_T, alphas_tot,                       &
+            CALL eval_settling_fluid_properties(rheology_model, r_T, alphas_tot,                                       &
                         r_rho_m, r_rho_c, kin_visc_c_local, rhoc, inv_kin_visc)
 
             DO i_solid=1,n_solid
 
                     IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( settling_flag ) ) THEN
 
-                            settling_vel = settling_velocity( diam_s(i_solid) , rho_s(i_solid) ,           &
+                            settling_vel = settling_velocity( diam_s(i_solid) , rho_s(i_solid) ,                       &
                                         rhoc , inv_kin_visc )
 
-                            deposition_rate(i_solid) = eval_solid_deposition_rate(                         &
-                                        rheology_model, r_alphas(i_solid), settling_vel, r_h, dt,            &
+                            deposition_rate(i_solid) = eval_solid_deposition_rate(                                     &
+                                        rheology_model, r_alphas(i_solid), settling_vel, r_h, dt,                      &
                                         alphas_tot, alpha_max, hind_exp)
 
                             IF ( deposition_rate(i_solid) .LT. 0.0_wp ) THEN
@@ -209,19 +209,19 @@ CONTAINS
                             set_vel_old = settling_velocity
 
                             IF (collective_settling_flag) THEN
-                                    inv_sqrt_C_D = SQRT(1.0_wp / (24.0_wp * (1.0_wp +                        &
-                                                0.15_wp * Rey**(0.687_wp)) / Rey +                             &
+                                    inv_sqrt_C_D = SQRT(1.0_wp / (24.0_wp * (1.0_wp +                                  &
+                                                0.15_wp * Rey**(0.687_wp)) / Rey +                                     &
                                                 A_drag * (LOG(Rey) - B_drag)))
 
                             ELSE
 
-                                    inv_sqrt_C_D = SQRT(Rey / (24.0_wp * (1.0_wp +                           &
+                                    inv_sqrt_C_D = SQRT(Rey / (24.0_wp * (1.0_wp +                                     &
                                                 0.15_wp * Rey**(0.687_wp))))
                             END IF
 
                             settling_velocity = const_part * inv_sqrt_C_D
 
-                            IF (ABS(set_vel_old - settling_velocity) / set_vel_old                         &
+                            IF (ABS(set_vel_old - settling_velocity) / set_vel_old                                     &
                                         < 1.0E-6_wp) THEN
                                     RETURN
                             END IF
@@ -242,11 +242,12 @@ CONTAINS
         !> @param[in] mixture_density Mixture mass density [kg/m3].
         !> @param[in] carrier_density_fallback Carrier density from mixture properties [kg/m3].
         !> @param[in] kinematic_viscosity_fallback Default carrier kinematic viscosity [m2/s].
-        !> @param[out] carrier_density Carrier density selected for the settling calculation [kg/m3].
+        !> @param[out] carrier_density Carrier density selected for the settling calculation
+        !> [kg/m3].
         !> @param[out] inverse_kinematic_viscosity Inverse selected kinematic viscosity [s/m2].
-        SUBROUTINE eval_settling_fluid_properties(model_name, temperature,                             &
-                    total_solid_fraction, mixture_density, carrier_density_fallback,                     &
-                    kinematic_viscosity_fallback, carrier_density,                                       &
+        SUBROUTINE eval_settling_fluid_properties(model_name, temperature,                                             &
+                    total_solid_fraction, mixture_density, carrier_density_fallback,                                   &
+                    kinematic_viscosity_fallback, carrier_density,                                                     &
                     inverse_kinematic_viscosity)
 
             CHARACTER(*), INTENT(IN) :: model_name
@@ -259,7 +260,7 @@ CONTAINS
             carrier_density = carrier_density_fallback
 
             IF (model_name .EQ. 'lahar') THEN
-                    fluid_viscosity = eval_lahar_fluid_viscosity(temperature,                            &
+                    fluid_viscosity = eval_lahar_fluid_viscosity(temperature,                                          &
                                 total_solid_fraction)
                     carrier_density = mixture_density
                     inverse_kinematic_viscosity = mixture_density / fluid_viscosity
@@ -282,8 +283,8 @@ CONTAINS
         !> @param[in] hindered_settling_exponent Exponent controlling settling suppression at high
         !> concentration.
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_solid_deposition_rate(model_name, solid_fraction,                           &
-                    settling_velocity, flow_depth, time_step, total_solid_fraction,                      &
+        PURE FUNCTION eval_solid_deposition_rate(model_name, solid_fraction,                                           &
+                    settling_velocity, flow_depth, time_step, total_solid_fraction,                                    &
                     maximum_solid_fraction, hindered_settling_exponent) RESULT(rate)
 
             CHARACTER(*), INTENT(IN) :: model_name
@@ -293,13 +294,13 @@ CONTAINS
             REAL(wp) :: rate
 
             IF (model_name .EQ. 'lahar') THEN
-                    rate = eval_lahar_deposition_rate(solid_fraction, settling_velocity,                 &
+                    rate = eval_lahar_deposition_rate(solid_fraction, settling_velocity,                               &
                                 flow_depth, time_step)
 
             ELSE
 
-                    rate = eval_hindered_settling_deposition_rate(solid_fraction,                        &
-                                settling_velocity, flow_depth, time_step, total_solid_fraction,            &
+                    rate = eval_hindered_settling_deposition_rate(solid_fraction,                                      &
+                                settling_velocity, flow_depth, time_step, total_solid_fraction,                        &
                                 maximum_solid_fraction, hindered_settling_exponent)
             END IF
 
@@ -311,14 +312,14 @@ CONTAINS
         !> @param[in] flow_depth Mobile flow thickness [m].
         !> @param[in] time_step Physical time-step duration [s].
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_lahar_deposition_rate(solid_fraction, settling_velocity,                    &
+        PURE FUNCTION eval_lahar_deposition_rate(solid_fraction, settling_velocity,                                    &
                     flow_depth, time_step) RESULT(deposition_rate)
 
             REAL(wp), INTENT(IN) :: solid_fraction, settling_velocity
             REAL(wp), INTENT(IN) :: flow_depth, time_step
             REAL(wp) :: deposition_rate
 
-            deposition_rate = MIN(solid_fraction * settling_velocity,                                  &
+            deposition_rate = MIN(solid_fraction * settling_velocity,                                                  &
                         flow_depth * solid_fraction / time_step)
 
         END FUNCTION eval_lahar_deposition_rate
@@ -333,8 +334,8 @@ CONTAINS
         !> @param[in] hindered_settling_exponent Exponent controlling settling suppression at high
         !> concentration.
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_hindered_settling_deposition_rate(solid_fraction,                           &
-                    settling_velocity, flow_depth, time_step, total_solid_fraction,                      &
+        PURE FUNCTION eval_hindered_settling_deposition_rate(solid_fraction,                                           &
+                    settling_velocity, flow_depth, time_step, total_solid_fraction,                                    &
                     maximum_solid_fraction, hindered_settling_exponent) RESULT(rate)
 
             REAL(wp), INTENT(IN) :: solid_fraction, settling_velocity
@@ -343,7 +344,7 @@ CONTAINS
             REAL(wp) :: rate
 
             rate = solid_fraction * settling_velocity
-            rate = rate * (1.0_wp - MIN(1.0_wp, total_solid_fraction /                                 &
+            rate = rate * (1.0_wp - MIN(1.0_wp, total_solid_fraction /                                                 &
                         maximum_solid_fraction))**hindered_settling_exponent
             rate = MIN(rate, flow_depth * solid_fraction / time_step)
 

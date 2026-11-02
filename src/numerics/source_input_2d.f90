@@ -4,10 +4,10 @@
 !>          namelists; SOURCE_GROUPS is no longer accepted.
 !********************************************************************************
 MODULE source_input_2d
-    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag, &
-            lava_deposition_model, lava_deposition_rate, lava_deposition_visc_ref, &
+    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                                                 &
+            lava_deposition_model, lava_deposition_rate, lava_deposition_visc_ref,                                     &
             lava_deposition_exponent, lava_deposition_temp_ref, lava_deposition_temp_width
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
+    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,                                               &
             loss_rate, entrainment_flag
     USE parameters_2d, ONLY : wp, gas_loss_flag, liquid_vaporization_flag
     IMPLICIT NONE
@@ -28,11 +28,11 @@ MODULE source_input_2d
     CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
     INTEGER, PUBLIC :: mass_exchange_group=4
     LOGICAL, PUBLIC :: mass_exchange_configuration_present=.FALSE.
-    NAMELIST /mass_exchange_parameters/ mass_exchange_method, &
-            mass_exchange_group, erosion_coeff, &
-            settling_flag, loss_rate, entrainment_flag, gas_loss_flag, &
-            liquid_vaporization_flag, lava_deposition_flag, lava_deposition_model, &
-            lava_deposition_rate, lava_deposition_visc_ref, lava_deposition_exponent, &
+    NAMELIST /mass_exchange_parameters/ mass_exchange_method,                                                          &
+            mass_exchange_group, erosion_coeff,                                                                        &
+            settling_flag, loss_rate, entrainment_flag, gas_loss_flag,                                                 &
+            liquid_vaporization_flag, lava_deposition_flag, lava_deposition_model,                                     &
+            lava_deposition_rate, lava_deposition_visc_ref, lava_deposition_exponent,                                  &
             lava_deposition_temp_ref, lava_deposition_temp_width
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
     PUBLIC :: uppercase_source_text
@@ -61,12 +61,12 @@ CONTAINS
                 error='Unable to scan MASS_EXCHANGE_PARAMETERS'; RETURN
             END IF
             line=uppercase_source_text(ADJUSTL(line))
-            IF (INDEX(line,'&SOURCE_GROUPS')==1 .OR. &
+            IF (INDEX(line,'&SOURCE_GROUPS')==1 .OR.                                                                   &
                 INDEX(line,'$SOURCE_GROUPS')==1) THEN
                 error='SOURCE_GROUPS is removed; use physical METHOD and GROUP'
                 RETURN
             END IF
-            IF (INDEX(line,'&MASS_EXCHANGE_PARAMETERS')==1 .OR. &
+            IF (INDEX(line,'&MASS_EXCHANGE_PARAMETERS')==1 .OR.                                                        &
                 INDEX(line,'$MASS_EXCHANGE_PARAMETERS')==1) count=count+1
         END DO
         IF (count>1) THEN
@@ -80,8 +80,8 @@ CONTAINS
             END IF
             mass_exchange_configuration_present=.TRUE.
             mass_exchange_method=uppercase_source_text(ADJUSTL(mass_exchange_method))
-            IF (mass_exchange_method/='EXPLICIT' .AND. &
-                mass_exchange_method/='NEWTON' .AND. &
+            IF (mass_exchange_method/='EXPLICIT' .AND.                                                                 &
+                mass_exchange_method/='NEWTON' .AND.                                                                   &
                 mass_exchange_method/='ANALYTIC') THEN
                 error='Unsupported mass-exchange METHOD'; RETURN
             END IF
@@ -92,7 +92,7 @@ CONTAINS
                 CASE DEFAULT
                     error='Unsupported LAVA_DEPOSITION_MODEL'; RETURN
                 END SELECT
-                IF (lava_deposition_rate<0.0_wp .OR. lava_deposition_visc_ref<=0.0_wp .OR. &
+                IF (lava_deposition_rate<0.0_wp .OR. lava_deposition_visc_ref<=0.0_wp .OR.                             &
                     lava_deposition_exponent<=0.0_wp .OR. lava_deposition_temp_width<=0.0_wp) THEN
                     error='Invalid lava deposition parameters'; RETURN
                 END IF
@@ -115,7 +115,7 @@ CONTAINS
         upper=text
         DO i=1,LEN(text)
         code=IACHAR(text(i:i))
-        IF (code>=IACHAR('a') .AND. code<=IACHAR('z')) &
+        IF (code>=IACHAR('a') .AND. code<=IACHAR('z'))                                                                 &
                 upper(i:i)=ACHAR(code-IACHAR('a')+IACHAR('A'))
         END DO
     END FUNCTION uppercase_source_text

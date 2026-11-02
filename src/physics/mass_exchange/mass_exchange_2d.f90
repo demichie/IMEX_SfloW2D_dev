@@ -3,11 +3,11 @@
 !> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
         USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
-        USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                              &
-                    idx_stochEqn, idx_poreEqn,                                                           &
-                    idx_solidEqn_first, idx_solidEqn_last,                                               &
-                    idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                      &
-                    pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                  &
+        USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                                              &
+                    idx_stochEqn, idx_poreEqn,                                                                         &
+                    idx_solidEqn_first, idx_solidEqn_last,                                                             &
+                    idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                                    &
+                    pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                                &
                     reset_mass_exchange_rates
         USE diagnostics_2d, ONLY : fatal_error
         USE constitutive_parameters_2d, ONLY : maximum_solid_packing
@@ -17,7 +17,7 @@ MODULE mass_exchange_2d
         USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
         USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
         USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
-        USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                             &
+        USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                                             &
             eval_mass_exchange_lava_deposition_explicit
 
         IMPLICIT NONE
@@ -59,7 +59,7 @@ CONTAINS
             do_entrainment=ANY(selected_names=='mass_exchange_entrainment')
             do_vaporization=ANY(selected_names=='mass_exchange_vaporization')
             do_lava=ANY(selected_names=='mass_exchange_lava_deposition')
-            IF (do_vaporization .AND. .NOT.do_deposition) &
+            IF (do_vaporization .AND. .NOT.do_deposition)                                                              &
                     CALL fatal_error('mass_exchange: vaporization requires same-group deposition')
             CALL reset_mass_exchange_rates(total_rates)
             eqns_term=0.0_wp
@@ -70,14 +70,14 @@ CONTAINS
             IF (gas_flag .OR. liquid_flag) THEN
                 alpha=SUM(physical_state%alphas)
                 CALL reset_mass_exchange_rates(process_rates)
-                IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(physical_state,erodible, &
+                IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(physical_state,erodible,                      &
                                 dt,process_rates)
                 ! Erosion can increase packing by importing a solid-rich substrate.
                 ! Limit it before accumulating any conservative or bed contribution.
                 IF (do_erosion) THEN
-                        erosion_factor=erosion_packing_factor(physical_state%h,alpha, &
-                                SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)), &
-                                MAX(0.0_wp,process_rates%carrier_erosion_rate), &
+                        erosion_factor=erosion_packing_factor(physical_state%h,alpha,                                  &
+                                SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)),                                     &
+                                MAX(0.0_wp,process_rates%carrier_erosion_rate),                                        &
                                 maximum_solid_packing,dt)
                         CALL scale_process(process_rates,erosion_factor)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
@@ -85,7 +85,7 @@ CONTAINS
                 CALL reset_mass_exchange_rates(deposition_rates)
                 CALL reset_mass_exchange_rates(liquid_loss_rates)
                 IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
-                IF (do_liquid_loss) &
+                IF (do_liquid_loss)                                                                                    &
                         CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
 
                 ! Deposition and liquid carrier loss share the exchange inventory.
@@ -104,8 +104,8 @@ CONTAINS
 
                 ! The packing constraint acts on the coupled changes in solid and
                 ! total volumes, including the solid removed by deposition.
-                packing_factor=packing_withdrawal_factor(physical_state%h,alpha,solid_erosion,                        &
-                                carrier_erosion,solid_deposition,carrier_volume,                             &
+                packing_factor=packing_withdrawal_factor(physical_state%h,alpha,solid_erosion,                         &
+                                carrier_erosion,solid_deposition,carrier_volume,                                       &
                                 carrier_loss,0.0_wp,maximum_solid_packing,dt)
                 carrier_factor=MIN(carrier_factor,packing_factor)
 
@@ -121,14 +121,14 @@ CONTAINS
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
                 END IF
                 IF (do_vaporization) THEN
-                        CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &
+                        CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone,                           &
                             deposition_rates%solid_deposition_rate,process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
                 END IF
 
                 ! Scalar transport and pore-pressure sources inherit the net mass exchange.
                 IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
-                IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                        &
+                IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                                        &
                                 eqns_term(idx_totMassEqn)*physical_state%exc_pore_pres
             END IF  ! gas_flag .OR. liquid_flag
 
@@ -204,7 +204,8 @@ CONTAINS
         ! Limit simultaneous withdrawal demands from one physical inventory.
         ! Positive source total_rates are excluded from the budget, not netted against sinks.
 
-        !> @brief Limit simultaneous positive withdrawal demands against a single available inventory.
+        !> @brief Limit simultaneous positive withdrawal demands against a single available
+        !> inventory.
         !> @details Positive signed rates are excluded from gross withdrawal budgets.
         !> @param[in] signed_rates Signed process flux demands; negative values mean withdrawals.
         !> @param[in] available Maximum withdrawal flux available from the shared phase inventory.
@@ -215,7 +216,7 @@ CONTAINS
 
             total_withdrawal=SUM(MAX(0.0_wp,-signed_rates))
             f=1.0_wp
-            IF (total_withdrawal>0.0_wp)                                                               &
+            IF (total_withdrawal>0.0_wp)                                                                               &
                         f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
         END FUNCTION shared_withdrawal_factor
 
@@ -228,7 +229,7 @@ CONTAINS
         !> @param[in] packing Maximum admissible solid volume fraction.
         !> @param[in] dt Physical timestep [s].
         !> @return Common erosion factor within [0,1].
-        PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion,                           &
+        PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion,                                           &
                     carrier_erosion,packing,dt) RESULT(f)
             REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion,packing,dt
             REAL(wp) :: deficit,margin
@@ -255,8 +256,8 @@ CONTAINS
         !> @param[in] packing Maximum admissible solid volume fraction.
         !> @param[in] dt Physical exchange step duration [s].
         !> @return Maximum permitted common scaling factor in [0,1].
-        PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion,                        &
-                    carrier_erosion,solid_deposition,carrier_deposition,shared_loss,                     &
+        PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion,                                        &
+                    carrier_erosion,solid_deposition,carrier_deposition,shared_loss,                                   &
                     other_loss,packing,dt) RESULT(f)
             REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion
             REAL(wp), INTENT(IN) :: solid_deposition,carrier_deposition,shared_loss
@@ -265,9 +266,9 @@ CONTAINS
 
             ! Enforce S_final <= packing * H_final without assuming that
             ! deposition leaves the solid volume unchanged.
-            margin=packing*(h+dt*(solid_erosion+carrier_erosion-other_loss))                           &
+            margin=packing*(h+dt*(solid_erosion+carrier_erosion-other_loss))                                           &
                         -(h*alpha+dt*solid_erosion)
-            coefficient=packing*(solid_deposition+carrier_deposition+shared_loss)                      &
+            coefficient=packing*(solid_deposition+carrier_deposition+shared_loss)                                      &
                         -solid_deposition
             f=1.0_wp
 
@@ -296,9 +297,9 @@ CONTAINS
             eqns_term(idx_uEqn)=eqns_term(idx_uEqn)+state%u*MIN(0.0_wp,p%mixture_mass_rate)
             eqns_term(idx_vEqn)=eqns_term(idx_vEqn)+state%v*MIN(0.0_wp,p%mixture_mass_rate)
             eqns_term(idx_engyEqn)=eqns_term(idx_engyEqn)+p%energy_rate
-            eqns_term(idx_solidEqn_first:idx_solidEqn_last)=                                           &
+            eqns_term(idx_solidEqn_first:idx_solidEqn_last)=                                                           &
                         eqns_term(idx_solidEqn_first:idx_solidEqn_last)+p%solid_mass_rate
-            IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)=                        &
+            IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)=                                        &
                         eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)+p%add_gas_mass_rate
             total%mixture_mass_rate=total%mixture_mass_rate+p%mixture_mass_rate
             total%energy_rate=total%energy_rate+p%energy_rate
@@ -306,13 +307,13 @@ CONTAINS
             total%add_gas_mass_rate=total%add_gas_mass_rate+p%add_gas_mass_rate
             total%solid_erosion_rate=total%solid_erosion_rate+p%solid_erosion_rate
             total%solid_deposition_rate=total%solid_deposition_rate+p%solid_deposition_rate
-            total%carrier_erosion_rate=                                                                &
+            total%carrier_erosion_rate=                                                                                &
                         total%carrier_erosion_rate+p%carrier_erosion_rate
-            total%carrier_deposition_rate=                                                             &
+            total%carrier_deposition_rate=                                                                             &
                         total%carrier_deposition_rate+p%carrier_deposition_rate
             total%dB_dt=total%dB_dt+p%dB_dt
             total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
-            total%carrier_withdrawal_volume_rate=                                                      &
+            total%carrier_withdrawal_volume_rate=                                                                      &
                         total%carrier_withdrawal_volume_rate+p%carrier_withdrawal_volume_rate
         END SUBROUTINE accumulate_process
 
