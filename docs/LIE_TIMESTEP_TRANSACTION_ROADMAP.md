@@ -36,9 +36,10 @@ Do not clip or limit the spatial conservative update.
 - [x] Keep analytic and Newton results in cell-local candidates until validation.
 - [x] Remove per-group inventory staging; update per-cell inventories in
       the time-step trial, retaining bed-rate buffers for projection.
-- [ ] Run the Lie rollback/injected-failure regression Actions and PCCU tests.
-- [ ] Re-run the OpenMP performance benchmark at 1, 2 and 4 threads;
-      compare performance against commit 0e3a8a7.
+- [x] Run Lie OpenMP validation D20 (strict-debug build, OpenMP regressions, rollback and end-to-end comparisons): success on ccaef745 (run 41446379127).
+- [x] Re-run OpenMP benchmark at 1, 2, 4 and 8 threads on ccaef745;
+      compare against 0e3a8a7 (median wall seconds: 1t 5.495 -> 4.445;
+      2t 3.438 -> 2.681; 4t 3.170 -> 2.317; 8t 2.997 -> 2.292).
 - [ ] Investigate reducing remaining full-domain *time-step* copies only
       if profiling shows a benefit, preserving a single rollback boundary.
 
@@ -99,3 +100,23 @@ unwanted per-group staging in the production executor.
 
 Validation of this correction requires a new regression run; no pass has
 been asserted yet.
+
+## Verified closure — 2026-11-02
+
+GitHub Actions **Lie OpenMP validation (D20)** run
+https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/41446379127
+completed with conclusion **success** for commit
+`ccaef74555e838c5c7320fc6c84a9d6b4f9c7d4b`.
+This establishes the D20 workflow's current build, regression,
+full-step rollback and 1/2/4-thread end-to-end acceptance gates.
+
+The Lie OpenMP performance benchmark also completed on the same commit
+with grid x=192, horizon=0.1 s, CFL=0.24 and three timed samples.
+Compared to `0e3a8a7`, median total wall time decreased by 19.1% (1t),
+22.0% (2t), 26.9% (4t) and 23.5% (8t). GitHub runner has 2 physical cores,
+4 logical CPUs; performance results are indicative, not a dedicated-host
+scaling certification.
+
+**Status:** time-step-only Lie transaction migration validated and closed.
+Remaining work on trial-state allocations or CFL/spatial operator profiling
+is an optional new optimization phase, not a prerequisite for closure.
