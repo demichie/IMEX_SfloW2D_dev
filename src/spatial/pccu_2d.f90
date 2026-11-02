@@ -73,6 +73,44 @@ CONTAINS
     END SUBROUTINE eval_hydrostatic_path
 
     !******************************************************************************
+    !> @brief Split a numerical flux and path jump into the two cell-facing values.
+    !>
+    !> @param[in] numerical_flux Central-upwind conservative flux before the path split.
+    !> @param[in] path_contribution Integrated nonconservative path contribution, one entry per
+    !>                              equation.
+    !> @param[in] a_minus Nonpositive lower characteristic bound at the face [m s^-1].
+    !> @param[in] a_plus Nonnegative upper characteristic bound at the face [m s^-1].
+    !> @param[out] value_left Oriented face value consumed by the negative/left adjacent cell.
+    !> @param[out] value_right Oriented face value consumed by the positive/right adjacent cell.
+    !******************************************************************************
+
+    SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution,       &
+            a_minus, a_plus, value_left, value_right )
+
+        REAL(wp), INTENT(IN) :: numerical_flux(:), path_contribution(:)
+        REAL(wp), INTENT(IN) :: a_minus, a_plus
+        REAL(wp), INTENT(OUT) :: value_left(:), value_right(:)
+
+        REAL(wp) :: denominator
+
+        IF ( ( SIZE(path_contribution) .NE. SIZE(numerical_flux) ) .OR.           &
+            ( SIZE(value_left) .NE. SIZE(numerical_flux) ) .OR.                  &
+            ( SIZE(value_right) .NE. SIZE(numerical_flux) ) ) THEN
+            ERROR STOP 'eval_oriented_pccu_pair: inconsistent array sizes'
+        END IF
+
+        denominator = a_plus - a_minus
+        IF ( denominator .GT. pccu_speed_tolerance ) THEN
+            value_left = numerical_flux + a_minus/denominator * path_contribution
+            value_right = numerical_flux + a_plus/denominator * path_contribution
+        ELSE
+            value_left = numerical_flux
+            value_right = numerical_flux
+        END IF
+
+    END SUBROUTINE eval_oriented_pccu_pair
+
+    !******************************************************************************
     !> @brief Combine inertial endpoint fluxes with central-upwind dissipation.
     !>
     !> @param[in] a_minus Nonpositive lower characteristic bound at the face [m s^-1].
@@ -110,44 +148,6 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_central_upwind_flux
-
-    !******************************************************************************
-    !> @brief Split a numerical flux and path jump into the two cell-facing values.
-    !>
-    !> @param[in] numerical_flux Central-upwind conservative flux before the path split.
-    !> @param[in] path_contribution Integrated nonconservative path contribution, one entry per
-    !>                              equation.
-    !> @param[in] a_minus Nonpositive lower characteristic bound at the face [m s^-1].
-    !> @param[in] a_plus Nonnegative upper characteristic bound at the face [m s^-1].
-    !> @param[out] value_left Oriented face value consumed by the negative/left adjacent cell.
-    !> @param[out] value_right Oriented face value consumed by the positive/right adjacent cell.
-    !******************************************************************************
-
-    SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution,       &
-            a_minus, a_plus, value_left, value_right )
-
-        REAL(wp), INTENT(IN) :: numerical_flux(:), path_contribution(:)
-        REAL(wp), INTENT(IN) :: a_minus, a_plus
-        REAL(wp), INTENT(OUT) :: value_left(:), value_right(:)
-
-        REAL(wp) :: denominator
-
-        IF ( ( SIZE(path_contribution) .NE. SIZE(numerical_flux) ) .OR.           &
-            ( SIZE(value_left) .NE. SIZE(numerical_flux) ) .OR.                  &
-            ( SIZE(value_right) .NE. SIZE(numerical_flux) ) ) THEN
-            ERROR STOP 'eval_oriented_pccu_pair: inconsistent array sizes'
-        END IF
-
-        denominator = a_plus - a_minus
-        IF ( denominator .GT. pccu_speed_tolerance ) THEN
-            value_left = numerical_flux + a_minus/denominator * path_contribution
-            value_right = numerical_flux + a_plus/denominator * path_contribution
-        ELSE
-            value_left = numerical_flux
-            value_right = numerical_flux
-        END IF
-
-    END SUBROUTINE eval_oriented_pccu_pair
 
     !> @brief Evaluate the hydrostatic momentum one-form at a quadrature state.
     !>

@@ -133,130 +133,6 @@ CONTAINS
 
     END SUBROUTINE initialize_reconstruction
 
-    !> \brief Release all reconstructed-state and HP work arrays.
-    !>
-    !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
-
-    SUBROUTINE finalize_reconstruction( this )
-
-        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
-
-
-
-        DEALLOCATE( this%qp_adv_interfaceL )
-        DEALLOCATE( this%h_selected_interfaceL )
-        DEALLOCATE( this%qp_adv_interfaceR )
-        DEALLOCATE( this%h_selected_interfaceR )
-        DEALLOCATE( this%qp_adv_interfaceB )
-        DEALLOCATE( this%h_selected_interfaceB )
-        DEALLOCATE( this%qp_adv_interfaceT )
-        DEALLOCATE( this%h_selected_interfaceT )
-
-        DEALLOCATE( this%qp_cellW )
-        DEALLOCATE( this%qp_cellE )
-        DEALLOCATE( this%qp_cellS )
-        DEALLOCATE( this%qp_cellN )
-
-        DEALLOCATE( this%eta_cellW )
-        DEALLOCATE( this%eta_cellE )
-        DEALLOCATE( this%eta_cellS )
-        DEALLOCATE( this%eta_cellN )
-        DEALLOCATE( this%eta_interfaceL )
-        DEALLOCATE( this%eta_interfaceR )
-        DEALLOCATE( this%eta_interfaceB )
-        DEALLOCATE( this%eta_interfaceT )
-        DEALLOCATE( this%h_minmod_interfaceL )
-        DEALLOCATE( this%h_minmod_interfaceR )
-        DEALLOCATE( this%h_minmod_interfaceB )
-        DEALLOCATE( this%h_minmod_interfaceT )
-        DEALLOCATE( this%h_froude_interfaceL )
-        DEALLOCATE( this%h_froude_interfaceR )
-        DEALLOCATE( this%h_froude_interfaceB )
-        DEALLOCATE( this%h_froude_interfaceT )
-
-        DEALLOCATE( this%hp_eta_mask )
-        DEALLOCATE( this%hp_eta_j )
-        DEALLOCATE( this%hp_eta_k )
-
-
-    END SUBROUTINE finalize_reconstruction
-
-    !> \brief Build a deduplicated eta workset containing active cells and immediate neighbours.
-    !>
-    !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
-    !> \param[in] solve_cells Number of entries in the active-cell index lists.
-    !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
-    !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
-    !>
-    !> \note Writes only the parent workspace eta mask/list; immediate neighbours provide the
-    !>       additional continuity stencil needed by active cells.
-
-    SUBROUTINE build_hp_workset(this, solve_cells, j_cent, k_cent)
-
-        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
-        INTEGER, INTENT(IN) :: solve_cells
-        INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
-        INTEGER :: l, j, k
-
-        DO l = 1, this%hp_eta_cells
-                this%hp_eta_mask(this%hp_eta_j(l),this%hp_eta_k(l)) = .FALSE.
-        END DO
-        this%hp_eta_cells = 0
-
-        ! Active cells first, followed by unique stencil halo neighbours.
-        DO l = 1, solve_cells
-                j = j_cent(l)
-                k = k_cent(l)
-                CALL append_eta_cell(j,k)
-        END DO
-        DO l = 1, solve_cells
-                j = j_cent(l)
-                k = k_cent(l)
-                IF ( j .GT. 1 ) CALL append_eta_cell(j-1,k)
-                IF ( j .LT. comp_cells_x ) CALL append_eta_cell(j+1,k)
-                IF ( k .GT. 1 ) CALL append_eta_cell(j,k-1)
-                IF ( k .LT. comp_cells_y ) CALL append_eta_cell(j,k+1)
-        END DO
-
-    CONTAINS
-
-        !> \brief Append one cell to the parent eta workset only if it is not already present.
-        !>
-        !> \param[in] j_cell X index of the cell appended to the parent eta workset.
-        !> \param[in] k_cell Y index of the cell appended to the parent eta workset.
-        !>
-        !> \note Updates the host-associated this workspace; the active-cell workset is not modified.
-
-        SUBROUTINE append_eta_cell(j_cell,k_cell)
-
-            INTEGER, INTENT(IN) :: j_cell, k_cell
-
-            IF ( this%hp_eta_mask(j_cell,k_cell) ) RETURN
-
-            this%hp_eta_mask(j_cell,k_cell) = .TRUE.
-            this%hp_eta_cells = this%hp_eta_cells + 1
-            this%hp_eta_j(this%hp_eta_cells) = j_cell
-            this%hp_eta_k(this%hp_eta_cells) = k_cell
-
-        END SUBROUTINE append_eta_cell
-
-    END SUBROUTINE build_hp_workset
-
-    !> @brief Store the HP workset built once by the active-domain refresh.
-    !> @param[in,out] this Reconstruction workspace whose HP list is updated.
-    !> @param[in] hp_cells Number of HP workset entries.
-    !> @param[in] hp_j X-cell indices of the HP workset.
-    !> @param[in] hp_k Y-cell indices of the HP workset.
-    SUBROUTINE prepare_hp_workset(this, hp_cells, hp_j, hp_k)
-        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
-        INTEGER, INTENT(IN) :: hp_cells
-        INTEGER, INTENT(IN) :: hp_j(:), hp_k(:)
-        this%hp_eta_cells = hp_cells
-        this%hp_eta_j(1:hp_cells) = hp_j(1:hp_cells)
-        this%hp_eta_k(1:hp_cells) = hp_k(1:hp_cells)
-        this%hp_workset_prepared = .TRUE.
-    END SUBROUTINE prepare_hp_workset
-
     !> \brief Reconstruct physical traces, apply boundary conditions and finalize HP states.
     !>
     !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
@@ -869,6 +745,67 @@ CONTAINS
 
     END SUBROUTINE reconstruction
 
+    !> \brief Build a deduplicated eta workset containing active cells and immediate neighbours.
+    !>
+    !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+    !> \param[in] solve_cells Number of entries in the active-cell index lists.
+    !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
+    !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
+    !>
+    !> \note Writes only the parent workspace eta mask/list; immediate neighbours provide the
+    !>       additional continuity stencil needed by active cells.
+
+    SUBROUTINE build_hp_workset(this, solve_cells, j_cent, k_cent)
+
+        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+        INTEGER, INTENT(IN) :: solve_cells
+        INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
+        INTEGER :: l, j, k
+
+        DO l = 1, this%hp_eta_cells
+                this%hp_eta_mask(this%hp_eta_j(l),this%hp_eta_k(l)) = .FALSE.
+        END DO
+        this%hp_eta_cells = 0
+
+        ! Active cells first, followed by unique stencil halo neighbours.
+        DO l = 1, solve_cells
+                j = j_cent(l)
+                k = k_cent(l)
+                CALL append_eta_cell(j,k)
+        END DO
+        DO l = 1, solve_cells
+                j = j_cent(l)
+                k = k_cent(l)
+                IF ( j .GT. 1 ) CALL append_eta_cell(j-1,k)
+                IF ( j .LT. comp_cells_x ) CALL append_eta_cell(j+1,k)
+                IF ( k .GT. 1 ) CALL append_eta_cell(j,k-1)
+                IF ( k .LT. comp_cells_y ) CALL append_eta_cell(j,k+1)
+        END DO
+
+    CONTAINS
+
+        !> \brief Append one cell to the parent eta workset only if it is not already present.
+        !>
+        !> \param[in] j_cell X index of the cell appended to the parent eta workset.
+        !> \param[in] k_cell Y index of the cell appended to the parent eta workset.
+        !>
+        !> \note Updates the host-associated this workspace; the active-cell workset is not modified.
+
+        SUBROUTINE append_eta_cell(j_cell,k_cell)
+
+            INTEGER, INTENT(IN) :: j_cell, k_cell
+
+            IF ( this%hp_eta_mask(j_cell,k_cell) ) RETURN
+
+            this%hp_eta_mask(j_cell,k_cell) = .TRUE.
+            this%hp_eta_cells = this%hp_eta_cells + 1
+            this%hp_eta_j(this%hp_eta_cells) = j_cell
+            this%hp_eta_k(this%hp_eta_cells) = k_cell
+
+        END SUBROUTINE append_eta_cell
+
+    END SUBROUTINE build_hp_workset
+
     !******************************************************************************
     !> \brief Reconstruct the KP free surface for KT dissipation and path terms.
     !> \param[in,out] this Workspace containing the active HP-eta cell list and traces.
@@ -1023,178 +960,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             END IF
 
     END SUBROUTINE reconstruct_kt_eta_cell
-
-    !> @brief Reconstruct KT free-surface and transport-depth traces on the HP workset.
-    !> @details Applies the configured trace reconstruction to prepared HP cells.
-    !> @param[in,out] this Reconstruction workspace and output face traces.
-    !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
-    SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
-        USE parameters_2d, ONLY : limiter,reconstr_coeff
-        USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
-        USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
-        USE constitutive_parameters_2d, ONLY : grav
-
-        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
-        REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
-        REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
-        REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
-        REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
-        REAL(wp) :: eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm
-        REAL(wp) :: slope_eta2_x,slope_eta2_y
-        REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
-        REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
-        INTEGER :: l,j,k,kt_mode
-
-        ! Decode the configuration once, outside the reconstruction face loop.
-        SELECT CASE (TRIM(kt_trace_reconstruction))
-        CASE ('h_x')
-            kt_mode=1
-        CASE ('minmod')
-            kt_mode=3
-        CASE ('froude_blend')
-            kt_mode=4
-        CASE DEFAULT
-            kt_mode=2
-        END SELECT
-
-        IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
-            DO k=1,comp_cells_y
-                this%h_froude_interfaceL(1,k)=this%h_froude_interfaceR(1,k)
-                this%h_froude_interfaceR(comp_interfaces_x,k)= &
-                    this%h_froude_interfaceL(comp_interfaces_x,k)
-            END DO
-            DO j=1,comp_cells_x
-                this%h_froude_interfaceB(j,1)=this%h_froude_interfaceT(j,1)
-                this%h_froude_interfaceT(j,comp_interfaces_y)= &
-                    this%h_froude_interfaceB(j,comp_interfaces_y)
-            END DO
-        END IF
-
-        !$OMP PARALLEL DO PRIVATE(l,j,k)
-        DO l=1,this%hp_eta_cells
-            j=this%hp_eta_j(l)
-            k=this%hp_eta_k(l)
-            this%eta_interfaceR(j,k)=this%eta_cellW(j,k)
-            this%eta_interfaceL(j+1,k)=this%eta_cellE(j,k)
-            this%eta_interfaceT(j,k)=this%eta_cellS(j,k)
-            this%eta_interfaceB(j,k+1)=this%eta_cellN(j,k)
-            IF (j.EQ.1) THEN
-                this%eta_interfaceL(1,k)=this%eta_interfaceR(1,k)
-                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                    this%h_minmod_interfaceL(1,k)=this%h_minmod_interfaceR(1,k)
-            END IF
-            IF (j.EQ.comp_cells_x) THEN
-                this%eta_interfaceR(comp_interfaces_x,k)= &
-                    this%eta_interfaceL(comp_interfaces_x,k)
-                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                    this%h_minmod_interfaceR(comp_interfaces_x,k)= &
-                    this%h_minmod_interfaceL(comp_interfaces_x,k)
-            END IF
-            IF (k.EQ.1) THEN
-                this%eta_interfaceB(j,1)=this%eta_interfaceT(j,1)
-                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                    this%h_minmod_interfaceB(j,1)=this%h_minmod_interfaceT(j,1)
-            END IF
-            IF (k.EQ.comp_cells_y) THEN
-                this%eta_interfaceT(j,comp_interfaces_y)= &
-                    this%eta_interfaceB(j,comp_interfaces_y)
-                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                    this%h_minmod_interfaceT(j,comp_interfaces_y)= &
-                    this%h_minmod_interfaceB(j,comp_interfaces_y)
-            END IF
-        END DO
-        !$OMP END PARALLEL DO
-
-        DO k=1,comp_cells_y
-            this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
-            this%qp_adv_interfaceR(:,comp_interfaces_x,k)= &
-                this%qp_adv_interfaceL(:,comp_interfaces_x,k)
-        END DO
-        DO j=1,comp_cells_x
-            this%qp_adv_interfaceB(:,j,1)=this%qp_adv_interfaceT(:,j,1)
-            this%qp_adv_interfaceT(:,j,comp_interfaces_y)= &
-                this%qp_adv_interfaceB(:,j,comp_interfaces_y)
-        END DO
-        ! reconstruct() has already reflected the primitive states
-        ! at the internal radial-source wall. The eta pass above overwrites its
-        ! scalar ghost traces: restore equal depths on both sides, including the
-        ! selected transport reconstruction, before evaluating speeds and fluxes.
-        ! Injection is volumetric; no mass may cross this excluded inner boundary.
-        IF ( radial_source_flag ) THEN
-            DO l=1,this%hp_eta_cells
-                j=this%hp_eta_j(l)
-                k=this%hp_eta_k(l)
-                IF ( source_cell(j,k) .NE. 2 ) CYCLE
-                IF ( sourceE(j,k) ) THEN
-                    this%eta_interfaceR(j+1,k)=this%eta_interfaceL(j+1,k)
-                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                        this%h_minmod_interfaceR(j+1,k)=this%h_minmod_interfaceL(j+1,k)
-                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
-                        this%h_froude_interfaceR(j+1,k)=this%h_froude_interfaceL(j+1,k)
-                ELSEIF ( sourceW(j,k) ) THEN
-                    this%eta_interfaceL(j,k)=this%eta_interfaceR(j,k)
-                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                        this%h_minmod_interfaceL(j,k)=this%h_minmod_interfaceR(j,k)
-                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
-                        this%h_froude_interfaceL(j,k)=this%h_froude_interfaceR(j,k)
-                END IF
-                IF ( sourceN(j,k) ) THEN
-                    this%eta_interfaceT(j,k+1)=this%eta_interfaceB(j,k+1)
-                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                        this%h_minmod_interfaceT(j,k+1)=this%h_minmod_interfaceB(j,k+1)
-                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
-                        this%h_froude_interfaceT(j,k+1)=this%h_froude_interfaceB(j,k+1)
-                ELSEIF ( sourceS(j,k) ) THEN
-                    this%eta_interfaceB(j,k)=this%eta_interfaceT(j,k)
-                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
-                        this%h_minmod_interfaceB(j,k)=this%h_minmod_interfaceT(j,k)
-                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
-                        this%h_froude_interfaceB(j,k)=this%h_froude_interfaceT(j,k)
-                END IF
-            END DO
-        END IF
-
-        ! Select final depths after eta and radial boundary corrections.
-        ! Keep the direct h_x candidate available for characteristic speed bounds.
-        !$OMP PARALLEL DO PRIVATE(l,j,k)
-        DO l=1,this%hp_eta_cells
-            j=this%hp_eta_j(l)
-            k=this%hp_eta_k(l)
-            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), &
-                this%eta_interfaceR(j,k),B_face_x(j,k), &
-                this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k), &
-                lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2, &
-                this%h_selected_interfaceR(j,k),'KT reconstruction west',kt_mode)
-            CALL select_final_transport_trace(this%qp_adv_interfaceL(:,j+1,k), &
-                this%eta_interfaceL(j+1,k),B_face_x(j+1,k), &
-                this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k), &
-                lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2, &
-                this%h_selected_interfaceL(j+1,k),'KT reconstruction east',kt_mode)
-            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), &
-                this%eta_interfaceT(j,k),B_face_y(j,k), &
-                this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k), &
-                lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2, &
-                this%h_selected_interfaceT(j,k),'KT reconstruction south',kt_mode)
-            CALL select_final_transport_trace(this%qp_adv_interfaceB(:,j,k+1), &
-                this%eta_interfaceB(j,k+1),B_face_y(j,k+1), &
-                this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1), &
-                lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2, &
-                this%h_selected_interfaceB(j,k+1),'KT reconstruction north',kt_mode)
-        END DO
-        !$OMP END PARALLEL DO
-
-        ! External ghost states inherit the selected depths of their owners.
-        DO k=1,comp_cells_y
-            this%h_selected_interfaceL(1,k)=this%h_selected_interfaceR(1,k)
-            this%h_selected_interfaceR(comp_interfaces_x,k)= &
-                this%h_selected_interfaceL(comp_interfaces_x,k)
-        END DO
-        DO j=1,comp_cells_x
-            this%h_selected_interfaceB(j,1)=this%h_selected_interfaceT(j,1)
-            this%h_selected_interfaceT(j,comp_interfaces_y)= &
-                this%h_selected_interfaceB(j,comp_interfaces_y)
-        END DO
-    END SUBROUTINE reconstruct_kt_eta_traces
 
     !******************************************************************************
     !> \brief Compute a smooth blend weight from the local Froude number.
@@ -1407,6 +1172,241 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         !$OMP END PARALLEL
 
     END SUBROUTINE apply_hp_reconstruction
+
+    !> \brief Release all reconstructed-state and HP work arrays.
+    !>
+    !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+
+    SUBROUTINE finalize_reconstruction( this )
+
+        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+
+
+
+        DEALLOCATE( this%qp_adv_interfaceL )
+        DEALLOCATE( this%h_selected_interfaceL )
+        DEALLOCATE( this%qp_adv_interfaceR )
+        DEALLOCATE( this%h_selected_interfaceR )
+        DEALLOCATE( this%qp_adv_interfaceB )
+        DEALLOCATE( this%h_selected_interfaceB )
+        DEALLOCATE( this%qp_adv_interfaceT )
+        DEALLOCATE( this%h_selected_interfaceT )
+
+        DEALLOCATE( this%qp_cellW )
+        DEALLOCATE( this%qp_cellE )
+        DEALLOCATE( this%qp_cellS )
+        DEALLOCATE( this%qp_cellN )
+
+        DEALLOCATE( this%eta_cellW )
+        DEALLOCATE( this%eta_cellE )
+        DEALLOCATE( this%eta_cellS )
+        DEALLOCATE( this%eta_cellN )
+        DEALLOCATE( this%eta_interfaceL )
+        DEALLOCATE( this%eta_interfaceR )
+        DEALLOCATE( this%eta_interfaceB )
+        DEALLOCATE( this%eta_interfaceT )
+        DEALLOCATE( this%h_minmod_interfaceL )
+        DEALLOCATE( this%h_minmod_interfaceR )
+        DEALLOCATE( this%h_minmod_interfaceB )
+        DEALLOCATE( this%h_minmod_interfaceT )
+        DEALLOCATE( this%h_froude_interfaceL )
+        DEALLOCATE( this%h_froude_interfaceR )
+        DEALLOCATE( this%h_froude_interfaceB )
+        DEALLOCATE( this%h_froude_interfaceT )
+
+        DEALLOCATE( this%hp_eta_mask )
+        DEALLOCATE( this%hp_eta_j )
+        DEALLOCATE( this%hp_eta_k )
+
+
+    END SUBROUTINE finalize_reconstruction
+
+    !> @brief Store the HP workset built once by the active-domain refresh.
+    !> @param[in,out] this Reconstruction workspace whose HP list is updated.
+    !> @param[in] hp_cells Number of HP workset entries.
+    !> @param[in] hp_j X-cell indices of the HP workset.
+    !> @param[in] hp_k Y-cell indices of the HP workset.
+    SUBROUTINE prepare_hp_workset(this, hp_cells, hp_j, hp_k)
+        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+        INTEGER, INTENT(IN) :: hp_cells
+        INTEGER, INTENT(IN) :: hp_j(:), hp_k(:)
+        this%hp_eta_cells = hp_cells
+        this%hp_eta_j(1:hp_cells) = hp_j(1:hp_cells)
+        this%hp_eta_k(1:hp_cells) = hp_k(1:hp_cells)
+        this%hp_workset_prepared = .TRUE.
+    END SUBROUTINE prepare_hp_workset
+
+    !> @brief Reconstruct KT free-surface and transport-depth traces on the HP workset.
+    !> @details Applies the configured trace reconstruction to prepared HP cells.
+    !> @param[in,out] this Reconstruction workspace and output face traces.
+    !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
+    SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
+        USE parameters_2d, ONLY : limiter,reconstr_coeff
+        USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
+        USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
+        USE constitutive_parameters_2d, ONLY : grav
+
+        CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+        REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
+        REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
+        REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
+        REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
+        REAL(wp) :: eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm
+        REAL(wp) :: slope_eta2_x,slope_eta2_y
+        REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
+        REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
+        INTEGER :: l,j,k,kt_mode
+
+        ! Decode the configuration once, outside the reconstruction face loop.
+        SELECT CASE (TRIM(kt_trace_reconstruction))
+        CASE ('h_x')
+            kt_mode=1
+        CASE ('minmod')
+            kt_mode=3
+        CASE ('froude_blend')
+            kt_mode=4
+        CASE DEFAULT
+            kt_mode=2
+        END SELECT
+
+        IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
+            DO k=1,comp_cells_y
+                this%h_froude_interfaceL(1,k)=this%h_froude_interfaceR(1,k)
+                this%h_froude_interfaceR(comp_interfaces_x,k)= &
+                    this%h_froude_interfaceL(comp_interfaces_x,k)
+            END DO
+            DO j=1,comp_cells_x
+                this%h_froude_interfaceB(j,1)=this%h_froude_interfaceT(j,1)
+                this%h_froude_interfaceT(j,comp_interfaces_y)= &
+                    this%h_froude_interfaceB(j,comp_interfaces_y)
+            END DO
+        END IF
+
+        !$OMP PARALLEL DO PRIVATE(l,j,k)
+        DO l=1,this%hp_eta_cells
+            j=this%hp_eta_j(l)
+            k=this%hp_eta_k(l)
+            this%eta_interfaceR(j,k)=this%eta_cellW(j,k)
+            this%eta_interfaceL(j+1,k)=this%eta_cellE(j,k)
+            this%eta_interfaceT(j,k)=this%eta_cellS(j,k)
+            this%eta_interfaceB(j,k+1)=this%eta_cellN(j,k)
+            IF (j.EQ.1) THEN
+                this%eta_interfaceL(1,k)=this%eta_interfaceR(1,k)
+                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                    this%h_minmod_interfaceL(1,k)=this%h_minmod_interfaceR(1,k)
+            END IF
+            IF (j.EQ.comp_cells_x) THEN
+                this%eta_interfaceR(comp_interfaces_x,k)= &
+                    this%eta_interfaceL(comp_interfaces_x,k)
+                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                    this%h_minmod_interfaceR(comp_interfaces_x,k)= &
+                    this%h_minmod_interfaceL(comp_interfaces_x,k)
+            END IF
+            IF (k.EQ.1) THEN
+                this%eta_interfaceB(j,1)=this%eta_interfaceT(j,1)
+                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                    this%h_minmod_interfaceB(j,1)=this%h_minmod_interfaceT(j,1)
+            END IF
+            IF (k.EQ.comp_cells_y) THEN
+                this%eta_interfaceT(j,comp_interfaces_y)= &
+                    this%eta_interfaceB(j,comp_interfaces_y)
+                IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                    this%h_minmod_interfaceT(j,comp_interfaces_y)= &
+                    this%h_minmod_interfaceB(j,comp_interfaces_y)
+            END IF
+        END DO
+        !$OMP END PARALLEL DO
+
+        DO k=1,comp_cells_y
+            this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
+            this%qp_adv_interfaceR(:,comp_interfaces_x,k)= &
+                this%qp_adv_interfaceL(:,comp_interfaces_x,k)
+        END DO
+        DO j=1,comp_cells_x
+            this%qp_adv_interfaceB(:,j,1)=this%qp_adv_interfaceT(:,j,1)
+            this%qp_adv_interfaceT(:,j,comp_interfaces_y)= &
+                this%qp_adv_interfaceB(:,j,comp_interfaces_y)
+        END DO
+        ! reconstruct() has already reflected the primitive states
+        ! at the internal radial-source wall. The eta pass above overwrites its
+        ! scalar ghost traces: restore equal depths on both sides, including the
+        ! selected transport reconstruction, before evaluating speeds and fluxes.
+        ! Injection is volumetric; no mass may cross this excluded inner boundary.
+        IF ( radial_source_flag ) THEN
+            DO l=1,this%hp_eta_cells
+                j=this%hp_eta_j(l)
+                k=this%hp_eta_k(l)
+                IF ( source_cell(j,k) .NE. 2 ) CYCLE
+                IF ( sourceE(j,k) ) THEN
+                    this%eta_interfaceR(j+1,k)=this%eta_interfaceL(j+1,k)
+                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                        this%h_minmod_interfaceR(j+1,k)=this%h_minmod_interfaceL(j+1,k)
+                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                        this%h_froude_interfaceR(j+1,k)=this%h_froude_interfaceL(j+1,k)
+                ELSEIF ( sourceW(j,k) ) THEN
+                    this%eta_interfaceL(j,k)=this%eta_interfaceR(j,k)
+                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                        this%h_minmod_interfaceL(j,k)=this%h_minmod_interfaceR(j,k)
+                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                        this%h_froude_interfaceL(j,k)=this%h_froude_interfaceR(j,k)
+                END IF
+                IF ( sourceN(j,k) ) THEN
+                    this%eta_interfaceT(j,k+1)=this%eta_interfaceB(j,k+1)
+                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                        this%h_minmod_interfaceT(j,k+1)=this%h_minmod_interfaceB(j,k+1)
+                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                        this%h_froude_interfaceT(j,k+1)=this%h_froude_interfaceB(j,k+1)
+                ELSEIF ( sourceS(j,k) ) THEN
+                    this%eta_interfaceB(j,k)=this%eta_interfaceT(j,k)
+                    IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                        this%h_minmod_interfaceB(j,k)=this%h_minmod_interfaceT(j,k)
+                    IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                        this%h_froude_interfaceB(j,k)=this%h_froude_interfaceT(j,k)
+                END IF
+            END DO
+        END IF
+
+        ! Select final depths after eta and radial boundary corrections.
+        ! Keep the direct h_x candidate available for characteristic speed bounds.
+        !$OMP PARALLEL DO PRIVATE(l,j,k)
+        DO l=1,this%hp_eta_cells
+            j=this%hp_eta_j(l)
+            k=this%hp_eta_k(l)
+            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), &
+                this%eta_interfaceR(j,k),B_face_x(j,k), &
+                this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k), &
+                lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2, &
+                this%h_selected_interfaceR(j,k),'KT reconstruction west',kt_mode)
+            CALL select_final_transport_trace(this%qp_adv_interfaceL(:,j+1,k), &
+                this%eta_interfaceL(j+1,k),B_face_x(j+1,k), &
+                this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k), &
+                lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2, &
+                this%h_selected_interfaceL(j+1,k),'KT reconstruction east',kt_mode)
+            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), &
+                this%eta_interfaceT(j,k),B_face_y(j,k), &
+                this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k), &
+                lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2, &
+                this%h_selected_interfaceT(j,k),'KT reconstruction south',kt_mode)
+            CALL select_final_transport_trace(this%qp_adv_interfaceB(:,j,k+1), &
+                this%eta_interfaceB(j,k+1),B_face_y(j,k+1), &
+                this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1), &
+                lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2, &
+                this%h_selected_interfaceB(j,k+1),'KT reconstruction north',kt_mode)
+        END DO
+        !$OMP END PARALLEL DO
+
+        ! External ghost states inherit the selected depths of their owners.
+        DO k=1,comp_cells_y
+            this%h_selected_interfaceL(1,k)=this%h_selected_interfaceR(1,k)
+            this%h_selected_interfaceR(comp_interfaces_x,k)= &
+                this%h_selected_interfaceL(comp_interfaces_x,k)
+        END DO
+        DO j=1,comp_cells_x
+            this%h_selected_interfaceB(j,1)=this%h_selected_interfaceT(j,1)
+            this%h_selected_interfaceT(j,comp_interfaces_y)= &
+                this%h_selected_interfaceB(j,comp_interfaces_y)
+        END DO
+    END SUBROUTINE reconstruct_kt_eta_traces
 
 
 

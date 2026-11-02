@@ -53,29 +53,6 @@ CONTAINS
 
     END SUBROUTINE initialize_spatial_operator
 
-    !> \brief Release the reconstruction and KT flux workspace.
-    !>
-    !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
-
-    SUBROUTINE finalize_spatial_operator( this )
-
-        CLASS(spatial_operator_type), INTENT(INOUT) :: this
-
-        CALL this%hp_pccu%finalize
-        CALL this%reconstruction%finalize
-
-    END SUBROUTINE finalize_spatial_operator
-
-    !> @brief Reuse the HP workset prepared by the active-domain refresh.
-    !> @param[in,out] this Spatial operator and owned reconstruction workset.
-    !> @param[in] domain Active-domain worklist supplying HP workset indices.
-    SUBROUTINE prepare_spatial_hp_workset(this, domain)
-        CLASS(spatial_operator_type), INTENT(INOUT) :: this
-        CLASS(domain_type), INTENT(IN) :: domain
-        CALL this%reconstruction%prepare_hp_workset( &
-            domain%hp_eta_cells, domain%hp_eta_j, domain%hp_eta_k)
-    END SUBROUTINE prepare_spatial_hp_workset
-
     !******************************************************************************
     !> \brief Evaluate the complete explicit spatial term on the active domain.
     !>
@@ -242,5 +219,28 @@ CONTAINS
             speeds%a_interface_yPos(j,k+1),                                   &
             -speeds%a_interface_yNeg(j,k+1))
     END SUBROUTINE accumulate_directional_face_speeds
+
+    !> \brief Release the reconstruction and KT flux workspace.
+    !>
+    !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
+
+    SUBROUTINE finalize_spatial_operator( this )
+
+        CLASS(spatial_operator_type), INTENT(INOUT) :: this
+
+        CALL this%hp_pccu%finalize
+        CALL this%reconstruction%finalize
+
+    END SUBROUTINE finalize_spatial_operator
+
+    !> @brief Reuse the HP workset prepared by the active-domain refresh.
+    !> @param[in,out] this Spatial operator and owned reconstruction workset.
+    !> @param[in] domain Active-domain worklist supplying HP workset indices.
+    SUBROUTINE prepare_spatial_hp_workset(this, domain)
+        CLASS(spatial_operator_type), INTENT(INOUT) :: this
+        CLASS(domain_type), INTENT(IN) :: domain
+        CALL this%reconstruction%prepare_hp_workset( &
+            domain%hp_eta_cells, domain%hp_eta_j, domain%hp_eta_k)
+    END SUBROUTINE prepare_spatial_hp_workset
 
 END MODULE spatial_operator_2d

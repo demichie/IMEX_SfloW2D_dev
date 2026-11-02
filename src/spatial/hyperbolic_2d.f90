@@ -88,27 +88,6 @@ CONTAINS
 
     END SUBROUTINE initialize_hyperbolic
 
-    !> \brief Release the hyperbolic workspace arrays.
-    !>
-    !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
-
-    SUBROUTINE finalize_hyperbolic( this )
-
-        CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
-
-        DEALLOCATE( this%a_interface_xNeg )
-        DEALLOCATE( this%a_interface_xPos )
-        DEALLOCATE( this%a_interface_yNeg )
-        DEALLOCATE( this%a_interface_yPos )
-        DEALLOCATE( this%G_interface_xL )
-        DEALLOCATE( this%G_interface_xR )
-        DEALLOCATE( this%G_interface_yB )
-        DEALLOCATE( this%G_interface_yT )
-        DEALLOCATE( this%P_cell_x )
-        DEALLOCATE( this%P_cell_y )
-
-    END SUBROUTINE finalize_hyperbolic
-
     !> \brief Assemble the complete HP-PCCU spatial term on active cells.
     !>
     !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
@@ -766,6 +745,75 @@ CONTAINS
     END SUBROUTINE eval_pccu_interface
 
     !******************************************************************************
+    !> \brief Use the wet endpoint pressure coefficient on a wet/dry path.
+    !>
+    !> Gamma is a material coefficient, not a thickness variable.  A dry final
+    !> trace carries no composition and eval_hydrostatic_coefficient therefore
+    !> returns Gamma=0.  Along a wet/dry shoreline this artificial jump would
+    !> create a spurious -0.5*h^2*dGamma contribution in the hydrostatic path.
+    !> Use the wet-side limiting value at the dry endpoint instead.
+    !>
+    !> \param[in] h_left Depth at the negative/left path endpoint [m].
+    !> \param[in,out] gamma_left Left coefficient, replaced by the right one if only the left trace is
+    !>                           dry.
+    !> \param[in] h_right Depth at the positive/right path endpoint [m].
+    !> \param[in,out] gamma_right Right coefficient, replaced by the left one if only the right trace
+    !>                            is dry.
+    !******************************************************************************
+
+    !> @brief Extend the wet-side hydrostatic coefficient across a dry interface.
+    !> @param[in] h_left Depth at the negative-side face state [m].
+    !> @param[in,out] gamma_left Hydrostatic coefficient at the negative-side face state.
+    !> @param[in] h_right Depth at the positive-side face state [m].
+    !> @param[in,out] gamma_right Hydrostatic coefficient at the positive-side face state.
+    PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
+        REAL(wp), INTENT(IN) :: h_left,h_right
+        REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
+        IF ( ( h_left .LE. dry_thickness_tolerance ) .AND.                              &
+            ( h_right .GT. dry_thickness_tolerance ) ) THEN
+            gamma_left = gamma_right
+        ELSEIF ( ( h_right .LE. dry_thickness_tolerance ) .AND.                         &
+            ( h_left .GT. dry_thickness_tolerance ) ) THEN
+            gamma_right = gamma_left
+        END IF
+    END SUBROUTINE regularize_dry_gamma_pair
+
+    !******************************************************************************
+    !> \brief Identify lateral source traces on the domain boundary.
+    !> \param[in] direction Cartesian orientation of the face.
+    !> \param[in] face_i X interface index.
+    !> \param[in] face_j Y interface index.
+    !> \param[out] source_left True when the negative-side trace is a source cell.
+    !> \param[out] source_right True when the positive-side trace is a source cell.
+    !******************************************************************************
+    SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j,           &
+            source_left,source_right)
+
+        USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+
+        IMPLICIT NONE
+
+        INTEGER, INTENT(IN) :: direction,face_i,face_j
+        LOGICAL, INTENT(OUT) :: source_left,source_right
+
+        source_left=.FALSE.
+        source_right=.FALSE.
+        IF ( .NOT. lateral_source_flag ) RETURN
+
+        SELECT CASE (direction)
+        CASE (PATH_DIR_X)
+            IF ( face_i .EQ. 1 ) source_left=source_cell(1,face_j) .EQ. 2
+            IF ( face_i .EQ. comp_interfaces_x ) &
+                source_right=source_cell(comp_cells_x,face_j) .EQ. 2
+        CASE (PATH_DIR_Y)
+            IF ( face_j .EQ. 1 ) source_left=source_cell(face_i,1) .EQ. 2
+            IF ( face_j .EQ. comp_interfaces_y ) &
+                source_right=source_cell(face_i,comp_cells_y) .EQ. 2
+        END SELECT
+
+    END SUBROUTINE lateral_source_trace_sides
+
+    !******************************************************************************
     !> \brief Integrate the hydrostatic path between the final traces of each active cell.
     !>
     !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
@@ -884,39 +932,26 @@ CONTAINS
 
     END SUBROUTINE eval_cell_hydrostatic_path
 
-    !******************************************************************************
-    !> \brief Use the wet endpoint pressure coefficient on a wet/dry path.
+    !> \brief Release the hyperbolic workspace arrays.
     !>
-    !> Gamma is a material coefficient, not a thickness variable.  A dry final
-    !> trace carries no composition and eval_hydrostatic_coefficient therefore
-    !> returns Gamma=0.  Along a wet/dry shoreline this artificial jump would
-    !> create a spurious -0.5*h^2*dGamma contribution in the hydrostatic path.
-    !> Use the wet-side limiting value at the dry endpoint instead.
-    !>
-    !> \param[in] h_left Depth at the negative/left path endpoint [m].
-    !> \param[in,out] gamma_left Left coefficient, replaced by the right one if only the left trace is
-    !>                           dry.
-    !> \param[in] h_right Depth at the positive/right path endpoint [m].
-    !> \param[in,out] gamma_right Right coefficient, replaced by the left one if only the right trace
-    !>                            is dry.
-    !******************************************************************************
+    !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
 
-    !> @brief Extend the wet-side hydrostatic coefficient across a dry interface.
-    !> @param[in] h_left Depth at the negative-side face state [m].
-    !> @param[in,out] gamma_left Hydrostatic coefficient at the negative-side face state.
-    !> @param[in] h_right Depth at the positive-side face state [m].
-    !> @param[in,out] gamma_right Hydrostatic coefficient at the positive-side face state.
-    PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
-        REAL(wp), INTENT(IN) :: h_left,h_right
-        REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
-        IF ( ( h_left .LE. dry_thickness_tolerance ) .AND.                              &
-            ( h_right .GT. dry_thickness_tolerance ) ) THEN
-            gamma_left = gamma_right
-        ELSEIF ( ( h_right .LE. dry_thickness_tolerance ) .AND.                         &
-            ( h_left .GT. dry_thickness_tolerance ) ) THEN
-            gamma_right = gamma_left
-        END IF
-    END SUBROUTINE regularize_dry_gamma_pair
+    SUBROUTINE finalize_hyperbolic( this )
+
+        CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+
+        DEALLOCATE( this%a_interface_xNeg )
+        DEALLOCATE( this%a_interface_xPos )
+        DEALLOCATE( this%a_interface_yNeg )
+        DEALLOCATE( this%a_interface_yPos )
+        DEALLOCATE( this%G_interface_xL )
+        DEALLOCATE( this%G_interface_xR )
+        DEALLOCATE( this%G_interface_yB )
+        DEALLOCATE( this%G_interface_yT )
+        DEALLOCATE( this%P_cell_x )
+        DEALLOCATE( this%P_cell_y )
+
+    END SUBROUTINE finalize_hyperbolic
 
     !******************************************************************************
     !> \brief Evaluate facewise characteristic bounds from the reconstructed endpoint states.
@@ -1088,40 +1123,5 @@ CONTAINS
         speed_plus = MAX(minus_max,plus_max,0.0_wp)
 
     END SUBROUTINE eval_interface_speed_bounds
-
-    !******************************************************************************
-    !> \brief Identify lateral source traces on the domain boundary.
-    !> \param[in] direction Cartesian orientation of the face.
-    !> \param[in] face_i X interface index.
-    !> \param[in] face_j Y interface index.
-    !> \param[out] source_left True when the negative-side trace is a source cell.
-    !> \param[out] source_right True when the positive-side trace is a source cell.
-    !******************************************************************************
-    SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j,           &
-            source_left,source_right)
-
-        USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
-
-        IMPLICIT NONE
-
-        INTEGER, INTENT(IN) :: direction,face_i,face_j
-        LOGICAL, INTENT(OUT) :: source_left,source_right
-
-        source_left=.FALSE.
-        source_right=.FALSE.
-        IF ( .NOT. lateral_source_flag ) RETURN
-
-        SELECT CASE (direction)
-        CASE (PATH_DIR_X)
-            IF ( face_i .EQ. 1 ) source_left=source_cell(1,face_j) .EQ. 2
-            IF ( face_i .EQ. comp_interfaces_x ) &
-                source_right=source_cell(comp_cells_x,face_j) .EQ. 2
-        CASE (PATH_DIR_Y)
-            IF ( face_j .EQ. 1 ) source_left=source_cell(face_i,1) .EQ. 2
-            IF ( face_j .EQ. comp_interfaces_y ) &
-                source_right=source_cell(face_i,comp_cells_y) .EQ. 2
-        END SELECT
-
-    END SUBROUTINE lateral_source_trace_sides
 
 END MODULE hyperbolic_2d
