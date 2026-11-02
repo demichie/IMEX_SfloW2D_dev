@@ -79,6 +79,14 @@ def prepare(repo, root, name):
     if name == "EXAMPLE_2D_TOPO":
         text = replace_one(text, r"^\s*TOPO_CHANGE_FLAG\s*=.*$",
                            " TOPO_CHANGE_FLAG=T,")
+        # Dedicated active-settling fixture. A coarse solid diameter makes
+        # deposition measurable against the finite-precision bed elevation;
+        # disabling entrainment removes an unrelated competing mass-transfer
+        # process. The ordinary EXAMPLE_2D regression remains unchanged.
+        text = replace_one(text, r"^\s*DIAM_S\s*=.*$",
+                           " DIAM_S=2.0E-3,")
+        text = replace_one(text, r"^\s*ENTRAINMENT_FLAG\s*=.*$",
+                           " ENTRAINMENT_FLAG=F,")
     input_path.write_text(text)
     return fixture
 
