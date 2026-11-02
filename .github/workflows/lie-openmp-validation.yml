@@ -78,6 +78,22 @@ jobs:
           if-no-files-found: warn
 
 
+  geometry-rollback:
+    name: Geometry rollback and workspace lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install numerical dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config
+      - name: Verify transaction rollback using production geometry module
+        env:
+          OMP_NUM_THREADS: "4"
+          OMP_DYNAMIC: "FALSE"
+        run: sh TESTS/TEST_WORKSPACE_LIFECYCLE/run_test.sh
+
   lie-end-to-end:
     name: Lie end-to-end numeric comparison (1/2/4 threads)
     runs-on: ubuntu-24.04

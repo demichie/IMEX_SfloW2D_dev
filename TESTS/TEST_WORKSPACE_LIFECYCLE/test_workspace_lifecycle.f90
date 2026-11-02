@@ -6,7 +6,10 @@ PROGRAM test_workspace_lifecycle
        curvature_term_flag, liquid_vaporization_flag
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, x0, y0,   &
        topography_profile, nodata_topo, init_grid, B_vertex,                &
-       sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x
+       sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x, &
+       B_cent, B_face_x, B_face_y, B_prime_x_geom, grav_coeff, &
+       begin_geometry_transaction, rollback_geometry_transaction, &
+       commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -15,6 +18,8 @@ PROGRAM test_workspace_lifecycle
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
   INTEGER :: j, k
+  REAL(wp), ALLOCATABLE :: bed_before(:,:), center_before(:,:), &
+       face_before(:,:), slope_before(:,:), gravity_before(:,:)
 
   n_vars = 5
   n_eqns = 5
@@ -47,6 +52,29 @@ PROGRAM test_workspace_lifecycle
        .NOT.ALLOCATED(sourceE_vect_x) .AND. .NOT.ALLOCATED(sourceW_vect_x) &
        .AND. .NOT.ALLOCATED(sourceS_vect_x) .AND. .NOT.ALLOCATED(sourceN_vect_x))
 
+  ! Exercise the production geometry transaction: all fields must recover
+  ! exactly, including cached centre/face elevation and derived coefficients.
+  bed_before=B_vertex
+  center_before=B_cent
+  face_before=B_face_x
+  slope_before=B_prime_x_geom
+  gravity_before=grav_coeff
+  CALL begin_geometry_transaction
+  B_vertex=B_vertex+1.0_wp
+  B_cent=B_cent+2.0_wp
+  B_face_x=B_face_x+3.0_wp
+  B_prime_x_geom=B_prime_x_geom+4.0_wp
+  grav_coeff=grav_coeff+5.0_wp
+  CALL rollback_geometry_transaction
+  CALL assert_true('rollback restores nodal bed exactly', ALL(B_vertex==bed_before))
+  CALL assert_true('rollback restores cell geometry exactly', ALL(B_cent==center_before))
+  CALL assert_true('rollback restores face geometry exactly', ALL(B_face_x==face_before))
+  CALL assert_true('rollback restores slope cache exactly', ALL(B_prime_x_geom==slope_before))
+  CALL assert_true('rollback restores gravity cache exactly', ALL(grav_coeff==gravity_before))
+  CALL begin_geometry_transaction
+  CALL commit_geometry_transaction
+  CALL assert_true('commit leaves nodal bed unchanged', ALL(B_vertex==bed_before))
+
   ALLOCATE(thickness_init(comp_cells_x,comp_cells_y))
   ALLOCATE(erodible_init(comp_cells_x,comp_cells_y))
   CALL release_initialization_fields
@@ -68,7 +96,7 @@ PROGRAM test_workspace_lifecycle
      CALL assert_true('HP scratch released', .NOT.ALLOCATED(reconstruction%hp_eta_mask))
   END DO
 
-  PRINT *, 'PASS: initialization storage and HP-PCCU workspace lifecycle verified'
+  PRINT *, 'PASS: workspace lifecycle and geometry transaction rollback verified'
 
 CONTAINS
 

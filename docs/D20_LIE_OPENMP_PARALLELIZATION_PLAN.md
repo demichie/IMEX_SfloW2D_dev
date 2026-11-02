@@ -221,3 +221,7 @@ Aggiunto `TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py` e il job `lie-end
 ### Fixture numeriche Lie
 
 I template storici `EXAMPLE_2D` e `EXAMPLE_2D_PP` riportano ancora `N_RK=2` in `NUMERIC_PARAMETERS`, mentre la nuova namelist non lo accetta dopo la migrazione a Lie. Il test end-to-end rimuove tale sola voce obsoleta **dalle copie temporanee** e mantiene invariati gli altri coefficienti; i template di produzione rimangono intatti. Da verificare con Action.
+
+### Estensione verifiche (2026-11-02)
+
+La suite end-to-end D20 comprende anche due configurazioni derivate da EXAMPLE_2D: `EXAMPLE_2D_NEWTON` imposta `RHEOLOGY_METHOD='NEWTON'` e `RHEOLOGY_GROUP=2`, mentre `EXAMPLE_2D_TOPO` abilita `TOPO_CHANGE_FLAG=T`. Entrambe sono confrontate su tutti i campi NetCDF con team effettivi 1/2/4. Aggiunto il job `geometry-rollback` che usa il modulo geometrico di produzione per verificare il ripristino esatto di topografia e cache dopo una mutazione volontaria, e che controlla anche il percorso commit. **Questi nuovi casi non risultano ancora eseguiti in CI**. Il rollback completo dello stato fisico nel ramo di errore Lie richiede ancora un test integrato separato; il job geometrico non lo certifica. Verificare inoltre con CI che la configurazione TOPO generi effettivamente un letto dinamico non nullo.

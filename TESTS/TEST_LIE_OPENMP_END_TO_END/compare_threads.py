@@ -18,7 +18,7 @@ import tempfile
 import numpy as np
 from netCDF4 import Dataset
 
-CASES = ("EXAMPLE_2D", "EXAMPLE_2D_PP")
+CASES = ("EXAMPLE_2D", "EXAMPLE_2D_PP", "EXAMPLE_2D_NEWTON", "EXAMPLE_2D_TOPO")
 THREADS = (1, 2, 4)
 RTOL = 5e-12
 ATOL = 1e-10
@@ -32,7 +32,8 @@ def replace_one(text, expression, replacement):
 
 
 def prepare(repo, root, name):
-    source = repo / "EXAMPLES" / name
+    source_name = "EXAMPLE_2D" if name in ("EXAMPLE_2D_NEWTON", "EXAMPLE_2D_TOPO") else name
+    source = repo / "EXAMPLES" / source_name
     fixture = root / "fixtures" / name
     shutil.copytree(source, fixture, ignore=shutil.ignore_patterns("OUTPUT", "__pycache__"))
     subprocess.run([sys.executable, "create_example.py", "32", "0.5", "300", "false"],
@@ -71,6 +72,13 @@ def prepare(repo, root, name):
                     + " /\n")
         text = replace_one(text, r"^\s*&GAS_TRANSPORT_PARAMETERS\b",
                            exchange + "&GAS_TRANSPORT_PARAMETERS")
+    if name == "EXAMPLE_2D_NEWTON":
+        # Force the actual production backward-Euler Newton group.
+        text = replace_one(text, r"^\s*RHEOLOGY_MODEL\s*=.*$",
+                           " RHEOLOGY_MODEL='quadratic',\n RHEOLOGY_METHOD='NEWTON',\n RHEOLOGY_GROUP=2,")
+    if name == "EXAMPLE_2D_TOPO":
+        text = replace_one(text, r"^\s*TOPO_CHANGE_FLAG\s*=.*$",
+                           " TOPO_CHANGE_FLAG=T,")
     input_path.write_text(text)
     return fixture
 
