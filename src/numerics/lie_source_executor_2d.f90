@@ -24,7 +24,8 @@ MODULE lie_source_executor_2d
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
     END TYPE group_profile_type
     TYPE :: lie_source_scratch_type
-        CHARACTER(LEN=256), ALLOCATABLE :: cell_failure(:)
+        INTEGER, ALLOCATABLE :: failure_code(:),failure_group(:),failure_detail(:),failure_iterations(:)
+        REAL(wp), ALLOCATABLE :: failure_mass(:),failure_components(:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
     END TYPE lie_source_scratch_type
@@ -104,6 +105,8 @@ CONTAINS
         LOGICAL, POINTER :: exchange_group(:)
         LOGICAL :: newton_witness_active
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,bed_group_id
+        INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
+        REAL(wp) :: cell_mass,cell_components
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
@@ -217,13 +220,23 @@ CONTAINS
             END DO
         END IF
         has_exchange_group=ANY(exchange_group)
-        IF (.NOT.ALLOCATED(scratch%cell_failure)) THEN
-            ALLOCATE(scratch%cell_failure(domain%solve_cells))
-        ELSE IF (SIZE(scratch%cell_failure)<domain%solve_cells) THEN
-            DEALLOCATE(scratch%cell_failure)
-            ALLOCATE(scratch%cell_failure(domain%solve_cells))
+        IF (.NOT.ALLOCATED(scratch%failure_code)) THEN
+            ALLOCATE(scratch%failure_code(domain%solve_cells))
+            ALLOCATE(scratch%failure_group(domain%solve_cells))
+            ALLOCATE(scratch%failure_detail(domain%solve_cells))
+            ALLOCATE(scratch%failure_iterations(domain%solve_cells))
+            ALLOCATE(scratch%failure_mass(domain%solve_cells))
+            ALLOCATE(scratch%failure_components(domain%solve_cells))
+        ELSE IF (SIZE(scratch%failure_code)<domain%solve_cells) THEN
+            DEALLOCATE(scratch%failure_code,scratch%failure_group,scratch%failure_detail)
+            DEALLOCATE(scratch%failure_iterations,scratch%failure_mass,scratch%failure_components)
+            ALLOCATE(scratch%failure_code(domain%solve_cells))
+            ALLOCATE(scratch%failure_group(domain%solve_cells))
+            ALLOCATE(scratch%failure_detail(domain%solve_cells))
+            ALLOCATE(scratch%failure_iterations(domain%solve_cells))
+            ALLOCATE(scratch%failure_mass(domain%solve_cells))
+            ALLOCATE(scratch%failure_components(domain%solve_cells))
         END IF
-        scratch%cell_failure(1:domain%solve_cells)=''
         IF (has_bed_group) THEN
             IF (.NOT.ALLOCATED(scratch%bed_rate_cell)) &
                 ALLOCATE(scratch%bed_rate_cell(comp_cells_x,comp_cells_y))
@@ -249,13 +262,22 @@ CONTAINS
             group_profile(1)%setup=group_profile(1)%setup+REAL(tock-tick,wp)/REAL(clock_rate,wp)
             tick=tock
         END IF
+        first_failure=HUGE(0)
         !$OMP PARALLEL DO DEFAULT(SHARED) &
         !$OMP& PRIVATE(cell,j,k,group_index,with_exchange,qpentry,q_candidate,qp_candidate, &
         !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local, &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
         !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
-        !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context)
+        !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context, &
+        !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components) &
+        !$OMP& REDUCTION(MIN:first_failure)
         cell_loop: DO cell=1,domain%solve_cells
+            cell_error=0
+            cell_detail=0
+            cell_iterations=0
+            cell_group=0
+            cell_mass=0.0_wp
+            cell_components=0.0_wp
             j=domain%j_cent(cell)
             k=domain%k_cent(cell)
             q_local=q(:,j,k)
@@ -282,13 +304,15 @@ CONTAINS
                 .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR.                                        &
                 .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                        &
                 .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
-                scratch%cell_failure(cell)='D19: non-finite source-group geometry'
+                cell_error=1
+                first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
 
             END IF
 
             IF (.NOT.ieee_is_finite(noise)) THEN
-                scratch%cell_failure(cell)='D19: non-finite source-group physical input'
+                cell_error=2
+                first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
             END IF
             group_loop: DO group_index=1,SIZE(groups)
@@ -305,7 +329,7 @@ CONTAINS
                 ! Validate constitutive inputs before dispatch. Model/method errors
                 ! remain configuration errors, not recoverable timestep rejections.
                 IF (.NOT.physical_cell_state_finite(qpentry)) THEN
-                    scratch%cell_failure(cell)='D19: non-finite source-group physical input'
+                    cell_error=2
                     EXIT group_loop
 
                 END IF
@@ -321,7 +345,7 @@ CONTAINS
                         ANY(deposit_local<0.0_wp) .OR.                                                  &
                         ANY(erosion_local<0.0_wp) .OR.                                                  &
                         lava_local<0.0_wp) THEN
-                        scratch%cell_failure(cell)='D19: invalid substrate inventory before mass exchange'
+                        cell_error=3
                         EXIT group_loop
 
                     END IF
@@ -336,13 +360,13 @@ CONTAINS
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy)
 
                     IF (cell_has_exchange .NEQV. with_exchange) THEN
-                        scratch%cell_failure(cell)='D20: inconsistent cell exchange group metadata'
+                        cell_error=4
                         EXIT group_loop
 
                     END IF
 
                     IF (.NOT.ok) THEN
-                        scratch%cell_failure(cell)='D19: physical source transaction rejected'
+                        cell_error=5
                         EXIT group_loop
 
                     END IF
@@ -351,10 +375,10 @@ CONTAINS
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
 
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
-                        WRITE(scratch%cell_failure(cell),'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)')                                 &
-                            'D19: inadmissible source candidate group=',groups(group_index)%id,                        &
-                            ' cell=',j,',',k,' mass=',q_candidate(idx_totMassEqn),                                     &
-                            ' components=',SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
+                        cell_error=6
+                        cell_group=groups(group_index)%id
+                        cell_mass=q_candidate(idx_totMassEqn)
+                        cell_components=SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
                         EXIT group_loop
 
                     END IF
@@ -377,7 +401,7 @@ CONTAINS
                             ANY(deposit_candidate<0.0_wp) .OR.                                                         &
                             ANY(erosion_candidate<0.0_wp) .OR.                                                         &
                             lava_candidate<0.0_wp) THEN
-                            scratch%cell_failure(cell)='D19: invalid candidate substrate inventory'
+                            cell_error=7
                             EXIT group_loop
 
                         END IF
@@ -388,7 +412,7 @@ CONTAINS
                         CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate',conversion_ok)
 
                         IF (.NOT.conversion_ok) THEN
-                            scratch%cell_failure(cell)='D19: explicit candidate conversion failed'
+                            cell_error=8
                             EXIT group_loop
 
                         END IF
@@ -419,13 +443,14 @@ CONTAINS
                         analytic_rate, status)
 
                     IF (status/=0) THEN
-                        WRITE(scratch%cell_failure(cell),'(A,I0)') 'D19: analytic group status ',status
+                        cell_error=9
+                        cell_detail=status
                         EXIT group_loop
 
                     END IF
 
                     IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
-                        scratch%cell_failure(cell)='D19: analytic source returned non-finite rate'
+                        cell_error=10
                         EXIT group_loop
 
                     END IF
@@ -442,13 +467,14 @@ CONTAINS
                         scratch%newton_iterations(cell,group_index)=iterations
 
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
-                        WRITE(scratch%cell_failure(cell),'(A,I0,A,I0)')                                                        &
-                            'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
+                        cell_error=11
+                        cell_detail=linear_info
+                        cell_iterations=iterations
                         EXIT group_loop
 
                     END IF
                 CASE DEFAULT
-                    scratch%cell_failure(cell)='D19: invalid group method'
+                    cell_error=12
                     EXIT group_loop
 
                 END SELECT
@@ -456,7 +482,7 @@ CONTAINS
                 IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE group_loop
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
-                    scratch%cell_failure(cell)='D19: inadmissible conservative source group state'
+                    cell_error=13
                     EXIT group_loop
 
                 END IF
@@ -465,7 +491,7 @@ CONTAINS
                     CALL qc_to_qp(q_candidate,qp_candidate,pressure,TRIM(context),conversion_ok)
 
                     IF (.NOT.conversion_ok) THEN
-                        scratch%cell_failure(cell)='D19: source group conversion failed'
+                        cell_error=14
                         EXIT group_loop
 
                     END IF
@@ -479,7 +505,7 @@ CONTAINS
 
 
             END DO group_loop
-            IF (LEN_TRIM(scratch%cell_failure(cell))==0) THEN
+            IF (cell_error==0) THEN
                 q(:,j,k)=q_local
                 qp(:,j,k)=qp_local
                 IF (has_exchange_group) THEN
@@ -488,6 +514,15 @@ CONTAINS
                     state%erodible(1:n_solid,j,k)=erodible_local
                     state%lava_deposit(j,k)=lava_local
                 END IF
+            END IF
+            IF (cell_error/=0) THEN
+                scratch%failure_code(cell)=cell_error
+                scratch%failure_group(cell)=cell_group
+                scratch%failure_detail(cell)=cell_detail
+                scratch%failure_iterations(cell)=cell_iterations
+                scratch%failure_mass(cell)=cell_mass
+                scratch%failure_components(cell)=cell_components
+                first_failure=MIN(first_failure,cell)
             END IF
         END DO cell_loop
         !$OMP END PARALLEL DO
@@ -498,16 +533,47 @@ CONTAINS
             profile_cell_sweep=profile_cell_sweep+REAL(tock-tick,wp)/REAL(clock_rate,wp)
             tick=tock
         END IF
-        first_failure=0
-        DO cell=1,domain%solve_cells
-            IF (LEN_TRIM(scratch%cell_failure(cell))>0) THEN
-                first_failure=cell
-                EXIT
-            END IF
-        END DO
-        IF (first_failure/=0) THEN
+        IF (first_failure/=HUGE(0)) THEN
             step_failed=.TRUE.
-            failure_reason=scratch%cell_failure(first_failure)
+            SELECT CASE(scratch%failure_code(first_failure))
+            CASE(1)
+                failure_reason='D19: non-finite source-group geometry'
+            CASE(2)
+                failure_reason='D19: non-finite source-group physical input'
+            CASE(3)
+                failure_reason='D19: invalid substrate inventory before mass exchange'
+            CASE(4)
+                failure_reason='D20: inconsistent cell exchange group metadata'
+            CASE(5)
+                failure_reason='D19: physical source transaction rejected'
+            CASE(7)
+                failure_reason='D19: invalid candidate substrate inventory'
+            CASE(8)
+                failure_reason='D19: explicit candidate conversion failed'
+            CASE(10)
+                failure_reason='D19: analytic source returned non-finite rate'
+            CASE(12)
+                failure_reason='D19: invalid group method'
+            CASE(13)
+                failure_reason='D19: inadmissible conservative source group state'
+            CASE(14)
+                failure_reason='D19: source group conversion failed'
+            CASE(6)
+                j=domain%j_cent(first_failure)
+                k=domain%k_cent(first_failure)
+                WRITE(failure_reason,'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
+                    'D19: inadmissible source candidate group=',scratch%failure_group(first_failure), &
+                    ' cell=',j,',',k,' mass=',scratch%failure_mass(first_failure), &
+                    ' components=',scratch%failure_components(first_failure)
+            CASE(9)
+                WRITE(failure_reason,'(A,I0)') 'D19: analytic group status ', &
+                    scratch%failure_detail(first_failure)
+            CASE(11)
+                WRITE(failure_reason,'(A,I0,A,I0)') 'D19: Newton failed, linear_info=', &
+                    scratch%failure_detail(first_failure),', iterations=',scratch%failure_iterations(first_failure)
+            CASE DEFAULT
+                failure_reason='D19: unknown cell failure'
+            END SELECT
             IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
             RETURN
         END IF
