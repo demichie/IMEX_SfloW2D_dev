@@ -9,13 +9,13 @@ MODULE source_configuration_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_input_2d
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
-    USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model, &
-            thermal_cooling_flag, &
-            pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
-            bottom_fissural_source_flag, radial_source_flag, &
-            liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag, &
+    USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model,                                               &
+            thermal_cooling_flag,                                                                                      &
+            pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag,                                        &
+            bottom_fissural_source_flag, radial_source_flag,                                                           &
+            liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag,                                                &
             idx_pore
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
+    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,                                               &
             coeff_porosity, entrainment_flag
     IMPLICIT NONE
     PRIVATE
@@ -41,14 +41,14 @@ CONTAINS
         error='At least one physical phase flag must be true'; RETURN
         END IF
         IF (rheology_flag) THEN
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
+        IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0)                                                &
                 active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND. &
+        IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND.                                          &
                 TRIM(rheology_model)/='none') THEN
             error='D17: unsupported configured rheology'; RETURN
         END IF
         END IF
-        IF (include_thermal) active_names=[CHARACTER(LEN=64) :: active_names, &
+        IF (include_thermal) active_names=[CHARACTER(LEN=64) :: active_names,                                          &
             'thermal_cooling']
         IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
         IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
@@ -57,7 +57,7 @@ CONTAINS
         IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
         ! Lateral boundary injection is a spatial boundary condition, not a Lie cell source.
         IF (ALLOCATED(erosion_coeff)) THEN
-        IF (erosion_coeff>0.0_wp) &
+        IF (erosion_coeff>0.0_wp)                                                                                      &
                 active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
         END IF
         IF (lava_deposition_flag) THEN
@@ -71,7 +71,7 @@ CONTAINS
         END IF
         IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
         IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
-        IF (gas_flag .AND. liquid_vaporization_flag) &
+        IF (gas_flag .AND. liquid_vaporization_flag)                                                                   &
             active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
         error=''
     END SUBROUTINE collect_active_source_names
@@ -105,9 +105,9 @@ CONTAINS
             CHARACTER(LEN=64) :: active_names(1)
             active_names(1)=names(i)
         SELECT CASE(TRIM(active_names(1)))
-        CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
-                'rheology_lahar','rheology_empirical','rheology_quadratic', &
-                'rheology_froude','rheology_lucas','rheology_mui', &
+        CASE('rheology_voellmy','rheology_plastic','rheology_lava',                                                    &
+                'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
+                'rheology_froude','rheology_lucas','rheology_mui',                                                     &
                 'rheology_mui_voellmy','rheology_newmodel')
             requested_method=rheology_method
             id=rheology_group
@@ -117,7 +117,7 @@ CONTAINS
         CASE('pore_pressure_dissipation')
             requested_method=pore_pressure_method
             id=pore_pressure_group
-        CASE('bottom_circular_injection','bottom_fissural_injection', &
+        CASE('bottom_circular_injection','bottom_fissural_injection',                                                  &
                 'radial_injection','geometry_curvature')
             SELECT CASE(TRIM(active_names(1)))
             CASE('bottom_circular_injection')
@@ -133,9 +133,9 @@ CONTAINS
                 requested_method=geometry_curvature_method
                 id=geometry_curvature_group
             END SELECT
-        CASE('mass_exchange_lava_deposition','mass_exchange_erosion', &
-                'mass_exchange_deposition','mass_exchange_carrier_liquid_loss', &
-                'mass_exchange_entrainment', &
+        CASE('mass_exchange_lava_deposition','mass_exchange_erosion',                                                  &
+                'mass_exchange_deposition','mass_exchange_carrier_liquid_loss',                                        &
+                'mass_exchange_entrainment',                                                                           &
                 'mass_exchange_vaporization')
             requested_method=mass_exchange_method
             id=mass_exchange_group
@@ -154,8 +154,8 @@ CONTAINS
         CASE DEFAULT
             error='D19: invalid METHOD'; RETURN
         END SELECT
-        IF ((lava_flag .AND. .NOT.term%allows_lava) .OR. &
-                (gas_flag .AND. .NOT.term%allows_gas) .OR. &
+        IF ((lava_flag .AND. .NOT.term%allows_lava) .OR.                                                               &
+                (gas_flag .AND. .NOT.term%allows_gas) .OR.                                                             &
                 (liquid_flag .AND. .NOT.term%allows_liquid)) THEN
             error='D19: source incompatible with phase configuration'; RETURN
         END IF
@@ -203,14 +203,14 @@ CONTAINS
             END IF
             DO j=1,SIZE(affected)
                 affected_idx=affected(j)
-                IF (.NOT.ANY(groups(k)%equation_ids==affected_idx)) &
+                IF (.NOT.ANY(groups(k)%equation_ids==affected_idx))                                                    &
                     groups(k)%equation_ids=[groups(k)%equation_ids,affected_idx]
             END DO
         END IF
         END DO
         ! Vaporization produces steam from material deposited in the same Lie
         ! transaction. A separate (or absent) deposition source has no rate to use.
-        IF (ANY(names=='mass_exchange_vaporization') .AND. &
+        IF (ANY(names=='mass_exchange_vaporization') .AND.                                                             &
             .NOT.ANY(names=='mass_exchange_deposition')) THEN
         error='D19: vaporization requires deposition in the same mass-exchange group'; RETURN
         END IF
