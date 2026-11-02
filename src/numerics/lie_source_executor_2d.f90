@@ -80,6 +80,8 @@ CONTAINS
         LOGICAL, INTENT(OUT) :: step_failed
         CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
         REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
+        REAL(wp) :: q_local(n_vars),qp_local(n_vars+2)
+        REAL(wp) :: deposit_local(n_solid),erosion_local(n_solid),erodible_local(n_solid),lava_local
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
@@ -196,19 +198,26 @@ CONTAINS
         END IF
         !$OMP PARALLEL DO DEFAULT(SHARED) &
         !$OMP& PRIVATE(cell,j,k,group_index,with_exchange,qpentry,q_candidate,qp_candidate, &
+        !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local, &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
         !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
         !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context)
         cell_loop: DO cell=1,domain%solve_cells
             j=domain%j_cent(cell)
             k=domain%k_cent(cell)
+            q_local=q(:,j,k)
+            qp_local=qp(:,j,k)
+            deposit_local=state%deposit(j,k,1:n_solid)
+            erosion_local=state%erosion(j,k,1:n_solid)
+            erodible_local=state%erodible(1:n_solid,j,k)
+            lava_local=state%lava_deposit(j,k)
             group_loop: DO group_index=1,SIZE(groups)
                 IF (SIZE(groups(group_index)%source_names)==0) CYCLE group_loop
                 with_exchange=exchange_group(group_index)
                 IF (groups(group_index)%id==0) THEN
                     qpentry=qp_original(:,j,k)
                 ELSE
-                    qpentry=qp(:,j,k)
+                    qpentry=qp_local
 
                 END IF
 
@@ -246,14 +255,14 @@ CONTAINS
                 IF (with_exchange) THEN
                     ! All immobilized and erodible inventories are nonnegative.
                     ! Validate the group input before computing any exchange rate.
-                    IF (.NOT.ALL(ieee_is_finite(state%erodible(1:n_solid,j,k))) .OR.                                   &
-                        .NOT.ALL(ieee_is_finite(state%deposit(j,k,1:n_solid))) .OR.                                    &
-                        .NOT.ALL(ieee_is_finite(state%erosion(j,k,1:n_solid))) .OR.                                    &
-                        .NOT.ieee_is_finite(state%lava_deposit(j,k)) .OR.                                              &
-                        ANY(state%erodible(1:n_solid,j,k)<0.0_wp) .OR.                                                 &
-                        ANY(state%deposit(j,k,1:n_solid)<0.0_wp) .OR.                                                  &
-                        ANY(state%erosion(j,k,1:n_solid)<0.0_wp) .OR.                                                  &
-                        state%lava_deposit(j,k)<0.0_wp) THEN
+                    IF (.NOT.ALL(ieee_is_finite(erodible_local)) .OR.                                   &
+                        .NOT.ALL(ieee_is_finite(deposit_local)) .OR.                                    &
+                        .NOT.ALL(ieee_is_finite(erosion_local)) .OR.                                    &
+                        .NOT.ieee_is_finite(lava_local) .OR.                                              &
+                        ANY(erodible_local<0.0_wp) .OR.                                                 &
+                        ANY(deposit_local<0.0_wp) .OR.                                                  &
+                        ANY(erosion_local<0.0_wp) .OR.                                                  &
+                        lava_local<0.0_wp) THEN
                         cell_failure(cell)='D19: invalid substrate inventory before mass exchange'
                         EXIT group_loop
 
@@ -264,7 +273,7 @@ CONTAINS
                 SELECT CASE(groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
                     CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
-                        groups(group_index), state%erodible(1:n_solid,j,k), total_rate, transfers, cell_has_exchange,  &
+                        groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange,  &
                         ok, noise, B_zone(j,k), analytic_context, cell_source_fractions(j,k),                          &
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy)
 
@@ -280,7 +289,7 @@ CONTAINS
 
                     END IF
                     ! Stage the entire local fluid/substrate transfer before committing it.
-                    q_candidate=q(:,j,k)
+                    q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
 
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
@@ -293,15 +302,15 @@ CONTAINS
                     END IF
 
                     IF (with_exchange) THEN
-                        deposit_candidate=state%deposit(j,k,1:n_solid)+                                                &
+                        deposit_candidate=deposit_local+                                                &
                             time_step*transfers%solid_deposition_rate
-                        erosion_candidate=state%erosion(j,k,1:n_solid)+                                                &
+                        erosion_candidate=erosion_local+                                                &
                             time_step*transfers%solid_erosion_rate
-                        erodible_candidate=state%erodible(1:n_solid,j,k)-                                              &
+                        erodible_candidate=erodible_local-                                              &
                             time_step*transfers%solid_erosion_rate
                         IF (erodible_deposit_flag) erodible_candidate=                                                 &
                             erodible_candidate+time_step*transfers%solid_deposition_rate
-                        lava_candidate=state%lava_deposit(j,k)+time_step*transfers%lava_deposit_rate
+                        lava_candidate=lava_local+time_step*transfers%lava_deposit_rate
                         IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR.                                           &
                             .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR.                                           &
                             .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR.                                          &
@@ -329,22 +338,22 @@ CONTAINS
                         CALL initialize_dry_physical_cell(qp_candidate)
 
                     END IF
-                    ! Publish only the fully validated cell to the time-step trial.
-                    q(:,j,k)=q_candidate
-                    qp(:,j,k)=qp_candidate
+                    ! Publish to cell-local state; the trial array is written once after all groups.
+                    q_local=q_candidate
+                    qp_local=qp_candidate
 
                     IF (with_exchange) THEN
-                        state%deposit(j,k,1:n_solid)=deposit_candidate
-                        state%erosion(j,k,1:n_solid)=erosion_candidate
-                        state%erodible(1:n_solid,j,k)=erodible_candidate
-                        state%lava_deposit(j,k)=lava_candidate
+                        deposit_local=deposit_candidate
+                        erosion_local=erosion_candidate
+                        erodible_local=erodible_candidate
+                        lava_local=lava_candidate
                         IF (topo_change_flag) staged_bed_rate(cell)=staged_bed_rate(cell)+transfers%dB_dt
 
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
                     ! Group 0 evaluates on the immutable pre-spatial state;
                     ! its increment is applied to the post-spatial group candidate.
-                    analytic_input=q(:,j,k)
+                    analytic_input=q_local
                     IF (groups(group_index)%id==0) analytic_input=q_original(:,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
                     CALL eval_source_analytic(groups(group_index), analytic_input, analytic_context, time_step,        &
@@ -361,11 +370,11 @@ CONTAINS
                         EXIT group_loop
 
                     END IF
-                    q_candidate=q(:,j,k)
+                    q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
                     IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
-                    q_candidate=q(:,j,k)
+                    q_candidate=q_local
                     CALL solve_backward_euler_group(groups(group_index), q_candidate, time_step,                      &
                         B_prime_x_geom(j,k), B_prime_y_geom(j,k), grav_coeff(j,k), noise, iterations, ok, linear_info, &
                         failed)
@@ -404,11 +413,19 @@ CONTAINS
 
                 END IF
 
-                q(:,j,k)=q_candidate
-                qp(:,j,k)=qp_candidate
+                q_local=q_candidate
+                qp_local=qp_candidate
 
 
             END DO group_loop
+            IF (LEN_TRIM(cell_failure(cell))==0) THEN
+                q(:,j,k)=q_local
+                qp(:,j,k)=qp_local
+                state%deposit(j,k,1:n_solid)=deposit_local
+                state%erosion(j,k,1:n_solid)=erosion_local
+                state%erodible(1:n_solid,j,k)=erodible_local
+                state%lava_deposit(j,k)=lava_local
+            END IF
         END DO cell_loop
         !$OMP END PARALLEL DO
         IF (profiling_enabled) THEN
