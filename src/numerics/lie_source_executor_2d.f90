@@ -211,6 +211,31 @@ CONTAINS
             erosion_local=state%erosion(j,k,1:n_solid)
             erodible_local=state%erodible(1:n_solid,j,k)
             lava_local=state%lava_deposit(j,k)
+            analytic_context%Bprime_x=B_prime_x_geom(j,k)
+            analytic_context%Bprime_y=B_prime_y_geom(j,k)
+            analytic_context%Bsecond_xx=B_second_xx_geom(j,k)
+            analytic_context%Bsecond_xy=B_second_xy_geom(j,k)
+            analytic_context%Bsecond_yy=B_second_yy_geom(j,k)
+            analytic_context%grav_coeff=grav_coeff(j,k)
+            noise=0.0_wp
+            IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
+            analytic_context%Zij=noise
+
+            IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR.                                          &
+                .NOT.ieee_is_finite(B_prime_y_geom(j,k)) .OR.                                          &
+                .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR.                                        &
+                .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR.                                        &
+                .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                        &
+                .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
+                cell_failure(cell)='D19: non-finite source-group geometry'
+                CYCLE cell_loop
+
+            END IF
+
+            IF (.NOT.ieee_is_finite(noise)) THEN
+                cell_failure(cell)='D19: non-finite source-group physical input'
+                CYCLE cell_loop
+            END IF
             group_loop: DO group_index=1,SIZE(groups)
                 IF (SIZE(groups(group_index)%source_names)==0) CYCLE group_loop
                 with_exchange=exchange_group(group_index)
@@ -222,32 +247,10 @@ CONTAINS
                 END IF
 
                 context='Lie source group'
-                analytic_context%Bprime_x=B_prime_x_geom(j,k)
-                analytic_context%Bprime_y=B_prime_y_geom(j,k)
-                analytic_context%Bsecond_xx=B_second_xx_geom(j,k)
-                analytic_context%Bsecond_xy=B_second_xy_geom(j,k)
-                analytic_context%Bsecond_yy=B_second_yy_geom(j,k)
-                analytic_context%grav_coeff=grav_coeff(j,k)
-                noise=0.0_wp
-                IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
-                analytic_context%Zij=noise
-
                 ! Validate constitutive inputs before dispatch. Model/method errors
                 ! remain configuration errors, not recoverable timestep rejections.
-                IF (.NOT.physical_cell_state_finite(qpentry) .OR.                                                      &
-                    .NOT.ieee_is_finite(noise)) THEN
+                IF (.NOT.physical_cell_state_finite(qpentry)) THEN
                     cell_failure(cell)='D19: non-finite source-group physical input'
-                    EXIT group_loop
-
-                END IF
-
-                IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR.                                                      &
-                    .NOT.ieee_is_finite(B_prime_y_geom(j,k)) .OR.                                                      &
-                    .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR.                                                    &
-                    .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR.                                                    &
-                    .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                                    &
-                    .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
-                    cell_failure(cell)='D19: non-finite source-group geometry'
                     EXIT group_loop
 
                 END IF
@@ -376,7 +379,8 @@ CONTAINS
                     IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
                     q_candidate=q_local
                     CALL solve_backward_euler_group(groups(group_index), q_candidate, time_step,                      &
-                        B_prime_x_geom(j,k), B_prime_y_geom(j,k), grav_coeff(j,k), noise, iterations, ok, linear_info, &
+                        analytic_context%Bprime_x, analytic_context%Bprime_y, analytic_context%grav_coeff, noise, &
+                        iterations, ok, linear_info, &
                         failed)
                     IF (ALLOCATED(newton_iterations)) newton_iterations(cell,group_index)=iterations
 
