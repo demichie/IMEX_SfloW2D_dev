@@ -91,6 +91,7 @@ CONTAINS
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
+        CHARACTER(LEN=24) :: newton_witness_env
         CHARACTER(LEN=24) :: reject_env
         INTEGER :: reject_group,env_status,parse_status
         INTEGER :: tick,tock,clock_rate
@@ -182,8 +183,12 @@ CONTAINS
             cell_failure=''
 
             IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
-                ALLOCATE(newton_iterations(domain%solve_cells))
-                newton_iterations=0
+                newton_witness_env=''
+                CALL GET_ENVIRONMENT_VARIABLE('IMEX_NEWTON_WITNESS',newton_witness_env)
+                IF (TRIM(newton_witness_env)=='1') THEN
+                    ALLOCATE(newton_iterations(domain%solve_cells))
+                    newton_iterations=0
+                END IF
 
             END IF
             ! Only the time-step trial is updated; group rollback is unnecessary.
@@ -368,7 +373,7 @@ CONTAINS
                     CALL solve_backward_euler_group(groups(group_index), q_candidate, time_step,                      &
                         B_prime_x_geom(j,k), B_prime_y_geom(j,k), grav_coeff(j,k), noise, iterations, ok, linear_info, &
                         failed)
-                    newton_iterations(cell)=iterations
+                    IF (ALLOCATED(newton_iterations)) newton_iterations(cell)=iterations
 
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0,A,I0)')                                                        &

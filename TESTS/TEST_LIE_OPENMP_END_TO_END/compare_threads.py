@@ -123,6 +123,8 @@ def run_case(solver, fixture, root, case, threads, evidence):
     env = os.environ.copy()
     env.update(OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
                OPENBLAS_NUM_THREADS="1")
+    if case == "EXAMPLE_2D_NEWTON":
+        env["IMEX_NEWTON_WITNESS"] = "1"
     result = subprocess.run([str(solver)], cwd=target, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=240)
