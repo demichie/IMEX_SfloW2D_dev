@@ -54,10 +54,10 @@ def prepare(repo, root, name):
                            "&RUN_PARAMETERS\n SERIAL_FLAG=F,")
     text = replace_one(text, r"^\s*OUTPUT_NETCDF_FLAG\s*=.*$",
                        " OUTPUT_NETCDF_FLAG=T,")
-    # Legacy EXAMPLE_2D places exchange flags in transport namelists,
+    # Both legacy examples place exchange flags in transport namelists,
     # whereas the current solver reads them only from MASS_EXCHANGE_PARAMETERS.
     # Normalize this copied fixture, leaving the numerical settings unchanged.
-    if name == "EXAMPLE_2D":
+    if name in CASES:
         transferred = {}
         for key in ("SETTLING_FLAG", "EROSION_COEFF", "ENTRAINMENT_FLAG"):
             pattern = rf"^\s*{key}\s*=\s*([^,\n]+)\s*,?\s*$"
