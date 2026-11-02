@@ -75,7 +75,7 @@ CONTAINS
         REAL(wp), ALLOCATABLE :: q_group(:,:,:),qp_group(:,:,:)
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
-        INTEGER, ALLOCATABLE :: group_j(:),group_k(:)
+        INTEGER, ALLOCATABLE :: group_j(:),group_k(:),newton_iterations(:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
         REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:), &
             staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
@@ -139,6 +139,10 @@ CONTAINS
 
             ALLOCATE(cell_failure(domain%solve_cells))
             cell_failure=''
+            IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
+                ALLOCATE(newton_iterations(domain%solve_cells))
+                newton_iterations=0
+            END IF
             ! q and qp remain immutable group-entry states until the serial commit.
             ! Only q_group/qp_group candidates and per-cell staging are modified.
             ! Each active cell owns distinct candidate slices and staging slots.
@@ -290,6 +294,7 @@ CONTAINS
                     CALL solve_backward_euler_group(groups(group_index), &
                         q_group(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
                         grav_coeff(j,k),noise,iterations,ok,linear_info,failed)
+                    newton_iterations(cell)=iterations
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0,A,I0)') &
                             'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
@@ -329,6 +334,12 @@ CONTAINS
                 failure_reason=cell_failure(first_failure)
             END IF
             DEALLOCATE(cell_failure)
+            IF (ALLOCATED(newton_iterations)) THEN
+                WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=', &
+                    groups(group_index)%id,' solved_cells=',COUNT(newton_iterations>0), &
+                    ' total_iterations=',SUM(newton_iterations)
+                DEALLOCATE(newton_iterations)
+            END IF
             IF (step_failed) THEN
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
@@ -357,6 +368,9 @@ CONTAINS
                 ! A rejected geometric refresh therefore leaves both inventories
                 ! and the conserved/primitive group state unmodified.
                 IF (topo_change_flag) THEN
+                    WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=', &
+                        groups(group_index)%id,' max_abs_delta=', &
+                        MAXVAL(ABS(bed_candidate-B_vertex))
                     CALL assign_topography_vertices(bed_candidate,bed_accepted)
                     IF (.NOT.bed_accepted) THEN
                         CALL reject_cell('D19: invalid refreshed geometry')
