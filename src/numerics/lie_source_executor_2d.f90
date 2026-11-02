@@ -515,7 +515,8 @@ CONTAINS
             DO group_index=1,SIZE(groups)
                 IF (groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
                 WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
-                    groups(group_index)%id,' solved_cells=',COUNT(scratch%newton_iterations(1:domain%solve_cells,group_index)>0),                 &
+                    groups(group_index)%id,' solved_cells=', &
+                    COUNT(scratch%newton_iterations(1:domain%solve_cells,group_index)>0), &
                     ' total_iterations=',SUM(scratch%newton_iterations(1:domain%solve_cells,group_index))
             END DO
         END IF
