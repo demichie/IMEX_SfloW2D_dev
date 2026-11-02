@@ -50,11 +50,11 @@ MODULE simulation_2d
         !> \param[in] event Completed phase identifier from TIMESTEP_EVENT_*.
         !> \param[in] time Step-start time, or the advanced time for the clock event [s].
         !> \param[in] dt Timestep length used by the completed phase [s].
-        SUBROUTINE timestep_event_observer(event,time,dt)
+    SUBROUTINE timestep_event_observer(event,time,dt)
             IMPORT :: wp
             INTEGER, INTENT(IN) :: event
             REAL(wp), INTENT(IN) :: time,dt
-        END SUBROUTINE timestep_event_observer
+    END SUBROUTINE timestep_event_observer
     END INTERFACE
 
     !> \brief Ownership root for runtime, states and reusable numerical workspaces.

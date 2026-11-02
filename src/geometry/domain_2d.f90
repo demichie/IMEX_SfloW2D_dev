@@ -431,14 +431,14 @@ CONTAINS
         RETURN
 
     CONTAINS
-        SUBROUTINE append_hp_cell(j_cell,k_cell)
+    SUBROUTINE append_hp_cell(j_cell,k_cell)
         INTEGER, INTENT(IN) :: j_cell,k_cell
         IF (this%hp_eta_mask(j_cell,k_cell)) RETURN
         this%hp_eta_mask(j_cell,k_cell) = .TRUE.
         this%hp_eta_cells = this%hp_eta_cells + 1
         this%hp_eta_j(this%hp_eta_cells) = j_cell
         this%hp_eta_k(this%hp_eta_cells) = k_cell
-        END SUBROUTINE append_hp_cell
+    END SUBROUTINE append_hp_cell
     END SUBROUTINE check_solve
 
 END MODULE domain_2d
