@@ -92,24 +92,6 @@ CONTAINS
         valid=ALL(ieee_is_finite(qp_cell))
     END FUNCTION physical_cell_state_finite
 
-    !> @brief Test finite, nonnegative and internally consistent mass inventories.
-    !> @details Checks total mass against summed solid and additional gas mass;
-    !>          does not clip or otherwise modify a candidate conservative state.
-    !> @param[in] q_cell One conservative cell vector of n_eqns entries.
-    !> @return True if the candidate satisfies all mass admissibility guards.
-    PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
-        REAL(wp), INTENT(IN) :: q_cell(n_eqns)
-        valid=.FALSE.
-        IF (.NOT.ALL(ieee_is_finite(q_cell))) RETURN
-        IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
-        IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
-        IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
-        ! All transported component masses share the same total-mixture budget.
-        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) + &
-            SUM(q_cell(idx_add_gas_first:idx_add_gas_last)) > q_cell(idx_totMassEqn)) RETURN
-        valid=.TRUE.
-    END FUNCTION conservative_mass_admissible
-
 
     !******************************************************************************
     !> \brief Allocate and reset cell states and accumulated diagnostics for one model layout.
@@ -169,6 +151,15 @@ CONTAINS
 
     END SUBROUTINE initialize_state
 
+    !> @brief Initialize one primitive cell, including halo, to the dry state.
+    !> @details Sets all components to zero except ambient temperature.
+    !> @param[out] qp_cell Local physical state vector to reset.
+    PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
+        REAL(wp), INTENT(OUT) :: qp_cell(:)
+        qp_cell = 0.0_wp
+        qp_cell(idx_T) = T_ambient
+    END SUBROUTINE initialize_dry_physical_cell
+
     !******************************************************************************
     !> \brief Release the physical/conservative state and diagnostic fields.
     !>
@@ -191,6 +182,24 @@ CONTAINS
         DEALLOCATE( this%qp )
 
     END SUBROUTINE finalize_state
+
+    !> @brief Test finite, nonnegative and internally consistent mass inventories.
+    !> @details Checks total mass against summed solid and additional gas mass;
+    !>          does not clip or otherwise modify a candidate conservative state.
+    !> @param[in] q_cell One conservative cell vector of n_eqns entries.
+    !> @return True if the candidate satisfies all mass admissibility guards.
+    PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
+        REAL(wp), INTENT(IN) :: q_cell(n_eqns)
+        valid=.FALSE.
+        IF (.NOT.ALL(ieee_is_finite(q_cell))) RETURN
+        IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
+        IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
+        IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
+        ! All transported component masses share the same total-mixture budget.
+        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) + &
+            SUM(q_cell(idx_add_gas_first:idx_add_gas_last)) > q_cell(idx_totMassEqn)) RETURN
+        valid=.TRUE.
+    END FUNCTION conservative_mass_admissible
 
     !> @brief Snapshot all owned substrate inventories and their aggregates.
     !> @param[in] this Authoritative state before the Lie source sweep.
@@ -233,15 +242,6 @@ CONTAINS
         this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-erodible_porosity)
         this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
     END SUBROUTINE refresh_substrate_totals
-
-    !> @brief Initialize one primitive cell, including halo, to the dry state.
-    !> @details Sets all components to zero except ambient temperature.
-    !> @param[out] qp_cell Local physical state vector to reset.
-    PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
-        REAL(wp), INTENT(OUT) :: qp_cell(:)
-        qp_cell = 0.0_wp
-        qp_cell(idx_T) = T_ambient
-    END SUBROUTINE initialize_dry_physical_cell
 
     !******************************************************************************
 END MODULE state_2d

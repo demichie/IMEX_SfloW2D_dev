@@ -29,60 +29,6 @@ MODULE source_registry_2d
         LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
         TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
     CONTAINS
-        PROCEDURE :: groups => copy_lie_groups
-        PROCEDURE :: initialize => initialize_lie_registry
-        PROCEDURE :: finalize => finalize_registry
-        PROCEDURE :: is_initialized => registry_is_initialized
-        PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
-    END TYPE source_registry_type
-CONTAINS
-    !> @brief Test whether a group schedules the named physical source.
-    !> @param[in] group Lie group and its configured canonical identities.
-    !> @param[in] name Canonical identity to search for.
-    !> @return True if the name occurs in the allocated group source list.
-    PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
-        TYPE(source_group_type), INTENT(IN) :: group
-        CHARACTER(*), INTENT(IN) :: name
-        found=.FALSE.
-        IF (.NOT.ALLOCATED(group%source_names)) RETURN
-        found=ANY(group%source_names==TRIM(name))
-    END FUNCTION group_contains_name
-
-    !> @brief Copy the source identities owned by a Lie group.
-    !> @param[in] group Lie group with an optional allocated source list.
-    !> @return Independent source name array, empty if none are configured.
-    FUNCTION group_source_names(group) RESULT(names)
-        TYPE(source_group_type), INTENT(IN) :: group
-        CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-        ALLOCATE(names(0))
-        IF (ALLOCATED(group%source_names)) names=group%source_names
-    END FUNCTION group_source_names
-
-    !> \brief Release every owned descriptor and reset initialization status.
-    !> \param[in,out] this Registry to release; repeated calls are safe.
-    SUBROUTINE finalize_registry(this)
-        CLASS(source_registry_type), INTENT(INOUT) :: this
-        IF (ALLOCATED(this%lie_entries)) DEALLOCATE(this%lie_entries)
-        this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
-        this%implicit_sources_flag=.FALSE.
-    END SUBROUTINE finalize_registry
-
-    !> \brief Query cached initialization status without walking term arrays.
-    !> \param[in] this Registry.
-    !> \return True only after successful transactional validation.
-    !> Cached query, set once following successful registry validation.
-    PURE LOGICAL FUNCTION registry_has_implicit_sources(this)
-        CLASS(source_registry_type), INTENT(IN) :: this
-        registry_has_implicit_sources = this%initialized .AND. this%implicit_sources_flag
-    END FUNCTION registry_has_implicit_sources
-
-    !> @brief Query whether group metadata passed initialization and validation.
-    !> @param[in] this Lie registry to examine.
-    !> @return True only after successful initialization.
-    PURE LOGICAL FUNCTION registry_is_initialized(this)
-        CLASS(source_registry_type), INTENT(IN) :: this
-        registry_is_initialized=this%initialized
-    END FUNCTION registry_is_initialized
 
     !> @brief Validate and store groups for the first-order Lie integrator.
     !> @details Rejects inconsistent methods, duplicated identities and invalid
@@ -182,16 +128,6 @@ CONTAINS
         error=''
     END SUBROUTINE initialize_lie_registry
 
-    !> @brief Return a detached copy of the ordered Lie source groups.
-    !> @param[in] this Initialized source registry.
-    !> @return Independently allocated group descriptors for the caller.
-    FUNCTION copy_lie_groups(this) RESULT(groups)
-        CLASS(source_registry_type), INTENT(IN) :: this
-        TYPE(source_group_type), ALLOCATABLE :: groups(:)
-        ALLOCATE(groups(0))
-        IF (ALLOCATED(this%lie_entries)) groups=this%lie_entries
-    END FUNCTION copy_lie_groups
-
     !> \brief Map one target to conservative equation indices.
     !> \param[in] target Velocity, energy or pore target ID.
     !> \param[in] pore Pore equation index, zero when absent.
@@ -228,5 +164,69 @@ CONTAINS
         END DO
         equal=.TRUE.
     END FUNCTION same_set
+
+    !> \brief Release every owned descriptor and reset initialization status.
+    !> \param[in,out] this Registry to release; repeated calls are safe.
+    SUBROUTINE finalize_registry(this)
+        CLASS(source_registry_type), INTENT(INOUT) :: this
+        IF (ALLOCATED(this%lie_entries)) DEALLOCATE(this%lie_entries)
+        this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
+        this%implicit_sources_flag=.FALSE.
+    END SUBROUTINE finalize_registry
+        PROCEDURE :: groups => copy_lie_groups
+        PROCEDURE :: initialize => initialize_lie_registry
+        PROCEDURE :: finalize => finalize_registry
+        PROCEDURE :: is_initialized => registry_is_initialized
+        PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
+    END TYPE source_registry_type
+CONTAINS
+    !> @brief Test whether a group schedules the named physical source.
+    !> @param[in] group Lie group and its configured canonical identities.
+    !> @param[in] name Canonical identity to search for.
+    !> @return True if the name occurs in the allocated group source list.
+    PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
+        TYPE(source_group_type), INTENT(IN) :: group
+        CHARACTER(*), INTENT(IN) :: name
+        found=.FALSE.
+        IF (.NOT.ALLOCATED(group%source_names)) RETURN
+        found=ANY(group%source_names==TRIM(name))
+    END FUNCTION group_contains_name
+
+    !> @brief Copy the source identities owned by a Lie group.
+    !> @param[in] group Lie group with an optional allocated source list.
+    !> @return Independent source name array, empty if none are configured.
+    FUNCTION group_source_names(group) RESULT(names)
+        TYPE(source_group_type), INTENT(IN) :: group
+        CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+        ALLOCATE(names(0))
+        IF (ALLOCATED(group%source_names)) names=group%source_names
+    END FUNCTION group_source_names
+
+    !> \brief Query cached initialization status without walking term arrays.
+    !> \param[in] this Registry.
+    !> \return True only after successful transactional validation.
+    !> Cached query, set once following successful registry validation.
+    PURE LOGICAL FUNCTION registry_has_implicit_sources(this)
+        CLASS(source_registry_type), INTENT(IN) :: this
+        registry_has_implicit_sources = this%initialized .AND. this%implicit_sources_flag
+    END FUNCTION registry_has_implicit_sources
+
+    !> @brief Query whether group metadata passed initialization and validation.
+    !> @param[in] this Lie registry to examine.
+    !> @return True only after successful initialization.
+    PURE LOGICAL FUNCTION registry_is_initialized(this)
+        CLASS(source_registry_type), INTENT(IN) :: this
+        registry_is_initialized=this%initialized
+    END FUNCTION registry_is_initialized
+
+    !> @brief Return a detached copy of the ordered Lie source groups.
+    !> @param[in] this Initialized source registry.
+    !> @return Independently allocated group descriptors for the caller.
+    FUNCTION copy_lie_groups(this) RESULT(groups)
+        CLASS(source_registry_type), INTENT(IN) :: this
+        TYPE(source_group_type), ALLOCATABLE :: groups(:)
+        ALLOCATE(groups(0))
+        IF (ALLOCATED(this%lie_entries)) groups=this%lie_entries
+    END FUNCTION copy_lie_groups
 
 END MODULE source_registry_2d

@@ -101,6 +101,24 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.) &
             ]
 CONTAINS
+
+    !> @brief Resolve a rheology model name to its canonical source identity.
+    !> @param[in] model_name Text identifier of the rheology constitutive law.
+    !> @return Registered rheology source name, empty when not found or disabled.
+    PURE FUNCTION canonical_rheology_source_name(model_name) RESULT(name)
+        CHARACTER(*), INTENT(IN) :: model_name
+        CHARACTER(LEN=64) :: name
+        INTEGER :: i
+        name=''
+        IF (TRIM(model_name)=='none') RETURN
+        DO i=1,SOURCE_TERM_COUNT
+            IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
+            IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
+                name=SOURCE_CATALOG(i)%name
+                RETURN
+            END IF
+        END DO
+    END FUNCTION canonical_rheology_source_name
     !> Structurally affected conservative equations for a Newton-capable source.
     !> A zero instantaneous rate does not remove an equation from this set.
     !> An unsupported source/method returns an empty set.
@@ -158,24 +176,6 @@ CONTAINS
         END DO
         ok=.TRUE.
     END FUNCTION source_catalog_names_unique
-
-    !> @brief Resolve a rheology model name to its canonical source identity.
-    !> @param[in] model_name Text identifier of the rheology constitutive law.
-    !> @return Registered rheology source name, empty when not found or disabled.
-    PURE FUNCTION canonical_rheology_source_name(model_name) RESULT(name)
-        CHARACTER(*), INTENT(IN) :: model_name
-        CHARACTER(LEN=64) :: name
-        INTEGER :: i
-        name=''
-        IF (TRIM(model_name)=='none') RETURN
-        DO i=1,SOURCE_TERM_COUNT
-            IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
-            IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
-                name=SOURCE_CATALOG(i)%name
-                RETURN
-            END IF
-        END DO
-    END FUNCTION canonical_rheology_source_name
 
     !> @brief Ensure the rheology subset contains no duplicate source names.
     !> @return True if rheology source identities are unique.
