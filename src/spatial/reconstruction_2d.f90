@@ -11,7 +11,7 @@
 
 MODULE reconstruction_2d
 
-        USE parameters_2d, ONLY : idx_h
+    USE parameters_2d, ONLY : idx_h
     USE parameters_2d, ONLY : wp, n_vars, kt_trace_reconstruction, dry_thickness_tolerance
     USE parameters_2d, ONLY : lateral_source_flag, radial_source_flag
     USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
@@ -149,22 +149,22 @@ CONTAINS
     SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, source_boundary_enabled )
 
         ! External procedures
-        USE state_conversion_2d, ONLY : qp_to_qp2
-        USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
-        USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
-        USE parameters_2d, ONLY : limiter
+    USE state_conversion_2d, ONLY : qp_to_qp2
+    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
+    USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
+    USE parameters_2d, ONLY : limiter
 
-        USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
+    USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
 
-        USE geometry_2d, ONLY : sourceW , sourceE , sourceN , sourceS
-        USE geometry_2d, ONLY : sourceW_vect_x , sourceW_vect_y
-        USE geometry_2d, ONLY : sourceE_vect_x , sourceE_vect_y
-        USE geometry_2d, ONLY : sourceN_vect_x , sourceN_vect_y
-        USE geometry_2d, ONLY : sourceS_vect_x , sourceS_vect_y
+    USE geometry_2d, ONLY : sourceW , sourceE , sourceN , sourceS
+    USE geometry_2d, ONLY : sourceW_vect_x , sourceW_vect_y
+    USE geometry_2d, ONLY : sourceE_vect_x , sourceE_vect_y
+    USE geometry_2d, ONLY : sourceN_vect_x , sourceN_vect_y
+    USE geometry_2d, ONLY : sourceS_vect_x , sourceS_vect_y
 
-        USE parameters_2d, ONLY : reconstr_coeff
+    USE parameters_2d, ONLY : reconstr_coeff
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
@@ -220,6 +220,7 @@ CONTAINS
             qrecE = qrecW
             qrecS = qrecW
             qrecN = qrecW
+
             IF (l .LE. solve_cells) THEN
             x_stencil(2) = x_comp(j)
             y_stencil(2) = y_comp(k)
@@ -505,6 +506,7 @@ CONTAINS
                                 qrecS(i) = bcS(i)%value
                             ELSE
                                 IF ( i .EQ. 3 ) qrecS(i) = MIN( qrecS(i) , 0.0_wp )
+
                             END IF
 
                         END IF
@@ -524,6 +526,7 @@ CONTAINS
                                 qrecN(i) = bcN(i)%value
                             ELSE
                                 IF ( i .EQ. 3 ) qrecN(i) = MAX( qrecN(i) , 0.0_wp )
+
                             END IF
 
                         END IF
@@ -707,6 +710,7 @@ CONTAINS
             END IF
 
             END IF ! active cell
+
             this%qp_cellW(:,j,k) = qrecW
             this%qp_cellE(:,j,k) = qrecE
             this%qp_cellS(:,j,k) = qrecS
@@ -752,7 +756,9 @@ CONTAINS
 
         DO l = 1, this%hp_eta_cells
                 this%hp_eta_mask(this%hp_eta_j(l),this%hp_eta_k(l)) = .FALSE.
+
         END DO
+
         this%hp_eta_cells = 0
 
         ! Active cells first, followed by unique stencil halo neighbours.
@@ -760,7 +766,9 @@ CONTAINS
                 j = j_cent(l)
                 k = k_cent(l)
                 CALL append_eta_cell(j,k)
+
         END DO
+
         DO l = 1, solve_cells
                 j = j_cent(l)
                 k = k_cent(l)
@@ -768,6 +776,7 @@ CONTAINS
                 IF ( j .LT. comp_cells_x ) CALL append_eta_cell(j+1,k)
                 IF ( k .GT. 1 ) CALL append_eta_cell(j,k-1)
                 IF ( k .LT. comp_cells_y ) CALL append_eta_cell(j,k+1)
+
         END DO
 
     CONTAINS
@@ -807,9 +816,9 @@ CONTAINS
     !> @param[in] j X index of the workset cell.
     !> @param[in] k Y index of the workset cell.
     SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k)
-        USE parameters_2d, ONLY : limiter,reconstr_coeff
-        USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
-        USE constitutive_parameters_2d, ONLY : grav
+    USE parameters_2d, ONLY : limiter,reconstr_coeff
+    USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
+    USE constitutive_parameters_2d, ONLY : grav
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
         INTEGER, INTENT(IN) :: j,k
@@ -825,6 +834,7 @@ CONTAINS
             slope_y=0.0_wp
             slope_hx=0.0_wp
             slope_hy=0.0_wp
+
             IF ((j.GT.1).AND.(j.LT.comp_cells_x)) THEN
                 sx=[qp_expl(1,j-1,k)+B_cent(j-1,k),eta_center,                                                         &
                     qp_expl(1,j+1,k)+B_cent(j+1,k)]
@@ -832,7 +842,9 @@ CONTAINS
                 xx=[x_comp(j-1),x_comp(j),x_comp(j+1)]
                 CALL limit(sx,xx,limiter(1),slope_x)
                 CALL limit(hx,xx,limiter(1),slope_hx)
+
             END IF
+
             IF ((k.GT.1).AND.(k.LT.comp_cells_y)) THEN
                 sy=[qp_expl(1,j,k-1)+B_cent(j,k-1),eta_center,                                                         &
                     qp_expl(1,j,k+1)+B_cent(j,k+1)]
@@ -840,7 +852,9 @@ CONTAINS
                 yy=[y_comp(k-1),y_comp(k),y_comp(k+1)]
                 CALL limit(sy,yy,limiter(1),slope_y)
                 CALL limit(hy,yy,limiter(1),slope_hy)
+
             END IF
+
             eta_w=eta_center-reconstr_coeff*dx2*slope_x
             eta_e=eta_center+reconstr_coeff*dx2*slope_x
             eta_s=eta_center-reconstr_coeff*dy2*slope_y
@@ -854,14 +868,18 @@ CONTAINS
             ELSEIF ( eta_w .LT. B_face_x(j,k) ) THEN
                 eta_w=B_face_x(j,k)
                 eta_e=2.0_wp*eta_center-eta_w
+
             END IF
+
             IF ( eta_n .LT. B_face_y(j,k+1) ) THEN
                 eta_n=B_face_y(j,k+1)
                 eta_s=2.0_wp*eta_center-eta_n
             ELSEIF ( eta_s .LT. B_face_y(j,k) ) THEN
                 eta_s=B_face_y(j,k)
                 eta_n=2.0_wp*eta_center-eta_s
+
             END IF
+
             this%eta_cellW(j,k)=eta_w
             this%eta_cellE(j,k)=eta_e
             this%eta_cellS(j,k)=eta_s
@@ -875,13 +893,16 @@ CONTAINS
                 slope_minmod=minmod_slope_pair(reconstr_coeff*slope_x,slope_eta2)
                 eta_w_mm=eta_center-dx2*slope_minmod
                 eta_e_mm=eta_center+dx2*slope_minmod
+
                 IF ( eta_e_mm .LT. B_face_x(j+1,k) ) THEN
                     eta_e_mm=B_face_x(j+1,k)
                     eta_w_mm=2.0_wp*eta_center-eta_e_mm
                 ELSEIF ( eta_w_mm .LT. B_face_x(j,k) ) THEN
                     eta_w_mm=B_face_x(j,k)
                     eta_e_mm=2.0_wp*eta_center-eta_w_mm
+
                 END IF
+
                 this%h_minmod_interfaceR(j,k)=                                                                         &
                     MAX(eta_w_mm-B_face_x(j,k),0.0_wp)
                 this%h_minmod_interfaceL(j+1,k)=                                                                       &
@@ -892,18 +913,23 @@ CONTAINS
                 slope_minmod=minmod_slope_pair(reconstr_coeff*slope_y,slope_eta2)
                 eta_s_mm=eta_center-dy2*slope_minmod
                 eta_n_mm=eta_center+dy2*slope_minmod
+
                 IF ( eta_n_mm .LT. B_face_y(j,k+1) ) THEN
                     eta_n_mm=B_face_y(j,k+1)
                     eta_s_mm=2.0_wp*eta_center-eta_n_mm
                 ELSEIF ( eta_s_mm .LT. B_face_y(j,k) ) THEN
                     eta_s_mm=B_face_y(j,k)
                     eta_n_mm=2.0_wp*eta_center-eta_s_mm
+
                 END IF
+
                 this%h_minmod_interfaceT(j,k)=                                                                         &
                     MAX(eta_s_mm-B_face_y(j,k),0.0_wp)
                 this%h_minmod_interfaceB(j,k+1)=                                                                       &
                     MAX(eta_n_mm-B_face_y(j,k+1),0.0_wp)
+
             END IF
+
 IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             fr_weight_x=froude_h_blend_weight(qp_expl(1,j,k),                                                          &
                 qp_expl(idx_u,j,k),grav)
@@ -920,13 +946,16 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
             eta_blend_w=eta_center-dx2*slope_blend_x
             eta_blend_e=eta_center+dx2*slope_blend_x
+
             IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
                 eta_blend_e=B_face_x(j+1,k)
                 eta_blend_w=2.0_wp*eta_center-eta_blend_e
             ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
                 eta_blend_w=B_face_x(j,k)
                 eta_blend_e=2.0_wp*eta_center-eta_blend_w
+
             END IF
+
             this%h_froude_interfaceR(j,k)=                                                                             &
                 MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
             this%h_froude_interfaceL(j+1,k)=                                                                           &
@@ -934,17 +963,21 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
             eta_blend_s=eta_center-dy2*slope_blend_y
             eta_blend_n=eta_center+dy2*slope_blend_y
+
             IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
                 eta_blend_n=B_face_y(j,k+1)
                 eta_blend_s=2.0_wp*eta_center-eta_blend_n
             ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
                 eta_blend_s=B_face_y(j,k)
                 eta_blend_n=2.0_wp*eta_center-eta_blend_s
+
             END IF
+
             this%h_froude_interfaceT(j,k)=                                                                             &
                 MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
             this%h_froude_interfaceB(j,k+1)=                                                                           &
                 MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
+
             END IF
 
     END SUBROUTINE reconstruct_kt_eta_cell
@@ -1013,6 +1046,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         IF (boundary_flag .EQ. 0) THEN
             stencil_values(2)=center_value
             stencil_coordinates(2)=center_coordinate
+
             IF (lower_boundary) THEN
                 stencil_values(1)=boundary_value
                 stencil_values(3)=adjacent_value
@@ -1023,16 +1057,21 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                 stencil_values(3)=boundary_value
                 stencil_coordinates(1)=adjacent_coordinate
                 stencil_coordinates(3)=boundary_coordinate
+
             END IF
+
             CALL limit(stencil_values,stencil_coordinates,limiter_id,slope)
         ELSEIF (boundary_flag .EQ. 1) THEN
             slope=boundary_value
         ELSEIF (boundary_flag .EQ. 2) THEN
+
             IF (lower_boundary) THEN
                 slope=(adjacent_value-center_value)*inverse_spacing
             ELSE
                 slope=(center_value-adjacent_value)*inverse_spacing
+
             END IF
+
         END IF
     END SUBROUTINE boundary_reconstruction_slope
 
@@ -1055,8 +1094,10 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         REAL(wp) :: value
 
         value = qp_center(component,j,k)
+
         IF ((component .EQ. idx_u) .OR. (component .EQ. idx_v)) THEN
             IF (qp_center(1,j,k) .LE. dry_thickness_tolerance) value = 0.0_wp
+
         END IF
     END FUNCTION reconstruction_cell_value
 
@@ -1078,9 +1119,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent, k_cent, use_kt_direct )
 
-        USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
+    USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_center(:,:,:)
@@ -1101,6 +1142,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             this%qp_adv_interfaceL(:,1,k) = this%qp_adv_interfaceR(:,1,k)
             this%qp_adv_interfaceR(:,comp_interfaces_x,k) =                                                            &
                 this%qp_adv_interfaceL(:,comp_interfaces_x,k)
+
         END DO
         !$OMP END DO
 
@@ -1109,6 +1151,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             this%qp_adv_interfaceB(:,j,1) = this%qp_adv_interfaceT(:,j,1)
             this%qp_adv_interfaceT(:,j,comp_interfaces_y) =                                                            &
                 this%qp_adv_interfaceB(:,j,comp_interfaces_y)
+
         END DO
         !$OMP END DO
 
@@ -1135,6 +1178,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                     this%qp_adv_interfaceL(idx_u,j,k) =                                                                &
                         -this%qp_adv_interfaceL(idx_u,j,k)
                     this%eta_interfaceL(j,k) = this%eta_interfaceR(j,k)
+
                 END IF
 
                 IF ( sourceN(j,k) ) THEN
@@ -1151,7 +1195,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                     this%qp_adv_interfaceB(idx_v,j,k) =                                                                &
                         -this%qp_adv_interfaceB(idx_v,j,k)
                     this%eta_interfaceB(j,k) = this%eta_interfaceT(j,k)
+
                 END IF
+
             END DO
             !$OMP END DO
         END IF
@@ -1228,10 +1274,10 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[in,out] this Reconstruction workspace and output face traces.
     !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
     SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
-        USE parameters_2d, ONLY : limiter,reconstr_coeff
-        USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
-        USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
-        USE constitutive_parameters_2d, ONLY : grav
+    USE parameters_2d, ONLY : limiter,reconstr_coeff
+    USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
+    USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
+    USE constitutive_parameters_2d, ONLY : grav
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
@@ -1254,19 +1300,25 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             kt_mode=4
         CASE DEFAULT
             kt_mode=2
+
         END SELECT
 
         IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
+
             DO k=1,comp_cells_y
                 this%h_froude_interfaceL(1,k)=this%h_froude_interfaceR(1,k)
                 this%h_froude_interfaceR(comp_interfaces_x,k)=                                                         &
                     this%h_froude_interfaceL(comp_interfaces_x,k)
+
             END DO
+
             DO j=1,comp_cells_x
                 this%h_froude_interfaceB(j,1)=this%h_froude_interfaceT(j,1)
                 this%h_froude_interfaceT(j,comp_interfaces_y)=                                                         &
                     this%h_froude_interfaceB(j,comp_interfaces_y)
+
             END DO
+
         END IF
 
         !$OMP PARALLEL DO PRIVATE(l,j,k)
@@ -1277,30 +1329,39 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             this%eta_interfaceL(j+1,k)=this%eta_cellE(j,k)
             this%eta_interfaceT(j,k)=this%eta_cellS(j,k)
             this%eta_interfaceB(j,k+1)=this%eta_cellN(j,k)
+
             IF (j.EQ.1) THEN
                 this%eta_interfaceL(1,k)=this%eta_interfaceR(1,k)
                 IF ( kt_trace_reconstruction .EQ. 'minmod' )                                                           &
                     this%h_minmod_interfaceL(1,k)=this%h_minmod_interfaceR(1,k)
+
             END IF
+
             IF (j.EQ.comp_cells_x) THEN
                 this%eta_interfaceR(comp_interfaces_x,k)=                                                              &
                     this%eta_interfaceL(comp_interfaces_x,k)
                 IF ( kt_trace_reconstruction .EQ. 'minmod' )                                                           &
                     this%h_minmod_interfaceR(comp_interfaces_x,k)=                                                     &
                     this%h_minmod_interfaceL(comp_interfaces_x,k)
+
             END IF
+
             IF (k.EQ.1) THEN
                 this%eta_interfaceB(j,1)=this%eta_interfaceT(j,1)
                 IF ( kt_trace_reconstruction .EQ. 'minmod' )                                                           &
                     this%h_minmod_interfaceB(j,1)=this%h_minmod_interfaceT(j,1)
+
             END IF
+
             IF (k.EQ.comp_cells_y) THEN
                 this%eta_interfaceT(j,comp_interfaces_y)=                                                              &
                     this%eta_interfaceB(j,comp_interfaces_y)
                 IF ( kt_trace_reconstruction .EQ. 'minmod' )                                                           &
                     this%h_minmod_interfaceT(j,comp_interfaces_y)=                                                     &
                     this%h_minmod_interfaceB(j,comp_interfaces_y)
+
             END IF
+
         END DO
         !$OMP END PARALLEL DO
 
@@ -1308,11 +1369,14 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
             this%qp_adv_interfaceR(:,comp_interfaces_x,k)=                                                             &
                 this%qp_adv_interfaceL(:,comp_interfaces_x,k)
+
         END DO
+
         DO j=1,comp_cells_x
             this%qp_adv_interfaceB(:,j,1)=this%qp_adv_interfaceT(:,j,1)
             this%qp_adv_interfaceT(:,j,comp_interfaces_y)=                                                             &
                 this%qp_adv_interfaceB(:,j,comp_interfaces_y)
+
         END DO
         ! reconstruct() has already reflected the primitive states
         ! at the internal radial-source wall. The eta pass above overwrites its
@@ -1320,10 +1384,12 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         ! selected transport reconstruction, before evaluating speeds and fluxes.
         ! Injection is volumetric; no mass may cross this excluded inner boundary.
         IF ( radial_source_flag ) THEN
+
             DO l=1,this%hp_eta_cells
                 j=this%hp_eta_j(l)
                 k=this%hp_eta_k(l)
                 IF ( source_cell(j,k) .NE. 2 ) CYCLE
+
                 IF ( sourceE(j,k) ) THEN
                     this%eta_interfaceR(j+1,k)=this%eta_interfaceL(j+1,k)
                     IF ( kt_trace_reconstruction .EQ. 'minmod' )                                                       &
@@ -1336,7 +1402,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                         this%h_minmod_interfaceL(j,k)=this%h_minmod_interfaceR(j,k)
                     IF ( kt_trace_reconstruction .EQ. 'froude_blend' )                                                 &
                         this%h_froude_interfaceL(j,k)=this%h_froude_interfaceR(j,k)
+
                 END IF
+
                 IF ( sourceN(j,k) ) THEN
                     this%eta_interfaceT(j,k+1)=this%eta_interfaceB(j,k+1)
                     IF ( kt_trace_reconstruction .EQ. 'minmod' )                                                       &
@@ -1349,8 +1417,11 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                         this%h_minmod_interfaceB(j,k)=this%h_minmod_interfaceT(j,k)
                     IF ( kt_trace_reconstruction .EQ. 'froude_blend' )                                                 &
                         this%h_froude_interfaceB(j,k)=this%h_froude_interfaceT(j,k)
+
                 END IF
+
             END DO
+
         END IF
 
         ! Select final depths after eta and radial boundary corrections.
@@ -1377,6 +1448,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                 this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1),                                       &
                 lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2,                                   &
                 this%h_selected_interfaceB(j,k+1),'KT reconstruction north',kt_mode)
+
         END DO
         !$OMP END PARALLEL DO
 
@@ -1385,11 +1457,14 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             this%h_selected_interfaceL(1,k)=this%h_selected_interfaceR(1,k)
             this%h_selected_interfaceR(comp_interfaces_x,k)=                                                           &
                 this%h_selected_interfaceL(comp_interfaces_x,k)
+
         END DO
+
         DO j=1,comp_cells_x
             this%h_selected_interfaceB(j,1)=this%h_selected_interfaceT(j,1)
             this%h_selected_interfaceT(j,comp_interfaces_y)=                                                           &
                 this%h_selected_interfaceB(j,comp_interfaces_y)
+
         END DO
     END SUBROUTINE reconstruct_kt_eta_traces
 
@@ -1413,12 +1488,14 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         SUBROUTINE form_direct_face_momentum(trace)
             REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
             trace(1) = MAX(trace(1),0.0_wp)
+
             IF (trace(1) .LE. dry_thickness_tolerance) THEN
                 trace(1:3) = 0.0_wp
                 trace(idx_u:idx_v) = 0.0_wp
             ELSE
                 trace(2) = trace(1)*trace(idx_u)
                 trace(3) = trace(1)*trace(idx_v)
+
             END IF
         END SUBROUTINE form_direct_face_momentum
 
@@ -1436,7 +1513,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[in] context Context string used in physical closure diagnostics.
     !> @param[in] kt_mode Selected KT trace reconstruction mode.
     SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, source_trace,h_selected,context,kt_mode)
-        USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
+    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
         REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
         REAL(wp), INTENT(IN) :: eta,bed,h_minmod,h_froude
         LOGICAL, INTENT(IN) :: source_trace
@@ -1453,7 +1530,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             h_selected=MAX(h_froude,0.0_wp)
         CASE DEFAULT
             h_selected=MAX(eta-bed,0.0_wp)
+
         END SELECT
+
         IF (source_trace) h_selected=MAX(qp(idx_h),0.0_wp)
         IF (h_selected .GT. dry_thickness_tolerance)                                                                   &
             CALL enforce_primitive_mass_fraction_closure(qp,context)

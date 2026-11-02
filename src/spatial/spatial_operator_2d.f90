@@ -8,7 +8,7 @@
 !********************************************************************************
 
 MODULE spatial_operator_2d
-        USE parameters_2d, ONLY : idx_totMassEqn, idx_T
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_T
 
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
     USE diagnostics_2d, ONLY : fatal_error
@@ -27,7 +27,7 @@ MODULE spatial_operator_2d
     !> \details Its private reconstruction/flux workspaces are reused by both
     !>          spatial-term evaluation and the CFL calculation.
     TYPE, PUBLIC :: spatial_operator_type
-        PRIVATE
+    PRIVATE
         TYPE(reconstruction_workspace_type) :: reconstruction
         TYPE(hyperbolic_workspace_type) :: hp_pccu
     CONTAINS
@@ -133,7 +133,9 @@ CONTAINS
             ELSE
                 qp(:,j,k) = 0.0_wp
                 qp(idx_T,j,k) = T_ambient
+
             END IF
+
         END DO
         !$OMP END PARALLEL DO
 
@@ -161,6 +163,7 @@ CONTAINS
             k = domain%k_cent(l)
 
             CALL accumulate_directional_face_speeds(this%hp_pccu,j,k, max_a_x,max_a_y)
+
         END DO
         !$OMP END PARALLEL DO
 
@@ -170,6 +173,7 @@ CONTAINS
         ! the main loop subsequently caps accepted steps at events and growth.
         cfl_spatial = cfl
         cfl_spatial = MIN(cfl_spatial,0.25_wp)
+
         SELECT CASE (TRIM(cfl_policy))
         CASE ('directional_min')
             IF ( max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial*dx/max_a_x)
@@ -184,10 +188,12 @@ CONTAINS
             ELSE
                 propagation_rate = max_a_x/dx + max_a_y/dy
                 IF ( propagation_rate .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial/propagation_rate)
+
             END IF
         CASE DEFAULT
             ! Also protect callers that configure the module without input I/O.
             CALL fatal_error('CFL_POLICY must be directional_min or combined')
+
         END SELECT
 
     END SUBROUTINE compute_spatial_timestep

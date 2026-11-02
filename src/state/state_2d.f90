@@ -9,7 +9,7 @@
 !********************************************************************************
 
 MODULE state_2d
-        USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T,                                                        &
+    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T,                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
     USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity
@@ -107,6 +107,7 @@ CONTAINS
 
         IF (.NOT. model_layout%is_initialized()) THEN
             ERROR STOP 'State allocation requires an initialized model layout'
+
         END IF
 
         ALLOCATE( this%q(model_layout%n_variables,comp_cells_x,comp_cells_y) )

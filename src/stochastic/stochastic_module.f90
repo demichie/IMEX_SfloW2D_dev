@@ -125,7 +125,7 @@ CONTAINS
     SUBROUTINE getSteadyStateZ(this, state, domain)
     ! should find a better way to understand when the process is stable.
     ! Since sigma is varing in space and time, the process may never be stable.
-        IMPLICIT none
+    IMPLICIT none
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         CLASS(domain_type), INTENT(IN) :: domain
@@ -145,11 +145,13 @@ CONTAINS
         ! Allocate and compute convolution kernel if needed (will be keept in memory)
         IF (length_spatial_corr > 0.0_wp) THEN
             CALL this%generate_kernel()
+
         END IF
 
         ! Compute n iterations to get to a steady state OU process
         DO i=1,n_iter
             CALL this%update(state, dt)
+
         END DO
 
         IF (stoch_transport_flag) THEN
@@ -185,7 +187,7 @@ CONTAINS
     !>       filtering of Gaussian samples.
 
     SUBROUTINE genConvolutionKernel(this)
-        IMPLICIT none
+    IMPLICIT none
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         INTEGER :: half_width, n_nodes_per_dim, x_index, y_index
         REAL(wp) :: bandwidth, x, y
@@ -204,11 +206,14 @@ CONTAINS
 
         ! Compute 2D Gaussian values (at centers of cells)
         DO y_index = 1, n_nodes_per_dim
+
             DO x_index = 1, n_nodes_per_dim
                 x = cell_size * REAL(x_index - half_width - 1, wp)
                 y = cell_size * REAL(y_index - half_width - 1, wp)
                 this%conv_kernel(x_index, y_index) = evalGaussian2d(x, y)
+
             END DO
+
         END DO
 
         ! Renormalize values of the kernel
@@ -226,7 +231,7 @@ CONTAINS
 
     REAL(wp) FUNCTION evalGaussian2d(x, y)
         ! Sample the centered isotropic Gaussian kernel Q^(1/2).
-        IMPLICIT none
+    IMPLICIT none
         REAL(wp), INTENT(IN) :: x, y
         REAL(wp) :: s, PI
 
@@ -245,7 +250,7 @@ CONTAINS
 
     SUBROUTINE update_stochastic_variable(this, state, dt)
         ! OU evolution is a fractional step distinct from conservative transport.
-        IMPLICIT NONE
+    IMPLICIT NONE
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(IN) :: state
         INTEGER :: j,k
@@ -267,6 +272,7 @@ CONTAINS
             ! (for convenience, the conv_kernel is generated only once before the burn in)
             CALL convolve_2d(noise, this%conv_kernel, conv_result)
             noise = conv_result
+
         END IF
 
         ! Evolve dry cells too, so an OU state exists when they become wet later.
@@ -274,12 +280,15 @@ CONTAINS
         !$OMP PARALLEL
         !$OMP DO private(j,k,sigma_noise)
         DO k = 1,comp_cells_y
+
             DO j = 1,comp_cells_x
                 ! Update the Ornstein-Uhlenback process
                 sigma_noise = getSigmaNoise(state,j,k)
                 this%Z(j,k) = EulerMaruyamaScheme(                                                                     &
                     this%Z(j,k), dt, sigma_noise, noise(j,k))
+
             END DO
+
         END DO
         !$OMP END DO
         !$OMP END PARALLEL
@@ -307,7 +316,9 @@ CONTAINS
             ! the previous timestep. Dry cells retain their independently evolving Z.
             WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
                 this%Z = state%q(idx_stoch,:,:) / state%q(idx_totMassEqn,:,:)
+
             END WHERE
+
         END IF
 
         CALL this%update(state, dt)
@@ -319,7 +330,9 @@ CONTAINS
             ELSEWHERE
                 state%q(idx_stoch,:,:) = 0.0_wp
                 state%qp(idx_stoch,:,:) = 0.0_wp
+
             END WHERE
+
         END IF
 
     END SUBROUTINE prepare_stochastic_timestep
@@ -341,6 +354,7 @@ CONTAINS
             this%effective_Z = -(ABS(this%Z)**noise_pow_val)
         ELSE
             this%effective_Z = this%Z
+
         END IF
 
     END SUBROUTINE refresh_effective_stochastic_field
@@ -364,6 +378,7 @@ CONTAINS
         VelocitySquared = state%qp(idx_u,j,k)**2 + state%qp(idx_v,j,k)**2
     ELSE
         VelocitySquared = 0.0_wp
+
     END IF
 
 END FUNCTION VelocitySquared
@@ -377,7 +392,7 @@ END FUNCTION VelocitySquared
 
     REAL(wp) FUNCTION getSigmaNoise(state,j,k)
     ! Compute the intensity of the noise depending of the friction used
-        IMPLICIT NONE
+    IMPLICIT NONE
         CLASS(state_type), INTENT(IN) :: state
         INTEGER, INTENT(IN) :: j, k
         REAL(wp) :: velocity_squared
@@ -391,7 +406,9 @@ END FUNCTION VelocitySquared
         getSigmaNoise = expFormNoise(velocity_squared)
         ELSE
         getSigmaNoise = std_max
+
         END IF
+
         RETURN
     END FUNCTION getSigmaNoise
 
@@ -402,7 +419,7 @@ END FUNCTION VelocitySquared
 
     REAL(wp) FUNCTION expFormNoise(val)
         ! Compute the bounded intensity of the noise of the stochastic process
-        IMPLICIT NONE
+    IMPLICIT NONE
         REAL(wp), INTENT(IN) :: val
         expFormNoise = std_max + ( std_min - std_max) * exp(- val / std_slope_factor )
     END FUNCTION expFormNoise
@@ -418,7 +435,7 @@ END FUNCTION VelocitySquared
     !> \return Updated Gaussian OU state after damping and stochastic forcing.
 
     REAL(wp) FUNCTION EulerMaruyamaScheme(Zij, dt, sigma, noise_ij)
-        IMPLICIT NONE
+    IMPLICIT NONE
         REAL(wp), INTENT(IN) :: Zij, dt, sigma, noise_ij
         EulerMaruyamaScheme = Zij - (dt / tau_stochastic) * Zij +                                                      &
                 sigma * SQRT(2.0_wp * (dt / tau_stochastic)) * noise_ij
@@ -476,6 +493,7 @@ subroutine convolve_2d(input_signal, kernel, result)
 
     ! Loop over all inp signal cells
     do inx_x = 1, len_inp_sig_x
+
         do inx_y = 1, len_inp_sig_y
         idx_centre_x = left_padding + inx_x
         idx_centre_y = south_padding + inx_y
@@ -483,6 +501,7 @@ subroutine convolve_2d(input_signal, kernel, result)
 
         ! Loop to convolve values around the current cell
         do idx_k_x = 1, len_kernel_x
+
             do idx_k_y = 1, len_kernel_y
                 ! Convolution offset: for kernel index k the flipped shift is
                 ! -(k - 1 - half_len_k) = -k + half_len_k + 1. The previous +2
@@ -502,7 +521,9 @@ subroutine convolve_2d(input_signal, kernel, result)
                 print*, inx_x, inx_y, idx_k_x, idx_k_y
                 print*,idx_centre_y + shift_y
                 STOP
+
                 END if
+
                 if ((idx_centre_x + shift_x .LT. 1) .or.  (idx_centre_x + shift_x .GT. size(padded_signal,1))) THEN
                 print*,"problem x idx"
                 print*,shape(kernel)
@@ -513,16 +534,21 @@ subroutine convolve_2d(input_signal, kernel, result)
                 print*, inx_x, inx_y, idx_k_x, idx_k_y
                 print*,idx_centre_x + shift_x
                 STOP
+
                 END if
 
                 sum_at_position = sum_at_position +                                                                    &
                 padded_signal(idx_centre_x + shift_x, idx_centre_y + shift_y)                                          &
                 * kernel(idx_k_x, idx_k_y)
+
             end do
+
         end do
 
         result(inx_x, inx_y) = sum_at_position
+
         end do
+
     end do
 
     deallocate(padded_signal)

@@ -106,10 +106,12 @@ CONTAINS
 
         IF ( SIZE(stateR) .NE. SIZE(stateL) ) THEN
             ERROR STOP 'eval_path_contribution: inconsistent state sizes'
+
         END IF
 
         IF ( direction .NE. PATH_DIR_X .AND. direction .NE. PATH_DIR_Y ) THEN
             ERROR STOP 'eval_path_contribution: invalid direction'
+
         END IF
 
         n_quad_local = 3
@@ -126,6 +128,7 @@ CONTAINS
             ELSE
                 path_state = stateL + gauss_abscissa(i_quad) * (stateR - stateL)
                 dstate_ds = stateR - stateL
+
             END IF
 
             integrand = 0.0_wp

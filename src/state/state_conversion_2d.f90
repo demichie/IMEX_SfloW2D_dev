@@ -11,7 +11,7 @@ MODULE state_conversion_2d
     USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn,                                                          &
             idx_uEqn, idx_vEqn, idx_engyEqn
 
-        USE parameters_2d, ONLY : idx_h, idx_T
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE constitutive_parameters_2d
     USE diagnostics_2d, ONLY : fatal_error
 
@@ -233,6 +233,7 @@ CONTAINS
                 rho_c = ( alpha_air * rho_a + SUM(alphag * rho_g) ) / alphac
             ELSE
                 rho_c = rho_a
+
             END IF
 
         ELSE
@@ -329,6 +330,7 @@ CONTAINS
         IF (pore_pressure_flag) state%exc_pore_pres = qp(idx_pore)
         state%alphas = 0.0_wp
         state%alphag = 0.0_wp
+
         IF (state%h <= EPSILON(1.0_wp)) THEN
             state%rho_m = rho_a_amb
             state%inv_rhom = 1.0_wp / state%rho_m
@@ -341,7 +343,9 @@ CONTAINS
             IF (PRESENT(byy)) geometry(5)=byy
             CALL update_physical_state_kinematics(state,geometry(1),geometry(2), geometry(3),geometry(4),geometry(5))
             RETURN
+
         END IF
+
         xs = state%xs
         xg = state%xg
         CALL enforce_mass_fraction_closure(xs, xg)
@@ -382,31 +386,43 @@ CONTAINS
         REAL(wp) :: explicit_mass_fraction
 
         IF (PRESENT(accepted)) accepted=.FALSE.
+
         IF (n_solid .GT. 0) THEN
+
             IF (ANY(xs .LT. -mass_fraction_roundoff_tolerance)) THEN
                 IF (PRESENT(accepted)) RETURN
                 CALL mass_fraction_closure_error(                                                                      &
                     'Material negative solid mass fraction', context)
+
             END IF
+
             xs = MAX(xs, 0.0_wp)
+
         END IF
 
         IF (n_add_gas .GT. 0) THEN
+
             IF (ANY(xg .LT. -mass_fraction_roundoff_tolerance)) THEN
                 IF (PRESENT(accepted)) RETURN
                 CALL mass_fraction_closure_error(                                                                      &
                     'Material negative additional-gas mass fraction', context)
+
             END IF
+
             xg = MAX(xg, 0.0_wp)
+
         END IF
 
         ! Only one continuous carrier is transported.
 
         explicit_mass_fraction = SUM(xs) + SUM(xg)
+
         IF (explicit_mass_fraction .GT. 1.0_wp) THEN
             xs = xs / explicit_mass_fraction
             xg = xg / explicit_mass_fraction
+
         END IF
+
         IF (PRESENT(accepted)) accepted=.TRUE.
 
     END SUBROUTINE enforce_mass_fraction_closure
@@ -425,6 +441,7 @@ CONTAINS
             CALL fatal_error(TRIM(context)//': '//TRIM(message))
         ELSE
             CALL fatal_error(message)
+
         END IF
 
     END SUBROUTINE mass_fraction_closure_error
@@ -445,11 +462,14 @@ CONTAINS
         state%inv_rhom = 1.0_wp / state%rho_m
         state%xs = 0.0_wp
         state%xg = 0.0_wp
+
         IF (q(idx_totMassEqn) > EPSILON(1.0_wp)) THEN
             state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
             state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
             CALL enforce_mass_fraction_closure(state%xs, state%xg)
+
         END IF
+
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx
         IF (PRESENT(by)) geometry(2)=by
@@ -487,7 +507,7 @@ CONTAINS
 
     SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag, red_grav, p_dyn, Zs, exc_pore_pres)
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: qj(n_vars)
         REAL(wp), INTENT(OUT) :: h, u, v, T, rho_m
@@ -528,10 +548,13 @@ CONTAINS
         state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
         state%xs = CMPLX(0.0_wp,0.0_wp,wp)
         state%xg = CMPLX(0.0_wp,0.0_wp,wp)
+
         IF (ABS(q(idx_totMassEqn)) > EPSILON(1.0_wp)) THEN
             state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
             state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
+
         END IF
+
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx
         IF (PRESENT(by)) geometry(2)=by
@@ -569,7 +592,7 @@ CONTAINS
 
     SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs, exc_pore_pres)
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         COMPLEX(wp), INTENT(IN) :: qj(n_vars)
         COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
@@ -652,14 +675,18 @@ CONTAINS
             red_grav=0.0_wp
             rho_m=rho_a_amb
             rho_c=rho_a_amb
+
             IF (liquid_flag) THEN
                 cp_c=sp_heat_l
                 cp_m=sp_heat_l
             ELSE
                 cp_c=sp_heat_a
                 cp_m=sp_heat_a
+
             END IF
+
             RETURN
+
         END IF
 
         xs=state%xs
@@ -671,12 +698,16 @@ CONTAINS
         speed_squared=state%u**2+state%v**2
         buoyancy_depth=red_grav*state%h
         ri=0.0_wp
+
         IF (speed_squared > 0.0_wp) THEN
+
             IF (buoyancy_depth/1.E15_wp > speed_squared) THEN
                 ri=1.E15_wp
             ELSE
                 ri=MIN(1.E15_wp,buoyancy_depth/speed_squared)
+
             END IF
+
         END IF
     END SUBROUTINE mixt_var_state
 
@@ -751,6 +782,7 @@ CONTAINS
             CALL enforce_mass_fraction_closure(xs, xg, context)
         ELSE
             CALL enforce_mass_fraction_closure(xs, xg)
+
         END IF
 
         qp(idx_solid_first:idx_solid_last) = xs
@@ -776,13 +808,18 @@ CONTAINS
             WHERE ((qc(idx_solid_first:idx_solid_last) .LT. 0.0_wp) .AND.                                              &
                 (qc(idx_solid_first:idx_solid_last) .GE. -tolerance))
                 qc(idx_solid_first:idx_solid_last) = 0.0_wp
+
             END WHERE
+
         END IF
+
         IF (n_add_gas .GT. 0) THEN
             WHERE ((qc(idx_add_gas_first:idx_add_gas_last) .LT. 0.0_wp) .AND.                                          &
                 (qc(idx_add_gas_first:idx_add_gas_last) .GE. -tolerance))
                 qc(idx_add_gas_first:idx_add_gas_last) = 0.0_wp
+
             END WHERE
+
         END IF
 
     END SUBROUTINE clip_roundoff_negative_component_masses
@@ -839,6 +876,7 @@ CONTAINS
             sauter_diameter = SUM( diam_s ) / n_solid
         ELSE
             sauter_diameter = SUM( alpha_solids ) / SUM( alpha_solids /  diam_s )
+
         END IF
 
     END FUNCTION sauter_diameter
@@ -861,6 +899,7 @@ CONTAINS
             average_density_solids = SUM( rho_s ) / n_solid
         ELSE
             average_density_solids = SUM( alpha_solids * rho_s ) / SUM( alpha_solids )
+
         END IF
 
     END FUNCTION average_density_solids
@@ -890,7 +929,7 @@ CONTAINS
 
     SUBROUTINE mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c, r_sp_heat_mix)
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: qpj(n_vars+2) !< real-value physical variables
         REAL(wp), INTENT(OUT) :: r_Ri         !< real-value Richardson number
@@ -964,12 +1003,14 @@ CONTAINS
         ! MIN(cap,numerator/denominator) evaluates that overflowing quotient first.
         speed_squared = r_u**2 + r_v**2
         buoyancy_depth = r_red_grav * r_h
+
         IF ( speed_squared .GT. 0.0_wp ) THEN
 
             IF ( buoyancy_depth / 1.E15_wp .GT. speed_squared ) THEN
                 r_Ri = 1.E15_wp
             ELSE
                 r_Ri = MIN(1.E15_wp,buoyancy_depth / speed_squared)
+
             END IF
 
         ELSE
@@ -1017,7 +1058,7 @@ CONTAINS
 
     SUBROUTINE qc_to_qp(qc,qp,p_dyn,context,accepted)
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: qc(n_vars)
         REAL(wp), INTENT(OUT) :: qp(n_vars+2)
@@ -1044,6 +1085,7 @@ CONTAINS
             p_dyn=0.0_wp
             IF (.NOT.ALL(ieee_is_finite(qc))) RETURN
             IF (qc(idx_totMassEqn)<0.0_wp) RETURN
+
             IF (qc(idx_totMassEqn)>EPSILON(1.0_wp)) THEN
                 IF (ANY(qc(idx_solid_first:idx_solid_last)<0.0_wp)) RETURN
                 IF (ANY(qc(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
@@ -1052,7 +1094,9 @@ CONTAINS
                 IF (.NOT.ALL(ieee_is_finite(r_xs)) .OR.                                                                &
                     .NOT.ALL(ieee_is_finite(r_xg))) RETURN
                 IF (SUM(r_xs)+SUM(r_xg)>1.0_wp+mass_fraction_roundoff_tolerance) RETURN
+
             END IF
+
         END IF
 
         qp = 0.0_wp
@@ -1069,15 +1113,19 @@ CONTAINS
 
         r_xs = 0.0_wp
         r_xg = 0.0_wp
+
         IF ( qc(idx_totMassEqn) .GT. EPSILON(1.0_wp) ) THEN
             r_xs = qc(idx_solid_first:idx_solid_last) / qc(idx_totMassEqn)
             r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(idx_totMassEqn)
+
             IF (PRESENT(accepted)) THEN
                 CALL enforce_mass_fraction_closure(r_xs, r_xg, context, closure_ok)
                 IF (.NOT.closure_ok) RETURN
             ELSE
                 CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
+
             END IF
+
         END IF
 
         qp(idx_solid_first:idx_solid_last) = r_xs
@@ -1093,7 +1141,9 @@ CONTAINS
         IF (PRESENT(accepted)) THEN
             IF (.NOT.ALL(ieee_is_finite(qp)) .OR. .NOT.ieee_is_finite(p_dyn)) RETURN
             accepted=.TRUE.
+
         END IF
+
         RETURN
 
     END SUBROUTINE qc_to_qp
@@ -1131,7 +1181,7 @@ CONTAINS
 
     SUBROUTINE qp_to_qc(qp,qc,context)
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         REAL(wp), INTENT(OUT) :: qc(n_vars)
@@ -1188,6 +1238,7 @@ CONTAINS
             CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
         ELSE
             CALL enforce_mass_fraction_closure(r_xs, r_xg)
+
         END IF
 
         CALL eval_mixture_properties_from_mass_fractions(                                                              &
@@ -1240,7 +1291,7 @@ CONTAINS
 
     SUBROUTINE qp_to_qp2(qpj,Bj,qp2j)
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: qpj(n_vars+2)
         REAL(wp), INTENT(IN) :: Bj

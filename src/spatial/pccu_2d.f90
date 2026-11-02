@@ -96,15 +96,18 @@ CONTAINS
             ( SIZE(value_left) .NE. SIZE(numerical_flux) ) .OR.                                                        &
             ( SIZE(value_right) .NE. SIZE(numerical_flux) ) ) THEN
             ERROR STOP 'eval_oriented_pccu_pair: inconsistent array sizes'
+
         END IF
 
         denominator = a_plus - a_minus
+
         IF ( denominator .GT. pccu_speed_tolerance ) THEN
             value_left = numerical_flux + a_minus/denominator * path_contribution
             value_right = numerical_flux + a_plus/denominator * path_contribution
         ELSE
             value_left = numerical_flux
             value_right = numerical_flux
+
         END IF
 
     END SUBROUTINE eval_oriented_pccu_pair
@@ -136,14 +139,17 @@ CONTAINS
             ( SIZE(state_right) .NE. SIZE(flux_left) ) .OR.                                                            &
             ( SIZE(numerical_flux) .NE. SIZE(flux_left) ) ) THEN
             ERROR STOP 'eval_central_upwind_flux: inconsistent array sizes'
+
         END IF
 
         denominator = a_plus - a_minus
+
         IF ( denominator .GT. pccu_speed_tolerance ) THEN
             numerical_flux = ( a_plus*flux_left - a_minus*flux_right                                                   &
                 + a_plus*a_minus*(state_right-state_left) ) / denominator
         ELSE
             numerical_flux = 0.5_wp * ( flux_left + flux_right )
+
         END IF
 
     END SUBROUTINE eval_central_upwind_flux
@@ -167,6 +173,7 @@ CONTAINS
 
         IF ( SIZE(path_state) .NE. 4 .OR. SIZE(dstate_ds) .NE. 4 ) THEN
             ERROR STOP 'hydrostatic_integrand: expected state (h,Gamma,eta,G)'
+
         END IF
 
         SELECT CASE ( direction )
@@ -176,10 +183,12 @@ CONTAINS
             normal_momentum = 3
         CASE DEFAULT
             ERROR STOP 'hydrostatic_integrand: invalid direction'
+
         END SELECT
 
         IF ( SIZE(integrand) .LT. normal_momentum ) THEN
             ERROR STOP 'hydrostatic_integrand: output has no normal momentum slot'
+
         END IF
 
         h = path_state(1)

@@ -40,15 +40,18 @@ CONTAINS
         IF (stochastic_seed < 0) THEN
             CALL random_seed
             RETURN
+
         END IF
 
         CALL random_seed(SIZE=seed_size)
         ALLOCATE(seed_state(seed_size))
 
         seed_modulus = INT(HUGE(0), int64)
+
         DO i = 1, seed_size
             seed_state(i) = INT(MODULO(INT(stochastic_seed, int64) +                                                   &
                 104729_int64 * INT(i, int64), seed_modulus))
+
         END DO
 
         CALL random_seed(PUT=seed_state)
