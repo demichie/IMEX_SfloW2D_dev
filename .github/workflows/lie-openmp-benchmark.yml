@@ -1,0 +1,77 @@
+name: Lie OpenMP performance benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      grid_cells_x:
+        description: "Grid cells in x (96 or 192); y scales with x"
+        required: true
+        type: choice
+        default: "192"
+        options: ["96", "192"]
+      horizon:
+        description: "Simulation end time in seconds"
+        required: true
+        type: choice
+        default: "0.5"
+        options: ["0.2", "0.5", "1.0"]
+      repetitions:
+        description: "Timed repetitions per thread count"
+        required: true
+        type: choice
+        default: "3"
+        options: ["3", "5"]
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and benchmark dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake gfortran make liblapack-dev libblas-dev libnetcdff-dev libnetcdf-dev python3-numpy python3-netcdf4
+      - name: Build optimized production executable
+        env:
+          FC: gfortran
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --with-netcdf=/usr
+          make -j2
+          test -x src/IMEX_SfloW2D
+      - name: Measure wall-clock OpenMP scaling
+        env:
+          OMP_DYNAMIC: "FALSE"
+          OMP_PROC_BIND: "CLOSE"
+          OMP_PLACES: "cores"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          BLIS_NUM_THREADS: "1"
+          PYTHON: /usr/bin/python3
+        run: |
+          /usr/bin/python3 TESTS/TEST_LIE_OPENMP_BENCHMARK/run_benchmark.py \
+            --repo "$GITHUB_WORKSPACE" \
+            --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
+            --evidence "$GITHUB_WORKSPACE/benchmark-results" \
+            --cells "${{ inputs.grid_cells_x }}" \
+            --horizon "${{ inputs.horizon }}" \
+            --repetitions "${{ inputs.repetitions }}"
+      - name: Publish benchmark summary
+        if: always()
+        run: |
+          if test -f benchmark-results/summary.md; then
+            cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Archive timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lie-openmp-benchmark-${{ github.run_id }}
+          path: benchmark-results/
+          retention-days: 30
+          if-no-files-found: warn

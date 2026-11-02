@@ -31,18 +31,18 @@ def replace_one(text, expression, replacement):
     return updated
 
 
-def prepare(repo, root, name):
+def prepare(repo, root, name, cells=32, horizon='2.0E-2'):
     source_name = "EXAMPLE_2D" if name in ("EXAMPLE_2D_NEWTON", "EXAMPLE_2D_TOPO") else name
     source = repo / "EXAMPLES" / source_name
     fixture = root / "fixtures" / name
     shutil.copytree(source, fixture, ignore=shutil.ignore_patterns("OUTPUT", "__pycache__"))
     solid_fraction = "0.15" if name == "EXAMPLE_2D_TOPO" else "0.5"
-    subprocess.run([sys.executable, "create_example.py", "32", solid_fraction, "300", "false"],
+    subprocess.run([sys.executable, "create_example.py", str(cells), solid_fraction, "300", "false"],
                    cwd=fixture, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                    text=True)
     input_path = fixture / "IMEX_SfloW2D.inp"
     text = input_path.read_text()
-    text = replace_one(text, r"^\s*T_END\s*=.*$", " T_END=2.0E-2,")
+    text = replace_one(text, r"^\s*T_END\s*=.*$", f" T_END={horizon},")
     text = replace_one(text, r"^\s*DT_OUTPUT\s*=.*$", " DT_OUTPUT=1.0E-2,")
     # N_RK belonged to the retired Runge-Kutta integrator. The production
     # solver now uses Lie splitting and does not accept N_RK in this namelist.
