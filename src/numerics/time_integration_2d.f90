@@ -79,7 +79,33 @@ CONTAINS
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
         TYPE(substrate_snapshot_type) :: substrate_before
+        LOGICAL, ALLOCATABLE :: seen_cells(:,:)
         IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
+        ! Validate disjoint write ownership before entering any OpenMP cell loop.
+        ! Domain refresh builds both lists from masks, but these checks also catch
+        ! accidental corruption or future alternative domain constructors.
+        ALLOCATE(seen_cells(comp_cells_x,comp_cells_y))
+        seen_cells=.FALSE.
+        DO l=1,domain%reconstruction_cells
+            j=domain%j_reconstruction(l)
+            k=domain%k_reconstruction(l)
+            IF (j<1 .OR. j>comp_cells_x .OR. k<1 .OR. k>comp_cells_y) &
+                CALL fatal_error('Lie OpenMP: reconstruction cell outside domain')
+            IF (seen_cells(j,k)) &
+                CALL fatal_error('Lie OpenMP: duplicate reconstruction cell')
+            seen_cells(j,k)=.TRUE.
+        END DO
+        seen_cells=.FALSE.
+        DO l=1,domain%solve_cells
+            j=domain%j_cent(l)
+            k=domain%k_cent(l)
+            IF (j<1 .OR. j>comp_cells_x .OR. k<1 .OR. k>comp_cells_y) &
+                CALL fatal_error('Lie OpenMP: solve cell outside domain')
+            IF (seen_cells(j,k)) CALL fatal_error('Lie OpenMP: duplicate solve cell')
+            seen_cells(j,k)=.TRUE.
+        END DO
+        DEALLOCATE(seen_cells)
+
         ! Snapshot before evaluating any operator, including the primitive halo.
         this%q_before=state%q
         this%qp_before=state%qp
