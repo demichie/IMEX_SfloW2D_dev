@@ -217,7 +217,10 @@ CONTAINS
                     q_candidate=q(:,j,k)
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
-                        cell_failure(cell)='D19: inadmissible conservative mass candidate'
+                        WRITE(cell_failure(cell),'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
+                            'D19: inadmissible source candidate group=',groups(group_index)%id, &
+                            ' cell=',j,',',k,' mass=',q_candidate(idx_totMassEqn), &
+                            ' components=',SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
                         CYCLE cell_loop
                     END IF
                     IF (with_exchange) THEN
