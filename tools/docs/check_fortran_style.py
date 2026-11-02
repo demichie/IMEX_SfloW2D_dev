@@ -66,12 +66,60 @@ def structural_warnings(path):
             stack.append((opener, prefix, line_no))
     return warnings
 
+
+def module_scope_warnings(path):
+    """Conservative checks for structural indentation at Fortran module scope."""
+    import re
+    warnings = []
+    inside_module = False
+    in_contains = False
+    interface_depth = 0
+    type_depth = 0
+    for line_no, line in enumerate(path.read_text().splitlines(), 1):
+        s = line.strip()
+        upper = s.upper()
+        if not s or s.startswith(("!", "#")):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if re.match(r"^MODULE\s+(?!PROCEDURE\b|SUBROUTINE\b|FUNCTION\b)\w+", upper):
+            inside_module = True
+            in_contains = False
+            continue
+        if re.match(r"^END\s*MODULE\b", upper):
+            inside_module = False
+            continue
+        if not inside_module:
+            continue
+        if re.match(r"^END\s*INTERFACE\b", upper):
+            interface_depth = max(0, interface_depth - 1)
+        elif re.match(r"^INTERFACE\b", upper):
+            interface_depth += 1
+        if re.match(r"^END\s*TYPE\b", upper):
+            type_depth = max(0, type_depth - 1)
+        elif re.match(r"^TYPE\b.*::", upper):
+            type_depth += 1
+        if s == "CONTAINS" and interface_depth == 0 and type_depth == 0:
+            in_contains = True
+            continue
+        if interface_depth or type_depth:
+            continue
+        if not in_contains and re.match(r"^(USE\b|IMPLICIT\s+NONE\b|PRIVATE\b|PUBLIC\b)", upper):
+            if indent != 4:
+                warnings.append(f"{path}:{line_no}: module-scope statement indent {indent}, expected 4")
+        if in_contains and re.match(
+                r"^(?:(?:PURE|ELEMENTAL|RECURSIVE|IMPURE)\s+)*(?:SUBROUTINE|FUNCTION)\b|^END\s*(?:SUBROUTINE|FUNCTION)\b",
+                upper):
+            if indent != 4:
+                warnings.append(f"{path}:{line_no}: module procedure boundary indent {indent}, expected 4")
+    return warnings
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", help="Fortran files/directories")
     parser.add_argument("--line-width-report", action="store_true",
                         help="report Fortran and Doxygen line-width exceptions")
-    parser.add_argument("--structural-report", action="store_true",
+    parser.add_argument("--module-scope-report", action="store_true",
+                        help="report exact module-level USE and procedure-boundary indentation")\n    parser.add_argument("--structural-report", action="store_true",
                         help="print conservative block-nesting warnings (non-failing)")
     args = parser.parse_args()
     errors = []
@@ -82,6 +130,8 @@ def main():
         if path in seen:
             continue
         seen.add(path)
+        if args.module_scope_report:
+            nesting_warnings.extend(module_scope_warnings(path))
         if args.structural_report:
             nesting_warnings.extend(structural_warnings(path))
         for line_no, line in enumerate(path.read_text().splitlines(), 1):
@@ -103,7 +153,7 @@ def main():
             prefix = len(line) - len(line.lstrip(" "))
             if not line.lstrip().startswith("#") and prefix % 4:
                 errors.append(f"{path}:{line_no}: indentation is not a multiple of 4")
-    if args.structural_report:
+    if args.structural_report or args.module_scope_report:
         print(*nesting_warnings, sep=chr(10)) if nesting_warnings else print('No conservative nesting warnings')
         print(f'Structural warnings: {len(nesting_warnings)}')
     if args.line_width_report:
