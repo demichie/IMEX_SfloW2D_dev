@@ -651,7 +651,7 @@ CONTAINS
     USE state_conversion_2d, ONLY : qp_to_qc
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
-    USE pccu_2d, ONLY : pccu_speed_tolerance
+    USE pccu_2d, ONLY : eval_pccu_advective_flux
     USE nonconservative_2d, ONLY : PATH_DIR_X
 
     IMPLICIT NONE
@@ -675,7 +675,7 @@ CONTAINS
         REAL(wp) :: gamma_left, gamma_right
         REAL(wp) :: reduced_gravity_left, reduced_gravity_right
         REAL(wp) :: eta_scale, eta_roundoff
-        REAL(wp) :: denominator,u_normal_left,u_normal_right
+        REAL(wp) :: u_normal_left,u_normal_right
         REAL(wp) :: eta_path_left, eta_path_right
         REAL(wp) :: h_eta_left,h_eta_right
         LOGICAL :: source_trace_left,source_trace_right
@@ -728,8 +728,6 @@ CONTAINS
         ! times endpoint states. This is algebraically identical to the usual
         ! flux formula, but avoids subtracting nearly equal convective and
         ! dissipative terms for a passively transported quantity.
-        denominator=a_plus-a_minus
-
         IF ( direction .EQ. PATH_DIR_X ) THEN
             u_normal_left=qp_adv_left_use(idx_u)
             u_normal_right=qp_adv_right_use(idx_u)
@@ -744,20 +742,8 @@ CONTAINS
         IF ( qp_adv_left_use(1) .LE. EPSILON(1.0_wp) ) u_normal_left=0.0_wp
         IF ( qp_adv_right_use(1) .LE. EPSILON(1.0_wp) ) u_normal_right=0.0_wp
 
-        IF (a_minus==0.0_wp .AND. a_plus>0.0_wp) THEN
-            ! Exactly one-sided speeds: upwind even below the absolute speed
-            ! tolerance. Central averaging here can drain a vanishing tracer
-            ! from the wrong donor cell and violate component positivity.
-            interface_flux=flux_left
-        ELSEIF (a_plus==0.0_wp .AND. a_minus<0.0_wp) THEN
-            interface_flux=flux_right
-        ELSEIF (denominator>pccu_speed_tolerance) THEN
-            interface_flux=(a_plus*(u_normal_left-a_minus)*q_adv_left_use                                              &
-                -a_minus*(u_normal_right-a_plus)*q_adv_right_use)/denominator
-        ELSE
-            interface_flux=0.5_wp*(flux_left+flux_right)
-
-        END IF
+        CALL eval_pccu_advective_flux(a_minus,a_plus,u_normal_left,u_normal_right,                                      &
+            q_adv_left_use,q_adv_right_use,flux_left,flux_right,interface_flux)
 
         CALL limit_component_mass_flux(interface_flux)
 

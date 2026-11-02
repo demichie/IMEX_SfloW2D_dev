@@ -24,6 +24,7 @@ MODULE pccu_2d
 
     PUBLIC :: eval_hydrostatic_path
     PUBLIC :: eval_central_upwind_flux
+    PUBLIC :: eval_pccu_advective_flux
     PUBLIC :: eval_oriented_pccu_pair
 
 CONTAINS
@@ -154,6 +155,31 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_central_upwind_flux
+
+    !> @brief Compute factored PCCU transport, preserving one-sided upwind limits.
+    !> @details This is the transport expression used by the production HP-PCCU
+    !>          interface before component and dry-donor flux guards.
+    SUBROUTINE eval_pccu_advective_flux(a_minus,a_plus,u_left,u_right, &
+            q_left,q_right,flux_left,flux_right,flux)
+        REAL(wp), INTENT(IN) :: a_minus,a_plus,u_left,u_right
+        REAL(wp), INTENT(IN) :: q_left(:),q_right(:),flux_left(:),flux_right(:)
+        REAL(wp), INTENT(OUT) :: flux(:)
+        REAL(wp) :: denominator
+        IF (SIZE(flux)/=SIZE(q_left) .OR. SIZE(q_right)/=SIZE(q_left) .OR. &
+            SIZE(flux_left)/=SIZE(q_left) .OR. SIZE(flux_right)/=SIZE(q_left)) &
+            ERROR STOP 'eval_pccu_advective_flux: inconsistent array sizes'
+        denominator=a_plus-a_minus
+        IF (a_minus==0.0_wp .AND. a_plus>0.0_wp) THEN
+            flux=flux_left
+        ELSEIF (a_plus==0.0_wp .AND. a_minus<0.0_wp) THEN
+            flux=flux_right
+        ELSEIF (denominator>pccu_speed_tolerance) THEN
+            flux=(a_plus*(u_left-a_minus)*q_left &
+                -a_minus*(u_right-a_plus)*q_right)/denominator
+        ELSE
+            flux=0.5_wp*(flux_left+flux_right)
+        END IF
+    END SUBROUTINE eval_pccu_advective_flux
 
     !> @brief Evaluate the hydrostatic momentum one-form at a quadrature state.
     !>

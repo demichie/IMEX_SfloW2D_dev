@@ -3,7 +3,7 @@ PROGRAM test_pccu
   USE parameters_2d, ONLY : wp
   USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
   USE pccu_2d, ONLY : eval_hydrostatic_path
-  USE pccu_2d, ONLY : eval_central_upwind_flux
+  USE pccu_2d, ONLY : eval_central_upwind_flux,eval_pccu_advective_flux
   USE pccu_2d, ONLY : eval_oriented_pccu_pair
 
   IMPLICIT NONE
@@ -12,6 +12,7 @@ PROGRAM test_pccu
   CALL check_slope_corrected_path
   CALL check_oriented_identity
   CALL check_degenerate_pair
+  CALL check_tiny_upwind_flux
 
   WRITE(*,*) 'PASS: slope-corrected HP-PCCU algebra verified'
 
@@ -147,6 +148,27 @@ CONTAINS
     CALL assert_small('degenerate pair equality',MAXVAL(ABS(valueR-valueL)),0.0_wp)
 
   END SUBROUTINE check_degenerate_pair
+
+  SUBROUTINE check_tiny_upwind_flux
+    REAL(wp) :: qL(2),qR(2),fL(2),fR(2),flux(2),a,dt,dx,mass_after
+    a=2.456726419282492E-21_wp
+    qL=[3.393823216070676E-7_wp,1.227273366324432E-91_wp]
+    qR=[3.393823216070676E-7_wp,2.933807629527778E-53_wp*qL(1)]
+    fL=a*qL
+    fR=a*qR
+    CALL eval_pccu_advective_flux(0.0_wp,a,a,a,qL,qR,fL,fR,flux)
+    CALL assert_small('tiny positive-speed upwind flux',MAXVAL(ABS(flux-fL)),0.0_wp)
+    dt=6.188134955666986E-4_wp
+    dx=0.15625_wp
+    mass_after=qL(2)-dt*flux(2)/dx
+    IF (mass_after<0.0_wp) ERROR STOP 'tiny positive-speed transport lost positivity'
+    CALL eval_pccu_advective_flux(-a,0.0_wp,-a,-a,qL,qR,-fL,-fR,flux)
+    CALL assert_small('tiny negative-speed upwind flux',MAXVAL(ABS(flux+fR)),0.0_wp)
+    CALL eval_pccu_advective_flux(0.0_wp,0.0_wp,0.0_wp,0.0_wp,qL,qR, &
+        0.0_wp*fL,0.0_wp*fR,flux)
+    CALL assert_small('zero speed zero flux',MAXVAL(ABS(flux)),0.0_wp)
+    WRITE(*,*) 'PASS: tiny one-sided PCCU flux preserves donor and tracer positivity'
+  END SUBROUTINE check_tiny_upwind_flux
 
   SUBROUTINE assert_small(label,value,limit_value)
 
