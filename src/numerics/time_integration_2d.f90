@@ -31,6 +31,8 @@ MODULE time_integration_2d
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
+        REAL(wp) :: profile_state_snapshot=0.0_wp,profile_substrate_snapshot=0.0_wp
+        REAL(wp) :: profile_source_executor=0.0_wp,profile_publish=0.0_wp
     CONTAINS
         PROCEDURE :: initialize => initialize_time_integration
         PROCEDURE :: finalize => finalize_time_integration
@@ -109,10 +111,15 @@ CONTAINS
 
         END IF
 
+        IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
         this%q_before=state%q
         this%qp_before=state%qp
         this%q_trial=state%q
         this%qp_trial=state%qp
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_state_snapshot=this%profile_state_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
         ! Each cell writes a distinct primitive slice; collect failures by cell.
         ALLOCATE(reconstruction_status(domain%reconstruction_cells))
         reconstruction_status=0
@@ -204,13 +211,22 @@ CONTAINS
         END IF
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
         ! Later groups evaluate from each predecessor's updated state.
-        ! The groups may update live geometry for successor groups; retain the
-        ! pre-step authoritative fields until the complete Lie sweep succeeds.
+        ! Geometry stays frozen for all source groups; retain authoritative
+        ! fields until the full trial succeeds.
         ! Stage substrate and bed changes before running ordered groups.
         CALL state%snapshot_substrate(substrate_before)
         CALL begin_geometry_transaction
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_substrate_snapshot=this%profile_substrate_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+            tick=tock
+        END IF
         CALL execute_lie_source_groups(state, this%q_trial, this%qp_trial, dt, domain, source_registry,                &
             stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure)
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
 
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
@@ -255,10 +271,15 @@ CONTAINS
         END IF
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
+        IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
         state%q=this%q_trial
         state%qp=this%qp_trial
         CALL state%refresh_substrate_totals()
         CALL commit_geometry_transaction
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_publish=this%profile_publish+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
     END SUBROUTINE advance_lie
 
     !> @brief Release previously allocated integration workspaces.
@@ -270,6 +291,10 @@ CONTAINS
             WRITE(*,'(A,I0)') 'LIE_PROFILE steps=',this%profile_calls
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE spatial_update_seconds=',this%profile_spatial
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_groups_seconds=',this%profile_sources
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE state_snapshot_seconds=',this%profile_state_snapshot
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE substrate_geometry_snapshot_seconds=',this%profile_substrate_snapshot
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_executor_seconds=',this%profile_source_executor
+            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE publish_seconds=',this%profile_publish
         END IF
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
