@@ -357,7 +357,7 @@ CONTAINS
         !> \param[in] u x velocity [m s^-1].
         !> \param[in] v y velocity [m s^-1].
         !> \return Computed acceleration for the requested model and inputs.
-        PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,                                       &
+    PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,                                       &
                 u, v) RESULT(acceleration)
 
             REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
@@ -367,7 +367,7 @@ CONTAINS
             acceleration = Bsecond_xx*u**2 +                                                                           &
                         2.0_wp*Bsecond_xy*u*v + Bsecond_yy*v**2
 
-        END FUNCTION curvature_acceleration
+    END FUNCTION curvature_acceleration
 
 
         ! Additive rates from all active rheology processes at the same stage state.

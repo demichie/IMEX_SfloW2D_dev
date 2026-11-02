@@ -38,7 +38,7 @@ CONTAINS
         !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
-        SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,selected_names,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,selected_names,total_rates,eqns_term)
 
             TYPE(physical_state_type), INTENT(IN) :: physical_state
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
@@ -146,7 +146,7 @@ CONTAINS
 
             END IF
 
-        END SUBROUTINE eval_mass_exchange_explicit
+    END SUBROUTINE eval_mass_exchange_explicit
 
 
         !> This family currently supports only explicit coordination.
@@ -156,14 +156,14 @@ CONTAINS
         !> @param[in] state Local real physical state.
         !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
         !> @param[out] eqns_term Zero-initialized conservative rate before reporting error.
-        SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
             TYPE(physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             CALL reset_mass_exchange_rates(total_rates)
             eqns_term=0.0_wp
             CALL fatal_error('mass_exchange: semi-implicit coordination is unsupported')
-        END SUBROUTINE eval_mass_exchange_semi_implicit
+    END SUBROUTINE eval_mass_exchange_semi_implicit
 
         !> @brief Reject unsupported Newton mass-exchange scheduling.
         !> @details The coordinator preserves the four-treatment contract;
@@ -171,14 +171,14 @@ CONTAINS
         !> @param[in] state Local complex physical state.
         !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
         !> @param[out] eqns_term Zero-initialized complex conservative rate before reporting error.
-        SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
             TYPE(complex_physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             COMPLEX(wp), INTENT(OUT) :: eqns_term(n_eqns)
             CALL reset_mass_exchange_rates(total_rates)
             eqns_term=CMPLX(0.0_wp,0.0_wp,wp)
             CALL fatal_error('mass_exchange: implicit coordination is unsupported')
-        END SUBROUTINE eval_mass_exchange_implicit
+    END SUBROUTINE eval_mass_exchange_implicit
 
         !> @brief Reject unsupported analytic mass-exchange scheduling.
         !> @details The coordinator preserves the four-treatment contract;
@@ -186,14 +186,14 @@ CONTAINS
         !> @param[in] state Local real physical state.
         !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
         !> @param[out] eqns_term Zero-initialized conservative rate before reporting error.
-        SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
+    SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
             TYPE(physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             CALL reset_mass_exchange_rates(total_rates)
             eqns_term=0.0_wp
             CALL fatal_error('mass_exchange: analytic coordination is unsupported')
-        END SUBROUTINE solve_mass_exchange_analytic
+    END SUBROUTINE solve_mass_exchange_analytic
 
 
         !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source
@@ -226,7 +226,7 @@ CONTAINS
             f=1.0_wp
             IF (total_withdrawal>0.0_wp)                                                                               &
                         f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
-        END FUNCTION shared_withdrawal_factor
+    END FUNCTION shared_withdrawal_factor
 
         !> @brief Bound solid-rich substrate erosion by the final packing limit.
         !> @details The eroded carrier and solid volumes are scaled together.
@@ -247,7 +247,7 @@ CONTAINS
             deficit=(1.0_wp-packing)*solid_erosion-packing*carrier_erosion
             margin=MAX(0.0_wp,h*(packing-alpha))
             IF (deficit>0.0_wp) f=MIN(1.0_wp,margin/(dt*deficit))
-        END FUNCTION erosion_packing_factor
+    END FUNCTION erosion_packing_factor
 
         !> @brief Limit a coupled deposition/carrier withdrawal by final solid packing.
         !> @details Erosion is already committed. Deposition removes both mobile
@@ -286,7 +286,7 @@ CONTAINS
 
             END IF
 
-        END FUNCTION packing_withdrawal_factor
+    END FUNCTION packing_withdrawal_factor
 
         !> @brief Add one process contribution to conserved equations and diagnostic rate totals.
         !> @details Sink momentum is advected with the local horizontal velocity.
@@ -295,7 +295,7 @@ CONTAINS
         !> @param[in] v Horizontal y velocity of the mobile material [m/s].
         !> @param[in,out] total Accumulated mass-exchange rates for the cell.
         !> @param[in,out] eqns_term Conservative mass, momentum, energy and species source vector.
-        SUBROUTINE accumulate_process(p,state,total,eqns_term)
+    SUBROUTINE accumulate_process(p,state,total,eqns_term)
 
             TYPE(mass_exchange_rates_type), INTENT(IN) :: p
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total
@@ -324,12 +324,12 @@ CONTAINS
             total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
             total%carrier_withdrawal_volume_rate=                                                                      &
                         total%carrier_withdrawal_volume_rate+p%carrier_withdrawal_volume_rate
-        END SUBROUTINE accumulate_process
+    END SUBROUTINE accumulate_process
 
         !> @brief Apply a common resource-limiting factor to every contribution from one process.
         !> @param[in,out] p Rates produced by one mass-exchange process.
         !> @param[in] factor Common dimensionless reduction factor between zero and one.
-        SUBROUTINE scale_process(p,factor)
+    SUBROUTINE scale_process(p,factor)
 
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: p
             REAL(wp), INTENT(IN) :: factor
@@ -345,6 +345,6 @@ CONTAINS
             p%dB_dt=p%dB_dt*factor
             p%lava_deposit_rate=p%lava_deposit_rate*factor
             p%carrier_withdrawal_volume_rate=p%carrier_withdrawal_volume_rate*factor
-        END SUBROUTINE scale_process
+    END SUBROUTINE scale_process
 
 END MODULE mass_exchange_2d

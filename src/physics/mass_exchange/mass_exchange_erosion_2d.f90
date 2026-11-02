@@ -26,7 +26,7 @@ CONTAINS
         !> @param[in] erodible Available erodible solid inventory by species [m].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_erosion_explicit(state,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_explicit(state,erodible,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -50,7 +50,7 @@ CONTAINS
             r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+                                     &
                         rho_c_sub*cp_sub*r%carrier_erosion_rate)
             r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
-        END SUBROUTINE eval_mass_exchange_erosion_explicit
+    END SUBROUTINE eval_mass_exchange_erosion_explicit
 
         !> @brief Reject unsupported semi-implicit treatment for erosion.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -58,7 +58,7 @@ CONTAINS
         !> @param[in] erodible Available erodible solid inventory by species [m].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_erosion_semi_implicit(state,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_semi_implicit(state,erodible,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -66,7 +66,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('erosion: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_erosion_semi_implicit
+    END SUBROUTINE eval_mass_exchange_erosion_semi_implicit
 
         !> @brief Reject unsupported implicit treatment for erosion from erodible substrate.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -74,7 +74,7 @@ CONTAINS
         !> @param[in] erodible Available erodible solid inventory by species [m].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_erosion_implicit(state,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_implicit(state,erodible,dt,r)
 
             TYPE(complex_physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -82,7 +82,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('erosion: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_erosion_implicit
+    END SUBROUTINE eval_mass_exchange_erosion_implicit
 
         !> @brief Reject unsupported analytic treatment for erosion from erodible substrate.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -90,7 +90,7 @@ CONTAINS
         !> @param[in] erodible Available erodible solid inventory by species [m].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE solve_mass_exchange_erosion_analytic(state,erodible,dt,r)
+    SUBROUTINE solve_mass_exchange_erosion_analytic(state,erodible,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -98,7 +98,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('erosion: unsupported physical treatment')
-        END SUBROUTINE solve_mass_exchange_erosion_analytic
+    END SUBROUTINE solve_mass_exchange_erosion_analytic
 
         !> @brief Compute erosion volumes under the finite erodible-bed inventory constraint.
         !> @param[in] r_h Mobile flow thickness [m].
@@ -108,7 +108,7 @@ CONTAINS
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
         !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
-        SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, erosion_rate,                    &
+    SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, erosion_rate,                    &
             carrier_erosion_rate)
 
             REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
@@ -126,7 +126,7 @@ CONTAINS
 
             END IF
 
-        END SUBROUTINE eval_erosion_volume_kernel
+    END SUBROUTINE eval_erosion_volume_kernel
 
         !> @brief Apply the empirical erosion flux and cap solid removal by available bed material.
         !> @param[in] flow_depth Mobile flow thickness [m].
@@ -139,7 +139,7 @@ CONTAINS
         !> @param[in] time_step Physical time-step duration [s].
         !> @param[out] solid_erosion_rate Capped solid erosion volume fluxes by species [m/s].
         !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
-        PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction,                                    &
+    PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction,                                    &
                     erosion_coefficient, erodible_porosity, erodible_fraction,                                         &
                     erodible_inventory, time_step, solid_erosion_rate,                                                 &
                     carrier_erosion_rate)
@@ -172,6 +172,6 @@ CONTAINS
             total_erosion = total_solid_erosion / (1.0_wp - erodible_porosity)
             carrier_erosion_rate = total_erosion * erodible_porosity
 
-        END SUBROUTINE eval_erosion_rates
+    END SUBROUTINE eval_erosion_rates
 
 END MODULE mass_exchange_erosion_2d

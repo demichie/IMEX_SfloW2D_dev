@@ -30,7 +30,7 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_vaporization_explicit(state,B_zone,deposition,r)
+    SUBROUTINE eval_mass_exchange_vaporization_explicit(state,B_zone,deposition,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             INTEGER, INTENT(IN) :: B_zone
@@ -46,7 +46,7 @@ CONTAINS
                         deposition,gamma_steam)
             r%add_gas_mass_rate(1)=r%mixture_mass_rate
             r%energy_rate=eval_vaporization_energy_rate(r%mixture_mass_rate,sp_heat_g(1))
-        END SUBROUTINE
+    END SUBROUTINE
 
         !> @brief Reject unsupported semi-implicit treatment for vaporization.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -54,7 +54,7 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_vaporization_semi_implicit(state,B_zone,deposition,r)
+    SUBROUTINE eval_mass_exchange_vaporization_semi_implicit(state,B_zone,deposition,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             INTEGER, INTENT(IN) :: B_zone
@@ -63,15 +63,16 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('vaporization: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_vaporization_semi_implicit
+    END SUBROUTINE eval_mass_exchange_vaporization_semi_implicit
 
-        !> @brief Reject unsupported implicit treatment for steam generation from deposited hot solids.
+        !> @brief Reject unsupported implicit treatment for steam generation from deposited hot
+        !> solids.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_vaporization_implicit(state,B_zone,deposition,r)
+    SUBROUTINE eval_mass_exchange_vaporization_implicit(state,B_zone,deposition,r)
 
             TYPE(complex_physical_state_type), INTENT(IN) :: state
             INTEGER, INTENT(IN) :: B_zone
@@ -80,15 +81,16 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('vaporization: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_vaporization_implicit
+    END SUBROUTINE eval_mass_exchange_vaporization_implicit
 
-        !> @brief Reject unsupported analytic treatment for steam generation from deposited hot solids.
+        !> @brief Reject unsupported analytic treatment for steam generation from deposited hot
+        !> solids.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE solve_mass_exchange_vaporization_analytic(state,B_zone,deposition,r)
+    SUBROUTINE solve_mass_exchange_vaporization_analytic(state,B_zone,deposition,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             INTEGER, INTENT(IN) :: B_zone
@@ -97,7 +99,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('vaporization: unsupported physical treatment')
-        END SUBROUTINE solve_mass_exchange_vaporization_analytic
+    END SUBROUTINE solve_mass_exchange_vaporization_analytic
 
 PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,                                             &
             solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)

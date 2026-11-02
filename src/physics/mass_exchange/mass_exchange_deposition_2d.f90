@@ -33,7 +33,7 @@ CONTAINS
         !> @param[in] state Local real physical state.
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_deposition_explicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_explicit(state,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -65,14 +65,14 @@ CONTAINS
                         r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                                         &
                         state%xg/gas_phase_mass_fraction
             r%dB_dt=SUM(r%solid_deposition_rate)+r%carrier_deposition_rate
-        END SUBROUTINE eval_mass_exchange_deposition_explicit
+    END SUBROUTINE eval_mass_exchange_deposition_explicit
 
         !> @brief Reject unsupported semi-implicit treatment for deposition.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] state Local real physical state.
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_deposition_semi_implicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_semi_implicit(state,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -80,14 +80,14 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('deposition: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
+    END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
 
         !> @brief Reject unsupported implicit treatment for sediment settling and deposition.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] state Local real physical state.
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_deposition_implicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_implicit(state,dt,r)
 
             TYPE(complex_physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -95,14 +95,14 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('deposition: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_deposition_implicit
+    END SUBROUTINE eval_mass_exchange_deposition_implicit
 
         !> @brief Reject unsupported analytic treatment for sediment settling and deposition.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] state Local real physical state.
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE solve_mass_exchange_deposition_analytic(state,dt,r)
+    SUBROUTINE solve_mass_exchange_deposition_analytic(state,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -110,7 +110,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('deposition: unsupported physical treatment')
-        END SUBROUTINE solve_mass_exchange_deposition_analytic
+    END SUBROUTINE solve_mass_exchange_deposition_analytic
 
         !> @brief Compute per-species settling and choose carrier-fluid properties.
         !> @param[in] r_h Mobile flow thickness [m].
@@ -121,7 +121,7 @@ CONTAINS
         !> @param[in] r_rho_c Carrier density [kg/m3].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] deposition_rate Solid deposition thickness flux for each species [m/s].
-        SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_rate)
+    SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_rate)
 
             REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
             REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
@@ -169,7 +169,7 @@ CONTAINS
 
             END DO
 
-        END SUBROUTINE eval_deposition_volume_kernel
+    END SUBROUTINE eval_deposition_volume_kernel
 
         !> @brief Iteratively evaluate terminal settling speed using the configured drag closure.
         !> @param[in] diam Solid particle diameter [m].
@@ -237,7 +237,7 @@ CONTAINS
 
             RETURN
 
-        END FUNCTION settling_velocity
+    END FUNCTION settling_velocity
 
         !> @brief Select carrier density and inverse kinematic viscosity for settling.
         !> @param[in] model_name Canonical rheology closure identifier.
@@ -249,7 +249,7 @@ CONTAINS
         !> @param[out] carrier_density Carrier density selected for the settling calculation
         !> [kg/m3].
         !> @param[out] inverse_kinematic_viscosity Inverse selected kinematic viscosity [s/m2].
-        SUBROUTINE eval_settling_fluid_properties(model_name, temperature, total_solid_fraction, mixture_density,      &
+    SUBROUTINE eval_settling_fluid_properties(model_name, temperature, total_solid_fraction, mixture_density,      &
             carrier_density_fallback, kinematic_viscosity_fallback, carrier_density, inverse_kinematic_viscosity)
 
             CHARACTER(*), INTENT(IN) :: model_name
@@ -273,7 +273,7 @@ CONTAINS
 
             END IF
 
-        END SUBROUTINE eval_settling_fluid_properties
+    END SUBROUTINE eval_settling_fluid_properties
 
         !> @brief Dispatch the selected solid settling/deposition closure.
         !> @param[in] model_name Canonical rheology closure identifier.
@@ -286,7 +286,7 @@ CONTAINS
         !> @param[in] hindered_settling_exponent Exponent controlling settling suppression at high
         !> concentration.
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_solid_deposition_rate(model_name, solid_fraction,                                           &
+    PURE FUNCTION eval_solid_deposition_rate(model_name, solid_fraction,                                           &
                     settling_velocity, flow_depth, time_step, total_solid_fraction,                                    &
                     maximum_solid_fraction, hindered_settling_exponent) RESULT(rate)
 
@@ -308,7 +308,7 @@ CONTAINS
 
             END IF
 
-        END FUNCTION eval_solid_deposition_rate
+    END FUNCTION eval_solid_deposition_rate
 
         !> @brief Limit lahar settling flux by the mobile solid inventory per time step.
         !> @param[in] solid_fraction Volume fraction of the settling solid species.
@@ -316,7 +316,7 @@ CONTAINS
         !> @param[in] flow_depth Mobile flow thickness [m].
         !> @param[in] time_step Physical time-step duration [s].
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_lahar_deposition_rate(solid_fraction, settling_velocity,                                    &
+    PURE FUNCTION eval_lahar_deposition_rate(solid_fraction, settling_velocity,                                    &
                     flow_depth, time_step) RESULT(deposition_rate)
 
             REAL(wp), INTENT(IN) :: solid_fraction, settling_velocity
@@ -326,7 +326,7 @@ CONTAINS
             deposition_rate = MIN(solid_fraction * settling_velocity,                                                  &
                         flow_depth * solid_fraction / time_step)
 
-        END FUNCTION eval_lahar_deposition_rate
+    END FUNCTION eval_lahar_deposition_rate
 
         !> @brief Apply concentration-dependent settling hindrance and inventory limiting.
         !> @param[in] solid_fraction Volume fraction of the settling solid species.
@@ -338,7 +338,7 @@ CONTAINS
         !> @param[in] hindered_settling_exponent Exponent controlling settling suppression at high
         !> concentration.
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_hindered_settling_deposition_rate(solid_fraction,                                           &
+    PURE FUNCTION eval_hindered_settling_deposition_rate(solid_fraction,                                           &
                     settling_velocity, flow_depth, time_step, total_solid_fraction,                                    &
                     maximum_solid_fraction, hindered_settling_exponent) RESULT(rate)
 
@@ -352,6 +352,6 @@ CONTAINS
                         maximum_solid_fraction))**hindered_settling_exponent
             rate = MIN(rate, flow_depth * solid_fraction / time_step)
 
-        END FUNCTION eval_hindered_settling_deposition_rate
+    END FUNCTION eval_hindered_settling_deposition_rate
 
 END MODULE mass_exchange_deposition_2d

@@ -29,14 +29,16 @@ MODULE rheology_quadratic_2d
 CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the explicit quadratic contribution to the horizontal momentum source.
-        !> \details Compute the momentum source under the quadratic velocity-dependent resistance law,
-        !> using the treatment-specific velocity and effective-stress inputs. Outputs are conservative
+        !> \details Compute the momentum source under the quadratic velocity-dependent resistance
+        !> law,
+        !> using the treatment-specific velocity and effective-stress inputs. Outputs are
+        !> conservative
         !> x/y momentum source rates.
         !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
         !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
         !> \param[in] moving True for a moving local state.
         !> \param[out] rate Two-component conservative momentum source.
-        SUBROUTINE eval_rheology_quadratic_explicit(state, rate)
+    SUBROUTINE eval_rheology_quadratic_explicit(state, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
 
 
@@ -50,22 +52,24 @@ CONTAINS
                     ix,                                                                                                &
                     iy)
             rate=[sx,sy]+REAL([ix,iy],wp)
-        END SUBROUTINE eval_rheology_quadratic_explicit
+    END SUBROUTINE eval_rheology_quadratic_explicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
-        !> \brief Evaluate the semi-implicit quadratic contribution to the horizontal momentum source.
-        !> \details Return the contribution assigned to the semi-implicit treatment. This implementation
+        !> \brief Evaluate the semi-implicit quadratic contribution to the horizontal momentum
+        !> source.
+        !> \details Return the contribution assigned to the semi-implicit treatment. This
+        !> implementation
         !> supplies a zero source when the model has no term in this treatment.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
-        SUBROUTINE eval_rheology_quadratic_semi_implicit(state, rate_x, rate_y)
+    SUBROUTINE eval_rheology_quadratic_semi_implicit(state, rate_x, rate_y)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
             rate_x = 0.0_wp
             rate_y = 0.0_wp
-        END SUBROUTINE eval_rheology_quadratic_semi_implicit
+    END SUBROUTINE eval_rheology_quadratic_semi_implicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
         !> \brief Evaluate the implicit quadratic contribution to the horizontal momentum source.
@@ -76,7 +80,7 @@ CONTAINS
         !> \param[in] moving True for a moving local state.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
-        SUBROUTINE eval_rheology_quadratic_implicit(state, rate_x, rate_y)
+    SUBROUTINE eval_rheology_quadratic_implicit(state, rate_x, rate_y)
 
             TYPE(complex_physical_state_type), INTENT(IN) :: state
 
@@ -90,17 +94,18 @@ CONTAINS
                         * friction_factor * state%mod_vel2
             rate_y = -state%rho_m * (state%v / state%mod_vel_hor)                                                      &
                         * friction_factor * state%mod_vel2
-        END SUBROUTINE eval_rheology_quadratic_implicit
+    END SUBROUTINE eval_rheology_quadratic_implicit
 
         !> \param[in] state Shared real state at the start of the analytic source step.
         !> \brief Integrate the quadratic velocity source in time.
-        !> \details Advance the scalar speed under the quadratic velocity-dependent resistance law with
+        !> \details Advance the scalar speed under the quadratic velocity-dependent resistance law
+        !> with
         !> model coefficients fixed over dt; the horizontal direction is retained in the returned
         !> velocity vector.
         !> \param[in] dt Source integration interval [s].
         !> \param[in] speed_ratio Ratio of total to horizontal speed.
         !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-        SUBROUTINE eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -118,7 +123,7 @@ CONTAINS
             CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC, [quadratic_drag],                                     &
                         dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before
-        END SUBROUTINE eval_rheology_quadratic_analytic
+    END SUBROUTINE eval_rheology_quadratic_analytic
 
         ! Unsupported physical treatment, rejected by the source catalog.
         ! Valid zero component of the configured Newton treatment.
