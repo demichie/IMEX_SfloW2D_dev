@@ -35,7 +35,9 @@ MODULE source_registry_2d
         PROCEDURE :: finalize => finalize_registry
         PROCEDURE :: is_initialized => registry_is_initialized
         PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
-    END TYPE source_registry_typeCONTAINS
+    END TYPE source_registry_type
+
+CONTAINS
 
     !> @brief Validate and store groups for the first-order Lie integrator.
     !> @details Rejects inconsistent methods, duplicated identities and invalid
