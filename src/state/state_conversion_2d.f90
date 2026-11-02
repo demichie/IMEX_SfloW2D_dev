@@ -413,17 +413,20 @@ CONTAINS
     !> \param[in,out] xg Additional-gas mass fractions, excluding ambient air.
     !> \param[in] context Optional diagnostic context included in closure errors.
 
-    SUBROUTINE enforce_mass_fraction_closure(xs, xg, context)
+    SUBROUTINE enforce_mass_fraction_closure(xs, xg, context, accepted)
 
         REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
         CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
+        LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         ! A few thousand machine epsilons allow accumulated cancellation noise in
         ! the explicit FV update to be clipped, while materially negative
         ! fractions still trigger the fatal check below.
         REAL(wp) :: explicit_mass_fraction
 
+        IF (PRESENT(accepted)) accepted=.FALSE.
         IF (n_solid .GT. 0) THEN
             IF (ANY(xs .LT. -mass_fraction_roundoff_tolerance)) THEN
+                IF (PRESENT(accepted)) RETURN
                 CALL mass_fraction_closure_error(                                  &
                     'Material negative solid mass fraction', context)
             END IF
@@ -431,9 +434,11 @@ CONTAINS
         END IF
 
         IF (n_add_gas .GT. 0) THEN
-            IF (ANY(xg .LT. -mass_fraction_roundoff_tolerance))                    &
+            IF (ANY(xg .LT. -mass_fraction_roundoff_tolerance)) THEN
+                IF (PRESENT(accepted)) RETURN
                 CALL mass_fraction_closure_error(                                &
-                        'Material negative additional-gas mass fraction', context)
+                    'Material negative additional-gas mass fraction', context)
+            END IF
             xg = MAX(xg, 0.0_wp)
         END IF
 
@@ -444,6 +449,7 @@ CONTAINS
             xs = xs / explicit_mass_fraction
             xg = xg / explicit_mass_fraction
         END IF
+        IF (PRESENT(accepted)) accepted=.TRUE.
 
     END SUBROUTINE enforce_mass_fraction_closure
 
@@ -1019,6 +1025,7 @@ CONTAINS
         REAL(wp) :: r_Zs             !< real-value stochastic variable
         REAL(wp) :: r_exc_pore_pres  !< real-value pore pressure
         REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
+        LOGICAL :: closure_ok
 
         IF (PRESENT(accepted)) THEN
             accepted=.FALSE.
@@ -1054,10 +1061,11 @@ CONTAINS
         IF ( qc(idx_totMassEqn) .GT. EPSILON(1.0_wp) ) THEN
             r_xs = qc(idx_solid_first:idx_solid_last) / qc(idx_totMassEqn)
             r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(idx_totMassEqn)
-            IF (PRESENT(context)) THEN
-                CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
+            IF (PRESENT(accepted)) THEN
+                CALL enforce_mass_fraction_closure(r_xs, r_xg, context, closure_ok)
+                IF (.NOT.closure_ok) RETURN
             ELSE
-                CALL enforce_mass_fraction_closure(r_xs, r_xg)
+                CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
             END IF
         END IF
 
