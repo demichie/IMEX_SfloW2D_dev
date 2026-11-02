@@ -81,7 +81,8 @@ CONTAINS
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
         LOGICAL :: with_exchange,ok,failed,bed_accepted,conversion_ok
-        INTEGER :: group_index,cell,j,k,status,iterations,linear_info
+        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
+        CHARACTER(LEN=256), ALLOCATABLE :: cell_failure(:)
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
@@ -116,6 +117,14 @@ CONTAINS
                 END IF
             END IF
 
+            ALLOCATE(cell_failure(domain%solve_cells))
+            cell_failure=''
+            ! Each active cell owns distinct candidate slices and staging slots.
+            !$OMP PARALLEL DO DEFAULT(SHARED) &
+            !$OMP& PRIVATE(cell,j,k,qpentry,q_candidate,qp_candidate,deposit_candidate, &
+            !$OMP& erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
+            !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
+            !$OMP& transfers,ok,failed,conversion_ok,status,iterations,linear_info,context)
             cell_loop: DO cell=1,domain%solve_cells
                 j=domain%j_cent(cell)
                 k=domain%k_cent(cell)
@@ -139,8 +148,8 @@ CONTAINS
                 ! remain configuration errors, not recoverable timestep rejections.
                 IF (.NOT.physical_cell_state_finite(qpentry) .OR. &
                     .NOT.ieee_is_finite(noise)) THEN
-                    CALL reject_cell('D19: non-finite source-group physical input')
-                    EXIT cell_loop
+                    cell_failure(cell)='D19: non-finite source-group physical input'
+                    CYCLE cell_loop
                 END IF
                 IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR. &
                     .NOT.ieee_is_finite(B_prime_y_geom(j,k)) .OR. &
@@ -148,8 +157,8 @@ CONTAINS
                     .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR. &
                     .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR. &
                     .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
-                    CALL reject_cell('D19: non-finite source-group geometry')
-                    EXIT cell_loop
+                    cell_failure(cell)='D19: non-finite source-group geometry'
+                    CYCLE cell_loop
                 END IF
                 IF (with_exchange) THEN
                     ! All immobilized and erodible inventories are nonnegative.
@@ -162,8 +171,8 @@ CONTAINS
                         ANY(state%deposit(j,k,1:n_solid)<0.0_wp) .OR. &
                         ANY(state%erosion(j,k,1:n_solid)<0.0_wp) .OR. &
                         state%lava_deposit(j,k)<0.0_wp) THEN
-                        CALL reject_cell('D19: invalid substrate inventory before mass exchange')
-                        EXIT cell_loop
+                        cell_failure(cell)='D19: invalid substrate inventory before mass exchange'
+                        CYCLE cell_loop
                     END IF
                 END IF
 
@@ -175,15 +184,15 @@ CONTAINS
                         cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
                         cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k),dx*dy)
                     IF (.NOT.ok) THEN
-                        CALL reject_cell('D19: physical source transaction rejected')
-                        EXIT cell_loop
+                        cell_failure(cell)='D19: physical source transaction rejected'
+                        CYCLE cell_loop
                     END IF
                     ! Stage the entire local fluid/substrate transfer before committing it.
                     q_candidate=q_group(:,j,k)
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
-                        CALL reject_cell('D19: inadmissible conservative mass candidate')
-                        EXIT cell_loop
+                        cell_failure(cell)='D19: inadmissible conservative mass candidate'
+                        CYCLE cell_loop
                     END IF
                     IF (with_exchange) THEN
                         deposit_candidate=state%deposit(j,k,1:n_solid)+ &
@@ -203,15 +212,15 @@ CONTAINS
                             ANY(deposit_candidate<0.0_wp) .OR. &
                             ANY(erosion_candidate<0.0_wp) .OR. &
                             lava_candidate<0.0_wp) THEN
-                            CALL reject_cell('D19: invalid candidate substrate inventory')
-                            EXIT cell_loop
+                            cell_failure(cell)='D19: invalid candidate substrate inventory'
+                            CYCLE cell_loop
                         END IF
                     END IF
                     IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
                         CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate',conversion_ok)
                         IF (.NOT.conversion_ok) THEN
-                            CALL reject_cell('D19: explicit candidate conversion failed')
-                            EXIT cell_loop
+                            cell_failure(cell)='D19: explicit candidate conversion failed'
+                            CYCLE cell_loop
                         END IF
                     ELSE
                         CALL initialize_dry_physical_cell(qp_candidate)
@@ -237,13 +246,13 @@ CONTAINS
                     CALL eval_source_analytic(groups(group_index),analytic_input, &
                         analytic_context,time_step,analytic_rate,status)
                     IF (status/=0) THEN
-                        WRITE(failure_reason,'(A,I0)') 'D19: analytic group status ',status
-                        step_failed=.TRUE.
-                        EXIT cell_loop
+                        WRITE(cell_failure(cell),'(A,I0)') 'D19: analytic group status ',status
+                        ! Error stored in cell_failure(cell)
+                        CYCLE cell_loop
                     END IF
                     IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
-                        CALL reject_cell('D19: analytic source returned non-finite rate')
-                        EXIT cell_loop
+                        cell_failure(cell)='D19: analytic source returned non-finite rate'
+                        CYCLE cell_loop
                     END IF
                     ! The analytic method must update the group candidate only.
                     ! Publishing q here would bypass the atomic group commit.
@@ -254,30 +263,43 @@ CONTAINS
                         q_group(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
                         grav_coeff(j,k),noise,iterations,ok,linear_info,failed)
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
-                        WRITE(failure_reason,'(A,I0,A,I0)') &
+                        WRITE(cell_failure(cell),'(A,I0,A,I0)') &
                             'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
-                        step_failed=.TRUE.
-                        EXIT cell_loop
+                        ! Error stored in cell_failure(cell)
+                        CYCLE cell_loop
                     END IF
                 CASE DEFAULT
-                    CALL reject_cell('D19: invalid group method')
-                    IF (step_failed) EXIT cell_loop
+                    cell_failure(cell)='D19: invalid group method'
+                    IF (step_failed) CYCLE cell_loop
                 END SELECT
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_group(1:n_eqns,j,k))) THEN
-                    CALL reject_cell('D19: inadmissible conservative source group state')
-                    EXIT cell_loop
+                    cell_failure(cell)='D19: inadmissible conservative source group state'
+                    CYCLE cell_loop
                 END IF
                 IF (q_group(idx_totMassEqn,j,k)>0.0_wp) THEN
                     CALL qc_to_qp(q_group(:,j,k),qp_group(:,j,k),pressure,TRIM(context),conversion_ok)
                     IF (.NOT.conversion_ok) THEN
-                        CALL reject_cell('D19: source group conversion failed')
-                        EXIT cell_loop
+                        cell_failure(cell)='D19: source group conversion failed'
+                        CYCLE cell_loop
                     END IF
                 ELSE
                     CALL initialize_dry_physical_cell(qp_group(:,j,k))
                 END IF
             END DO cell_loop
+            !$OMP END PARALLEL DO
+            first_failure=0
+            DO cell=1,domain%solve_cells
+                IF (LEN_TRIM(cell_failure(cell))>0) THEN
+                    first_failure=cell
+                    EXIT
+                END IF
+            END DO
+            IF (first_failure/=0) THEN
+                step_failed=.TRUE.
+                failure_reason=cell_failure(first_failure)
+            END IF
+            DEALLOCATE(cell_failure)
             IF (step_failed) THEN
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
