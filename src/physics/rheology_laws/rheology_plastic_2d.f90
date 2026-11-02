@@ -13,19 +13,19 @@
 !> \ref tau stores the model strength.
 !********************************************************************************
 MODULE rheology_plastic_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real,     &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real,     &
             real_part_physical_state
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
                 solve_exact_velocity_flow, EXACT_FLOW_CONSTANT
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_plastic_explicit
-        PUBLIC :: eval_rheology_plastic_semi_implicit
-        PUBLIC :: eval_rheology_plastic_implicit
-        PUBLIC :: eval_rheology_plastic_analytic
-        PUBLIC :: tau
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_plastic_explicit
+    PUBLIC :: eval_rheology_plastic_semi_implicit
+    PUBLIC :: eval_rheology_plastic_implicit
+    PUBLIC :: eval_rheology_plastic_analytic
+    PUBLIC :: tau
         REAL(wp) :: tau
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS

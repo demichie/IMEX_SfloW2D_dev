@@ -23,20 +23,20 @@
 !> combined velocity source while holding non-velocity inputs fixed.
 !********************************************************************************
 MODULE rheology_voellmy_2d
-        USE diagnostics_2d, ONLY : fatal_error
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-        USE rheology_parameters_2d, ONLY : xi
-        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE rheology_parameters_2d, ONLY : xi
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                      &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_QUADRATIC_POLYNOMIAL
-        IMPLICIT NONE
-        PRIVATE
-        PUBLIC :: eval_rheology_voellmy_explicit
-        PUBLIC :: eval_rheology_voellmy_semi_implicit
-        PUBLIC :: eval_rheology_voellmy_implicit
-        PUBLIC :: eval_rheology_voellmy_analytic
-        PUBLIC :: mu
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_voellmy_explicit
+    PUBLIC :: eval_rheology_voellmy_semi_implicit
+    PUBLIC :: eval_rheology_voellmy_implicit
+    PUBLIC :: eval_rheology_voellmy_analytic
+    PUBLIC :: mu
         REAL(wp) :: mu
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
@@ -145,6 +145,7 @@ CONTAINS
             rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
             rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
             IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
+
             IF (use_stochastic_xi) THEN
                 xi_effective = xi + stochastic_value
                 IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
@@ -188,6 +189,7 @@ CONTAINS
             REAL(wp) :: coulomb_stress, constant_drag, quadratic_drag
 
             velocity_before = [state%u, state%v]
+
             ASSOCIATE(h => state%h,                                                                                    &
                         rhom => state%rho_m,                                                                           &
                         red_grav => state%red_grav,                                                                    &
@@ -197,6 +199,7 @@ CONTAINS
             CALL validate_analytic_velocity_inputs(dt, h,                                                              &
                         speed_ratio, speed_before, 'Voellmy')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+
             IF (rhom .LE. 0.0_wp) THEN
                 CALL fatal_analytic_input_error(                                                                       &
                         'Nonpositive mixture density in Voellmy analytic solver')
@@ -210,6 +213,7 @@ CONTAINS
             END IF
 
             xi_effective = xi
+
             IF (use_stochastic_xi) THEN
                 xi_effective = xi + stochastic_xi_value
                 xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))

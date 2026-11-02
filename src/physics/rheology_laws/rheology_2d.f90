@@ -12,55 +12,55 @@
 
 MODULE rheology_2d
 
-        USE parameters_2d, ONLY : wp
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                              &
+    USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                              &
             update_physical_state_kinematics
-        USE diagnostics_2d, ONLY : fatal_error
-        USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                                &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                                &
                 eval_rheology_voellmy_implicit,                                                                        &
                 eval_rheology_voellmy_semi_implicit,                                                                   &
                 eval_rheology_voellmy_analytic
-        USE rheology_plastic_2d, ONLY : eval_rheology_plastic_explicit,                                                &
+    USE rheology_plastic_2d, ONLY : eval_rheology_plastic_explicit,                                                &
                 eval_rheology_plastic_implicit,                                                                        &
                 eval_rheology_plastic_analytic
-        USE rheology_lava_2d, ONLY : eval_rheology_lava_explicit,                                                      &
+    USE rheology_lava_2d, ONLY : eval_rheology_lava_explicit,                                                      &
                 eval_rheology_lava_implicit,                                                                           &
                 eval_rheology_lava_semi_implicit,                                                                      &
                 eval_rheology_lava_analytic
-        USE rheology_lahar_2d, ONLY : eval_rheology_lahar_explicit,                                                    &
+    USE rheology_lahar_2d, ONLY : eval_rheology_lahar_explicit,                                                    &
                 eval_rheology_lahar_implicit,                                                                          &
                 eval_rheology_lahar_semi_implicit,                                                                     &
                 eval_rheology_lahar_analytic
-        USE rheology_empirical_2d, ONLY : eval_rheology_empirical_explicit,                                            &
+    USE rheology_empirical_2d, ONLY : eval_rheology_empirical_explicit,                                            &
                 eval_rheology_empirical_implicit,                                                                      &
                 eval_rheology_empirical_analytic
-        USE rheology_quadratic_2d, ONLY : eval_rheology_quadratic_explicit,                                            &
+    USE rheology_quadratic_2d, ONLY : eval_rheology_quadratic_explicit,                                            &
                 eval_rheology_quadratic_implicit,                                                                      &
                 eval_rheology_quadratic_analytic
-        USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_explicit,                                              &
+    USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_explicit,                                              &
                 eval_rheology_newmodel_implicit
-        USE rheology_froude_2d, ONLY : eval_rheology_froude_explicit,                                                  &
+    USE rheology_froude_2d, ONLY : eval_rheology_froude_explicit,                                                  &
                 eval_rheology_froude_semi_implicit,                                                                    &
                 eval_rheology_froude_analytic
-        USE rheology_lucas_2d, ONLY : eval_rheology_lucas_explicit,                                                    &
+    USE rheology_lucas_2d, ONLY : eval_rheology_lucas_explicit,                                                    &
                 eval_rheology_lucas_semi_implicit,                                                                     &
                 eval_rheology_lucas_analytic
-        USE rheology_mui_2d, ONLY : eval_rheology_mui_explicit,                                                        &
+    USE rheology_mui_2d, ONLY : eval_rheology_mui_explicit,                                                        &
                 eval_rheology_mui_semi_implicit,                                                                       &
                 eval_rheology_mui_analytic
-        USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_explicit,                                        &
+    USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_explicit,                                        &
                 eval_rheology_mui_voellmy_semi_implicit,                                                               &
                 eval_rheology_mui_voellmy_implicit,                                                                    &
                 eval_rheology_mui_voellmy_analytic
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
-        PRIVATE
+    PRIVATE
 
-        PUBLIC :: curvature_acceleration
-        PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
-        PUBLIC :: eval_rheology_implicit, eval_rheology_analytic
-        PUBLIC :: limit_rheology_momentum_reversal
+    PUBLIC :: curvature_acceleration
+    PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
+    PUBLIC :: eval_rheology_implicit, eval_rheology_analytic
+    PUBLIC :: limit_rheology_momentum_reversal
 
         ! Uniform treatment surface for this source family.
 
@@ -75,9 +75,11 @@ CONTAINS
         initial_norm2=DOT_PRODUCT(momentum_before,momentum_before)
         IF (initial_norm2<=0.0_wp) RETURN
         reversed_component=DOT_PRODUCT(momentum_after,momentum_before)
+
         IF (reversed_component<0.0_wp) THEN
         momentum_after=momentum_after-                                                                                 &
                 (reversed_component/initial_norm2)*momentum_before
+
         END IF
     END SUBROUTINE limit_rheology_momentum_reversal
 
@@ -94,8 +96,10 @@ CONTAINS
             REAL(wp) :: process_rate(2)
             INTEGER :: i
             rate=0.0_wp
+
             DO i=1,SIZE(models)
                 process_rate = 0.0_wp
+
                 SELECT CASE(TRIM(models(i)))
             CASE('rheology_voellmy')
                 CALL eval_rheology_voellmy_explicit(state,                                                             &
@@ -152,6 +156,7 @@ CONTAINS
             END SELECT
 
                 rate=rate+process_rate
+
             END DO
         END SUBROUTINE eval_rheology_explicit
 
@@ -168,8 +173,10 @@ CONTAINS
             REAL(wp) :: process_rate(2)
             INTEGER :: i
             rate=0.0_wp
+
             DO i=1,SIZE(models)
                 process_rate = 0.0_wp
+
                 SELECT CASE(TRIM(models(i)))
             CASE('rheology_voellmy')
                 CALL eval_rheology_voellmy_semi_implicit(state,                                                        &
@@ -220,6 +227,7 @@ CONTAINS
             END SELECT
 
                 rate=rate+process_rate
+
             END DO
         END SUBROUTINE eval_rheology_semi_implicit
 
@@ -236,8 +244,10 @@ CONTAINS
             COMPLEX(wp) :: process_rate(2)
             INTEGER :: i
             rate=CMPLX(0.0_wp,0.0_wp,wp)
+
             DO i=1,SIZE(models)
                 process_rate = CMPLX(0.0_wp,0.0_wp,wp)
+
                 SELECT CASE(TRIM(models(i)))
             CASE('rheology_voellmy')
                 CALL eval_rheology_voellmy_implicit(state,                                                             &
@@ -281,6 +291,7 @@ CONTAINS
             END SELECT
 
                 rate=rate+process_rate
+
             END DO
         END SUBROUTINE eval_rheology_implicit
 
@@ -301,10 +312,12 @@ CONTAINS
             current_state=state
             velocity_after=[state%u,state%v]
             model_supported=.TRUE.
+
             DO i=1,SIZE(models)
                 velocity_before = [current_state%u,current_state%v]
                 velocity_after=velocity_before
                 model_supported=.TRUE.
+
                 SELECT CASE(TRIM(models(i)))
             CASE ('none')
                 CONTINUE
@@ -342,6 +355,7 @@ CONTAINS
                 current_state%u=velocity_after(1)
                 current_state%v=velocity_after(2)
                 CALL update_physical_state_kinematics(current_state,bx,by,bxx,bxy,byy)
+
             END DO
         END SUBROUTINE eval_rheology_analytic
 

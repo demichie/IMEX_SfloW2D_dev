@@ -4,7 +4,7 @@
 !> The Lie executor applies the resulting limited rates and publishes
 !> fluid/substrate candidates at group boundaries.
 MODULE source_terms_2d
-        USE parameters_2d, ONLY : idx_h
+    USE parameters_2d, ONLY : idx_h
     USE mass_injection_2d, ONLY : eval_mass_injection_explicit
     USE mass_injection_coefficients_2d
     USE parameters_2d
@@ -90,29 +90,38 @@ CONTAINS
                     context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                          &
                     context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                               &
                     arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value)
+
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
                 group%source_names,transfer,exchange)
+
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
                 IF (.NOT.ieee_is_finite(coverage)) RETURN
                 IF (coverage<0.0_wp .OR. coverage>1.0_wp) RETURN
                 exchange=coverage*exchange
                 CALL scale_mass_exchange_transfer(transfer,coverage)
+
             END IF
         END IF
+
         rate=physical+exchange
+
         IF (has_exchange) THEN
             IF (.NOT.mass_exchange_transfer_is_finite(transfer)) RETURN
+
         END IF
+
         IF (has_exchange) THEN
             CALL limit_explicit_source_rates(q_recipient,inventory,dt,rate,                                            &
                 transfer%solid_erosion_rate,scale,valid)
         ELSE
             CALL limit_explicit_source_rates(q_recipient,[REAL(wp)::],dt,rate,                                         &
                 [REAL(wp)::],scale,valid)
+
         END IF
+
         IF (.NOT.valid) RETURN
         rate=scale*rate
         IF (has_exchange) CALL scale_mass_exchange_transfer(transfer,scale)
@@ -168,11 +177,15 @@ CONTAINS
         DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
             IF (rate(solid_eq)<0.0_wp) limiter=MIN(limiter,                                                            &
                 MAX(0.0_wp,q_reference(solid_eq)/(-dt*rate(solid_eq))))
+
         END DO
+
         DO i=1,SIZE(inventory)
             IF (solid_erosion_rate(i)>0.0_wp) limiter=MIN(limiter,                                                     &
                 MAX(0.0_wp,inventory(i)/(dt*solid_erosion_rate(i))))
+
         END DO
+
         available_carrier=q_reference(idx_totMassEqn)-                                                                 &
             SUM(q_reference(idx_solidEqn_first:idx_solidEqn_last))
         carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
@@ -184,10 +197,13 @@ CONTAINS
         ! Stay a few representable steps inside the admissible interval,
         ! only when an actual physical transfer is limited.
         IF (limiter>0.0_wp .AND. limiter<1.0_wp) THEN
+
             DO i=1,8
                 limiter=NEAREST(limiter,-1.0_wp)
+
             END DO
         END IF
+
         valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
     END SUBROUTINE limit_explicit_source_rates
 
@@ -201,14 +217,19 @@ CONTAINS
         INTEGER, INTENT(OUT) :: status
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
+
         IF (interval<0.0_wp) THEN
         status=-8
         RETURN
+
         END IF
+
         IF (interval==0.0_wp) THEN
         status=0
         RETURN
+
         END IF
+
         CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
@@ -233,6 +254,7 @@ CONTAINS
         IF (.NOT.ALLOCATED(group%source_names)) RETURN
         IF (SIZE(group%source_names)/=1) RETURN
         selected_model_name=TRIM(group%source_names(1))
+
         IF (INDEX(selected_model_name,'rheology_')==1) THEN
 
             CALL real_physical_state_from_q(q_before, physical_state,                                                  &
@@ -244,19 +266,25 @@ CONTAINS
                     speed_ratio=physical_state%mod_vel/horizontal_speed
             curvature_accel=physical_state%curvature_acceleration
             velocity_after=[physical_state%u,physical_state%v]
+
             IF (LEN_TRIM(selected_model_name)==0) THEN
                 status=-7
                 RETURN
+
             END IF
+
             CALL eval_rheology_analytic([selected_model_name], interval, physical_state,                               &
                     speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag,                              &
                     stochastic_flag, context%Zij, velocity_after, supported,                                           &
                     context%Bprime_x, context%Bprime_y, context%Bsecond_xx,                                            &
                     context%Bsecond_xy, context%Bsecond_yy)
+
             IF (.NOT.supported) THEN
                 status=-7
                 RETURN
+
             END IF
+
             q_after(2:3)=q_before(1)*velocity_after
             status=0
 
@@ -264,10 +292,13 @@ CONTAINS
             CALL real_physical_state_from_q(q_before, physical_state,                                                  &
                     context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
                     context%Bsecond_xy,context%Bsecond_yy)
+
             IF (physical_state%T<=0.0_wp) THEN
                 status=-3
                 RETURN
+
             END IF
+
             heat_capacity=q_before(4)/physical_state%T
             CALL eval_thermal_analytic(['thermal_cooling'],physical_state,interval,                                    &
                     heat_capacity,radiative_term_coeff,convective_term_coeff,                                          &
@@ -283,15 +314,21 @@ CONTAINS
                     context%Bsecond_xy,context%Bsecond_yy)
                 CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],                                              &
                         physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
+
                 IF (.NOT.pore_ok) THEN
                     status=-9
                     RETURN
+
                 END IF
+
                 q_after(1:n_eqns)=q_before(1:n_eqns)+interval*pore_rate
+
             END IF
+
             status=0
         ELSE
             RETURN
+
         END IF
     END SUBROUTINE eval_source_analytic_state
 
@@ -304,10 +341,12 @@ CONTAINS
         INTEGER :: i
         name=''
         IF (.NOT.ALLOCATED(group%source_names)) RETURN
+
         DO i=1,SIZE(group%source_names)
             IF (INDEX(TRIM(group%source_names(i)),'rheology_')/=1) CYCLE
             name=group%source_names(i)
             RETURN
+
         END DO
     END FUNCTION group_rheology_name
 
@@ -398,20 +437,24 @@ CONTAINS
 
         ! initialize the source terms
         source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
+
         IF (selected_rheology .OR. selected_thermal) THEN
             CALL physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y,                                       &
                 0.0_wp, 0.0_wp, 0.0_wp)
+
         END IF
 
         IF (selected_rheology) THEN
 
             CALL eval_rheology_implicit([selected_model_name], physical_state,                                         &
                 stochastic_flag, Zij, source_term(2:3))
+
         END IF
 
         IF (selected_thermal) THEN
             CALL eval_thermal_implicit(['thermal_cooling'],physical_state,                                             &
                 radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
+
         END IF
 
         IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
@@ -539,11 +582,14 @@ CONTAINS
                     grav_coeff, pore_pressure_flag,                                                                    &
                     stochastic_flag, stochastic_value, rheology_rate)
                 expl_term(2:3)=expl_term(2:3)+rheology_rate
+
             END IF
+
             IF (group_contains_name(group,'thermal_cooling')) THEN
                 CALL eval_thermal_explicit(['thermal_cooling'],physical_state,                                         &
                     radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
+
             END IF
         END IF
 
