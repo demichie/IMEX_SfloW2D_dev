@@ -24,6 +24,8 @@ MODULE lie_source_executor_2d
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
     END TYPE group_profile_type
     TYPE :: lie_source_scratch_type
+        LOGICAL :: diagnostics_initialized=.FALSE.,newton_witness=.FALSE.
+        INTEGER :: reject_group=-1
         INTEGER, ALLOCATABLE :: failure_code(:),failure_group(:),failure_detail(:),failure_iterations(:)
         REAL(wp), ALLOCATABLE :: failure_mass(:),failure_components(:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
@@ -123,16 +125,22 @@ CONTAINS
         END IF
         step_failed=.FALSE.
         failure_reason=''
-        reject_group=-1
-        reject_env=''
-        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', reject_env,STATUS=env_status)
-
-        IF (env_status==0 .AND. LEN_TRIM(reject_env)>0) THEN
-            READ(reject_env,*,IOSTAT=parse_status) reject_group
-            IF (parse_status/=0 .OR. reject_group<1)                                                                   &
-                CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
-
+        IF (.NOT.scratch%diagnostics_initialized) THEN
+            scratch%reject_group=-1
+            reject_env=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP',reject_env,STATUS=env_status)
+            IF (env_status==0 .AND. LEN_TRIM(reject_env)>0) THEN
+                READ(reject_env,*,IOSTAT=parse_status) scratch%reject_group
+                IF (parse_status/=0 .OR. scratch%reject_group<1) &
+                    CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
+            END IF
+            newton_witness_env=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_NEWTON_WITNESS',newton_witness_env)
+            scratch%newton_witness=TRIM(newton_witness_env)=='1'
+            scratch%diagnostics_initialized=.TRUE.
         END IF
+        reject_group=scratch%reject_group
+        newton_witness_active=scratch%newton_witness
 
         IF (PRESENT(failure_message)) failure_message=''
         IF (.NOT.source_registry%is_initialized())                                                                     &
@@ -242,9 +250,6 @@ CONTAINS
                 ALLOCATE(scratch%bed_rate_cell(comp_cells_x,comp_cells_y))
             scratch%bed_rate_cell=0.0_wp
         END IF
-        newton_witness_env=''
-        CALL GET_ENVIRONMENT_VARIABLE('IMEX_NEWTON_WITNESS',newton_witness_env)
-        newton_witness_active=TRIM(newton_witness_env)=='1'
         IF (newton_witness_active) THEN
             IF (ANY(groups%method==SOURCE_METHOD_NEWTON)) THEN
                 IF (ALLOCATED(scratch%newton_iterations)) THEN
