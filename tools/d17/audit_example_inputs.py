@@ -21,6 +21,7 @@ CASES = [
     "EXAMPLE_DAMBREAK",
     "EXAMPLE_ENGWELL2016",
     "EXAMPLE_ETNA",
+    "EXAMPLE_ENSEMBLE_ETNA",
     "EXAMPLE_ETNA_LAVA",
     "EXAMPLE_INCLINED_EXCAVATION_2D",
     "EXAMPLE_LATERAL_SOURCE",
@@ -32,7 +33,56 @@ LEGACY_INTERNAL = re.compile(r"\b(?:rheology_model_id|rheology_id_[A-Za-z_0-9]+|
 NAMELIST = re.compile(r"(?m)^\s*&[A-Za-z_][A-Za-z0-9_]*\s*$")
 PLACEHOLDER = re.compile(r"(?<![A-Za-z0-9_])(?:runname|restartfile|nx_cells|ny_cells|x_min|y_min|x_left|dx|n_cells)\b")
 
-def examine(root, name):
+
+# Validate the actual Fortran input contract, not just deprecated labels.
+NAMELIST_DECL = re.compile(r"^\s*NAMELIST\s*/([a-z_]\w*)/\s*(.*)", re.I)
+ASSIGNMENT = re.compile(r"(?m)^\s*([a-z_]\w*)(?:\s*\([^=\n]*\))?(?:\s*%\s*[a-z_]\w*)?\s*=", re.I)
+GROUP_HEADER = re.compile(r"(?m)^\s*&([a-z_]\w*)\s*$", re.I)
+GROUP_END = re.compile(r"(?m)^\s*/\s*(?:!.*)?$", re.I)
+
+
+def parser_contract(root):
+    contract = {}
+    for relative in ("src/io/inpout_2d.f90", "src/numerics/source_input_2d.f90"):
+        lines = (root / relative).read_text(encoding="utf-8").splitlines()
+        for n, line in enumerate(lines):
+            match = NAMELIST_DECL.match(line)
+            if not match:
+                continue
+            declaration = match.group(2)
+            cursor = n
+            while declaration.rstrip().endswith("&"):
+                cursor += 1
+                declaration = declaration.rstrip()[:-1] + " " + lines[cursor].strip()
+            contract[match.group(1).lower()] = {
+                key.lower() for key in re.findall(r"\b[a-z_]\w*\b", declaration, flags=re.I)
+            }
+    return contract
+
+
+def check_parser_contract(path, contract):
+    source = path.read_text(encoding="utf-8")
+    headers = list(GROUP_HEADER.finditer(source))
+    errors = []
+    for n, header in enumerate(headers):
+        name = header.group(1).lower()
+        end = headers[n + 1].start() if n + 1 < len(headers) else len(source)
+        payload = source[header.end():end]
+        terminator = GROUP_END.search(payload)
+        if not terminator:
+            errors.append(f"{path.name}: unterminated namelist {name}")
+            continue
+        if name not in contract:
+            errors.append(f"{path.name}: unknown namelist {name}")
+            continue
+        for assignment in ASSIGNMENT.finditer(payload[:terminator.start()]):
+            key = assignment.group(1).lower()
+            if key not in contract[name]:
+                errors.append(f"{path.name}: {name}.{key} is not in the current parser")
+    return errors
+
+
+def examine(root, name, contract):
     directory = root / "EXAMPLES" / name
     issues = []
     evidence = {"case": name, "checks": {}, "input_type": None, "status": "PASS_STATIC"}
@@ -43,10 +93,13 @@ def examine(root, name):
         evidence["checks"]["readme"] = "PASS"
     templates = list(directory.glob("IMEX_SfloW2D.template"))
     inputs = list(directory.glob("IMEX_SfloW2D.inp"))
+    if name == "EXAMPLE_ENSEMBLE_ETNA":
+        inputs.extend((directory / "templatedir").glob("IMEX_SfloW2D.inp"))
     if not templates and not inputs:
         issues.append("missing namelist template and tracked input")
     for path in templates + inputs:
         text = path.read_text(encoding="utf-8")
+        issues.extend(check_parser_contract(path, contract))
         if not NAMELIST.search(text):
             issues.append(f"{path.name}: missing namelist group")
         if LEGACY_INTERNAL.search(text):
@@ -78,7 +131,8 @@ def main():
     ap.add_argument("--output", type=Path)
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[2]
-    results = [examine(root, case) for case in (args.case and [args.case] or CASES)]
+    contract = parser_contract(root)
+    results = [examine(root, case, contract) for case in (args.case and [args.case] or CASES)]
     result = {"revision": "current checkout", "gate": "static-only", "results": results,
               "summary": {"total": len(results), "pass_static": sum(x["status"] == "PASS_STATIC" for x in results),
                           "fail_static": sum(x["status"] != "PASS_STATIC" for x in results)}}
