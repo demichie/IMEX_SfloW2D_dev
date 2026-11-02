@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--solver", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--cells", type=int, default=192)
-    parser.add_argument("--horizon", type=float, default=0.5)
+    parser.add_argument("--horizon", type=float, default=0.02)
     parser.add_argument("--repetitions", type=int, default=3)
     args = parser.parse_args()
     if args.cells < 32 or args.repetitions < 2 or args.horizon <= 0:
@@ -47,7 +47,7 @@ def main():
             # Independent directories prevent overwritten outputs and warmup leakage.
             threads = (1, 2, 4, 8)
             schedule = [(n, k) for k in range(args.repetitions + 1) for n in threads]
-            random.Random(20261102).shuffle(schedule)
+            # Validate the serial reference first, then interleave later repetitions.\n            first = [(1, 0)]\n            schedule.remove((1, 0))\n            random.Random(20261102).shuffle(schedule)\n            schedule = first + schedule
             results = {n: [] for n in threads}
             for n, k in schedule:
                 target = root / "run" / f"t{n}-r{k}"
@@ -81,7 +81,7 @@ def main():
                 rows.append({"threads": n, "median_seconds": med,
                              "speedup": speedup, "efficiency": speedup / n,
                              "samples_seconds": results[n]})
-            report["results"] = rows
+            report["results"] = rows\n            report["cpu_available"] = os.cpu_count()
             summary = ["# Lie OpenMP performance benchmark", "",
                        f"Commit: `{report['sha']}` · grid x={args.cells} · horizon={args.horizon}s",
                        "", "| Threads | Median wall (s) | Speedup | Efficiency |",

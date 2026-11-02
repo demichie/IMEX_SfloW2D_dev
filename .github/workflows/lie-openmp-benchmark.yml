@@ -13,8 +13,8 @@ on:
         description: "Simulation end time in seconds"
         required: true
         type: choice
-        default: "0.5"
-        options: ["0.2", "0.5", "1.0"]
+        default: "0.02"
+        options: ["0.02", "0.05", "0.1"]
       repetitions:
         description: "Timed repetitions per thread count"
         required: true
@@ -44,7 +44,7 @@ jobs:
           ./configure --with-netcdf=/usr
           make -j2
           test -x src/IMEX_SfloW2D
-      - name: Measure wall-clock OpenMP scaling
+      - name: Show runner CPU capacity\n        run: |\n          nproc\n          lscpu | grep -E "CPU\\(s\\)|Core\\(s\\)|Thread\\(s\\)" || true\n      - name: Measure wall-clock OpenMP scaling
         env:
           OMP_DYNAMIC: "FALSE"
           OMP_PROC_BIND: "CLOSE"
