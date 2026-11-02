@@ -2,7 +2,7 @@
 
 **Repository:** `demichie/IMEX_SfloW2D_dev` · **branch:** `master`  
 **Data dell'analisi:** 2026-11-01  
-**Stato:** piano approvabile per l'implementazione; nessuna modifica OpenMP applicata da questo documento.  
+**Stato:** implementazione iniziale su master; i nuovi cicli paralleli richiedono compilazione, verifica delle chiamate transitive e regressioni prima dell'accettazione.  
 **Dipendenza architetturale:** [D19 — Architettura Lie definitiva](D19_LIE_SPLITTING_MIGRATION_TRACKER.md).
 
 ## 1. Obiettivo e vincoli non negoziabili
@@ -169,11 +169,17 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 - [x] Individuati i rischi: variabili locali condivise, errori con `EXIT`, parametri Newton globali, output disgiunti, topografia.
 - [ ] Audit transitivo e matrice completa delle chiamate thread-safe.
 - [ ] Implementazione dello staging e diagnostica deterministica per cella.
-- [ ] OpenMP attivato nei cicli di `advance_lie`.
-- [ ] OpenMP attivato nel ciclo celle di `execute_lie_source_groups` per EXPLICIT, ANALYTIC e NEWTON.
-- [ ] Verifica di unicità degli indici del dominio.
+- [x] OpenMP attivato nei due cicli di `advance_lie` con raccolta seriale dell'esito. **Da compilare e validare**.
+- [x] Prima implementazione OpenMP nel ciclo celle di `execute_lie_source_groups` per EXPLICIT, ANALYTIC e NEWTON, con risultati per cella e scelta seriale deterministica dell'errore. **Da compilare e verificare per thread safety transitiva**.
+- [x] Verificata staticamente la costruzione ordinaria delle liste di celle mediante scansione delle maschere in `domain_2d` (una visita per coppia di indici). **Resta da testare** l'invariante e l'eventuale modifica esterna delle liste.
 - [ ] Confronti di correttezza `1/2/4/8` thread e test di rollback.
 - [ ] Analisi race e validazione prestazionale.
 - [ ] Integrazione finale con D19 e chiusura del piano.
+
+## 8. Registro implementazione (2026-11-02)
+
+- `time_integration_2d.f90`: `PARALLEL DO` su ricostruzione pre-spaziale e avanzamento spaziale, scratch `PRIVATE`, codici di errore per cella, controllo seriale dopo la barriera. Commit `10e224f`.
+- `lie_source_executor_2d.f90`: `PARALLEL DO` nel gruppo Lie, temporanei `PRIVATE`, diagnostiche per slot `cell_failure(cell)` e selezione deterministica della prima cella fallita; rimangono seriali gruppi, proiezione, aggiornamento degli inventari e refresh. Commit `fad351b`, correzione `f6d47e8`.
+- **Non certificato**: reentrancy dell'intera catena di chiamate (conversioni, fisica, Newton), univocità effettiva delle scritture in ogni configurazione, compilazione con `-fopenmp`, test 1/2/4/8 thread, casi di rollback e race detection. Questi restano gate obbligatori prima di considerare attiva e sicura la parallelizzazione.
 
 **Nota di metodo:** questo piano deriva dalla lettura del codice di produzione alla data sopra indicata. Le proprietà di thread safety transitive sono *ipotesi da validare*, non garanzie; non è stata effettuata compilazione né esecuzione dei test come parte della redazione.
