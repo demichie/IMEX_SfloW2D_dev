@@ -239,3 +239,13 @@ Sono stati migrati tutti i 21 file `EXAMPLES/**/IMEX_SfloW2D.inp` o `*.template`
 I controlli end-to-end per `EXAMPLE_2D_NEWTON` e `EXAMPLE_2D_TOPO` ora richiedono **evidenza operativa**: il solver registra rispettivamente il totale delle iterazioni Newton effettive e la massima variazione del letto prima dell'assegnazione; `compare_threads.py` fallisce se le iterazioni sono zero o il letto non cambia, per ciascuno dei team 1/2/4. La precedente Action verde *non* certifica queste nuove asserzioni, da rieseguire.
 
 **Gate ancora aperto:** il test integrato del rollback atomico del passo Lie dopo un fallimento tardivo, con confronto di `q`, `qp`, tutti gli inventari e le cache geometriche. I test separati `TEST_WORKSPACE_LIFECYCLE` verificano solo il ripristino dei componenti, non un rifiuto reale dell'integratore. Non dichiarare D20 chiuso prima di questo test.
+
+## 13. Test integrato dei tre gate D20 (2026-11-02)
+
+Sono stati aggiunti **tre gate obbligatori** alla suite `lie-end-to-end`:
+
+1. Il caso NEWTON deve dimostrare almeno una iterazione realmente eseguita nella routine `solve_backward_euler_group`, tramite conteggio locale per cella aggregato fuori dalla regione OpenMP.
+2. Il caso TOPO deve dimostrare una variazione **non nulla** di `B_vertex` prima dell'assegnazione attraverso `D20_BED_WITNESS`.
+3. Il caso TOPO viene rieseguito con `IMEX_LIE_TEST_REJECT_AFTER_GROUP=4`: dopo il **commit effettivo del gruppo** (inclusi topografia e inventari) il test forza il rifiuto; il percorso normale di `advance_lie` esegue il rollback e confronta esattamente `q/qp`, tutti i sei inventari e aggregati, `B_vertex` e le cache geometriche principali rispetto allo snapshot originale. La prova richiede che il letto sia realmente cambiato prima del rollback, che il processo termini con errore come previsto e che il log riporti `D20_FULL_STEP_ROLLBACK_PASS`. Ripetuta con team 1/2/4.
+
+L'iniezione e' esclusivamente un failpoint di integrazione: senza la variabile d'ambiente le equazioni e il flusso di controllo ordinario restano invariati. Le modifiche devono ancora superare CI: **non dichiarare D20 chiuso fino alla nuova Action verde**. Le prove non costituiscono una certificazione di race freedom universale o di scalabilita'.
