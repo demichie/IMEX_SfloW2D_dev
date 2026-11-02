@@ -101,8 +101,18 @@ CONTAINS
         DO group_index=1,SIZE(groups)
             q_group=q
             qp_group=qp
-            with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
+            ! Validate configuration before spawning workers: fatal dispatch errors
+            ! must not originate from a concurrent cell evaluation.
+            IF (.NOT.ALLOCATED(groups(group_index)%source_names)) &
+                CALL fatal_error('D20: Lie source group has no allocated source list')
             IF (SIZE(groups(group_index)%source_names)==0) CYCLE
+            SELECT CASE(groups(group_index)%method)
+            CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
+                CONTINUE
+            CASE DEFAULT
+                CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
+            END SELECT
+            with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
             IF (with_exchange) THEN
                 IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
