@@ -25,4 +25,4 @@ Freeze the complete geometry (including slope, curvature, gravity, zone/arc data
 
 ### Status
 
-Dependency audit complete. This file records the architectural and numerical preconditions; **the loop inversion is not yet implemented**. No compiler or runtime tests are claimed.
+The cell-major OpenMP Lie sweep and deferred geometry refresh are implemented in `src/numerics/lie_source_executor_2d.f90`. `LIE_CELL_SWEEP_PROFILE` and `LIE_GEOMETRY_COMMIT_PROFILE` now report aggregate wall times; `LIE_GROUP_PROFILE` retains group IDs, methods and call counts without falsely attributing wall time to individual groups. The injected late-step rollback fault now occurs after the deferred geometric refresh. **Compilation and D20 runtime validation are not yet verified; do not treat this as a validated numerical change.**

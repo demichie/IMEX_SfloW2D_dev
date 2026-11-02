@@ -503,19 +503,18 @@ CONTAINS
     END SUBROUTINE reject_cell
     END SUBROUTINE execute_lie_source_groups
 
-    !> @brief Emit cumulative per-group Lie source profiling on finalization.
+    !> @brief Emit group call counts and cell-major sweep/commit wall times.
+    !> @details Separate group wall times are not defined for the cell-major sweep.
     SUBROUTINE report_lie_source_profile()
         INTEGER :: n
         IF (.NOT.profiling_initialized) RETURN
         IF (.NOT.profiling_enabled) RETURN
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_BEGIN'
         DO n=1,SIZE(group_profile)
-            WRITE(*,'(A,I0,A,I0,A,I0,A,3(1X,ES15.7))') &
+            WRITE(*,'(A,I0,A,I0,A,I0)') &
                 'LIE_GROUP_PROFILE id=',group_profile(n)%id, &
                 ' method=',group_profile(n)%method, &
-                ' calls=',group_profile(n)%calls, &
-                ' setup/evaluate/commit=',group_profile(n)%setup, &
-                group_profile(n)%evaluate,group_profile(n)%commit
+                ' calls=',group_profile(n)%calls
         END DO
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_END'
         WRITE(*,'(A,ES15.7)') 'LIE_CELL_SWEEP_PROFILE seconds=',profile_cell_sweep
