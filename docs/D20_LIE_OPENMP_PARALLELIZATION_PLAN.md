@@ -2,7 +2,7 @@
 
 **Repository:** `demichie/IMEX_SfloW2D_dev` · **branch:** `master`  
 **Data dell'analisi:** 2026-11-01  
-**Stato:** implementazione iniziale su master; i nuovi cicli paralleli richiedono compilazione, verifica delle chiamate transitive e regressioni prima dell'accettazione.  
+**Stato al 2026-11-02:** Action `lie-openmp-validation.yml` riferita verde dall'utente, inclusi job strict-debug, regressioni multithread, casi end-to-end e test della transazione geometrica/substrato. Da rafforzare: iniezione controllata del fallimento dell'intero passo Lie, prova esplicita di topografia effettivamente variata e benchmark di scalabilità.  
 **Dipendenza architetturale:** [D19 — Architettura Lie definitiva](D19_LIE_SPLITTING_MIGRATION_TRACKER.md).
 
 ## 1. Obiettivo e vincoli non negoziabili
@@ -225,3 +225,11 @@ I template storici `EXAMPLE_2D` e `EXAMPLE_2D_PP` riportano ancora `N_RK=2` in `
 ### Estensione verifiche (2026-11-02)
 
 La suite end-to-end D20 comprende anche due configurazioni derivate da EXAMPLE_2D: `EXAMPLE_2D_NEWTON` imposta `RHEOLOGY_METHOD='NEWTON'` e `RHEOLOGY_GROUP=2`, mentre `EXAMPLE_2D_TOPO` abilita `TOPO_CHANGE_FLAG=T`. Entrambe sono confrontate su tutti i campi NetCDF con team effettivi 1/2/4. Aggiunto il job `geometry-rollback` che usa il modulo geometrico di produzione per verificare il ripristino esatto di topografia e cache dopo una mutazione volontaria, e che controlla anche il percorso commit. **Questi nuovi casi non risultano ancora eseguiti in CI**. Il rollback completo dello stato fisico nel ramo di errore Lie richiede ancora un test integrato separato; il job geometrico non lo certifica. Verificare inoltre con CI che la configurazione TOPO generi effettivamente un letto dinamico non nullo.
+
+## 11. Esito CI comunicato e migrazione degli esempi (2026-11-02)
+
+L'utente ha confermato verde l'intera GitHub Action D20 successivamente all'introduzione dei casi `EXAMPLE_2D_NEWTON`, `EXAMPLE_2D_TOPO` e del job `geometry-rollback`. Questa e' una conferma dell'esecuzione CI, non una prova supplementare che Newton abbia iterato in celle attive, che il letto sia effettivamente mutato o che un errore tardivo annulli **l'intera** transazione Lie. Restano aperti questi tre controlli di copertura.
+
+Sono stati migrati tutti i 21 file `EXAMPLES/**/IMEX_SfloW2D.inp` o `*.template` presenti nella revisione di partenza: rimosso `N_RK`, ormai estraneo alla namelist numerica Lie; i template senza `MASS_EXCHANGE_PARAMETERS` sono stati aggiornati spostando, senza cambiarne i valori, `SETTLING_FLAG`, `EROSION_COEFF` e `ENTRAINMENT_FLAG` dalla namelist di trasporto alla nuova sezione dedicata. Gli input che avevano gia' la sezione mass-exchange non sono stati duplicati. Il test end-to-end accetta direttamente gli input migrati e mantiene un adattatore soltanto per vecchi input senza la sezione. Compilazione e CI delle ultime modifiche non ancora rieseguite.
+
+**Prossimi gate:** (1) Action D20 verde sulla nuova revisione degli esempi; (2) prova di incremento non nullo della topografia quando `TOPO_CHANGE_FLAG=T`; (3) prova che Newton converga in almeno una cella; (4) rollback end-to-end in errore forzato dopo una modifica di inventario e geometria; (5) benchmark ottimizzato 1/2/4/8 thread.
