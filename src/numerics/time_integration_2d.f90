@@ -6,7 +6,8 @@ MODULE time_integration_2d
     USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
             begin_geometry_transaction,commit_geometry_transaction, &
-            rollback_geometry_transaction
+            rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y, &
+            B_prime_x_geom,B_prime_y_geom,grav_coeff
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : state_type,substrate_snapshot_type, &
             initialize_dry_physical_cell,conservative_mass_admissible
@@ -79,8 +80,28 @@ CONTAINS
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
         TYPE(substrate_snapshot_type) :: substrate_before
+        REAL(wp), ALLOCATABLE :: qp_authoritative(:,:,:),bed_before(:,:), &
+            bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:), &
+            slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
+        CHARACTER(LEN=24) :: injection_value
+        INTEGER :: injection_status
+        LOGICAL :: check_injected_rollback,had_bed_change
         IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
         ! Snapshot before evaluating any operator, including the primitive halo.
+        injection_value=''
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', &
+            injection_value,STATUS=injection_status)
+        check_injected_rollback=injection_status==0 .AND. LEN_TRIM(injection_value)>0
+        IF (check_injected_rollback) THEN
+            qp_authoritative=state%qp
+            bed_before=B_vertex
+            bed_cent_before=B_cent
+            bed_face_x_before=B_face_x
+            bed_face_y_before=B_face_y
+            slope_x_before=B_prime_x_geom
+            slope_y_before=B_prime_y_geom
+            gravity_before=grav_coeff
+        END IF
         this%q_before=state%q
         this%qp_before=state%qp
         this%q_trial=state%q
@@ -147,8 +168,35 @@ CONTAINS
             source_registry,stochastic_values,t,this%q_before,this%qp_before, &
             source_step_failed,source_failure)
         IF (source_step_failed) THEN
+            had_bed_change=.FALSE.
+            IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
             CALL state%restore_substrate(substrate_before)
             CALL rollback_geometry_transaction
+            IF (check_injected_rollback) THEN
+                IF (TRIM(source_failure)/='D20_INJECTED_LATE_LIE_FAILURE') &
+                    CALL fatal_error('D20 rollback: failpoint did not trigger')
+                IF (.NOT.had_bed_change) &
+                    CALL fatal_error('D20 rollback: failpoint had no prior bed change')
+                IF (.NOT.ALL(state%q==this%q_before) .OR. &
+                    .NOT.ALL(state%qp==qp_authoritative)) &
+                    CALL fatal_error('D20 rollback: published fluid state changed')
+                IF (.NOT.ALL(state%deposit==substrate_before%deposit) .OR. &
+                    .NOT.ALL(state%erosion==substrate_before%erosion) .OR. &
+                    .NOT.ALL(state%erodible==substrate_before%erodible) .OR. &
+                    .NOT.ALL(state%lava_deposit==substrate_before%lava_deposit) .OR. &
+                    .NOT.ALL(state%deposit_tot==substrate_before%deposit_tot) .OR. &
+                    .NOT.ALL(state%erosion_tot==substrate_before%erosion_tot)) &
+                    CALL fatal_error('D20 rollback: physical inventories not restored')
+                IF (.NOT.ALL(B_vertex==bed_before) .OR. &
+                    .NOT.ALL(B_cent==bed_cent_before) .OR. &
+                    .NOT.ALL(B_face_x==bed_face_x_before) .OR. &
+                    .NOT.ALL(B_face_y==bed_face_y_before) .OR. &
+                    .NOT.ALL(B_prime_x_geom==slope_x_before) .OR. &
+                    .NOT.ALL(B_prime_y_geom==slope_y_before) .OR. &
+                    .NOT.ALL(grav_coeff==gravity_before)) &
+                    CALL fatal_error('D20 rollback: geometry not restored')
+                WRITE(*,'(A)') 'D20_FULL_STEP_ROLLBACK_PASS'
+            END IF
             CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
         END IF
 
