@@ -23,26 +23,12 @@ MODULE nonlinear_solver_2d
     IMPLICIT NONE
 
     PRIVATE
-    PUBLIC :: initialize_nonlinear_solver
-    PUBLIC :: finalize_nonlinear_solver
     PUBLIC :: solve_backward_euler_group
-
-    !> Complex-step perturbation and its reciprocal.
-    REAL(wp) :: complex_step_perturbation, inverse_complex_step_perturbation
 
     !> Relative threshold used to reject numerically singular small systems.
     REAL(wp), PARAMETER :: pivot_tol_factor = 64.0_wp
 
 CONTAINS
-
-    !> Initialize the complex-step perturbation for the cell-local Newton solver.
-    SUBROUTINE initialize_nonlinear_solver
-        complex_step_perturbation = n_vars * EPSILON(1.0_wp)
-        inverse_complex_step_perturbation = 1.0_wp / complex_step_perturbation
-    END SUBROUTINE initialize_nonlinear_solver
-
-    SUBROUTINE finalize_nonlinear_solver
-    END SUBROUTINE finalize_nonlinear_solver
 
     !> Solve the entire structurally affected conservative equation set.
     !> Every other conservative component remains fixed at its group input value.
@@ -831,12 +817,17 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
 
+        REAL(wp) :: complex_step_perturbation,inverse_complex_step_perturbation
         REAL(wp) :: Jacob_relax(n_eqns,n_vars)
         COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
         COMPLEX(wp) :: qj_cmplx(n_vars) , qj_rel_cmplx(n_vars)
         COMPLEX(wp) :: qj_rel_cmplx_init(n_vars)
 
         INTEGER :: i, j, equation
+
+        ! Each Jacobian call owns its complex-step scale; no module-level mutable state.
+        complex_step_perturbation=n_vars*EPSILON(1.0_wp)
+        inverse_complex_step_perturbation=1.0_wp/complex_step_perturbation
 
         ! initialize the matrix of the linearized system and the Jacobian
 

@@ -22,9 +22,6 @@ MODULE simulation_2d
             n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag, &
             configure_canonical_state_indices
 
-    USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
-            finalize_nonlinear_solver
-
 
     USE runtime_2d, ONLY : runtime_state_type
     USE state_2d, ONLY : state_type
@@ -111,7 +108,6 @@ CONTAINS
         CALL this%spatial_operator%initialize
         CALL this%domain%initialize
 
-        CALL initialize_nonlinear_solver
         CALL this%time_integration%initialize
 
         CALL this%stochastic%initialize
@@ -165,7 +161,6 @@ CONTAINS
 
         CALL this%state%finalize
 
-        CALL finalize_nonlinear_solver
 
         CALL this%source_registry%finalize()
         CALL this%model_layout%finalize

@@ -188,4 +188,6 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 
 - Conversione stato, commit `2df999f`: `enforce_mass_fraction_closure` accetta ora lo stato opzionale `accepted` per segnalare frazioni materialmente negative senza invocare un errore fatale. `qc_to_qp`, quando richiesto l'esito `accepted`, utilizza questo percorso recuperabile; i chiamanti tradizionali senza stato mantengono la diagnostica fatale. La verifica dei dati prima di `r_phys_var` e la reentrancy dei percorsi transitivi restano soggette a compilazione e test.
 
+- **Newton reentrant (2026-11-02):** eliminati i due scalari globali mutabili di perturbazione complex-step; `eval_jacobian` determina localmente `complex_step_perturbation` e il reciproco dalla configurazione `n_vars`, preservando la formula originale. Rimossi i corrispondenti entrypoint di inizializzazione/finalizzazione ormai superflui e le chiamate in `simulation_2d`. Nessuna modifica alle quattro interfacce dei termini fisici. **Validazione compilatore e confronto numerico ancora da eseguire.**
+
 **Nota di metodo:** questo piano deriva dalla lettura del codice di produzione alla data sopra indicata. Le proprietà di thread safety transitive sono *ipotesi da validare*, non garanzie; non è stata effettuata compilazione né esecuzione dei test come parte della redazione.
