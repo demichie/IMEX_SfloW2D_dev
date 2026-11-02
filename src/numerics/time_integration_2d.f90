@@ -288,7 +288,8 @@ CONTAINS
         IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
         state%q=this%q_trial
         state%qp=this%qp_trial
-        IF (needs_substrate_snapshot) CALL state%refresh_substrate_totals()
+        ! The source executor refreshed substrate aggregates after its cell sweep.
+        ! Recomputing them here would traverse the whole domain a second time.
         IF (needs_geometry_snapshot) CALL commit_geometry_transaction
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
