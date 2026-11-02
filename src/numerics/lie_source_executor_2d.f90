@@ -18,7 +18,13 @@ MODULE lie_source_executor_2d
     IMPLICIT NONE
 
     PRIVATE
-    PUBLIC :: execute_lie_source_groups
+    PUBLIC :: execute_lie_source_groups,report_lie_source_profile
+    TYPE :: group_profile_type
+        INTEGER :: id=0,method=0,calls=0
+        REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
+    END TYPE group_profile_type
+    TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
+    LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
 
 CONTAINS
 
@@ -89,6 +95,8 @@ CONTAINS
         CHARACTER(LEN=256) :: failure_reason
         CHARACTER(LEN=24) :: reject_env
         INTEGER :: reject_group,env_status,parse_status
+        INTEGER :: tick,tock,clock_rate
+        CHARACTER(LEN=8) :: profile_env
 
         step_failed=.FALSE.
         failure_reason=''
@@ -107,12 +115,32 @@ CONTAINS
         IF (.NOT.source_registry%is_initialized())                                                                     &
             CALL fatal_error('D19: uninitialized Lie source registry')
         groups=source_registry%groups()
+        IF (.NOT.profiling_initialized) THEN
+            profile_env=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',profile_env,STATUS=env_status)
+            profiling_enabled=env_status==0 .AND. TRIM(profile_env)=='1'
+            profiling_initialized=.TRUE.
+            IF (profiling_enabled) THEN
+                ALLOCATE(group_profile(SIZE(groups)))
+                DO group_index=1,SIZE(groups)
+                    group_profile(group_index)%id=groups(group_index)%id
+                    group_profile(group_index)%method=groups(group_index)%method
+                END DO
+            END IF
+        END IF
+        IF (profiling_enabled) THEN
+            IF (SIZE(group_profile)/=SIZE(groups)) CALL fatal_error('Lie profiling group count changed')
+        END IF
         source_time=0.0_wp
         IF (PRESENT(step_start_time)) source_time=step_start_time
         IF (.NOT.ieee_is_finite(time_step)) CALL fatal_error('D19: non-finite Lie timestep')
         IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
 
         DO group_index=1,SIZE(groups)
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(tick,clock_rate)
+                group_profile(group_index)%calls=group_profile(group_index)%calls+1
+            END IF
             q_group=q
             qp_group=qp
             ! Validate configuration before spawning workers: fatal dispatch errors
@@ -170,6 +198,12 @@ CONTAINS
             ! q and qp remain immutable group-entry states until the serial commit.
             ! Only q_group/qp_group candidates and per-cell staging are modified.
             ! Each active cell owns distinct candidate slices and staging slots.
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                group_profile(group_index)%setup=group_profile(group_index)%setup+ &
+                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
+                tick=tock
+            END IF
             !$OMP PARALLEL DO DEFAULT(SHARED) &
             !$OMP& PRIVATE(cell,j,k,qpentry,q_candidate,qp_candidate,deposit_candidate, &
             !$OMP& erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
@@ -382,6 +416,12 @@ CONTAINS
 
             END DO cell_loop
             !$OMP END PARALLEL DO
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                group_profile(group_index)%evaluate=group_profile(group_index)%evaluate+ &
+                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
+                tick=tock
+            END IF
             first_failure=0
 
             DO cell=1,domain%solve_cells
@@ -485,6 +525,11 @@ CONTAINS
             ! has committed its candidate fluid, inventories and geometry.
             ! Never enabled in normal runs; the enclosing integrator must undo
             ! every preceding change using its authoritative snapshots.
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                group_profile(group_index)%commit=group_profile(group_index)%commit+ &
+                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
+            END IF
             IF (groups(group_index)%id==reject_group) THEN
                 step_failed=.TRUE.
                 failure_reason='D20_INJECTED_LATE_LIE_FAILURE'
@@ -515,5 +560,22 @@ CONTAINS
         step_failed=.TRUE.
     END SUBROUTINE reject_cell
     END SUBROUTINE execute_lie_source_groups
+
+    !> @brief Emit cumulative per-group Lie source profiling on finalization.
+    SUBROUTINE report_lie_source_profile()
+        INTEGER :: n
+        IF (.NOT.profiling_initialized) RETURN
+        IF (.NOT.profiling_enabled) RETURN
+        WRITE(*,'(A)') 'LIE_GROUP_PROFILE_BEGIN'
+        DO n=1,SIZE(group_profile)
+            WRITE(*,'(A,I0,A,I0,A,I0,A,3(1X,ES15.7))') &
+                'LIE_GROUP_PROFILE id=',group_profile(n)%id, &
+                ' method=',group_profile(n)%method, &
+                ' calls=',group_profile(n)%calls, &
+                ' setup/evaluate/commit=',group_profile(n)%setup, &
+                group_profile(n)%evaluate,group_profile(n)%commit
+        END DO
+        WRITE(*,'(A)') 'LIE_GROUP_PROFILE_END'
+    END SUBROUTINE report_lie_source_profile
 
 END MODULE lie_source_executor_2d

@@ -16,7 +16,7 @@ MODULE time_integration_2d
     USE source_registry_2d, ONLY : source_registry_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
-    USE lie_source_executor_2d, ONLY : execute_lie_source_groups
+    USE lie_source_executor_2d, ONLY : execute_lie_source_groups,report_lie_source_profile
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: time_integration_workspace_type
@@ -265,6 +265,7 @@ CONTAINS
     !> @param[in,out] this Integration workspace to release.
     SUBROUTINE finalize_time_integration(this)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
+        IF (this%profile_enabled) CALL report_lie_source_profile()
         IF (this%profile_enabled) THEN
             WRITE(*,'(A,I0)') 'LIE_PROFILE steps=',this%profile_calls
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE spatial_update_seconds=',this%profile_spatial
