@@ -36,7 +36,7 @@ CONTAINS
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
-            CALL eval_lava_deposition_volume_kernel(state%h,state%T,dt, &
+            CALL eval_lava_deposition_volume_kernel(state%h,state%T,dt,                                                &
                         r%carrier_deposition_rate)
             r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
             r%energy_rate=sp_heat_l*state%T*r%mixture_mass_rate
@@ -107,12 +107,12 @@ CONTAINS
 
             CASE('TEMPERATURE')
 
-                    factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/                 &
+                    factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/                               &
                                 lava_deposition_temp_width))
 
             CASE('VISCOSITY')
 
-                    factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)**                 &
+                    factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)**                               &
                                 lava_deposition_exponent)
             END SELECT
 
@@ -132,7 +132,7 @@ CONTAINS
             rate=0.0_wp
             IF (depth<=0.0_wp) RETURN
             IF (dt<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
-            rate=MIN(depth/dt,eval_lava_deposition_rate(temperature,                                   &
+            rate=MIN(depth/dt,eval_lava_deposition_rate(temperature,                                                   &
                         lava_kinematic_viscosity(temperature)))
         END SUBROUTINE eval_lava_deposition_volume_kernel
 

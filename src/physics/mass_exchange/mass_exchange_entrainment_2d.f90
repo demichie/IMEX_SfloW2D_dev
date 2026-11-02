@@ -2,7 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_entrainment_2d
-        USE parameters_2d, ONLY : wp, mass_exchange_rates_type, &
+        USE parameters_2d, ONLY : wp, mass_exchange_rates_type,                                                        &
             reset_mass_exchange_rates
         USE diagnostics_2d, ONLY : fatal_error
         USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
@@ -85,7 +85,7 @@ CONTAINS
         REAL(wp) FUNCTION eval_entrainment_volume_kernel(r_h, r_Ri, mod_vel2)
             REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
 
-            IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                                     &
+            IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                                                     &
                         ( r_Ri .GT. 0.0_wp ) ) THEN
 
                     eval_entrainment_volume_kernel = eval_air_entrainment_rate(r_Ri, mod_vel2)
@@ -102,13 +102,13 @@ CONTAINS
         !> @param[in] richardson_number Richardson number controlling entrainment [dimensionless].
         !> @param[in] speed_squared Squared three-dimensional flow speed [m2/s2].
         !> @return Physical rate from the indicated constitutive closure.
-        PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)                      &
+        PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)                                      &
                     RESULT(entrainment_rate)
 
             REAL(wp), INTENT(IN) :: richardson_number, speed_squared
             REAL(wp) :: entrainment_coefficient, entrainment_rate
 
-            entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *                              &
+            entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *                                              &
                         richardson_number**2.4_wp)
             entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
 
