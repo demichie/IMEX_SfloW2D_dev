@@ -80,10 +80,9 @@ CONTAINS
         REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
-        INTEGER, ALLOCATABLE :: group_j(:),group_k(:),newton_iterations(:)
+        INTEGER, ALLOCATABLE :: newton_iterations(:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
-        REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:),                                              &
-            staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
+        REAL(wp), ALLOCATABLE :: staged_bed_rate(:)
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
         LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok
@@ -170,13 +169,8 @@ CONTAINS
             IF (with_exchange) THEN
                 IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                                &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
-                ALLOCATE(group_j(domain%solve_cells),group_k(domain%solve_cells))
-                ALLOCATE(staged_deposit(n_solid,domain%solve_cells),                                                   &
-                    staged_erosion(n_solid,domain%solve_cells),                                                        &
-                    staged_erodible(n_solid,domain%solve_cells),                                                       &
-                    staged_lava(domain%solve_cells),staged_bed_rate(domain%solve_cells))
-
                 IF (topo_change_flag) THEN
+                    ALLOCATE(staged_bed_rate(domain%solve_cells))
                     ALLOCATE(bed_rate_cell(comp_cells_x,comp_cells_y))
                     bed_rate_cell=0.0_wp
 
@@ -192,7 +186,7 @@ CONTAINS
                 newton_iterations=0
 
             END IF
-            ! q and qp remain immutable group-entry states until the serial commit.
+            ! Only the time-step trial is updated; group rollback is unnecessary.
             ! Each worker modifies only its own cell in the trial timestep state.
             ! A failure discards the entire timestep trial, never a single group.
             IF (profiling_enabled) THEN
@@ -334,18 +328,16 @@ CONTAINS
                         CALL initialize_dry_physical_cell(qp_candidate)
 
                     END IF
-                    ! Commit only after the complete cell-local candidate is admissible.
+                    ! Publish only the fully validated cell to the time-step trial.
                     q(:,j,k)=q_candidate
                     qp(:,j,k)=qp_candidate
 
                     IF (with_exchange) THEN
-                        group_j(cell)=j
-                        group_k(cell)=k
-                        staged_deposit(:,cell)=deposit_candidate
-                        staged_erosion(:,cell)=erosion_candidate
-                        staged_erodible(:,cell)=erodible_candidate
-                        staged_lava(cell)=lava_candidate
-                        staged_bed_rate(cell)=transfers%dB_dt
+                        state%deposit(j,k,1:n_solid)=deposit_candidate
+                        state%erosion(j,k,1:n_solid)=erosion_candidate
+                        state%erodible(1:n_solid,j,k)=erodible_candidate
+                        state%lava_deposit(j,k)=lava_candidate
+                        IF (topo_change_flag) staged_bed_rate(cell)=transfers%dB_dt
 
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
@@ -368,12 +360,12 @@ CONTAINS
                         CYCLE cell_loop
 
                     END IF
-                    ! The analytic method must update the group candidate only.
-                    ! Publishing q here would bypass the atomic group commit.
-                    q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*analytic_rate
+                    q_candidate=q(:,j,k)
+                    q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
                     IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
-                    CALL solve_backward_euler_group(groups(group_index), q(:,j,k), time_step,                    &
+                    q_candidate=q(:,j,k)
+                    CALL solve_backward_euler_group(groups(group_index), q_candidate, time_step,                      &
                         B_prime_x_geom(j,k), B_prime_y_geom(j,k), grav_coeff(j,k), noise, iterations, ok, linear_info, &
                         failed)
                     newton_iterations(cell)=iterations
@@ -392,14 +384,14 @@ CONTAINS
                 ! Explicit candidates were already validated and converted above.
                 IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE cell_loop
                 ! Only check admissibility: never clip the accepted source update.
-                IF (.NOT.conservative_mass_admissible(q(1:n_eqns,j,k))) THEN
+                IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                     cell_failure(cell)='D19: inadmissible conservative source group state'
                     CYCLE cell_loop
 
                 END IF
 
-                IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
-                    CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context),conversion_ok)
+                IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
+                    CALL qc_to_qp(q_candidate,qp_candidate,pressure,TRIM(context),conversion_ok)
 
                     IF (.NOT.conversion_ok) THEN
                         cell_failure(cell)='D19: source group conversion failed'
@@ -407,9 +399,12 @@ CONTAINS
 
                     END IF
                 ELSE
-                    CALL initialize_dry_physical_cell(qp(:,j,k))
+                    CALL initialize_dry_physical_cell(qp_candidate)
 
                 END IF
+
+                q(:,j,k)=q_candidate
+                qp(:,j,k)=qp_candidate
 
             END DO cell_loop
             !$OMP END PARALLEL DO
@@ -481,8 +476,7 @@ CONTAINS
 
             IF (with_exchange) THEN
                 ! Accept the geometric projection before publishing inventory changes.
-                ! A rejected geometric refresh therefore leaves both inventories
-                ! and the conserved/primitive group state unmodified.
+                ! A rejected refresh rolls back the entire time-step.
                 IF (topo_change_flag) THEN
                     WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',                                               &
                         groups(group_index)%id,' max_abs_delta=',                                                      &
@@ -500,19 +494,8 @@ CONTAINS
 
                 END IF
 
-                DO cell=1,domain%solve_cells
-                    j=group_j(cell)
-                    k=group_k(cell)
-                    state%deposit(j,k,1:n_solid)=staged_deposit(:,cell)
-                    state%erosion(j,k,1:n_solid)=staged_erosion(:,cell)
-                    state%erodible(1:n_solid,j,k)=staged_erodible(:,cell)
-                    state%lava_deposit(j,k)=staged_lava(cell)
-
-                END DO
-
                 CALL state%refresh_substrate_totals()
-                DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion,                                              &
-                    staged_erodible,staged_lava,staged_bed_rate)
+                IF (ALLOCATED(staged_bed_rate)) DEALLOCATE(staged_bed_rate)
 
             END IF
 
@@ -540,8 +523,8 @@ CONTAINS
         INTEGER :: n,j_cell,k_cell
 
         DO n=1,domain%solve_cells
-            j_cell=group_j(n)
-            k_cell=group_k(n)
+            j_cell=domain%j_cent(n)
+            k_cell=domain%k_cent(n)
             bed_rate_cell(j_cell,k_cell)=staged_bed_rate(n)
 
         END DO

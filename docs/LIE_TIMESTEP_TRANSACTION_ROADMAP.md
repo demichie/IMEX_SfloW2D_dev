@@ -33,6 +33,9 @@ Do not clip or limit the spatial conservative update.
       level and retain the existing rollback failpoint.
 - [x] Remove obsolete per-group copy profiling counters; retain setup,
       evaluation and completion measurements.
+- [x] Keep analytic and Newton results in cell-local candidates until validation.
+- [x] Remove per-group inventory staging; update per-cell inventories in
+      the time-step trial, retaining bed-rate buffers for projection.
 - [ ] Run the Lie rollback/injected-failure regression Actions and PCCU tests.
 - [ ] Re-run the OpenMP performance benchmark at 1, 2 and 4 threads;
       compare performance against commit 0e3a8a7.
@@ -56,3 +59,11 @@ The time-step trial arrays are retained intentionally: this permits
 in-place per-cell updates while keeping the published fluid state
 unchanged until the entire time-step succeeds. Source-group-local
 full-domain snapshots are unnecessary with this structure.
+
+## Second implementation pass
+
+Analytic and Newton operations now validate private cell candidates before
+publishing each cell. Explicit mass-exchange updates the substrate per cell
+inside OpenMP; a later failure rolls back the full time-step. Bed geometry
+projection and its validation remain outside the parallel region. The
+existing injected late-failure regression must still be run.
