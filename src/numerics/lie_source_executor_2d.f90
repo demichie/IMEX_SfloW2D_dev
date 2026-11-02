@@ -305,6 +305,7 @@ CONTAINS
                 .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                        &
                 .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
                 cell_error=1
+                scratch%failure_code(cell)=cell_error
                 first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
 
@@ -312,6 +313,7 @@ CONTAINS
 
             IF (.NOT.ieee_is_finite(noise)) THEN
                 cell_error=2
+                scratch%failure_code(cell)=cell_error
                 first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
             END IF
