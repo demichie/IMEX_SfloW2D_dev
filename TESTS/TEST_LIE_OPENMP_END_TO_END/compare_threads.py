@@ -45,7 +45,7 @@ def prepare(repo, root, name):
     # N_RK belonged to the retired Runge-Kutta integrator. The production
     # solver now uses Lie splitting and does not accept N_RK in this namelist.
     # Remove only the obsolete option from temporary test inputs.
-    text = replace_one(text, r"^\\s*N_RK\\s*=.*(?:\\n|$)", "")
+    text = replace_one(text, r"^[ \t]*N_RK[ \t]*=.*$", "")
     # The solver otherwise selects its serial path even with OMP_NUM_THREADS>1.
     if re.search(r"^\s*SERIAL_FLAG\s*=", text, re.I | re.M):
         text = replace_one(text, r"^\s*SERIAL_FLAG\s*=.*$", " SERIAL_FLAG=F,")
