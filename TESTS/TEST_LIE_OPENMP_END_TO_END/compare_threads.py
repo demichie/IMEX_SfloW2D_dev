@@ -42,6 +42,10 @@ def prepare(repo, root, name):
     text = input_path.read_text()
     text = replace_one(text, r"^\s*T_END\s*=.*$", " T_END=2.0E-2,")
     text = replace_one(text, r"^\s*DT_OUTPUT\s*=.*$", " DT_OUTPUT=1.0E-2,")
+    # N_RK belonged to the retired Runge-Kutta integrator. The production
+    # solver now uses Lie splitting and does not accept N_RK in this namelist.
+    # Remove only the obsolete option from temporary test inputs.
+    text = replace_one(text, r"^\\s*N_RK\\s*=.*(?:\\n|$)", "")
     # The solver otherwise selects its serial path even with OMP_NUM_THREADS>1.
     if re.search(r"^\s*SERIAL_FLAG\s*=", text, re.I | re.M):
         text = replace_one(text, r"^\s*SERIAL_FLAG\s*=.*$", " SERIAL_FLAG=F,")

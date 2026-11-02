@@ -217,3 +217,7 @@ Aggiunto `TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py` e il job `lie-end
 ### Correzione fixture end-to-end
 
 `EXAMPLE_2D` usa un template precedente alla riorganizzazione degli input: `SETTLING_FLAG`, `EROSION_COEFF` ed `ENTRAINMENT_FLAG` sono ancora nei namelist di trasporto. La fixture temporanea del test li trasferisce in `MASS_EXCHANGE_PARAMETERS` senza modificarne i valori e lascia invariato il template originale; questo evita l'errore di lettura `IOSTAT=5010` in `GAS_TRANSPORT_PARAMETERS`. Il test deve ancora essere rieseguito nella Action.
+
+### Fixture numeriche Lie
+
+I template storici `EXAMPLE_2D` e `EXAMPLE_2D_PP` riportano ancora `N_RK=2` in `NUMERIC_PARAMETERS`, mentre la nuova namelist non lo accetta dopo la migrazione a Lie. Il test end-to-end rimuove tale sola voce obsoleta **dalle copie temporanee** e mantiene invariati gli altri coefficienti; i template di produzione rimangono intatti. Da verificare con Action.
