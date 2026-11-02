@@ -79,7 +79,7 @@ def read_fields(directory):
     return fields
 
 
-def run_case(solver, fixture, root, case, threads):
+def run_case(solver, fixture, root, case, threads, evidence):
     target = root / "runs" / case / str(threads)
     shutil.copytree(fixture, target)
     env = os.environ.copy()
@@ -88,12 +88,22 @@ def run_case(solver, fixture, root, case, threads):
     result = subprocess.run([str(solver)], cwd=target, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=240)
-    (target / "solver.log").write_text(result.stdout)
+    log_path = evidence / f"{case}-threads-{threads}.log"
+    log_path.write_text(result.stdout)
+    tail = "\\n".join(result.stdout.splitlines()[-35:])
     if result.returncode:
-        raise AssertionError(f"{case}/{threads}: solver exited {result.returncode}; see solver.log")
-    match = re.search(r"Parallel run: number of threads used\s+(\d+)", result.stdout)
-    if not match or int(match.group(1)) != threads:
-        raise AssertionError(f"{case}/{threads}: actual thread count not demonstrated")
+        raise AssertionError(f"{case}/{threads}: solver exited {result.returncode}; "
+                             f"log={log_path}; tail:\\n{tail}")
+    match = re.search(r"Parallel run:\\s*number of threads used\\s+(\\d+)", result.stdout)
+    if not match:
+        mode = ("non-OpenMP mode" if "Non-OpenMP simulation" in result.stdout
+                else "no OpenMP team report")
+        raise AssertionError(f"{case}/{threads}: {mode}; log={log_path}; "
+                             f"stdout tail:\\n{tail}")
+    actual = int(match.group(1))
+    if actual != threads:
+        raise AssertionError(f"{case}/{threads}: actual OpenMP team {actual} "
+                             f"!= requested {threads}; log={log_path}; tail:\\n{tail}")
     return read_fields(target)
 
 
@@ -136,7 +146,7 @@ def main():
                 baseline = None
                 results = {}
                 for threads in THREADS:
-                    fields = run_case(solver, fixture, root, case, threads)
+                    fields = run_case(solver, fixture, root, case, threads, evidence)
                     if baseline is None:
                         baseline = fields
                     else:
