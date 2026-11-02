@@ -44,6 +44,10 @@ jobs:
           ./configure --with-netcdf=/usr
           make -j2
           test -x src/IMEX_SfloW2D
+      - name: Validate benchmark Python syntax
+        run: |
+          /usr/bin/python3 -m py_compile TESTS/TEST_LIE_OPENMP_BENCHMARK/run_benchmark.py
+          /usr/bin/python3 -m py_compile TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py
       - name: Show runner CPU capacity
         run: |
           nproc
