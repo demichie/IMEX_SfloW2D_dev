@@ -18,6 +18,7 @@ MODULE domain_2d
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_cells_xy
     USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
     USE geometry_2d, ONLY : source_cell, cell_source_fractions
+    USE diagnostics_2d, ONLY : fatal_error
 
     IMPLICIT NONE
 
@@ -305,6 +306,10 @@ CONTAINS
         END DO
 
         this%solve_cells = i
+        ! This compact worklist is built by a single scan of a logical mask:
+        ! no coordinate can be inserted twice. Assert the cardinality at refresh.
+        IF (this%solve_cells/=COUNT(this%solve_mask)) &
+            CALL fatal_error('Lie OpenMP: inconsistent unique solve worklist')
 
         ! Preserve the former HP workset order: active cells, then neighbours.
         DO i = 1, this%hp_eta_cells
@@ -358,6 +363,8 @@ CONTAINS
             END DO
         END DO
         this%reconstruction_cells = i
+        IF (this%reconstruction_cells/=COUNT(this%reconstruction_mask)) &
+            CALL fatal_error('Lie OpenMP: inconsistent unique reconstruction worklist')
 
         !----- check for y-interfaces where computation is needed
         i = 0
