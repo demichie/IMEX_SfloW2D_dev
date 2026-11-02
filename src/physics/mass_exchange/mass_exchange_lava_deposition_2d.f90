@@ -29,7 +29,7 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_lava_deposition_explicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_explicit(state,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -41,7 +41,7 @@ CONTAINS
             r%energy_rate=sp_heat_l*state%T*r%mixture_mass_rate
             r%lava_deposit_rate=r%carrier_deposition_rate
             r%dB_dt=r%carrier_deposition_rate
-        END SUBROUTINE
+    END SUBROUTINE
 
         !> @brief Reject unsupported semi-implicit treatment for lava deposition.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -49,7 +49,7 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(state,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -57,7 +57,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('lava_deposition: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit
+    END SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit
 
         !> @brief Reject unsupported implicit treatment for immobilization of mobile lava.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -65,7 +65,7 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE eval_mass_exchange_lava_deposition_implicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_implicit(state,dt,r)
 
             TYPE(complex_physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -73,7 +73,7 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('lava_deposition: unsupported physical treatment')
-        END SUBROUTINE eval_mass_exchange_lava_deposition_implicit
+    END SUBROUTINE eval_mass_exchange_lava_deposition_implicit
 
         !> @brief Reject unsupported analytic treatment for immobilization of mobile lava.
         !> @details This entry point raises fatal_error; the rates are reset first.
@@ -81,7 +81,7 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-        SUBROUTINE solve_mass_exchange_lava_deposition_analytic(state,dt,r)
+    SUBROUTINE solve_mass_exchange_lava_deposition_analytic(state,dt,r)
 
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -89,9 +89,10 @@ CONTAINS
 
             CALL reset_mass_exchange_rates(r)
             CALL fatal_error('lava_deposition: unsupported physical treatment')
-        END SUBROUTINE solve_mass_exchange_lava_deposition_analytic
+    END SUBROUTINE solve_mass_exchange_lava_deposition_analytic
 
-        !> @brief Evaluate the configured temperature- or viscosity-dependent lava immobilization rate.
+        !> @brief Evaluate the configured temperature- or viscosity-dependent lava immobilization
+        !> rate.
         !> @param[in] temperature Material temperature [K].
         !> @param[in] viscosity Lava kinematic viscosity [m2/s].
         !> @return Physical rate from the indicated constitutive closure.
@@ -117,14 +118,14 @@ CONTAINS
             END SELECT
 
             rate=MAX(0.0_wp,lava_deposition_rate)*factor
-        END FUNCTION eval_lava_deposition_rate
+    END FUNCTION eval_lava_deposition_rate
 
         !> @brief Cap lava immobilization by the mobile layer depth available over the time step.
         !> @param[in] depth Mobile lava thickness [m].
         !> @param[in] temperature Material temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] rate Requested immobilization thickness rate [m/s].
-        SUBROUTINE eval_lava_deposition_volume_kernel(depth,temperature,dt,rate)
+    SUBROUTINE eval_lava_deposition_volume_kernel(depth,temperature,dt,rate)
 
             REAL(wp), INTENT(IN) :: depth,temperature,dt
             REAL(wp), INTENT(OUT) :: rate
@@ -134,6 +135,6 @@ CONTAINS
             IF (dt<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
             rate=MIN(depth/dt,eval_lava_deposition_rate(temperature,                                                   &
                         lava_kinematic_viscosity(temperature)))
-        END SUBROUTINE eval_lava_deposition_volume_kernel
+    END SUBROUTINE eval_lava_deposition_volume_kernel
 
 END MODULE mass_exchange_lava_deposition_2d
