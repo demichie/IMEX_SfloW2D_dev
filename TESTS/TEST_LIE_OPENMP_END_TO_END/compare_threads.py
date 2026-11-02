@@ -133,6 +133,18 @@ def run_case(solver, fixture, root, case, threads, evidence):
     if actual != threads:
         raise AssertionError(f"{case}/{threads}: actual OpenMP team {actual} "
                              f"!= requested {threads}; log={log_path}; tail:\\n{tail}")
+    if case == "EXAMPLE_2D_NEWTON":
+        witnesses = re.findall(
+            r"D20_NEWTON_WITNESS group=([0-9]+) solved_cells=([0-9]+) total_iterations=([0-9]+)",
+            result.stdout)
+        if not witnesses or sum(int(row[2]) for row in witnesses) <= 0:
+            raise AssertionError(f"{case}/{threads}: no actual Newton iterations; log={log_path}")
+    if case == "EXAMPLE_2D_TOPO":
+        witnesses = re.findall(
+            r"D20_BED_WITNESS group=[0-9]+ max_abs_delta=([+\\-0-9.Ee]+)",
+            result.stdout)
+        if not witnesses or max(float(value) for value in witnesses) <= 0.0:
+            raise AssertionError(f"{case}/{threads}: bed did not evolve; log={log_path}")
     return read_fields(target)
 
 
