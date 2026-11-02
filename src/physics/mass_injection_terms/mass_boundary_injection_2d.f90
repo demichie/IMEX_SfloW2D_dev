@@ -21,7 +21,7 @@ CONTAINS
     !> @param[out] source_bdry Primitive injection boundary trace.
     SUBROUTINE eval_boundary_injection_explicit( time, vect_x , vect_y , source_bdry )
 
-        USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,    &
+        USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,                                        &
             xg_source, time_param
 
         USE geometry_2d, ONLY : pi_g
@@ -65,7 +65,7 @@ CONTAINS
 
             ELSEIF ( t_rem .LE. time_param(2) ) THEN
 
-                t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g * ( ( t_rem - time_param(2) ) &
+                t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g * ( ( t_rem - time_param(2) )                                  &
                     / time_param(3) + 1.0_wp ) ) )
 
             END IF

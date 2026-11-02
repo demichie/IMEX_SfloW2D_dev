@@ -5,10 +5,10 @@ MODULE pore_pressure_2d
     USE parameters_2d, ONLY : wp, n_solid, n_eqns, pore_pressure_flag
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE diagnostics_2d, ONLY : fatal_error
-    USE pore_pressure_darcy_2d, ONLY : &
-            darcy_explicit => eval_pore_pressure_darcy_explicit, &
-            darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit, &
-            darcy_implicit => eval_pore_pressure_darcy_implicit, &
+    USE pore_pressure_darcy_2d, ONLY :                                                                                 &
+            darcy_explicit => eval_pore_pressure_darcy_explicit,                                                       &
+            darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit,                                             &
+            darcy_implicit => eval_pore_pressure_darcy_implicit,                                                       &
             darcy_analytic => eval_pore_pressure_darcy_analytic
     IMPLICIT NONE
     PRIVATE
@@ -97,7 +97,7 @@ CONTAINS
     !> @param[out] rate Mean conservative rate across the substep.
     !> @param[out] admissible Acceptance flag for the resulting local state.
     !> @param[in] include_gas_loss Optional coupled pore-gas loss switch.
-    SUBROUTINE eval_pore_pressure_analytic(models,state,q_before,interval,rate,admissible, &
+    SUBROUTINE eval_pore_pressure_analytic(models,state,q_before,interval,rate,admissible,                             &
             include_gas_loss)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state

@@ -4,18 +4,18 @@
 
 MODULE pore_pressure_darcy_2d
 
-    USE parameters_2d, ONLY : wp, n_solid, gas_flag, gas_loss_flag, pore_pressure_flag, &
-            n_eqns, n_add_gas, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn, &
-            idx_poreEqn, idx_addGasEqn_first, idx_solidEqn_first, &
+    USE parameters_2d, ONLY : wp, n_solid, gas_flag, gas_loss_flag, pore_pressure_flag,                                &
+            n_eqns, n_add_gas, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,                                        &
+            idx_poreEqn, idx_addGasEqn_first, idx_solidEqn_first,                                                      &
             idx_solidEqn_last, sutherland_flag
     USE COMPLEXIFY
     USE diagnostics_2d, ONLY : fatal_error
-    USE constitutive_parameters_2d, ONLY : alpha_trans, N_inh, f_inhibit_mode,    &
-            pascal_coeff, hydraulic_permeability, kin_visc_c, sp_heat_a,             &
-            sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,       &
+    USE constitutive_parameters_2d, ONLY : alpha_trans, N_inh, f_inhibit_mode,                                         &
+            pascal_coeff, hydraulic_permeability, kin_visc_c, sp_heat_a,                                               &
+            sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,                                         &
             dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
     USE geometry_2d, ONLY : pi_g
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, &
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                                  &
             mixt_var_state
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
@@ -65,7 +65,7 @@ CONTAINS
 
     !> Integrate frozen-coefficient Darcy directly and return the full
     !> conservative mean rate for the selected substep.
-    SUBROUTINE eval_pore_pressure_darcy_analytic( &
+    SUBROUTINE eval_pore_pressure_darcy_analytic(                                                                      &
             state,q_before,interval,rate,admissible,include_gas_loss)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
@@ -98,15 +98,15 @@ CONTAINS
         RETURN
         END IF
         solid_fractions=CMPLX(state%alphas,0.0_wp,wp)
-        CALL eval_pore_pressure_diffusion_factors(CMPLX(state%h,0.0_wp,wp), &
+        CALL eval_pore_pressure_diffusion_factors(CMPLX(state%h,0.0_wp,wp),                                            &
             CMPLX(state%T,0.0_wp,wp),solid_fractions,diffusion,inhibition,active)
         lambda=0.0_wp
-        IF (active) lambda=REAL((pi_g/2.0_wp)**2*diffusion*inhibition,wp) / &
+        IF (active) lambda=REAL((pi_g/2.0_wp)**2*diffusion*inhibition,wp) /                                            &
             (state%h*MAX(h_min,state%h))
         A=0.0_wp
         do_gas_loss=gas_flag .AND. gas_loss_flag
         IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
-        IF (do_gas_loss .AND. &
+        IF (do_gas_loss .AND.                                                                                          &
             SUM(state%alphas)<maximum_solid_packing) THEN
         CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
         IF (state%exc_pore_pres>0.0_wp) THEN
@@ -114,10 +114,10 @@ CONTAINS
             ! Evaluate at p_e=1 Pa to obtain the mass-loss coefficient A.
             BLOCK
                 COMPLEX(wp) :: gas_loss_coefficient
-                CALL pore_gas_loss_complex(CMPLX(state%h,0.0_wp,wp), &
-                    CMPLX(state%T,0.0_wp,wp),CMPLX(state%alphas,0.0_wp,wp), &
-                    CMPLX(SUM(state%alphas),0.0_wp,wp), &
-                    CMPLX(rho_c,0.0_wp,wp),CMPLX(1.0_wp,0.0_wp,wp), &
+                CALL pore_gas_loss_complex(CMPLX(state%h,0.0_wp,wp),                                                   &
+                    CMPLX(state%T,0.0_wp,wp),CMPLX(state%alphas,0.0_wp,wp),                                            &
+                    CMPLX(SUM(state%alphas),0.0_wp,wp),                                                                &
+                    CMPLX(rho_c,0.0_wp,wp),CMPLX(1.0_wp,0.0_wp,wp),                                                    &
                     gas_loss_coefficient)
                 A=rho_c*REAL(gas_loss_coefficient,wp)
             END BLOCK
@@ -127,17 +127,17 @@ CONTAINS
         pressure_after=state%exc_pore_pres
         pressure_q=mass_after*pressure_after
         loss=0.0_wp
-        IF (.NOT.ieee_is_finite(lambda) .OR. .NOT.ieee_is_finite(A) .OR. &
+        IF (.NOT.ieee_is_finite(lambda) .OR. .NOT.ieee_is_finite(A) .OR.                                               &
             .NOT.ieee_is_finite(state%exc_pore_pres)) RETURN
         IF (lambda<0.0_wp .OR. A<0.0_wp) RETURN
         admissible=.TRUE.
         IF (state%exc_pore_pres>0.0_wp .AND. interval>0.0_wp) THEN
-        IF (.NOT.ieee_is_finite(q_before(idx_totMassEqn)) .OR. &
-                .NOT.ieee_is_finite(state%exc_pore_pres) .OR. &
-                .NOT.ieee_is_finite(interval) .OR. &
-                .NOT.ieee_is_finite(lambda) .OR. &
+        IF (.NOT.ieee_is_finite(q_before(idx_totMassEqn)) .OR.                                                         &
+                .NOT.ieee_is_finite(state%exc_pore_pres) .OR.                                                          &
+                .NOT.ieee_is_finite(interval) .OR.                                                                     &
+                .NOT.ieee_is_finite(lambda) .OR.                                                                       &
                 .NOT.ieee_is_finite(A)) RETURN
-        IF (q_before(idx_totMassEqn)<=0.0_wp .OR. interval<0.0_wp .OR. &
+        IF (q_before(idx_totMassEqn)<=0.0_wp .OR. interval<0.0_wp .OR.                                                 &
                 lambda<0.0_wp .OR. A<0.0_wp) RETURN
 
         ! The existing v2/dev diffusion closure does not dissipate
@@ -152,8 +152,8 @@ CONTAINS
             ! Stable evaluation of (1-exp(-lambda*dt))/lambda,
             ! including small lambda*dt without cancellation.
             IF (ABS(lambda*interval)<1.0e-5_wp) THEN
-                pressure_integral=interval*(1.0_wp-0.5_wp*lambda*interval+ &
-                    (lambda*interval)**2/6.0_wp- &
+                pressure_integral=interval*(1.0_wp-0.5_wp*lambda*interval+                                             &
+                    (lambda*interval)**2/6.0_wp-                                                                       &
                     (lambda*interval)**3/24.0_wp)
             ELSE
                 pressure_integral=(1.0_wp-exponential_factor)/lambda
@@ -169,7 +169,7 @@ CONTAINS
 
         END IF
         gas_inventory=q_before(idx_totMassEqn)
-        gas_inventory=gas_inventory-SUM(q_before( &
+        gas_inventory=gas_inventory-SUM(q_before(                                                                      &
             idx_solidEqn_first:idx_solidEqn_last))
         IF (gas_inventory<0.0_wp) THEN
         admissible=.FALSE.
@@ -178,14 +178,14 @@ CONTAINS
         ! Independent Darcy inventory limiter: do not withdraw more carrier
         ! mass than the frozen state contains. Preserve a positive total mass.
         IF (loss>0.0_wp) THEN
-        loss=MIN(loss,MAX(0.0_wp,gas_inventory), &
-                MAX(0.0_wp,q_before(idx_totMassEqn)- &
+        loss=MIN(loss,MAX(0.0_wp,gas_inventory),                                                                       &
+                MAX(0.0_wp,q_before(idx_totMassEqn)-                                                                   &
                 EPSILON(1.0_wp)*MAX(1.0_wp,q_before(idx_totMassEqn))))
         mass_after=q_before(idx_totMassEqn)-loss
         pressure_q=mass_after*pressure_after
         END IF
         IF (n_add_gas>0 .AND. loss>0.0_wp) THEN
-        IF (ANY(q_before(idx_addGasEqn_first: &
+        IF (ANY(q_before(idx_addGasEqn_first:                                                                          &
                 idx_addGasEqn_first+n_add_gas-1)<0.0_wp)) THEN
             admissible=.FALSE.
             RETURN
@@ -197,13 +197,13 @@ CONTAINS
         q_after(idx_vEqn)=q_before(idx_vEqn)-state%v*loss
         IF (loss>0.0_wp) THEN
         ! No gas is removed from solid-class conservative masses.
-        q_after(idx_engyEqn)=q_before(idx_engyEqn)- &
+        q_after(idx_engyEqn)=q_before(idx_engyEqn)-                                                                    &
                 state%T*cp_c*loss
         IF (n_add_gas>0) THEN
             gas_fraction=loss/gas_inventory
-            q_after(idx_addGasEqn_first: &
-                    idx_addGasEqn_first+n_add_gas-1)= &
-                    q_before(idx_addGasEqn_first: &
+            q_after(idx_addGasEqn_first:                                                                               &
+                    idx_addGasEqn_first+n_add_gas-1)=                                                                  &
+                    q_before(idx_addGasEqn_first:                                                                      &
                     idx_addGasEqn_first+n_add_gas-1)*(1.0_wp-gas_fraction)
         END IF
         END IF
@@ -237,7 +237,7 @@ CONTAINS
     !******************************************************************************
 
 
-    SUBROUTINE pore_gas_loss_complex(flow_depth,temperature,solid_fractions, &
+    SUBROUTINE pore_gas_loss_complex(flow_depth,temperature,solid_fractions,                                           &
             total_solid_fraction,carrier_density,excess_pressure,gas_loss)
         COMPLEX(wp), INTENT(IN) :: flow_depth,temperature
         COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
@@ -247,13 +247,13 @@ CONTAINS
         LOGICAL :: active
 
         gas_loss=CMPLX(0.0_wp,0.0_wp,wp)
-        CALL eval_pore_pressure_diffusion_factors(flow_depth,temperature, &
+        CALL eval_pore_pressure_diffusion_factors(flow_depth,temperature,                                              &
             solid_fractions,diffusion,inhibition,active,mobility)
         IF (.NOT.active) RETURN
         IF (REAL(carrier_density,wp)<=0.0_wp) RETURN
-        depth=MERGE(flow_depth,CMPLX(1.0e-5_wp,0.0_wp,wp), &
+        depth=MERGE(flow_depth,CMPLX(1.0e-5_wp,0.0_wp,wp),                                                             &
             REAL(flow_depth,wp)>1.0e-5_wp)
-        gas_loss=(pi_g/2.0_wp)*mobility*excess_pressure*inhibition/ &
+        gas_loss=(pi_g/2.0_wp)*mobility*excess_pressure*inhibition/                                                    &
             (carrier_density*depth)
     END SUBROUTINE pore_gas_loss_complex
 
@@ -276,7 +276,7 @@ CONTAINS
     !> \note Real parts select piecewise branches while smooth closure algebra retains
     !>       complex perturbations for complex-step differentiation.
     !******************************************************************************
-    SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature,    &
+    SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature,                                           &
             solid_fractions, diffusion_coefficient, inhibition, active, mobility)
 
         COMPLEX(wp), INTENT(IN) :: flow_depth, temperature
@@ -314,26 +314,26 @@ CONTAINS
         IF (dynamic_permeability_flag) THEN
             IF (n_solid .GT. 1) THEN
                 sauter_diam = SUM(solid_fractions) / SUM(solid_fractions / diam_s)
-                mean_sphericity = SUM(solid_fractions * diam_s**2 * sphericity_s) / &
+                mean_sphericity = SUM(solid_fractions * diam_s**2 * sphericity_s) /                                    &
                     SUM(solid_fractions * diam_s**2)
             ELSE
                 sauter_diam = diam_s(1)
                 mean_sphericity = sphericity_s(1)
             END IF
-            local_permeability = (porosity**3.0_wp *                             &
-                (sauter_diam * mean_sphericity)**2.0_wp) /                      &
+            local_permeability = (porosity**3.0_wp *                                                                   &
+                (sauter_diam * mean_sphericity)**2.0_wp) /                                                             &
                 (150.0_wp * (1.0_wp - porosity)**2.0_wp)
         END IF
 
         IF (gas_flag .AND. sutherland_flag) THEN
-            dynamic_viscosity = muRef_Suth * (temperature / Tref_Suth)**1.5_wp *  &
+            dynamic_viscosity = muRef_Suth * (temperature / Tref_Suth)**1.5_wp *                                       &
                 (Tref_Suth + S_mu) / (temperature + S_mu)
             local_kinematic_viscosity = dynamic_viscosity / gas_density
         END IF
 
         IF (PRESENT(mobility)) mobility=local_permeability/local_kinematic_viscosity
-        diffusion_coefficient = local_permeability /                            &
-            (porosity * local_kinematic_viscosity * gas_density *               &
+        diffusion_coefficient = local_permeability /                                                                   &
+            (porosity * local_kinematic_viscosity * gas_density *                                                      &
             gas_compressibility)
 
         SELECT CASE (TRIM(ADJUSTL(f_inhibit_mode)))

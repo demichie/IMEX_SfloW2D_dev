@@ -24,11 +24,11 @@ CONTAINS
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate)
-        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
-            time_param, bottom_radial_source_flag, pore_pressure_flag, &
-            pore_pres_fract, n_intervals, t_intervals, vel_intervals, &
-            radial_source_flag, h_source, bottom_fissural_source_flag, &
-            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures, &
+        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                          &
+            time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
+            pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
+            radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
+            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
             xs_fissures, xg_fissures
         USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -50,7 +50,7 @@ CONTAINS
 
                 IF ( cell_fissure_fract(i_fissure) .LE. 0.0_wp ) CYCLE
 
-                t_rem = MOD(time + time_param_fissures(4,i_fissure),                &
+                t_rem = MOD(time + time_param_fissures(4,i_fissure),                                                   &
                     time_param_fissures(1,i_fissure))
                 IF (time_param_fissures(3,i_fissure) .EQ. 0.0_wp) THEN
                     IF (t_rem .LE. time_param_fissures(2,i_fissure)) THEN
@@ -60,18 +60,18 @@ CONTAINS
                     END IF
                 ELSEIF (t_rem .LT. time_param_fissures(3,i_fissure)) THEN
                     t_coeff = t_rem / time_param_fissures(3,i_fissure)
-                ELSEIF (t_rem .LE. time_param_fissures(2,i_fissure) -              &
+                ELSEIF (t_rem .LE. time_param_fissures(2,i_fissure) -                                                  &
                     time_param_fissures(3,i_fissure)) THEN
                     t_coeff = 1.0_wp
                 ELSEIF (t_rem .LE. time_param_fissures(2,i_fissure)) THEN
-                    t_coeff = 1.0_wp - (t_rem - time_param_fissures(2,i_fissure) +  &
-                        time_param_fissures(3,i_fissure)) /                        &
+                    t_coeff = 1.0_wp - (t_rem - time_param_fissures(2,i_fissure) +                                     &
+                        time_param_fissures(3,i_fissure)) /                                                            &
                         time_param_fissures(3,i_fissure)
                 ELSE
                     t_coeff = 0.0_wp
                 END IF
 
-                IF ( ALLOCATED( fissure_coeff_step ) )                              &
+                IF ( ALLOCATED( fissure_coeff_step ) )                                                                 &
                     t_coeff = fissure_coeff_step(i_fissure)
 
                 IF (t_coeff .LE. 0.0_wp) CYCLE
@@ -80,33 +80,33 @@ CONTAINS
                 qp_source = 0.0_wp
                 qp_source(idx_h) = 1.0_wp
                 qp_source(idx_T) = T_fissures(i_fissure)
-                qp_source(idx_solid_first:idx_solid_last) =                          &
+                qp_source(idx_solid_first:idx_solid_last) =                                                            &
                     xs_fissures(1:n_solid,i_fissure)
-                qp_source(idx_add_gas_first:idx_add_gas_last) =                      &
+                qp_source(idx_add_gas_first:idx_add_gas_last) =                                                        &
                     xg_fissures(1:n_add_gas,i_fissure)
                 IF (stoch_transport_flag) qp_source(idx_stoch) = 0.0_wp
                 IF (pore_pressure_flag) qp_source(idx_poreEqn) = 0.0_wp
                 qp_source(idx_u) = 0.0_wp
                 qp_source(idx_v) = 0.0_wp
 
-                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav,       &
+                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav,                                           &
                     r_sp_heat_c, r_sp_heat_mix)
 
                 rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
-                rate(4) = rate(4) + (t_coeff * &
+                rate(4) = rate(4) + (t_coeff *                                                                         &
                     h_dot * r_rho_m * r_sp_heat_mix * T_fissures(i_fissure))
-                rate(idx_solidEqn_first:idx_solidEqn_last) =                   &
-                    rate(idx_solidEqn_first:idx_solidEqn_last) +              &
+                rate(idx_solidEqn_first:idx_solidEqn_last) =                                                           &
+                    rate(idx_solidEqn_first:idx_solidEqn_last) +                                                       &
                     t_coeff * h_dot * r_rho_m * xs_fissures(1:n_solid,i_fissure)
-                rate(idx_addGasEqn_first:idx_addGasEqn_last) =                  &
-                    rate(idx_addGasEqn_first:idx_addGasEqn_last) +             &
+                rate(idx_addGasEqn_first:idx_addGasEqn_last) =                                                         &
+                    rate(idx_addGasEqn_first:idx_addGasEqn_last) +                                                     &
                     t_coeff * h_dot * r_rho_m * xg_fissures(1:n_add_gas,i_fissure)
 
 
                 IF (pore_pressure_flag) THEN
                     exc_pore_pres = state%exc_pore_pres
-                    rate(idx_poreEqn) = rate(idx_poreEqn) +                &
-                        t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot * &
+                    rate(idx_poreEqn) = rate(idx_poreEqn) +                                                            &
+                        t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot *                                   &
                         r_rho_m * r_red_grav + exc_pore_pres * h_dot * r_rho_m)
                 END IF
 

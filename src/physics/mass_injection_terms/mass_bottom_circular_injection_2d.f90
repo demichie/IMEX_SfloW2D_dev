@@ -24,11 +24,11 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate)
-        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
-            time_param, bottom_radial_source_flag, pore_pressure_flag, &
-            pore_pres_fract, n_intervals, t_intervals, vel_intervals, &
-            radial_source_flag, h_source, bottom_fissural_source_flag, &
-            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures, &
+        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                          &
+            time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
+            pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
+            radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
+            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
             xs_fissures, xg_fissures
         USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -107,7 +107,7 @@ CONTAINS
 
                     ELSEIF ( t_rem .LE. time_param(2) ) THEN
 
-                        t_coeff = 1.0_wp - ( t_rem - time_param(2) + time_param(3) ) /     &
+                        t_coeff = 1.0_wp - ( t_rem - time_param(2) + time_param(3) ) /                                 &
                             time_param(3)
 
                     ELSE
@@ -142,24 +142,24 @@ CONTAINS
             qp_source(idx_v) = 0.0_wp
 
 
-            CALL mixt_var(qp_source,r_Ri,r_rho_m,r_rho_c,r_red_grav,                   &
+            CALL mixt_var(qp_source,r_Ri,r_rho_m,r_rho_c,r_red_grav,                                                   &
                 r_sp_heat_c,r_sp_heat_mix)
 
             rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
             rate(2) = rate(2) + 0.0_wp
             rate(3) = rate(3) + 0.0_wp
 
-            rate(4) = rate(4) + (t_coeff * &
+            rate(4) = rate(4) + (t_coeff *                                                                             &
                 h_dot * r_rho_m * r_sp_heat_mix * t_source)
 
             ! source terms for the solid equations
-            rate(idx_solidEqn_first:idx_solidEqn_last) =                          &
-                rate(idx_solidEqn_first:idx_solidEqn_last) + t_coeff             &
+            rate(idx_solidEqn_first:idx_solidEqn_last) =                                                               &
+                rate(idx_solidEqn_first:idx_solidEqn_last) + t_coeff                                                   &
                 * h_dot * r_rho_m * xs_source(1:n_solid)
 
             ! source terms for the additional gas equations
-            rate(idx_addGasEqn_first:idx_addGasEqn_last) =                         &
-                rate(idx_addGasEqn_first:idx_addGasEqn_last) + t_coeff            &
+            rate(idx_addGasEqn_first:idx_addGasEqn_last) =                                                             &
+                rate(idx_addGasEqn_first:idx_addGasEqn_last) + t_coeff                                                 &
                 * h_dot * r_rho_m * xg_source(1:n_add_gas)
 
 
@@ -169,8 +169,8 @@ CONTAINS
 
                 ! Pore-pressure contribution uses the existing cell mixture mass.
                 ! the units of this source term are: kg^2 m^-3 s^-3
-                rate(idx_poreEqn) = rate(idx_poreEqn) +                       &
-                    t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot * &
+                rate(idx_poreEqn) = rate(idx_poreEqn) +                                                                &
+                    t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot *                                       &
                             r_rho_m * r_red_grav + exc_pore_pres * h_dot * r_rho_m)
 
             END IF

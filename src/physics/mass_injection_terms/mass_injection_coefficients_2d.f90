@@ -23,8 +23,8 @@ CONTAINS
     !> @param[in] dt Integration interval duration [s].
     SUBROUTINE set_source_time_coefficients( time , dt )
 
-        USE parameters_2d, ONLY : time_param , bottom_radial_source_flag ,          &
-            radial_source_flag , n_intervals , bottom_fissural_source_flag ,      &
+        USE parameters_2d, ONLY : time_param , bottom_radial_source_flag ,                                             &
+            radial_source_flag , n_intervals , bottom_fissural_source_flag ,                                           &
             n_fissures , time_param_fissures
 
         REAL(wp), INTENT(IN) :: time
@@ -42,8 +42,8 @@ CONTAINS
 
             ELSE
 
-                bottom_coeff_step = window_mean( time + time_param(4) , dt ,         &
-                    time_param(1) , time_param(2) , time_param(3) , .FALSE. ,      &
+                bottom_coeff_step = window_mean( time + time_param(4) , dt ,                                           &
+                    time_param(1) , time_param(2) , time_param(3) , .FALSE. ,                                          &
                     HUGE(1.0_wp) )
 
             END IF
@@ -52,15 +52,15 @@ CONTAINS
 
         IF ( bottom_fissural_source_flag ) THEN
 
-            IF ( .NOT. ALLOCATED( fissure_coeff_step ) )                            &
+            IF ( .NOT. ALLOCATED( fissure_coeff_step ) )                                                               &
                 ALLOCATE( fissure_coeff_step(n_fissures) )
 
             DO i_fissure = 1, n_fissures
 
-                fissure_coeff_step(i_fissure) = window_mean( time +                 &
-                    time_param_fissures(4,i_fissure) , dt ,                        &
-                    time_param_fissures(1,i_fissure) ,                             &
-                    time_param_fissures(2,i_fissure) ,                             &
+                fissure_coeff_step(i_fissure) = window_mean( time +                                                    &
+                    time_param_fissures(4,i_fissure) , dt ,                                                            &
+                    time_param_fissures(1,i_fissure) ,                                                                 &
+                    time_param_fissures(2,i_fissure) ,                                                                 &
                     time_param_fissures(3,i_fissure) , .FALSE. , HUGE(1.0_wp) )
 
             END DO
@@ -68,8 +68,8 @@ CONTAINS
         END IF
 
         ! The lateral radial source has cosine ramps and stops at TIME_PARAM(4)
-        IF ( radial_source_flag ) lateral_coeff_step = window_mean( time , dt ,     &
-            time_param(1) , time_param(2) , time_param(3) , .TRUE. ,              &
+        IF ( radial_source_flag ) lateral_coeff_step = window_mean( time , dt ,                                        &
+            time_param(1) , time_param(2) , time_param(3) , .TRUE. ,                                                   &
             time_param(4) )
 
     END SUBROUTINE set_source_time_coefficients
@@ -110,7 +110,7 @@ CONTAINS
         END IF
 
         ! A window with no ramp that is active over the whole period is always on
-        IF ( ( ramp .LE. 0.0_wp ) .AND. ( act .GE. per ) .AND.                    &
+        IF ( ( ramp .LE. 0.0_wp ) .AND. ( act .GE. per ) .AND.                                                         &
             ( v0 + dt .LE. cutoff ) ) THEN
 
             window_mean = 1.0_wp
@@ -126,7 +126,7 @@ CONTAINS
         IF ( n1 .EQ. n0 ) THEN
 
             ! A step that stays on the plateau gets exactly 1
-            IF ( ( u0 .GE. ramp ) .AND. ( u1 .LE. act - ramp ) .AND.                &
+            IF ( ( u0 .GE. ramp ) .AND. ( u1 .LE. act - ramp ) .AND.                                                   &
                 ( v0 + dt .LE. cutoff ) ) THEN
 
                 window_mean = 1.0_wp
@@ -138,8 +138,8 @@ CONTAINS
 
         ELSE
 
-            total = window_integral( u0 , per , act , ramp , cosine )               &
-                + ( n1 - n0 - 1.0_wp ) * ( act - ramp )                            &
+            total = window_integral( u0 , per , act , ramp , cosine )                                                  &
+                + ( n1 - n0 - 1.0_wp ) * ( act - ramp )                                                                &
                 + window_integral( 0.0_wp , u1 , act , ramp , cosine )
 
         END IF
@@ -190,11 +190,11 @@ CONTAINS
         IF ( x1 .GT. x0 ) THEN
 
             IF ( cosine ) THEN
-                window_integral = window_integral + 0.5_wp * ( x1 - x0 )             &
-                    - ramp / pi_g * COS( 0.5_wp * pi_g * ( x0 + x1 ) / ramp )      &
+                window_integral = window_integral + 0.5_wp * ( x1 - x0 )                                               &
+                    - ramp / pi_g * COS( 0.5_wp * pi_g * ( x0 + x1 ) / ramp )                                          &
                     * SIN( 0.5_wp * pi_g * ( x1 - x0 ) / ramp )
             ELSE
-                window_integral = window_integral                                    &
+                window_integral = window_integral                                                                      &
                     + 0.5_wp * ( x1 - x0 ) * ( x1 + x0 ) / ramp
             END IF
 
@@ -212,12 +212,12 @@ CONTAINS
         IF ( x1 .GT. x0 ) THEN
 
             IF ( cosine ) THEN
-                window_integral = window_integral + 0.5_wp * ( x1 - x0 )             &
-                    + ramp / pi_g * COS( 0.5_wp * pi_g * ( x0 + x1 - 2.0_wp *       &
-                    ( act - ramp ) ) / ramp ) * SIN( 0.5_wp * pi_g * ( x1 - x0 )    &
+                window_integral = window_integral + 0.5_wp * ( x1 - x0 )                                               &
+                    + ramp / pi_g * COS( 0.5_wp * pi_g * ( x0 + x1 - 2.0_wp *                                          &
+                    ( act - ramp ) ) / ramp ) * SIN( 0.5_wp * pi_g * ( x1 - x0 )                                       &
                     / ramp )
             ELSE
-                window_integral = window_integral                                    &
+                window_integral = window_integral                                                                      &
                     + 0.5_wp * ( x1 - x0 ) * ( 2.0_wp * act - x0 - x1 ) / ramp
             END IF
 
