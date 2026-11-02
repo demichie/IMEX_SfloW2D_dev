@@ -172,6 +172,7 @@ CONTAINS
                 WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
                     ' before/rate/after=',this%q_before(eq,j,k), &
                     this%spatial_rate(eq,j,k),this%q_trial(eq,j,k)
+                CALL spatial_operator%diagnose_cell(j,k,eq)
             END DO
             IF (spatial_status(first_failure)==1)                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')

@@ -34,11 +34,23 @@ MODULE spatial_operator_2d
         PROCEDURE, PUBLIC :: initialize => initialize_spatial_operator
         PROCEDURE, PUBLIC :: finalize => finalize_spatial_operator
         PROCEDURE, PUBLIC :: evaluate => evaluate_spatial_operator
+        PROCEDURE, PUBLIC :: diagnose_cell => diagnose_spatial_cell
         PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
         PROCEDURE, PUBLIC :: prepare_hp_workset => prepare_spatial_hp_workset
     END TYPE spatial_operator_type
 
 CONTAINS
+
+    !> @brief Report oriented HP-PCCU fluxes of a failed spatial cell.
+    !> @param[in] this Workspace holding the last evaluated spatial fluxes.
+    !> @param[in] j Horizontal cell index.
+    !> @param[in] k Vertical cell index.
+    !> @param[in] eq Conservative equation index.
+    SUBROUTINE diagnose_spatial_cell(this,j,k,eq)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        INTEGER, INTENT(IN) :: j,k,eq
+        CALL this%hp_pccu%diagnose_cell(j,k,eq)
+    END SUBROUTINE diagnose_spatial_cell
 
     !> \brief Initialize the reconstruction and KT flux workspace.
     !>

@@ -51,9 +51,45 @@ MODULE hyperbolic_2d
         PROCEDURE :: finalize => finalize_hyperbolic
         PROCEDURE :: evaluate_terms => eval_hyperbolic_terms
         PROCEDURE :: evaluate_speeds => eval_speeds
+        PROCEDURE :: diagnose_cell => diagnose_hyperbolic_cell
     END TYPE hyperbolic_workspace_type
 
 CONTAINS
+
+    !> @brief Report the resolved face contributions to one conservative residual.
+    !> @param[in] this Face-oriented HP-PCCU workspace.
+    !> @param[in] j Horizontal index of the failing cell.
+    !> @param[in] k Vertical index of the failing cell.
+    !> @param[in] eq Conservative equation index.
+    SUBROUTINE diagnose_hyperbolic_cell(this,j,k,eq)
+        CLASS(hyperbolic_workspace_type), INTENT(IN) :: this
+        INTEGER, INTENT(IN) :: j,k,eq
+        REAL(wp) :: x_right,x_left,y_top,y_bottom,path_x,path_y
+        x_right=0.0_wp
+        x_left=0.0_wp
+        y_top=0.0_wp
+        y_bottom=0.0_wp
+        path_x=0.0_wp
+        path_y=0.0_wp
+        IF (comp_cells_x>1) THEN
+            x_right=this%G_interface_xL(eq,j+1,k)
+            x_left=this%G_interface_xR(eq,j,k)
+            path_x=this%P_cell_x(eq,j,k)
+        END IF
+        IF (comp_cells_y>1) THEN
+            y_top=this%G_interface_yB(eq,j,k+1)
+            y_bottom=this%G_interface_yT(eq,j,k)
+            path_y=this%P_cell_y(eq,j,k)
+        END IF
+        WRITE(*,'(A,I0,A,6(1X,ES23.15))') 'LIE_FACE_FAILURE equation=',eq, &
+            ' right/left/top/bottom/path_x/path_y=', &
+            x_right,x_left,y_top,y_bottom,path_x,path_y
+        WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_FACE_FAILURE equation=',eq, &
+            ' div_x/div_y/total=', &
+            (x_right-x_left-path_x)*one_by_dx, &
+            (y_top-y_bottom-path_y)*one_by_dy, &
+            (x_right-x_left-path_x)*one_by_dx+(y_top-y_bottom-path_y)*one_by_dy
+    END SUBROUTINE diagnose_hyperbolic_cell
 
     !> \brief Allocate and zero wave-speed and oriented KT work arrays.
     !>
