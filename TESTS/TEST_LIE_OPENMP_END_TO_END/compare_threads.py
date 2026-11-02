@@ -141,7 +141,7 @@ def run_case(solver, fixture, root, case, threads, evidence):
             raise AssertionError(f"{case}/{threads}: no actual Newton iterations; log={log_path}")
     if case == "EXAMPLE_2D_TOPO":
         witnesses = re.findall(
-            r"D20_BED_WITNESS group=[0-9]+ max_abs_delta=([+\\-0-9.Ee]+)",
+            r"D20_BED_WITNESS group=[0-9]+ max_abs_delta=([0-9.Ee+-]+)",
             result.stdout)
         if not witnesses or max(float(value) for value in witnesses) <= 0.0:
             raise AssertionError(f"{case}/{threads}: bed did not evolve; log={log_path}")
