@@ -46,15 +46,15 @@ CONTAINS
 
     SUBROUTINE init_empty(state)
 
-        USE constitutive_parameters_2d, ONLY : T_ambient
+    USE constitutive_parameters_2d, ONLY : T_ambient
 
-        USE state_conversion_2d, ONLY : qp_to_qc
+    USE state_conversion_2d, ONLY : qp_to_qc
 
-        USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
+    USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
 
-        USE parameters_2d, ONLY : n_vars
+    USE parameters_2d, ONLY : n_vars
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(state_type), INTENT(INOUT) :: state
 
@@ -99,19 +99,19 @@ CONTAINS
 
     SUBROUTINE collapsing_volume(state)
 
-        USE state_conversion_2d, ONLY : qp_to_qc,                                                                      &
+    USE state_conversion_2d, ONLY : qp_to_qc,                                                                          &
                 eval_mixture_properties_from_volume_fractions
 
-        USE geometry_2d, ONLY : compute_cell_fract
+    USE geometry_2d, ONLY : compute_cell_fract
 
-        USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
+    USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
 
-        USE parameters_2d, ONLY : n_vars
+    USE parameters_2d, ONLY : n_vars
 
-        USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse ,                                  &
+    USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse ,                                      &
             h_collapse , alphas_collapse , alphag_collapse
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(state_type), INTENT(INOUT) :: state
 
@@ -150,10 +150,8 @@ CONTAINS
         qp_init(n_vars+1:n_vars+2) = 0.0_wp
 
         alphas_local = alphas_collapse(1:n_solid)
-        CALL eval_mixture_properties_from_volume_fractions(                                                            &
-                T_collapse, alphag_collapse(1:n_add_gas), alphas_local,                                                &
-                rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,                                                      &
-                xc, sp_heat_c, sp_heat_mix)
+        CALL eval_mixture_properties_from_volume_fractions(T_collapse, alphag_collapse(1:n_add_gas), alphas_local,     &
+            rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse, xc, sp_heat_c, sp_heat_mix)
 
         qp_init(5:4+n_solid) = xs_collapse
         qp_init(4+n_solid+1:4+n_solid+n_add_gas) = xg_collapse

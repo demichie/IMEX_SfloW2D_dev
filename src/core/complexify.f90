@@ -379,11 +379,14 @@ contains
 
     complex(wp) function max_cc(val1, val2)
         complex(wp), intent(in) :: val1, val2
+
         if (real(val1) > real(val2)) then
         max_cc = val1
         else
         max_cc = val2
+
         endif
+
         return
     end function max_cc
 
@@ -398,11 +401,14 @@ contains
     complex(wp) function max_cr(val1, val2)
         complex(wp), intent(in) :: val1
         real(wp), intent(in) :: val2
+
         if (real(val1) > val2) then
         max_cr = val1
         else
         max_cr = cmplx(val2, 0.0_wp,wp)
+
         endif
+
         return
     end function max_cr
 
@@ -417,11 +423,14 @@ contains
     complex(wp) function max_rc(val1, val2)
         real(wp), intent(in) :: val1
         complex(wp), intent(in) :: val2
+
         if (val1 > real(val2)) then
         max_rc = cmplx(val1, 0.0_wp,wp)
         else
         max_rc = val2
+
         endif
+
         return
     end function max_rc
 
@@ -436,14 +445,19 @@ contains
 
     complex(wp) function max_ccc(val1, val2, val3)
         complex(wp), intent(in) :: val1, val2, val3
+
         if (real(val1) > real(val2)) then
         max_ccc = val1
         else
         max_ccc = val2
+
         endif
+
         if (real(val3) > real(max_ccc)) then
         max_ccc = val3
+
         endif
+
         return
     end function max_ccc
 
@@ -461,19 +475,26 @@ contains
         complex(wp), intent(in) :: val1, val2, val3, val4
         complex(wp) max_cccc
         complex(wp) max_cccc2
+
         if (real(val1) > real(val2)) then
         max_cccc = val1
         else
         max_cccc = val2
+
         endif
+
         if (real(val3) > real(val4)) then
         max_cccc2 = val3
         else
         max_cccc2 = val4
+
         endif
+
         if (real(max_cccc2) > real(max_cccc)) then
         max_cccc = max_cccc2
+
         endif
+
         return
     end function max_cccc
 
@@ -488,11 +509,14 @@ contains
 
     complex(wp) function min_cc(val1, val2)
         complex(wp), intent(in) :: val1, val2
+
         if (real(val1) < real(val2)) then
         min_cc = val1
         else
         min_cc = val2
+
         endif
+
         return
     end function min_cc
 
@@ -507,11 +531,14 @@ contains
     complex(wp) function min_cr(val1, val2)
         complex(wp), intent(in) :: val1
         real(wp), intent(in) :: val2
+
         if (real(val1) < val2) then
         min_cr = val1
         else
         min_cr = cmplx(val2, 0.0_wp,wp)
+
         endif
+
         return
     end function min_cr
 
@@ -526,11 +553,14 @@ contains
     complex(wp) function min_rc(val1, val2)
         real(wp), intent(in) :: val1
         complex(wp), intent(in) :: val2
+
         if (val1 < real(val2)) then
         min_rc = cmplx(val1, 0.0_wp,wp)
         else
         min_rc = val2
+
         endif
+
         return
     end function min_rc
 
@@ -545,14 +575,19 @@ contains
 
     complex(wp) function min_ccc(val1, val2, val3)
         complex(wp), intent(in) :: val1, val2, val3
+
         if (real(val1) < real(val2)) then
         min_ccc = val1
         else
         min_ccc = val2
+
         endif
+
         if (real(val3) < real(min_ccc)) then
         min_ccc = val3
+
         endif
+
         return
     end function min_ccc
 
@@ -570,19 +605,26 @@ contains
         complex(wp), intent(in) :: val1, val2, val3, val4
         complex(wp) min_cccc
         complex(wp) min_cccc2
+
         if (real(val1) < real(val2)) then
         min_cccc = val1
         else
         min_cccc = val2
+
         endif
+
         if (real(val3) < real(val4)) then
         min_cccc2 = val3
         else
         min_cccc2 = val4
+
         endif
+
         if (real(min_cccc2) < real(min_cccc)) then
         min_cccc = min_cccc2
+
         endif
+
         return
     end function min_cccc
 
@@ -598,11 +640,14 @@ contains
     complex(wp) function sign_cc(val1, val2)
         complex(wp), intent(in) :: val1, val2
         real(wp)  sign
+
         if (real(val2) < 0.0_wp) then
         sign = -1.
         else
         sign = 1.
+
         endif
+
         sign_cc = sign * val1
         return
     end function sign_cc
@@ -617,11 +662,14 @@ contains
         complex(wp), intent(in) :: val1
         real(wp), intent(in) :: val2
         real(wp) sign
+
         if (real(val2) < 0.0_wp) then
         sign = -1.
         else
         sign = 1.
+
         endif
+
         sign_cr = sign * val1
         return
     end function sign_cr
@@ -636,11 +684,14 @@ contains
         real(wp), intent(in) :: val1
         complex(wp), intent(in) :: val2
         real(wp) sign
+
         if (real(val2) < 0.0_wp) then
         sign = -1.
         else
         sign = 1.
+
         endif
+
         sign_rc = sign * val1
         return
     end function sign_rc
@@ -654,11 +705,14 @@ contains
 
     complex(wp) function dim_cc(val1, val2)
         complex(wp), intent(in) :: val1, val2
+
         if (val1 > val2) then
         dim_cc = val1 - val2
         else
         dim_cc = cmplx(0.0_wp, 0.0_wp,wp)
+
         endif
+
         return
     end function dim_cc
 
@@ -671,11 +725,14 @@ contains
     complex(wp) function dim_cr(val1, val2)
         complex(wp), intent(in) :: val1
         real(wp), intent(in) :: val2
+
         if (val1 > val2) then
         dim_cr = val1 - cmplx(val2, 0.0_wp,wp)
         else
         dim_cr = cmplx(0.0_wp, 0.0_wp,wp)
+
         endif
+
         return
     end function dim_cr
 
@@ -688,11 +745,14 @@ contains
     complex(wp) function dim_rc(val1, val2)
         real(wp), intent(in) :: val1
         complex(wp), intent(in) :: val2
+
         if (val1 > val2) then
         dim_rc = cmplx(val1, 0.0_wp,wp) - val2
         else
         dim_rc = cmplx(0.0_wp, 0.0_wp,wp)
+
         endif
+
         return
     end function dim_rc
 

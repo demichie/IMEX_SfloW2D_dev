@@ -182,17 +182,17 @@ CONTAINS
 
     SUBROUTINE init_grid
 
-        USE parameters_2d, ONLY: radial_source_flag, lateral_source_flag
-        USE parameters_2d, ONLY: eps_sing , eps_sing4
-        USE parameters_2d, ONLY : bottom_radial_source_flag
-        USE parameters_2d, ONLY : bottom_fissural_source_flag, n_fissures
-        USE parameters_2d, ONLY : x_source , y_source , r_source , r2_source ,                                         &
+    USE parameters_2d, ONLY: radial_source_flag, lateral_source_flag
+    USE parameters_2d, ONLY: eps_sing , eps_sing4
+    USE parameters_2d, ONLY : bottom_radial_source_flag
+    USE parameters_2d, ONLY : bottom_fissural_source_flag, n_fissures
+    USE parameters_2d, ONLY : x_source , y_source , r_source , r2_source ,                                             &
             angle_source
-        USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,                                        &
+    USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,                                            &
                 width_fissures
-        USE parameters_2d, ONLY : liquid_vaporization_flag
+    USE parameters_2d, ONLY : liquid_vaporization_flag
 
-        IMPLICIT none
+    IMPLICIT none
 
         INTEGER j,k      !> loop counter
 
@@ -226,6 +226,7 @@ CONTAINS
             ALLOCATE( sourceS_vect_y(comp_cells_x,comp_cells_y) )
             ALLOCATE( sourceN_vect_x(comp_cells_x,comp_cells_y) )
             ALLOCATE( sourceN_vect_y(comp_cells_x,comp_cells_y) )
+
         END IF
 
         ALLOCATE( B_vertex(comp_interfaces_x,comp_interfaces_y) )
@@ -333,9 +334,8 @@ CONTAINS
 
             DO j=1,comp_cells_x
 
-                CALL interp_2d_nodata( topography_profile(1,:,:) ,                                                     &
-                    topography_profile(2,:,:), topography_profile(3,:,:) ,                                             &
-                    x_comp(j), y_comp(k) , B_nodata(j,k) )
+                CALL interp_2d_nodata(topography_profile(1,:,:) , topography_profile(2,:,:),                           &
+                    topography_profile(3,:,:) , x_comp(j), y_comp(k) , B_nodata(j,k))
 
             END DO
 
@@ -349,9 +349,8 @@ CONTAINS
 
             DO j=1,comp_interfaces_x
 
-                CALL interp_2d_scalar( topography_profile(1,:,:) ,                                                     &
-                    topography_profile(2,:,:), topography_profile(3,:,:) ,                                             &
-                    x_stag(j), y_stag(k) , B_vertex(j,k) )
+                CALL interp_2d_scalar(topography_profile(1,:,:) , topography_profile(2,:,:),                           &
+                    topography_profile(3,:,:) , x_stag(j), y_stag(k) , B_vertex(j,k))
 
             END DO
 
@@ -382,11 +381,11 @@ CONTAINS
         IF ( bottom_fissural_source_flag ) THEN
 
             DO j = 1, n_fissures
-                CALL compute_cell_fissure_fraction(                                                                    &
-                    x_fissures_end_points(:,j), y_fissures_end_points(:,j),                                            &
+                CALL compute_cell_fissure_fraction(x_fissures_end_points(:,j), y_fissures_end_points(:,j),             &
                     width_fissures(j), cell_fissure_fractions(:,:,j))
                 cell_source_fractions = MAX(cell_source_fractions,                                                     &
                     cell_fissure_fractions(:,:,j))
+
             END DO
 
         END IF
@@ -415,7 +414,7 @@ CONTAINS
     !-----------------------------------------------------------------------------
 
     SUBROUTINE interp_2d_scalar(x1, y1, f1, x2, y2, f2)
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
         REAL(wp), INTENT(IN) :: x2, y2
@@ -486,7 +485,7 @@ CONTAINS
     !-----------------------------------------------------------------------------
 
     SUBROUTINE interp_2d_nodata(x1, y1, f1, x2, y2, f2)
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
         REAL(wp), INTENT(IN) :: x2, y2
@@ -552,7 +551,7 @@ CONTAINS
 
     SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width, cell_fraction)
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: endpoints_x(2), endpoints_y(2), width
         REAL(wp), INTENT(OUT) :: cell_fraction(comp_cells_x,comp_cells_y)
@@ -602,6 +601,7 @@ CONTAINS
 
                 ! Clip the fissure polygon against the cell's four axis-aligned edges.
                 DO edge = 1, 4
+
                     SELECT CASE (edge)
                     CASE (1)
                         axis = 1
@@ -619,34 +619,44 @@ CONTAINS
                         axis = 2
                         boundary = y_stag(cell_y+1)
                         keep_greater = .FALSE.
+
                     END SELECT
 
                     clipped_count = 0
                     previous_vertex = vertex_count
+
                     IF (axis .EQ. 1) THEN
                         previous_coordinate = polygon_x(previous_vertex)
                     ELSE
                         previous_coordinate = polygon_y(previous_vertex)
+
                     END IF
+
                     IF (keep_greater) THEN
                         previous_inside = previous_coordinate .GE. boundary
                     ELSE
                         previous_inside = previous_coordinate .LE. boundary
+
                     END IF
 
                     DO vertex = 1, vertex_count
+
                         IF (axis .EQ. 1) THEN
                             current_coordinate = polygon_x(vertex)
                         ELSE
                             current_coordinate = polygon_y(vertex)
+
                         END IF
+
                         IF (keep_greater) THEN
                             current_inside = current_coordinate .GE. boundary
                         ELSE
                             current_inside = current_coordinate .LE. boundary
+
                         END IF
 
                         IF (current_inside .NEQV. previous_inside) THEN
+
                             IF (axis .EQ. 1) THEN
                                 denominator = polygon_x(vertex) - polygon_x(previous_vertex)
                                 fraction = (boundary - polygon_x(previous_vertex)) / denominator
@@ -659,26 +669,32 @@ CONTAINS
                                 intersection_x = polygon_x(previous_vertex) + fraction *                               &
                                     (polygon_x(vertex) - polygon_x(previous_vertex))
                                 intersection_y = boundary
+
                             END IF
+
                             clipped_count = clipped_count + 1
                             clipped_x(clipped_count) = intersection_x
                             clipped_y(clipped_count) = intersection_y
+
                         END IF
 
                         IF (current_inside) THEN
                             clipped_count = clipped_count + 1
                             clipped_x(clipped_count) = polygon_x(vertex)
                             clipped_y(clipped_count) = polygon_y(vertex)
+
                         END IF
 
                         previous_vertex = vertex
                         previous_inside = current_inside
+
                     END DO
 
                     vertex_count = clipped_count
                     IF (vertex_count .EQ. 0) EXIT
                     polygon_x(1:vertex_count) = clipped_x(1:vertex_count)
                     polygon_y(1:vertex_count) = clipped_y(1:vertex_count)
+
                 END DO
 
                 IF (vertex_count .LT. 3) CYCLE
@@ -687,6 +703,7 @@ CONTAINS
                 ! order 1e6 m the products of absolute coordinates lose about 1e-3 m2
                 ! per cell, a few parts in 1e6 of the coverage of an oblique fissure.
                 area_twice = 0.0_wp
+
                 DO vertex = 1, vertex_count
                     next_vertex = MOD(vertex, vertex_count) + 1
                     area_twice = area_twice                                                                            &
@@ -694,10 +711,14 @@ CONTAINS
                         * ( polygon_y(next_vertex) - y_stag(cell_y) )                                                  &
                         - ( polygon_x(next_vertex) - x_stag(cell_x) )                                                  &
                         * ( polygon_y(vertex) - y_stag(cell_y) )
+
                 END DO
+
                 cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                                                             &
                     0.5_wp * ABS(area_twice) / (dx * dy))
+
             END DO
+
         END DO
 
     END SUBROUTINE compute_cell_fissure_fraction
@@ -713,7 +734,7 @@ CONTAINS
 
     SUBROUTINE compute_cell_fract(xs,ys,rs,r2s,angles,cell_fract)
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: xs,ys,rs,r2s,angles
 
@@ -841,10 +862,13 @@ CONTAINS
         old_gravity_y=grav_coeff_stag_y
         B_vertex=bed_candidate
         CALL refresh_topography_geometry
+
         IF (topography_geometry_is_finite()) THEN
             accepted=.TRUE.
             RETURN
+
         END IF
+
         B_vertex=old_bed
         B_cent=old_cent
         B_face_x=old_face_x
@@ -899,9 +923,9 @@ CONTAINS
 
     SUBROUTINE topography_zones
 
-        USE parameters_2D, ONLY: water_level
+    USE parameters_2D, ONLY: water_level
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         INTEGER :: i,j,k
 
@@ -990,6 +1014,7 @@ CONTAINS
                 equi_list_new(zone) = i
 
             END IF
+
         END DO
 
         zone_counter = i
@@ -1055,17 +1080,17 @@ CONTAINS
 
     SUBROUTINE init_source
 
-        USE parameters_2d, ONLY : x_source , y_source , r_source
+    USE parameters_2d, ONLY : x_source , y_source , r_source
 
-        USE parameters_2d, ONLY : source_side
-        USE parameters_2d, ONLY : x1_source , x2_source
-        USE parameters_2d, ONLY : y1_source , y2_source
-        USE parameters_2d, ONLY : lateral_source_flag
-        USE parameters_2d, ONLY : radial_source_flag
-        USE parameters_2d, ONLY : azimuth_source , arc_width_source
-        USE parameters_2d, ONLY : r2_source
+    USE parameters_2d, ONLY : source_side
+    USE parameters_2d, ONLY : x1_source , x2_source
+    USE parameters_2d, ONLY : y1_source , y2_source
+    USE parameters_2d, ONLY : lateral_source_flag
+    USE parameters_2d, ONLY : radial_source_flag
+    USE parameters_2d, ONLY : azimuth_source , arc_width_source
+    USE parameters_2d, ONLY : r2_source
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp) :: source_distance
 
@@ -1310,6 +1335,7 @@ CONTAINS
             half_arc = 0.5_wp * arc_width_source
 
             DO k = 1,comp_cells_y
+
                 DO j = 1,comp_cells_x
 
                     IF ( source_cell(j,k) .NE. 2 ) CYCLE
@@ -1319,9 +1345,11 @@ CONTAINS
                         vx = sourceE_vect_x(j,k)
                         vy = sourceE_vect_y(j,k)
                         vmag = SQRT( vx*vx + vy*vy )
+
                         IF ( vmag .GT. 0.0_wp ) THEN
                             nx = vx / vmag
                             ny = vy / vmag
+
                             IF ( arc_width_source .GE. 360.0_wp ) THEN
                                 in_arc = .TRUE.
                             ELSE
@@ -1331,14 +1359,19 @@ CONTAINS
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
+
                             END IF
+
                             IF ( in_arc ) THEN
                                 face_len = dy
                                 cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
                                 cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
                                 cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+
                             END IF
+
                         END IF
+
                     END IF
 
                     ! West face
@@ -1346,9 +1379,11 @@ CONTAINS
                         vx = sourceW_vect_x(j,k)
                         vy = sourceW_vect_y(j,k)
                         vmag = SQRT( vx*vx + vy*vy )
+
                         IF ( vmag .GT. 0.0_wp ) THEN
                             nx = vx / vmag
                             ny = vy / vmag
+
                             IF ( arc_width_source .GE. 360.0_wp ) THEN
                                 in_arc = .TRUE.
                             ELSE
@@ -1358,14 +1393,19 @@ CONTAINS
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
+
                             END IF
+
                             IF ( in_arc ) THEN
                                 face_len = dy
                                 cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
                                 cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
                                 cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+
                             END IF
+
                         END IF
+
                     END IF
 
                     ! North face
@@ -1373,9 +1413,11 @@ CONTAINS
                         vx = sourceN_vect_x(j,k)
                         vy = sourceN_vect_y(j,k)
                         vmag = SQRT( vx*vx + vy*vy )
+
                         IF ( vmag .GT. 0.0_wp ) THEN
                             nx = vx / vmag
                             ny = vy / vmag
+
                             IF ( arc_width_source .GE. 360.0_wp ) THEN
                                 in_arc = .TRUE.
                             ELSE
@@ -1385,14 +1427,19 @@ CONTAINS
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
+
                             END IF
+
                             IF ( in_arc ) THEN
                                 face_len = dx
                                 cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
                                 cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
                                 cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+
                             END IF
+
                         END IF
+
                     END IF
 
                     ! South face
@@ -1400,9 +1447,11 @@ CONTAINS
                         vx = sourceS_vect_x(j,k)
                         vy = sourceS_vect_y(j,k)
                         vmag = SQRT( vx*vx + vy*vy )
+
                         IF ( vmag .GT. 0.0_wp ) THEN
                             nx = vx / vmag
                             ny = vy / vmag
+
                             IF ( arc_width_source .GE. 360.0_wp ) THEN
                                 in_arc = .TRUE.
                             ELSE
@@ -1412,14 +1461,19 @@ CONTAINS
                                     + 360.0_wp, 360.0_wp)
                                 IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
                                 in_arc = ( ang_diff .LE. half_arc )
+
                             END IF
+
                             IF ( in_arc ) THEN
                                 face_len = dx
                                 cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
                                 cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
                                 cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+
                             END IF
+
                         END IF
+
                     END IF
 
                     ! Normalize the cell-aggregate outward unit normal.
@@ -1427,13 +1481,17 @@ CONTAINS
                         cell_arc_n_x(j,k) = cell_arc_n_x(j,k) / cell_arc_perim(j,k)
                         cell_arc_n_y(j,k) = cell_arc_n_y(j,k) / cell_arc_perim(j,k)
                         vmag = SQRT( cell_arc_n_x(j,k)**2 + cell_arc_n_y(j,k)**2 )
+
                         IF ( vmag .GT. 0.0_wp ) THEN
                             cell_arc_n_x(j,k) = cell_arc_n_x(j,k) / vmag
                             cell_arc_n_y(j,k) = cell_arc_n_y(j,k) / vmag
+
                         END IF
+
                     END IF
 
                 END DO
+
             END DO
 
             arc_perim_total = SUM( cell_arc_perim(1:comp_cells_x,1:comp_cells_y) )
@@ -1453,6 +1511,7 @@ CONTAINS
             IF ( arc_width_source .LT. 360.0_wp ) THEN
                 source_length_analytical = source_length_analytical                                                    &
                     * ( arc_width_source / 360.0_wp )
+
             END IF
 
             IF ( arc_perim_total .GT. 0.0_wp ) THEN
@@ -1461,6 +1520,7 @@ CONTAINS
                 WRITE(*,*) 'Radial source analytical arc length (m) = ',                                               &
                     source_length_analytical
                 WRITE(*,*) 'Volume-source rescale factor              = ', rescale
+
             END IF
 
         END IF
@@ -1482,7 +1542,7 @@ CONTAINS
 
     SUBROUTINE derive_topography_from_vertices
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         B_face_x(:,:) = 0.5_wp * ( B_vertex(:,1:comp_cells_y)                                                          &
             + B_vertex(:,2:comp_interfaces_y) )
@@ -1510,7 +1570,7 @@ CONTAINS
 
     SUBROUTINE project_cell_field_to_vertices( cell_field, vertex_field )
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: cell_field(comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(OUT) :: vertex_field(comp_interfaces_x,comp_interfaces_y)
@@ -1525,6 +1585,7 @@ CONTAINS
         !$OMP PARALLEL DO COLLAPSE(2)                                             &
         !$OMP & PRIVATE(j_first,j_last,k_first,k_last,adjacent_cells)
         DO k = 1, comp_interfaces_y
+
             DO j = 1, comp_interfaces_x
                 j_first = MAX(1,j-1)
                 j_last = MIN(comp_cells_x,j)
@@ -1533,7 +1594,9 @@ CONTAINS
                 adjacent_cells = (j_last-j_first+1) * (k_last-k_first+1)
                 vertex_field(j,k) = SUM(cell_field(j_first:j_last,k_first:k_last))                                     &
                     / REAL(adjacent_cells,wp)
+
             END DO
+
         END DO
         !$OMP END PARALLEL DO
 
@@ -1611,7 +1674,7 @@ CONTAINS
 
     SUBROUTINE refresh_topography_geometry
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         ! Refresh shared Q1 elevations first. The derivative filter acts on the
         ! derived bed only; it must never overwrite the authoritative B_vertex.
@@ -1641,9 +1704,9 @@ CONTAINS
 
     SUBROUTINE topography_reconstruction
 
-        USE parameters_2d, ONLY : slope_correction_flag
+    USE parameters_2d, ONLY : slope_correction_flag
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         INTEGER :: j,k,kk,kj
         REAL(wp) :: weighted_sum
@@ -1680,6 +1743,7 @@ CONTAINS
             B_second_xx_geom = 0.0_wp
             B_second_yy_geom = 0.0_wp
             B_second_xy_geom = 0.0_wp
+
         END IF
 
         IF ( comp_cells_y .EQ. 1 ) THEN
@@ -1727,12 +1791,16 @@ CONTAINS
             DO k = 3, comp_cells_y - 2
                 first_derivative_sum = 0.0_wp
                 second_derivative_sum = 0.0_wp
+
                 DO kk = 1, 5
                     first_derivative_sum = first_derivative_sum + c1(kk) * B_cent(j,k+kk-3)
                     second_derivative_sum = second_derivative_sum + c2(kk) * B_cent(j,k+kk-3)
+
                 END DO
+
                 B_prime_y_geom(j,k) = first_derivative_sum / norm1_y
                 B_second_yy_geom(j,k) = second_derivative_sum / norm2_y
+
             END DO
             !$OMP END PARALLEL DO
 
@@ -1748,14 +1816,17 @@ CONTAINS
                 B_prime_y_geom(j,k)   = 0.0_wp
                 B_second_xx_geom(j,k) = 0.0_wp
                 B_second_yy_geom(j,k) = 0.0_wp
+
                 DO kj = 1, 5 ! Stencil in x-direction
                     B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   + c1(kj) * B_cent(j + kj - 3, k)
                     B_second_xx_geom(j,k) = B_second_xx_geom(j,k) + c2(kj) * B_cent(j + kj - 3, k)
 
                 END DO
+
                 DO kk = 1, 5 ! Stencil in y-direction
                     B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   + c1(kk) * B_cent(j, k + kk - 3)
                     B_second_yy_geom(j,k) = B_second_yy_geom(j,k) + c2(kk) * B_cent(j, k + kk - 3)
+
                 END DO
 
                 B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   / norm1_x
@@ -1766,14 +1837,20 @@ CONTAINS
                 ! --- Mixed derivative (xy) using a 2D kernel ---
                 ! The kernel is the outer product of the 1D first derivative kernels.
                 weighted_sum = 0.0_wp
+
                 DO kk = 1, 5 ! Stencil in y-direction
+
                     DO kj = 1, 5 ! Stencil in x-direction
                         weighted_sum = weighted_sum + c1(kj) * c1(kk) * B_cent(j + kj - 3, k + kk - 3)
+
                     END DO
+
                 END DO
+
                 B_second_xy_geom(j,k) = weighted_sum / norm_xy
 
             END DO
+
         END DO
         !$OMP END PARALLEL DO
 
@@ -1788,11 +1865,13 @@ CONTAINS
         ! --- Handle left and right boundaries (columns j=1, 2, comp_cells_x-1, comp_cells_x) ---
         IF (comp_cells_x .GE. 5) THEN
             CALL copy_derivative_halo_x
+
         END IF
 
         IF ( comp_cells_y .GE. 5 ) THEN
 
             CALL copy_derivative_halo_y
+
         END IF
 
         IF ( slope_correction_flag ) THEN
@@ -1842,16 +1921,21 @@ CONTAINS
         n = SIZE(bed)
         first = 0.0_wp; second = 0.0_wp
         IF (n .LE. 1) RETURN
+
         DO i=1,n
             coordinate(i) = (REAL(i-1,wp)-0.5_wp*REAL(n-1,wp))*spacing
+
         END DO
+
         linear = SUM(coordinate*bed)/SUM(coordinate**2)
         first = linear
+
         IF (n .GE. 3) THEN
             quadratic_basis = coordinate**2-SUM(coordinate**2)/REAL(n,wp)
             quadratic = SUM(quadratic_basis*bed)/SUM(quadratic_basis**2)
             first = linear+2.0_wp*quadratic*coordinate
             second = 2.0_wp*quadratic
+
         END IF
     END SUBROUTINE reconstruct_short_1d_line
 
@@ -1882,6 +1966,7 @@ CONTAINS
             B_second_yy_geom(comp_cells_x,k)   = B_second_yy_geom(comp_cells_x-2,k)
             B_second_xy_geom(comp_cells_x-1,k) = B_second_xy_geom(comp_cells_x-2,k)
             B_second_xy_geom(comp_cells_x,k)   = B_second_xy_geom(comp_cells_x-2,k)
+
         END DO
         !$OMP END PARALLEL DO
     END SUBROUTINE copy_derivative_halo_x
@@ -1913,6 +1998,7 @@ CONTAINS
             B_second_yy_geom(j,comp_cells_y)   = B_second_yy_geom(j,comp_cells_y-2)
             B_second_xy_geom(j,comp_cells_y-1) = B_second_xy_geom(j,comp_cells_y-2)
             B_second_xy_geom(j,comp_cells_y)   = B_second_xy_geom(j,comp_cells_y-2)
+
         END DO
         !$OMP END PARALLEL DO
     END SUBROUTINE copy_derivative_halo_y
@@ -1937,7 +2023,7 @@ CONTAINS
     !-----------------------------------------------------------------------------
 
     SUBROUTINE interp_2d_scalarB(x1, y1, f1, x2, y2, f2)
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN), DIMENSION(:) :: x1, y1
         REAL(wp), INTENT(IN), DIMENSION(:,:) :: f1
@@ -2024,7 +2110,7 @@ CONTAINS
     !-----------------------------------------------------------------------------
 
     SUBROUTINE regrid_scalar(xin, yin, fin, xl, xr , yl, yr, fout)
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN), DIMENSION(:) :: xin, yin
         REAL(wp), INTENT(IN), DIMENSION(:,:) :: fin
@@ -2090,9 +2176,9 @@ CONTAINS
 
     SUBROUTINE limit( v , z , limiter , slope_lim )
 
-        USE parameters_2d, ONLY : theta
+    USE parameters_2d, ONLY : theta
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: v(3)
         REAL(wp), INTENT(IN) :: z(3)
@@ -2170,7 +2256,7 @@ CONTAINS
 
     REAL(wp) FUNCTION minmod(a,b)
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: a
         REAL(wp), INTENT(IN) :: b
@@ -2199,7 +2285,7 @@ CONTAINS
 
     REAL(wp) function maxmod(a,b)
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp) :: a , b , sa , sb
 

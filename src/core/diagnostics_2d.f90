@@ -51,6 +51,7 @@ CONTAINS
             CALL FLUSH(error_unit)
             !$OMP END CRITICAL(diagnostics_output)
             RETURN
+
         END IF
 
         WRITE(output_unit,*) 'DEBUG PAUSE: ', TRIM(message)
@@ -61,6 +62,7 @@ CONTAINS
         IF (io_status /= 0) THEN
             WRITE(error_unit,*) 'WARNING: Unable to read interactive debug input.'
             CALL FLUSH(error_unit)
+
         END IF
 
     END SUBROUTINE debug_pause

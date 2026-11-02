@@ -162,6 +162,7 @@ PROGRAM IMEX_SfloW2D
         IF (serial_flag) THEN
             CALL omp_set_num_threads(1)  ! Use only 1 thread
             WRITE(*,*) 'Serial run'
+
         END IF
 
 !$    n_threads = omp_get_max_threads()
@@ -176,11 +177,14 @@ PROGRAM IMEX_SfloW2D
 
     lie_source_groups=simulation%source_registry%groups()
     boundary_source_enabled=.FALSE.
+
     DO i_source_group=1,SIZE(lie_source_groups)
         IF (lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
         boundary_source_enabled=boundary_source_enabled .OR. group_contains_name(                                      &
                 lie_source_groups(i_source_group),'boundary_injection')
+
     END DO
+
     DEALLOCATE(lie_source_groups)
 
     is_binary_restart = .FALSE.
@@ -193,10 +197,12 @@ PROGRAM IMEX_SfloW2D
 
         ! Calculate string length and extract the last 4 characters
         len_fname = LEN_TRIM(restart_file)
+
         IF (len_fname >= 4) THEN
             ext = restart_file(len_fname-3:len_fname)
         ELSE
             ext = '    '
+
         END IF
 
         IF ( ext .EQ. '.bin' ) THEN
@@ -204,8 +210,8 @@ PROGRAM IMEX_SfloW2D
             ! CASE 1: BINARY RESTART (Exact)
             ! ---------------------------------------------------------
             WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
-            CALL read_restart_file(TRIM(restart_file), simulation%runtime,                                             &
-                    simulation%stochastic, simulation%state, simulation%domain)
+            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state,    &
+                simulation%domain)
             CALL validate_restart_output_manifest(simulation%runtime)
 
             is_binary_restart = .TRUE.
@@ -214,6 +220,7 @@ PROGRAM IMEX_SfloW2D
             ! if spatial correlation is active
             IF (stochastic_flag .AND. length_spatial_corr > 0.0_wp) THEN
                 CALL simulation%stochastic%generate_kernel()
+
             END IF
 
             IF (stochastic_flag) CALL simulation%stochastic%refresh_effective()
@@ -276,14 +283,17 @@ PROGRAM IMEX_SfloW2D
         simulation%runtime%dt = dt0
         simulation%runtime%dt_old = dt0
         simulation%runtime%dt_old_old = dt0
+
     END IF
 
     stop_flag = .FALSE.
+
     IF (is_binary_restart) THEN
         stop_flag = simulation%runtime%stop_requested
         IF (.NOT. stop_flag) simulation%runtime%steady_deadline = t_end
     ELSE
         simulation%runtime%steady_deadline = t_end
+
     END IF
 
     IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
@@ -299,8 +309,7 @@ PROGRAM IMEX_SfloW2D
 
         IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                                                            &
-                    simulation%state%qp(1:n_vars+2,j,k), p_dyn)
+            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars+2,j,k), p_dyn)
 
             IF ( .NOT. is_binary_restart )                                                                             &
                     simulation%state%hmax(j,k) = simulation%state%qp(idx_h,j,k)
@@ -350,10 +359,12 @@ PROGRAM IMEX_SfloW2D
 
             simulation%state%qp(1:n_vars,j,k) = 0.0_wp
             simulation%state%qp(idx_T,j,k) = T_ambient
+
             IF ( .NOT. is_binary_restart ) THEN
                 simulation%state%hmax(j,k) = 0.0_wp
                 simulation%state%pdynmax(j,k) = 0.0_wp
                 simulation%state%mod_vel_max(j,k) = 0.0_wp
+
             END IF
 
         END IF
@@ -365,22 +376,23 @@ PROGRAM IMEX_SfloW2D
     IF (is_binary_restart) THEN
         CALL validate_runout_outputs(simulation%runtime, runout_exists, mass_exists)
         CALL write_param_backup()
+
     END IF
+
     CALL open_runout_outputs(simulation%runtime, is_binary_restart, runout_exists, mass_exists)
 
     IF ( output_runout_flag .AND. (.NOT. is_binary_restart) )                                                          &
-            CALL output_runout(                                                                                        &
-            simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
+            CALL output_runout(simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
 
     IF ( output_cons_flag .OR. output_esri_flag .OR.                                                                   &
         output_netcdf_flag ) THEN
         IF ( .NOT. is_binary_restart ) CALL output_solution(                                                           &
         simulation%runtime%t, simulation%state, simulation%runtime)
+
     END IF
 
     IF ( ( n_probes .GT. 0 ) .AND. (.NOT. is_binary_restart) )                                                         &
-            CALL output_probes(                                                                                        &
-            simulation%runtime%t, simulation%state, simulation%runtime)
+            CALL output_probes(simulation%runtime%t, simulation%state, simulation%runtime)
 
     IF ( SUM(simulation%state%q(idx_totMassEqn,:,:)) .EQ. 0.0_wp )                                                     &
         simulation%runtime%steady_deadline = t_end
@@ -474,8 +486,7 @@ PROGRAM IMEX_SfloW2D
 
             IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-                CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                                                        &
-                        simulation%state%qp(1:n_vars+2,j,k), p_dyn)
+                CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars+2,j,k), p_dyn)
 
                 simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),                                           &
                         simulation%state%qp(idx_h,j,k))
@@ -569,8 +580,7 @@ PROGRAM IMEX_SfloW2D
         IF ( n_probes .GT. 0 ) THEN
 
             IF ( simulation%runtime%t .GE. simulation%runtime%t_probes )                                               &
-                    CALL output_probes(simulation%runtime%t, simulation%state,                                         &
-                            simulation%runtime)
+                    CALL output_probes(simulation%runtime%t, simulation%state, simulation%runtime)
 
         END IF
 
@@ -589,11 +599,9 @@ PROGRAM IMEX_SfloW2D
 
             IF ( output_cons_flag .OR. output_esri_flag .OR. output_netcdf_flag ) THEN
 
-                CALL output_solution(simulation%runtime%t, simulation%state,                                           &
-                        simulation%runtime)
-                CALL write_restart_file(output_file_path('restart', 'restart.bin'),                                    &
-                        simulation%runtime,                                                                            &
-                        simulation%stochastic, simulation%state, simulation%domain)
+                CALL output_solution(simulation%runtime%t, simulation%state, simulation%runtime)
+                CALL write_restart_file(output_file_path('restart', 'restart.bin'), simulation%runtime,                &
+                    simulation%stochastic, simulation%state, simulation%domain)
 
             END IF
 

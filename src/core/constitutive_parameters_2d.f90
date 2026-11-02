@@ -219,47 +219,60 @@ CONTAINS
     SUBROUTINE precompute_pascal_coefficient(N_order)
         !! Computes the two Pascal-like coefficients for each n = 0..N
         !! Stores their product in the module array pascal_coeff(0:N_order).
-        IMPLICIT NONE
+    IMPLICIT NONE
         INTEGER, INTENT(IN) :: N_order
         INTEGER :: n, k
         REAL(wp) :: pascal1, pascal2
 
         ! allocate or reallocate pascal_coeff with 0-based indices
     IF ( ALLOCATED(pascal_coeff) ) THEN
+
         IF ( LBOUND(pascal_coeff,1) /= 0 .OR. UBOUND(pascal_coeff,1) /= N_order ) THEN
             DEALLOCATE(pascal_coeff)
             ALLOCATE(pascal_coeff(0:N_order))
+
         END IF
     ELSE
         ALLOCATE(pascal_coeff(0:N_order))
+
     END IF
 
         ! Validate input
         IF (N_order < 0) THEN
             WRITE(*,*) 'ERROR: N must be >= 0. N =', N_order
             STOP
+
         END IF
 
         ! Loop over n = 0..N and compute the two coefficients
         DO n = 0, N_order
             ! ----- First coefficient: pascal_triangle(-N-1, n) -----
             pascal1 = 1.0_wp
+
             IF (n > 0) THEN
+
                 DO k = 0, n-1
                     pascal1 = pascal1 * ( -REAL(N_order,kind=wp) - 1.0_wp -                                            &
                                         REAL(k, kind=wp) ) / REAL(k+1,kind=wp)
+
                 END DO
+
             END IF
             ! ----- Second coefficient: pascal_triangle(2N+1, N-n) -----
             pascal2 = 1.0_wp
+
             IF (N_order - n > 0) THEN
+
                 DO k = 0, N_order - n - 1
                     pascal2 = pascal2 * (2.0_wp*REAL(N_order,kind=wp)+1.0_wp-                                          &
                                         REAL(k,kind=wp) ) / REAL(k+1,kind=wp)
+
                 END DO
+
             END IF
 
             pascal_coeff(n) = pascal1 * pascal2
+
         END DO
 
         pascal_coeff_precomputed = .TRUE.

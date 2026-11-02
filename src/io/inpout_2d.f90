@@ -439,15 +439,17 @@ CONTAINS
     !>       finite-math assumptions can fold IEEE_IS_FINITE to true. No floating
     !>       arithmetic is performed, including for signaling NaN input.
     PURE ELEMENTAL LOGICAL FUNCTION finite_input_value(value) RESULT(finite)
-        USE, INTRINSIC :: iso_fortran_env, ONLY: int32, int64
+    USE, INTRINSIC :: iso_fortran_env, ONLY: int32, int64
         REAL(wp), INTENT(IN) :: value
         INTEGER(int32), PARAMETER :: exponent32=INT(Z'7F800000',int32)
         INTEGER(int64), PARAMETER :: exponent64=INT(Z'7FF0000000000000',int64)
         finite=.FALSE.
+
         IF (STORAGE_SIZE(value)==64 .AND. DIGITS(value)==53 .AND. RADIX(value)==2) THEN
         finite=IAND(TRANSFER(value,0_int64),exponent64)/=exponent64
         ELSEIF (STORAGE_SIZE(value)==32 .AND. DIGITS(value)==24 .AND. RADIX(value)==2) THEN
         finite=IAND(TRANSFER(value,0_int32),exponent32)/=exponent32
+
         END IF
     END FUNCTION finite_input_value
 
@@ -469,9 +471,9 @@ CONTAINS
 
     SUBROUTINE init_param
 
-        USE parameters_2d, ONLY: n_vars
+    USE parameters_2d, ONLY: n_vars
 
-        IMPLICIT none
+    IMPLICIT none
 
         LOGICAL :: lexist
         INTEGER :: ios
@@ -663,6 +665,7 @@ CONTAINS
 
         IF (n_layers .NE. 1) THEN
             CALL fatal_error('Only N_LAYERS=1 is currently supported')
+
         END IF
 
         idx_solid_first = 5
@@ -750,7 +753,9 @@ CONTAINS
                 WRITE (*, *) 'or BOTTOM_RADIAL_SOURCE_FLAG=T'
                 WRITE (*, *) 'Please check the input file'
                 STOP
+
                 END IF
+
             END IF
 
             ! Normalize and validate f_inhibit_mode (require uppercase tokens in input)
@@ -767,11 +772,13 @@ CONTAINS
                 WRITE (*, *) 'f_inhibit_mode = ', f_inhibit_mode
                 WRITE (*, *) 'Precomputed Pascal coefficients for N_INH = ', N_inh
                 WRITE (*, *) 'pascal_coeff_precomputed = ', pascal_coeff_precomputed
+
                 END IF
 
                 IF (N_inh <= 0) THEN
                 WRITE (*, *) 'ERROR: N_INH must be > 0 when F_INHIBIT_MODE is STATIC or DYNAMIC'
                 STOP
+
                 END IF
 
                 IF (alpha_trans .LE. 0.0_wp) THEN
@@ -779,6 +786,7 @@ CONTAINS
                 WRITE (*, *) 'alpha_trans =', alpha_trans
         WRITE (*, *) 'Please check that alpha_trans is > 0.0 when F_INHIBIT_MODE is STATIC or DYNAMIC'
                 STOP
+
                 END IF
 
             END IF
@@ -1053,28 +1061,28 @@ CONTAINS
 
     SUBROUTINE read_param
 
-        USE parameters_2d, ONLY: n_vars, n_eqns
-        USE parameters_2d, ONLY: limiter
-        USE parameters_2d, ONLY: bcW, bcE, bcS, bcN
+    USE parameters_2d, ONLY: n_vars, n_eqns
+    USE parameters_2d, ONLY: limiter
+    USE parameters_2d, ONLY: bcW, bcE, bcS, bcN
 
 
-        USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
+    USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
 
-        USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
-        USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions,                                    &
+    USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
+    USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions,                                        &
             eval_mixture_properties_from_volume_fractions,                                                             &
             enforce_mass_fraction_closure
 
-        USE rheology_lahar_2d, ONLY: n_td2
-        USE constitutive_parameters_2d, ONLY: coeff_porosity,                                                          &
+    USE rheology_lahar_2d, ONLY: n_td2
+    USE constitutive_parameters_2d, ONLY: coeff_porosity,                                                              &
             radiative_term_coeff, SBconst, convective_term_coeff
 
-        USE init_2d, ONLY: erodible_init
+    USE init_2d, ONLY: erodible_init
 
         ! External procedures
-        USE state_conversion_2d, ONLY: mixt_var
+    USE state_conversion_2d, ONLY: mixt_var
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp) :: max_cfl
 
@@ -1202,6 +1210,7 @@ CONTAINS
 
         IF (lava_flag .AND. (gas_flag .OR. liquid_flag)) THEN
         ERROR STOP 'LAVA_FLAG requires GAS_FLAG=F and LIQUID_FLAG=F'
+
         END IF
 
         IF ((.NOT. liquid_flag) .AND. (.NOT. gas_flag) .AND. (.NOT. lava_flag)) THEN
@@ -1353,6 +1362,7 @@ CONTAINS
                 WRITE (*, *) 'Carrier phase kinematic viscosity:', kin_visc_a
 
             END IF
+
             kin_visc_c = kin_visc_a
 
         END IF
@@ -1416,6 +1426,7 @@ CONTAINS
         END IF
 
         rho_a_amb = pres/(sp_gas_const_a*T_ambient)
+
         IF (verbose_level .GE. 0) THEN
 
         WRITE (*, *) 'Ambient density = ', rho_a_amb, ' (kg/m3)'
@@ -1686,31 +1697,42 @@ CONTAINS
                 WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
                 WRITE (*, *) 'FRACTAL_DIM must be > 0'
                 STOP
+
             END IF
+
             IF (alphas_source_total .LE. 0.0_wp) THEN
                 WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
                 WRITE (*, *) 'ALPHAS_SOURCE_TOTAL must be > 0'
                 STOP
+
             END IF
+
             IF (diam_min .LE. 0.0_wp .OR. diam_max .LE. 0.0_wp) THEN
                 WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
                 WRITE (*, *) 'DIAM_MIN and DIAM_MAX must be > 0'
                 STOP
+
             END IF
+
             IF (diam_min .GE. diam_max) THEN
                 WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
                 WRITE (*, *) 'DIAM_MIN must be < DIAM_MAX'
                 STOP
+
             END IF
+
             IF (rho_s_min .LE. 0.0_wp .OR. rho_s_max .LE. 0.0_wp) THEN
                 WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
                 WRITE (*, *) 'RHO_S_MIN and RHO_S_MAX must be > 0'
                 STOP
+
             END IF
+
             IF (rho_s_min .GE. rho_s_max) THEN
                 WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
                 WRITE (*, *) 'RHO_S_MIN must be < RHO_S_MAX'
                 STOP
+
             END IF
 
             BLOCK
@@ -1732,16 +1754,21 @@ CONTAINS
                         (1.0_wp + EXP(-sigmoid_k * (log_ctr - LOG(sigmoid_d0))))
                 w_frac(i_s) = diam_s(i_s) ** (3.0_wp - fractal_dim)
                 total_w = total_w + w_frac(i_s)
+
                 END DO
 
                 w_frac = w_frac / total_w
                 total_v = 0.0_wp
+
                 DO i_s = 1, n_solid
                 v_unnorm(i_s) = w_frac(i_s) / rho_s(i_s)
                 total_v = total_v + v_unnorm(i_s)
+
                 END DO
+
                 DO i_s = 1, n_solid
                 alphas_source(i_s) = v_unnorm(i_s) / total_v * alphas_source_total
+
                 END DO
 
                 IF (verbose_level .GE. 0) THEN
@@ -1749,12 +1776,16 @@ CONTAINS
                 WRITE (*, *) '  DIAM_S =', diam_s(1:n_solid)
                 WRITE (*, *) '  RHO_S =', rho_s(1:n_solid)
                 WRITE (*, *) '  ALPHAS_SOURCE =', alphas_source(1:n_solid)
+
                 END IF
+
                 DEALLOCATE(w_frac, v_unnorm)
+
             END BLOCK
 
         ELSE
             particle_distribution_flag = .FALSE.
+
         END IF
 
         IF (ANY(rho_s(1:n_solid) .EQ. -1.0_wp)) THEN
@@ -1985,21 +2016,29 @@ CONTAINS
 
 
         IF (settling_flag) THEN
+
             IF (collective_settling_flag) THEN
+
                 IF (A_drag .EQ. -1.0_wp) THEN
                 WRITE (*, *) 'ERROR: A_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
                 STOP
+
                 END IF
+
                 IF (B_drag .EQ. -1.0_wp) THEN
                 WRITE (*, *) 'ERROR: B_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
                 STOP
+
                 END IF
+
                 IF (verbose_level .GE. 0) WRITE (*, *)                                                                 &
                     'Settling: collective drag law, A_DRAG/B_DRAG =', A_drag, B_drag
             ELSE
                 IF (verbose_level .GE. 0) WRITE (*, *)                                                                 &
                     'Settling: original Schiller-Naumann drag law'
+
             END IF
+
         END IF
 
         ! If alpha_trans was provided earlier in the pore-pressure namelist,
@@ -2011,6 +2050,7 @@ CONTAINS
             WRITE (*, *) 'alpha_trans =', alpha_trans
             WRITE (*, *) 'Please check that MAXIMUM_SOLID_PACKING >= ALPHA_TRANS'
             STOP
+
         END IF
 
         END IF read_solid
@@ -2203,13 +2243,16 @@ CONTAINS
                 source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
             IF (rheology_group<0 .OR. thermal_group<0 .OR. pore_pressure_group<0)                                      &
                 source_input_error='D18 physical GROUP must be nonnegative'
+
         END IF
+
         IF (LEN_TRIM(source_input_error)>0) CALL fatal_error(TRIM(source_input_error))
         ! Reject unsupported tableaux here, before simulation workspace initialization.
         IF ((comp_cells_x .EQ. 1) .OR. (comp_cells_y .EQ. 1)) THEN
         max_cfl = 0.50_wp
         ELSE
         max_cfl = 0.25_wp
+
         END IF
 
         ! Configuration is validated once, outside cell/face loops. Omission
@@ -2219,6 +2262,7 @@ CONTAINS
         CONTINUE
         CASE DEFAULT
         CALL fatal_error('CFL_POLICY must be directional_min or combined')
+
         END SELECT
 
         SELECT CASE (TRIM(ADJUSTL(kt_trace_reconstruction)))
@@ -2232,7 +2276,9 @@ CONTAINS
         kt_trace_reconstruction = 'froude_blend'
         CASE DEFAULT
         CALL fatal_error('KT_TRACE_RECONSTRUCTION must be h_x, eta_x, minmod or froude_blend')
+
         END SELECT
+
         WRITE(*,'(A,A)') 'KT trace reconstruction: ',TRIM(kt_trace_reconstruction)
 
         ! Precisely -1 prescribes max_dt at the spatial-operator boundary.
@@ -2274,6 +2320,7 @@ CONTAINS
         IF (verbose_level .GE. 0) THEN
         WRITE (*, *) 'Linear reconstruction and b. c. applied to variables:'
         WRITE (*, *) 'h,hu,hv,T,mass fractions'
+
         END IF
 
         IF ((reconstr_coeff .GT. 1.0_wp) .OR. (reconstr_coeff .LT. 0.0_wp)) THEN
@@ -3005,19 +3052,25 @@ CONTAINS
             INTEGER :: i, code
             CHARACTER(LEN=LEN(rheology_model)) :: normalized
             normalized=ADJUSTL(rheology_model)
+
             DO i=1,LEN_TRIM(normalized)
                 code=IACHAR(normalized(i:i))
                 IF (code>=IACHAR('A') .AND. code<=IACHAR('Z'))                                                         &
                     normalized(i:i)=ACHAR(code+IACHAR('a')-IACHAR('A'))
+
             END DO
+
             rheology_model=TRIM(normalized)
+
         END BLOCK
+
         IF (TRIM(rheology_model)/='none' .AND.                                                                         &
                 LEN_TRIM(canonical_rheology_source_name(rheology_model))==0) THEN
             WRITE (*, *) 'ERROR: unknown RHEOLOGY_MODEL =', TRIM(rheology_model)
             WRITE (*, *) 'Supported names: none, voellmy, plastic, lava, lahar,'
             WRITE (*, *) '                 empirical, quadratic, froude, lucas, mui, mui_voellmy'
             STOP
+
         END IF
 
         ! Do this before comparisons: strict builds may trap even a comparison
@@ -3026,6 +3079,7 @@ CONTAINS
         BLOCK
             LOGICAL :: finite_parameters
             finite_parameters=.TRUE.
+
             SELECT CASE(TRIM(rheology_model))
             CASE('voellmy')
                 finite_parameters=ALL(finite_input_value([mu,xi]))
@@ -3045,12 +3099,16 @@ CONTAINS
                 finite_parameters=ALL(finite_input_value([mu_s,mu_2,I_0,muI_inf]))
             CASE('mui_voellmy')
                 finite_parameters=ALL(finite_input_value([mu_s,mu_2,I_0,muI_inf,xi]))
+
             END SELECT
+
             IF (.NOT.finite_parameters) THEN
                 WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
                 WRITE (*, *) 'RHEOLOGY_MODEL =',TRIM(rheology_model),' requires finite coefficients.'
                 STOP
+
             END IF
+
         END BLOCK
 
         IF (TRIM(rheology_model) .EQ. 'none') THEN
@@ -3318,6 +3376,7 @@ CONTAINS
                 WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
                 WRITE (*, *) 'Require MU_0 >= 0, MU_INF >= 0 and FR_0 > 0.'
                 STOP
+
             END IF
             ! Stop the program if mu_0 > mu_inf
             IF (mu_0 .GT. mu_inf) THEN
@@ -3326,6 +3385,7 @@ CONTAINS
                 WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
     WRITE (*, *) 'mu_inf > mu_0 required (mu(Fr) should be increasing)! Please correct the input file!'
                 STOP
+
             END IF
 
             ! Check Inputs Model Lucas et al 2014
@@ -3339,6 +3399,7 @@ CONTAINS
                 WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
                 WRITE (*, *) 'Require MU_0 >= 0, MU_INF >= 0 and U_W > 0.'
                 STOP
+
             END IF
             ! Stop the program if mu_0 > mu_inf
             IF (mu_inf .GT. mu_0) THEN
@@ -3347,14 +3408,17 @@ CONTAINS
                 WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
     WRITE (*, *) 'mu_0 > mu_inf required (mu(U) should be decreasing)! Please correct the input file!'
                 STOP
+
             END IF
 
         ELSEIF (TRIM(rheology_model) .EQ. 'mui') THEN
             WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
             WRITE (*, *) 'MU(I) RHEOLOGY FOR DENSE GRANULAR FLOWS'
             WRITE (*, *) 'MU_S =', mu_s, ' MU_2 =', mu_2, 'I_0 = ', I_0, 'MUI_INF = ', muI_inf
+
             IF (muI_inf .EQ. 0.0_wp) THEN
                 WRITE (*, *) 'Note that MUI_INF = 0, and therefore the classical mu(I) rheology is used.'
+
             END IF
 
             ! Require mu(I) parameters to be provided by the user
@@ -3368,6 +3432,7 @@ CONTAINS
                 WRITE (*, *) "  &RHEOLOGY_PARAMETERS rheology_model='mui',"
                 WRITE (*, *) '     mu_s=0.48, mu_2=0.73, I_0=0.279, muI_inf=0.005 /'
                 STOP
+
             END IF
 
         ELSEIF (TRIM(rheology_model) .EQ. 'mui_voellmy') THEN
@@ -3375,8 +3440,10 @@ CONTAINS
             WRITE (*, *) 'COMBINED MU(I) + VOELLMY RHEOLOGY'
             WRITE (*, *) 'MU_S =', mu_s, ' MU_2 =', mu_2, 'I_0 = ', I_0, 'MUI_INF = ', muI_inf
             WRITE (*, *) 'XI =', xi
+
             IF (muI_inf .EQ. 0.0_wp) THEN
                 WRITE (*, *) 'Note that MUI_INF = 0, and therefore the classical mu(I) rheology is used.'
+
             END IF
 
             ! Require mu(I) parameters to be provided by the user
@@ -3387,6 +3454,7 @@ CONTAINS
                 WRITE (*, *) 'MU_S =', mu_s, ' MU_2 =', mu_2, ' I_0 =', I_0, ' MUI_INF =', muI_inf
         WRITE (*, *) 'For combined rheology (model 12), you must set MU_S, MU_2, I_0 and MUI_INF (>=0)!'
                 STOP
+
             END IF
 
             ! Require XI (turbulent friction) from Voellmy
@@ -3396,6 +3464,7 @@ CONTAINS
                 WRITE (*, *) 'XI =', xi
                 WRITE (*, *) 'For combined rheology (model 12), you must set XI!'
                 STOP
+
             END IF
 
         ELSE
@@ -3434,11 +3503,15 @@ CONTAINS
             IF (.NOT. finite_input_value(T_env)) THEN
                 WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require finite T_ENV.'
                 STOP
+
             END IF
+
             IF (T_env .LE. 0.0_wp) THEN
                 WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require T_ENV > 0.'
                 STOP
+
             END IF
+
             WRITE (*, *) 'Cooling ambient temperature (K) =', T_env
 
             radiative_term_coeff = SBconst*emissivity*exp_area_fract
@@ -3591,6 +3664,7 @@ CONTAINS
             ALLOCATE (thickness_levels(n_thickness_levels))
             thickness_levels(1:n_thickness_levels) =                                                                   &
                 thickness_levels0(1:n_thickness_levels)
+
             IF (ANY(thickness_levels .LT. 0.0_wp)) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist ',                                                          &
@@ -3617,6 +3691,7 @@ CONTAINS
             ALLOCATE (dyn_pres_levels(n_dyn_pres_levels))
             dyn_pres_levels(1:n_dyn_pres_levels) =                                                                     &
                 dyn_pres_levels0(1:n_dyn_pres_levels)
+
             IF (ANY(dyn_pres_levels .LT. 0.0_wp)) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist ',                                                          &
@@ -3649,6 +3724,7 @@ CONTAINS
             WRITE (*, *) 'thickness_levels', thickness_levels
         ELSE
             WRITE (*, *) 'thickness_levels: not allocated'
+
         END IF
 
         WRITE (*, *) 'n_dyn_pres_levels', n_dyn_pres_levels
@@ -3657,6 +3733,7 @@ CONTAINS
             WRITE (*, *) 'dyn_pres_levels', dyn_pres_levels
         ELSE
             WRITE (*, *) 'dyn_pres_levels: not allocated'
+
         END IF
 
         END IF
@@ -3678,11 +3755,13 @@ CONTAINS
                 lateral_source_flag) THEN
                 WRITE (*, *) 'ERROR: BOTTOM_FISSURAL_SOURCE_FLAG cannot be combined with another source flag.'
                 STOP
+
             END IF
 
             IF ((n_fissures .LT. 1) .OR. (n_fissures .GT. 100)) THEN
                 WRITE (*, *) 'ERROR: N_FISSURES must be in [1,100].', n_fissures
                 STOP
+
             END IF
 
             READ (input_unit, fissural_source_parameters, IOSTAT=ios)
@@ -3719,6 +3798,7 @@ CONTAINS
                 WRITE (*, radial_source_parameters)
 
             END IF
+
             WRITE (*, *) 'Please check the input file'
             STOP
 
@@ -3727,29 +3807,39 @@ CONTAINS
             REWIND (input_unit)
 
             IF (bottom_fissural_source_flag) THEN
+
                 DO i = 1, n_fissures
                 IF (ANY(x_fissures_end_points(:,i) .EQ. -1.0_wp) .OR.                                                  &
                         ANY(y_fissures_end_points(:,i) .EQ. -1.0_wp)) THEN
                     WRITE (*, *) 'ERROR: define both endpoints for fissure ', i
                     STOP
+
                 END IF
+
                 IF (width_fissures(i) .LE. 0.0_wp) THEN
                     WRITE (*, *) 'ERROR: WIDTH_FISSURES must be positive for fissure ', i
                     STOP
+
                 END IF
+
                 IF (linear_vel_fissures(i) .LT. 0.0_wp) THEN
                     WRITE (*, *) 'ERROR: LINEAR_VEL_FISSURES must be non-negative for fissure ', i
                     STOP
+
                 END IF
+
                 IF (T_fissures(i) .LE. 0.0_wp) THEN
                     WRITE (*, *) 'ERROR: T_FISSURES must be positive for fissure ', i
                     STOP
+
                 END IF
+
                 IF (SQRT((x_fissures_end_points(2,i) - x_fissures_end_points(1,i))**2 +                                &
                             (y_fissures_end_points(2,i) - y_fissures_end_points(1,i))**2)                              &
                         .LE. EPSILON(1.0_wp)) THEN
                     WRITE (*, *) 'ERROR: fissure endpoints must be distinct for fissure ', i
                     STOP
+
                 END IF
 
                 IF ((MINVAL(x_fissures_end_points(:,i)) - 0.5_wp*width_fissures(i)                                     &
@@ -3762,6 +3852,7 @@ CONTAINS
                         .GE. Y0 + (comp_cells_y - 1)*cell_size)) THEN
                     WRITE (*, *) 'ERROR: fissure ', i, ' must remain inside the interior domain'
                     STOP
+
                 END IF
 
                 IF (ANY(time_param_fissures(:,i) .LT. 0.0_wp)) THEN
@@ -3769,6 +3860,7 @@ CONTAINS
                     time_param_fissures(2,i) = t_end
                     time_param_fissures(3,i) = 0.0_wp
                     time_param_fissures(4,i) = 0.0_wp
+
                 END IF
 
                 IF ((time_param_fissures(1,i) .LE. 0.0_wp) .OR.                                                        &
@@ -3780,12 +3872,15 @@ CONTAINS
                     WRITE (*, *) 'ERROR: invalid TIME_PARAM_FISSURES for fissure ', i
                     WRITE (*, *) 'Expected period>0, active in [0,period], ramp in [0,active/2], phase>=0.'
                     STOP
+
                 END IF
+
                 END DO
 
                 ! Composition is shared by all fissures; use the first fissure's
                 ! temperature when converting volume fractions to mass fractions.
                 T_source = T_fissures(1)
+
             END IF
 
             IF ((.NOT. bottom_fissural_source_flag) .AND. (t_source .EQ. -1.0_wp)) THEN
@@ -3903,6 +3998,7 @@ CONTAINS
                     WRITE (*, *) 'ERROR: ARC_WIDTH_SOURCE must be in (0,360]'
                     WRITE (*, *) 'ARC_WIDTH_SOURCE =', arc_width_source
                     STOP
+
                 END IF
 
                 source_length = source_length * ( arc_width_source / 360.0_wp )
@@ -4151,51 +4247,75 @@ CONTAINS
 
             ! Optional piecewise-constant velocity history for the bottom source
             IF ((n_intervals .GT. 0) .AND. (.NOT. bottom_fissural_source_flag)) THEN
+
                 IF (.NOT. bottom_radial_source_flag) THEN
                 WRITE (*, *) 'ERROR: N_INTERVALS can only be used with BOTTOM_RADIAL_SOURCE_FLAG = T'
                 STOP
+
                 END IF
+
                 IF (n_intervals .GT. 100) THEN
                 WRITE (*, *) 'ERROR: N_INTERVALS must be <= 100'
                 STOP
+
                 END IF
+
                 IF (t_intervals(1) .NE. 0.0_wp) THEN
                 WRITE (*, *) 'WARNING: source is off before T_INTERVALS(1) =',                                         &
                         t_intervals(1)
+
                 END IF
+
                 IF (t_intervals(1) .LT. 0.0_wp) THEN
                 WRITE (*, *) 'ERROR: T_INTERVALS(1) must be >= 0'
                 STOP
+
                 END IF
+
                 IF (vel_intervals(1) .LT. 0.0_wp) THEN
                 WRITE (*, *) 'ERROR: VEL_INTERVALS(1) must be >= 0'
                 STOP
+
                 END IF
+
                 DO i = 2, n_intervals
+
                 IF (t_intervals(i) .LT. 0.0_wp) THEN
                     WRITE (*, *) 'ERROR: T_INTERVALS(', i, ') must be >= 0'
                     STOP
+
                 END IF
+
                 IF (vel_intervals(i) .LT. 0.0_wp) THEN
                     WRITE (*, *) 'ERROR: VEL_INTERVALS(', i, ') must be >= 0'
                     STOP
+
                 END IF
+
                 IF (t_intervals(i) .LE. t_intervals(i-1)) THEN
                     WRITE (*, *) 'ERROR: T_INTERVALS must be monotonically increasing'
                     STOP
+
                 END IF
+
                 END DO
+
                 IF (verbose_level .GE. 0) THEN
                 WRITE (*, *) 'Variable velocity intervals mode active'
+
                 DO i = 1, n_intervals
                     WRITE (*, *) '  t =', t_intervals(i), ' vel =', vel_intervals(i)
+
                 END DO
+
                 END IF
+
             END IF
 
             composition_by_volume = .NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)
             alphas_given(1:n_solid) = alphas_source(1:n_solid)
             alphag_given(1:n_add_gas) = alphag_source(1:n_add_gas)
+
             IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
                 CALL eval_mixture_properties_from_volume_fractions(                                                    &
@@ -4212,8 +4332,7 @@ CONTAINS
 
             ! Source composition is canonical from here on, including for the
             ! bottom radial source, which does not enter the source-flow setup.
-            CALL enforce_mass_fraction_closure(                                                                        &
-                    xs_source(1:n_solid), xg_source(1:n_add_gas))
+            CALL enforce_mass_fraction_closure(xs_source(1:n_solid), xg_source(1:n_add_gas))
 
             ! Every fissure carries the source composition at its own
             ! temperature. Converting volume fractions once, at T_FISSURES(1),
@@ -4223,6 +4342,7 @@ CONTAINS
 
                 ALLOCATE (xs_fissures(n_solid, n_fissures))
                 ALLOCATE (xg_fissures(n_add_gas, n_fissures))
+
                 DO i = 1, n_fissures
 
                 IF (composition_by_volume) THEN
@@ -4238,13 +4358,13 @@ CONTAINS
                             xs_fissures(:, i), xg_fissures(:, i),                                                      &
                             xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
 
-                    CALL enforce_mass_fraction_closure(xs_fissures(:, i),                                              &
-                            xg_fissures(:, i))
+                    CALL enforce_mass_fraction_closure(xs_fissures(:, i), xg_fissures(:, i))
 
                 ELSE
 
                     xs_fissures(:, i) = xs_source(1:n_solid)
                     xg_fissures(:, i) = xg_source(1:n_add_gas)
+
                 END IF
 
                 END DO
@@ -4296,8 +4416,7 @@ CONTAINS
                 qp_source(idx_v) = 0.0_wp
 
                 ! compute the Richardson number for vel = 1.0 (or vel from input)
-                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c,                                        &
-                                sp_heat_mix)
+                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
 
                 WRITE (*, *) 'Source density =', rho_m, '(kg/m3)'
                 WRITE (*, *) 'Source reduced gravity =', red_grav, '(m/s2)'
@@ -4305,6 +4424,7 @@ CONTAINS
                 IF ( Ri_source .GE. 0.0_wp .AND. red_grav .LE. 0.0_wp ) THEN
                 WRITE (*, *) 'ERROR: Source reduced gravity must be positive when RI_SOURCE is specified'
                 ERROR STOP 1
+
                 END IF
 
                 IF (mfr_source .GE. 0.0_wp) THEN
@@ -4329,8 +4449,7 @@ CONTAINS
                         qp_source(idx_v) = 0.0_wp
 
                         ! compute the Richardson number for vel = 1.0
-                        CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav,                                           &
-                                        sp_heat_c, sp_heat_mix)
+                        CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
 
                         ! compute the correct velocity for the desired Richardson number
                         vel_source = SQRT(red_grav*h_source/Ri_source)
@@ -4339,8 +4458,7 @@ CONTAINS
 
                     ! mfr and velocity
 
-                    CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav,                                               &
-                                        sp_heat_c, sp_heat_mix)
+                    CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
 
                     h_source = mfr_source/(source_length*rho_m*                                                        &
                                                     vel_source)
@@ -4363,8 +4481,7 @@ CONTAINS
                 qp_source(idx_u) = vel_source
 
                 ! Check that the Richardson number is correct
-                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c,                                        &
-                                sp_heat_mix)
+                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
 
                 WRITE (*, *) 'Source Richardson number =', Ri
                 WRITE (*, *) 'Source velocity =', vel_source, ' (m/s)'
@@ -4540,34 +4657,38 @@ CONTAINS
             REWIND (input_unit)
         ELSE
             REWIND (input_unit)
+
         END IF
 
         WRITE (*, *) ' '
         WRITE (*, *) 'START PARSING THE STOCASTIC PARAMETERS...'
 
         IF ((std_max < 0.0_wp) .OR. (tau_stochastic <= 0.0_wp)) THEN
-            CALL fatal_error('STOCHASTIC_PARAMETERS requires std_max >= 0 and '//                                      &
-                    'tau_stochastic > 0')
+            CALL fatal_error('STOCHASTIC_PARAMETERS requires std_max >= 0 and '// 'tau_stochastic > 0')
+
         END IF
 
         IF ((sym_noise /= 0.0_wp) .AND. (noise_pow_val <= 0.0_wp)) THEN
-            CALL fatal_error('asymmetric stochastic noise requires '//                                                 &
-                    'noise_pow_val > 0')
+            CALL fatal_error('asymmetric stochastic noise requires '// 'noise_pow_val > 0')
+
         END IF
 
         IF ((sym_noise /= -1.0_wp) .AND. (sym_noise /= 0.0_wp) .AND.                                                   &
                 (sym_noise /= 1.0_wp)) THEN
             CALL fatal_error('sym_noise must be -1, 0, or 1')
+
         END IF
 
         IF (length_spatial_corr < 0.0_wp) THEN
             CALL fatal_error('length_spatial_corr must be >= 0')
+
         END IF
 
 
         ! Set velocity-dependent stochastic intensity and its rheology scale
         ! when no activation velocity is specified.
         WRITE (*, *) 'Setting stochastic intensity parameters...'
+
         if (TRIM(rheology_model) .EQ. 'froude') THEN
             std_min = 0.0_wp !std_max * (mu_0/mu_inf) ! mu_0 < mu_inf in mu(Fr)
             IF (noise_activation_velocity <= 0.0_wp)                                                                   &
@@ -4578,12 +4699,14 @@ CONTAINS
             IF (noise_activation_velocity <= 0.0_wp)                                                                   &
                     noise_activation_velocity = U_w
             std_slope_factor = noise_activation_velocity**2
+
         END IF
 
         IF (((TRIM(rheology_model) == 'froude') .OR.                                                                   &
                 (TRIM(rheology_model) == 'lucas')) .AND.                                                               &
                 (noise_activation_velocity <= 0.0_wp)) THEN
             CALL fatal_error('noise_activation_velocity must be > 0')
+
         END IF
 
         ! Stop the program if std_min > std_max
@@ -4594,6 +4717,7 @@ CONTAINS
                 'std_slope_factor = ', std_slope_factor
             WRITE (*, *) 'st_min <= std_max required  ! Please correct the input file'
             STOP
+
         END IF
 
         ! Write values variable loaded after having performed all checks
@@ -4611,6 +4735,7 @@ CONTAINS
             WRITE (*, *) 'The noise will asymmetric and negative!'
         ELSEIF (sym_noise == 0.0_wp) THEN
             WRITE (*, *) 'The noise will symmetric (positive and negative)!'
+
         END IF
 
         ! Say if noise is transported or not
@@ -4618,12 +4743,14 @@ CONTAINS
             WRITE (*, *) 'The noise will be transported by the flow!'
         ELSE
             WRITE (*, *) 'The noise will not be transported by the flow!'
+
         END IF
 
         IF (stochastic_seed >= 0) THEN
             WRITE (*, *) 'Using reproducible stochastic seed:', stochastic_seed
         ELSE
             WRITE (*, *) 'Using processor-generated stochastic seed'
+
         END IF
 
 
@@ -4634,13 +4761,18 @@ CONTAINS
         CLOSE (input_unit)
 
         restart_extension = ''
+
         IF (restart) THEN
         dot_idx = LEN_TRIM(restart_file)
         IF (dot_idx >= 4) restart_extension = restart_file(dot_idx-3:dot_idx)
+
         END IF
+
         binary_restart_output = restart .AND. restart_extension == '.bin'
         allow_in_place_restart = .FALSE.
+
         IF (binary_restart_output .AND. TRIM(restart_file) == 'restart.bin') THEN
+
         IF (LEN_TRIM(output_base_directory) > 0) THEN
             in_place_restart_path = TRIM(output_base_directory)
             IF (in_place_restart_path(LEN_TRIM(in_place_restart_path):                                                 &
@@ -4649,13 +4781,17 @@ CONTAINS
             in_place_restart_path = TRIM(in_place_restart_path)//TRIM(run_name)//                                      &
                                             '/restart/restart.bin'
             INQUIRE(FILE=TRIM(in_place_restart_path), EXIST=allow_in_place_restart)
+
         END IF
+
         END IF
-        CALL initialize_output_paths(output_base_directory, run_name,                                                  &
-            output_overwrite, allow_in_place_restart)
+
+        CALL initialize_output_paths(output_base_directory, run_name, output_overwrite, allow_in_place_restart)
+
         IF (allow_in_place_restart) THEN
         in_place_restart_path = output_file_path('restart', 'restart.bin')
         restart_file = TRIM(in_place_restart_path)
+
         END IF
 
         bak_name = output_file_path('metadata', TRIM(run_name)//'.bak')
@@ -4788,7 +4924,7 @@ CONTAINS
 
     SUBROUTINE update_param
 
-        IMPLICIT none
+    IMPLICIT none
 
         INTEGER :: ios
 
@@ -4895,17 +5031,17 @@ CONTAINS
     SUBROUTINE read_solution(state, domain)
 
         ! External procedures
-        USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-        USE state_conversion_2d, ONLY:                                                                                 &
+    USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
+    USE state_conversion_2d, ONLY:                                                                                     &
             eval_mixture_properties_from_volume_fractions
         ! External variables
-        USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
-        USE geometry_2d, ONLY: B_cent, B_vertex
-        USE geometry_2d, ONLY: project_cell_field_to_vertices,                                                         &
+    USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
+    USE geometry_2d, ONLY: B_cent, B_vertex
+    USE geometry_2d, ONLY: project_cell_field_to_vertices,                                                             &
             refresh_topography_geometry
-        USE init_2d, ONLY: thickness_init, erodible_init
-        USE parameters_2d, ONLY: n_vars
-        IMPLICIT none
+    USE init_2d, ONLY: thickness_init, erodible_init
+    USE parameters_2d, ONLY: n_vars
+    IMPLICIT none
 
         CLASS(state_type), INTENT(INOUT) :: state
         CLASS(domain_type), INTENT(INOUT) :: domain
@@ -4960,6 +5096,7 @@ CONTAINS
         DO i_solid=1,n_solid
         state%erodible(i_solid,:,:)=erodible_fract(i_solid)*                                                           &
                 (1.0_wp-erodible_porosity)*erodible_init(:,:)
+
         END DO
 
         ALLOCATE (thickness_init(comp_cells_x, comp_cells_y))
@@ -4974,6 +5111,7 @@ CONTAINS
         WRITE (*, *) 'ERROR: restart file has no valid extension: ',                                                   &
             TRIM(restart_file)
         STOP
+
         END IF
 
         check_file = restart_file(dot_idx + 1:dot_idx + 3)
@@ -5143,8 +5281,7 @@ CONTAINS
                 yl = y0 + (k - 1)*cell_size
                 yr = y0 + (k)*cell_size
 
-                CALL regrid_scalar(x1, y1, thickness_input, xl, xr, yl,                                                &
-                                            yr, thickness_interp)
+                CALL regrid_scalar(x1, y1, thickness_input, xl, xr, yl, yr, thickness_interp)
 
                 thickness_init(j, k) = thickness_init(j, k) + thickness_interp
 
@@ -5400,12 +5537,12 @@ CONTAINS
     SUBROUTINE read_erodible
 
         ! External procedures
-        USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
+    USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
         ! External variables
-        USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0
-        USE init_2d, ONLY: erodible_init
+    USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0
+    USE init_2d, ONLY: erodible_init
 
-        IMPLICIT none
+    IMPLICIT none
 
         CHARACTER(LEN=15) :: chara
 
@@ -5552,8 +5689,7 @@ CONTAINS
             yl = y0 + (k - 1)*cell_size
             yr = y0 + (k)*cell_size
 
-            CALL regrid_scalar(x1, y1, erodible_input, xl, xr, yl,                                                     &
-                                    yr, erodible_init(j, k))
+            CALL regrid_scalar(x1, y1, erodible_input, xl, xr, yl, yr, erodible_init(j, k))
 
         END DO
 
@@ -5591,13 +5727,13 @@ CONTAINS
 
     SUBROUTINE output_solution(time, state, runtime)
 
-        USE geometry_2d, ONLY: comp_cells_x, B_cent, comp_cells_y, x_comp,                                             &
+    USE geometry_2d, ONLY: comp_cells_x, B_cent, comp_cells_y, x_comp,                                                 &
                                     y_comp
 
-        USE parameters_2d, ONLY: n_vars
-        USE parameters_2d, ONLY: dt_output
+    USE parameters_2d, ONLY: n_vars
+    USE parameters_2d, ONLY: dt_output
 
-        IMPLICIT none
+    IMPLICIT none
 
         REAL(wp), INTENT(IN) :: time
         CLASS(state_type), INTENT(INOUT) :: state
@@ -5697,6 +5833,7 @@ CONTAINS
             END DO
 
             WRITE (output_unit_2d, *) ' '
+
             IF (erosion_coeff .GT. 0.0_wp) THEN
 
                 WRITE (output_unit_erosion, *) ' '
@@ -5784,6 +5921,7 @@ CONTAINS
         INQUIRE(FILE=TRIM(filename), EXIST=exists)
 
         IF (.NOT. output_manifest_initialized) THEN
+
         IF (binary_restart_output .AND. exists) THEN
             CALL validate_output_manifest(filename, header, index, time)
             OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD',                                         &
@@ -5792,13 +5930,16 @@ CONTAINS
             OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='REPLACE',                                     &
                     ACTION='WRITE', IOSTAT=ios, IOMSG=message)
             IF (ios == 0) WRITE(output_manifest_unit, '(A)') TRIM(header)
+
         END IF
+
         IF (ios /= 0) CALL fatal_error('Cannot open output manifest: '//TRIM(message))
         output_manifest_initialized = .TRUE.
         ELSE
         OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD',                                             &
                 POSITION='APPEND', ACTION='WRITE', IOSTAT=ios, IOMSG=message)
         IF (ios /= 0) CALL fatal_error('Cannot append output manifest: '//TRIM(message))
+
         END IF
 
         WRITE(output_manifest_unit, '(I0,",",ES24.16E3)', IOSTAT=ios, IOMSG=message)                                   &
@@ -5834,10 +5975,10 @@ CONTAINS
     !> \note Invalid histories are refused without automatic repair or truncation.
     !******************************************************************************
     SUBROUTINE validate_output_manifest(filename, header, next_index, next_time)
-        USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
-        USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode,                                 &
+    USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode,                                     &
             ieee_overflow, ieee_set_flag, ieee_set_halting_mode
-        USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
+    USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
         CHARACTER(LEN=*), INTENT(IN) :: filename, header
         INTEGER, INTENT(IN) :: next_index
         REAL(wp), INTENT(IN) :: next_time
@@ -5859,6 +6000,7 @@ CONTAINS
         has_previous = .FALSE.
         previous_index = -1
         previous_time = -HUGE(1.0_wp)
+
         DO
         READ(unit_manifest, '(A)', IOSTAT=ierr) line
         IF (ierr == iostat_end) EXIT
@@ -5898,21 +6040,26 @@ CONTAINS
                     CALL fatal_error('Output manifest snapshot index is exhausted: '//TRIM(filename))
             IF (row_index /= previous_index + 1 .OR. row_time <= previous_time)                                        &
                     CALL fatal_error('Output manifest indices or times are discontinuous: '//TRIM(filename))
+
         END IF
+
         previous_index = row_index
         previous_time = row_time
         has_previous = .TRUE.
+
         END DO
 
         CLOSE(unit_manifest, IOSTAT=ierr, IOMSG=message)
         IF (ierr /= 0) CALL fatal_error('Cannot close output manifest: '//TRIM(message))
         IF (next_index < 0 .OR. .NOT. ieee_is_finite(next_time))                                                       &
             CALL fatal_error('Restart output has an invalid manifest index or time: '//TRIM(filename))
+
         IF (has_previous) THEN
         IF (previous_index == HUGE(previous_index))                                                                    &
                 CALL fatal_error('Output manifest snapshot index is exhausted: '//TRIM(filename))
         IF (next_index /= previous_index + 1 .OR. next_time <= previous_time)                                          &
                 CALL fatal_error('Restart output does not continue the existing manifest: '//TRIM(filename))
+
         END IF
     END SUBROUTINE validate_output_manifest
 
@@ -5932,8 +6079,8 @@ CONTAINS
 
     SUBROUTINE output_max(state)
 
-        USE geometry_2d, ONLY: grid_output, grid_output_int
-        IMPLICIT NONE
+    USE geometry_2d, ONLY: grid_output, grid_output_int
+    IMPLICIT NONE
 
         CLASS(state_type), INTENT(IN) :: state
 
@@ -6046,10 +6193,10 @@ CONTAINS
 
     SUBROUTINE output_esri(output_idx, state)
 
-        USE geometry_2d, ONLY: B_cent, grid_output, B_nodata
-        USE geometry_2d, ONLY: B_zone
+    USE geometry_2d, ONLY: B_cent, grid_output, B_nodata
+    USE geometry_2d, ONLY: B_zone
         ! USE geometry_2d, ONLY : comp_interfaces_x , comp_interfaces_y
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         INTEGER, INTENT(IN) :: output_idx
         CLASS(state_type), INTENT(IN) :: state
@@ -6358,10 +6505,8 @@ CONTAINS
         IF (.NOT. runtime%runout%initialized)                                                                          &
             CALL fatal_error('Binary restart has no initialized runout history.')
         CALL make_runout_headers(runout_header, mass_header)
-        CALL validate_runout_csv(runout_file, runout_header,                                                           &
-            runtime%runout%runout_row, runout_exists)
-        CALL validate_runout_csv(mass_center_file, mass_header,                                                        &
-            runtime%runout%mass_center_row, mass_exists)
+        CALL validate_runout_csv(runout_file, runout_header, runtime%runout%runout_row, runout_exists)
+        CALL validate_runout_csv(mass_center_file, mass_header, runtime%runout%mass_center_row, mass_exists)
     END SUBROUTINE validate_runout_outputs
 
     !******************************************************************************
@@ -6379,10 +6524,13 @@ CONTAINS
 
         IF (.NOT. output_runout_flag) RETURN
         CALL make_runout_headers(runout_header, mass_header)
+
         IF (.NOT. binary_restart) THEN
         runtime%runout%origin_x = x0_runout
         runtime%runout%origin_y = y0_runout
+
         END IF
+
         CALL open_runout_csv(runout_unit, runout_file, runout_header, runout_exists, binary_restart)
         CALL open_runout_csv(mass_center_unit, mass_center_file, mass_header, mass_exists, binary_restart)
     END SUBROUTINE open_runout_outputs
@@ -6412,10 +6560,10 @@ CONTAINS
     !> expected row refers to the last diagnostic sample, not the checkpoint time.
     !******************************************************************************
     SUBROUTINE validate_runout_csv(filename, header, expected_row, exists)
-        USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
-        USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode,                                 &
+    USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode,                                     &
             ieee_overflow, ieee_set_flag, ieee_set_halting_mode
-        USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
+    USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
         CHARACTER(LEN=*), INTENT(IN) :: filename, header, expected_row
         LOGICAL, INTENT(OUT) :: exists
         INTEGER :: unit_csv, ierr, i, rows
@@ -6434,6 +6582,7 @@ CONTAINS
         rows = 0
         previous_time = -HUGE(1.0_wp)
         last_line = ''
+
         DO
         READ(unit_csv, '(A)', IOSTAT=ierr) line
         IF (ierr == iostat_end) EXIT
@@ -6457,7 +6606,9 @@ CONTAINS
         previous_time = values(1)
         last_line = line
         rows = rows + 1
+
         END DO
+
         CLOSE(unit_csv)
         IF (rows == 0 .OR. TRIM(last_line) /= TRIM(expected_row))                                                      &
             CALL fatal_error('Diagnostic CSV tail does not match checkpoint: '//TRIM(filename)//                       &
@@ -6485,12 +6636,16 @@ CONTAINS
         ELSE
         OPEN(UNIT=unit_csv, FILE=filename, STATUS='REPLACE', ACTION='WRITE',                                           &
                 IOSTAT=ierr, IOMSG=message)
+
         END IF
+
         IF (ierr /= 0) CALL fatal_error('Cannot open diagnostic CSV '//TRIM(filename)//': '//TRIM(message))
+
         IF (.NOT. append_history) THEN
         WRITE(unit_csv, '(A)') TRIM(header)
         FLUSH(unit_csv)
         IF (binary_restart) WRITE(*,*) 'New diagnostic CSV segment (earlier history absent): ', TRIM(filename)
+
         END IF
     END SUBROUTINE open_runout_csv
 
@@ -6500,7 +6655,7 @@ CONTAINS
     !******************************************************************************
     SUBROUTINE close_units
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         IF (output_runout_flag) THEN
 
@@ -6529,7 +6684,7 @@ CONTAINS
     !******************************************************************************
 
     CHARACTER(LEN=4) FUNCTION lettera(k)
-        IMPLICIT NONE
+    IMPLICIT NONE
         CHARACTER ones, tens, hund, thou
         !
         INTEGER :: k
@@ -6565,12 +6720,12 @@ CONTAINS
     !******************************************************************************
     SUBROUTINE output_probes(time, state, runtime)
 
-        USE geometry_2d, ONLY: x_comp, y_comp
-        USE parameters_2d, ONLY: n_vars
-        USE geometry_2d, ONLY: interp_2d_scalarB
-        USE state_conversion_2d, ONLY: primitive_to_volume_fractions
+    USE geometry_2d, ONLY: x_comp, y_comp
+    USE parameters_2d, ONLY: n_vars
+    USE geometry_2d, ONLY: interp_2d_scalarB
+    USE state_conversion_2d, ONLY: primitive_to_volume_fractions
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: time
         CLASS(state_type), INTENT(IN) :: state
@@ -6681,32 +6836,31 @@ CONTAINS
 
         WRITE (probes_unit, 1710, ADVANCE='no') time, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_h, :, :),                                                  &
-                                        probes_coords(1, k), probes_coords(2, k), h_prb)
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_h, :, :), probes_coords(1, k), probes_coords(2, k), h_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') h_prb, ','
 
         IF (h_prb .GT. 1.0E-5_wp) THEN
 
-            CALL interp_2d_scalarB(x_comp, y_comp, state%q(idx_totMassEqn, :, :),                                      &
-                                            probes_coords(1, k), probes_coords(2, k), hrhom_prb)
+            CALL interp_2d_scalarB(x_comp, y_comp, state%q(idx_totMassEqn, :, :), probes_coords(1, k),                 &
+                probes_coords(2, k), hrhom_prb)
 
             rhom_prb = hrhom_prb/h_prb
 
             WRITE (probes_unit, 1710, ADVANCE='no') rhom_prb, ','
 
-            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_T, :, :),                                              &
-                                            probes_coords(1, k), probes_coords(2, k), T_prb)
+            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_T, :, :), probes_coords(1, k), probes_coords(2, k),    &
+                T_prb)
 
             WRITE (probes_unit, 1710, ADVANCE='no') T_prb, ','
 
-            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_u, :, :),                                              &
-                                            probes_coords(1, k), probes_coords(2, k), u_prb)
+            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_u, :, :), probes_coords(1, k), probes_coords(2, k),    &
+                u_prb)
 
             WRITE (probes_unit, 1710, ADVANCE='no') u_prb, ','
 
-            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_v, :, :),                                              &
-                                            probes_coords(1, k), probes_coords(2, k), v_prb)
+            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_v, :, :), probes_coords(1, k), probes_coords(2, k),    &
+                v_prb)
 
             WRITE (probes_unit, 1710, ADVANCE='no') v_prb, ','
 
@@ -6717,16 +6871,14 @@ CONTAINS
             DO i_solid = 1, n_solid
 
                 CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_solid_first + i_solid - 1, :, :),                  &
-                                            probes_coords(1, k), probes_coords(2, k),                                  &
-                                            qp_prb(idx_solid_first + i_solid - 1))
+                    probes_coords(1, k), probes_coords(2, k), qp_prb(idx_solid_first + i_solid - 1))
 
             END DO
 
             DO i_gas = 1, n_add_gas
 
                 CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_add_gas_first + i_gas - 1, :, :),                  &
-                                            probes_coords(1, k), probes_coords(2, k),                                  &
-                                            qp_prb(idx_add_gas_first + i_gas - 1))
+                    probes_coords(1, k), probes_coords(2, k), qp_prb(idx_add_gas_first + i_gas - 1))
 
             END DO
 
@@ -6735,10 +6887,12 @@ CONTAINS
 
             DO i_solid = 1, n_solid
                 WRITE (probes_unit, 1710, ADVANCE='no') alphas_prb(i_solid), ','
+
             END DO
 
             DO i_gas = 1, n_add_gas
                 WRITE (probes_unit, 1710, ADVANCE='no') alphag_prb(i_gas), ','
+
             END DO
 
             pDyn_prb = 0.5*rhom_prb*(u_prb**2 + v_prb**2)
@@ -6773,8 +6927,8 @@ CONTAINS
 
             DO i_solid = 1, n_solid
 
-                CALL interp_2d_scalarB(x_comp, y_comp, state%deposit(:, :, i_solid),                                   &
-                                            probes_coords(1, k), probes_coords(2, k), dep_probe(i_solid))
+                CALL interp_2d_scalarB(x_comp, y_comp, state%deposit(:, :, i_solid), probes_coords(1, k),              &
+                    probes_coords(2, k), dep_probe(i_solid))
 
                 WRITE (probes_unit, 1710, ADVANCE='no') dep_probe(i_solid), ','
 
@@ -6813,10 +6967,10 @@ CONTAINS
     !> \param[in,out] runtime Original runout references, last sample and stopping history.
     SUBROUTINE output_runout(time, stop_flag, state, runtime)
 
-        USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
-        USE parameters_2d, ONLY: n_solid, n_vars
-        USE state_conversion_2d, ONLY: primitive_to_volume_fractions
-        IMPLICIT NONE
+    USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
+    USE parameters_2d, ONLY: n_solid, n_vars
+    USE state_conversion_2d, ONLY: primitive_to_volume_fractions
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: time
         LOGICAL, INTENT(INOUT) :: stop_flag
@@ -6880,15 +7034,19 @@ CONTAINS
         dist(:, :) = 0.0_wp
 
         IF (n_solid .GT. 0) THEN
+
         DO j = 1, sX
+
             DO k = 1, sY
-                CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),                                           &
-                    alphas_local, alphag_local)
+                CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k), alphas_local, alphag_local)
                 alphas_tot(j,k) = SUM(alphas_local)
+
             END DO
+
         END DO
         ELSE
         alphas_tot = 0.0_wp
+
         END IF
 
         IF (.NOT. had_history) THEN
@@ -6917,6 +7075,7 @@ CONTAINS
                 ELSE
                 x_mass_center = x_source
                 y_mass_center = y_source
+
                 END IF
 
             END IF
@@ -7053,6 +7212,7 @@ CONTAINS
         ELSE
             ! empty domain: nothing inundated, so no new fraction to report
             area_new_rel = 0.0_wp
+
         END IF
 
         x_mass_center_old = x_mass_center
@@ -7078,6 +7238,7 @@ CONTAINS
         runtime%runout%maximum_distance = MAX(runtime%runout%maximum_distance, runout_last)
         runtime%runout%initialized = .TRUE.
         runtime%stop_requested = stop_flag
+
         END ASSOCIATE
 
         runtime%t_runout = time + dt_runout
@@ -7097,10 +7258,10 @@ CONTAINS
 
     SUBROUTINE init_netcdf_output
 
-        USE netcdf
+    USE netcdf
 
-        USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, x_comp, y_comp
-        IMPLICIT NONE
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, x_comp, y_comp
+    IMPLICIT NONE
 
         INTEGER :: i
         CHARACTER(LEN=4) :: idx_string
@@ -7144,41 +7305,48 @@ CONTAINS
         CALL check(nf90_inq_varid(ncid, 'b', b_varid))
         CALL check(nf90_inq_varid(ncid, 'h', h_varid))
         status = nf90_inq_varid(ncid, 'eta', eta_varid)
+
         IF (status .EQ. nf90_enotvar) THEN
             WRITE (*, *) 'ERROR: cannot append to a legacy NetCDF file.'
             WRITE (*, *) 'Its variable w stores free-surface elevation; the current schema uses ' //                   &
                             'eta for elevation and w for vertical velocity.'
             WRITE (*, *) 'Start a new NetCDF output file to continue with the current schema.'
             STOP
+
         END IF
+
         CALL check(status)
         CALL check(nf90_inq_varid(ncid, 'u', u_varid))
         CALL check(nf90_inq_varid(ncid, 'v', v_varid))
         CALL check(nf90_inq_varid(ncid, 'w', w_varid))
         CALL check(nf90_inq_varid(ncid, 'T', Temp_varid))
+
         DO i = 1, n_solid
             WRITE (idx_string, '(I2.2)') i
-            CALL check(nf90_inq_varid(ncid, 'solid_frac_'//TRIM(idx_string),                                           &
-                                                solid_varid(i)))
-            CALL check(nf90_inq_varid(ncid, 'deposit__'//TRIM(idx_string),                                             &
-                                                deposit_varid(i)))
-            CALL check(nf90_inq_varid(ncid, 'erosion_'//TRIM(idx_string),                                              &
-                                                erosion_varid(i)))
+            CALL check(nf90_inq_varid(ncid, 'solid_frac_'//TRIM(idx_string), solid_varid(i)))
+            CALL check(nf90_inq_varid(ncid, 'deposit__'//TRIM(idx_string), deposit_varid(i)))
+            CALL check(nf90_inq_varid(ncid, 'erosion_'//TRIM(idx_string), erosion_varid(i)))
+
         END DO
+
         DO i = 1, n_add_gas
             WRITE (idx_string, '(I2.2)') i
-            CALL check(nf90_inq_varid(ncid, 'add_gas_frac_'//TRIM(idx_string),                                         &
-                                                gas_varid(i)))
+            CALL check(nf90_inq_varid(ncid, 'add_gas_frac_'//TRIM(idx_string), gas_varid(i)))
+
         END DO
+
         DO i = 1, n_stoch_vars
             WRITE (idx_string, '(I2.2)') i
             CALL check(nf90_inq_varid(ncid, 'Zs_'//TRIM(idx_string), stoch_varid(i)))
+
         END DO
+
         DO i = 1, n_pore_vars
             WRITE (idx_string, '(I2.2)') i
-            CALL check(nf90_inq_varid(ncid, 'PorePres_'//TRIM(idx_string),                                             &
-                                                pore_varid(i)))
+            CALL check(nf90_inq_varid(ncid, 'PorePres_'//TRIM(idx_string), pore_varid(i)))
+
         END DO
+
         CALL check(nf90_inq_varid(ncid, 'hMax', hMax_varid))
         CALL check(nf90_inq_varid(ncid, 'pDynMax', pDynMax_varid))
         CALL check(nf90_inq_varid(ncid, 'modVelMax', modVelMax_varid))
@@ -7188,13 +7356,16 @@ CONTAINS
         CALL check(nf90_inq_varid(ncid, 'mu eff', muEff_varid))
         CALL check(nf90_inq_varid(ncid, 'erodible', erodible_varid))
         CALL check(nf90_inq_varid(ncid, 'shear_velocity', shearVel_varid))
+
         DO i = 1, n_solid
             WRITE (idx_string, '(I2.2)') i
-            CALL check(nf90_inq_varid(ncid, 'Rouse_'//TRIM(idx_string),                                                &
-                                                Rouse_varid(i)))
+            CALL check(nf90_inq_varid(ncid, 'Rouse_'//TRIM(idx_string), Rouse_varid(i)))
+
         END DO
+
         CALL check(nf90_inq_varid(ncid, 'inertial_number', inertialNumber_varid))
         RETURN
+
         END IF
 
         IF (verbose_level >= 0) WRITE (*, *) 'Initializing NetCDF output file: ',                                      &
@@ -7225,42 +7396,31 @@ CONTAINS
 
         ! --- Define Data Variables: b, h, eta, and velocity components ---
         ! We pass the full 'dimids' array (x, y, time) because these are 3D variables
-        CALL check(nf90_def_var(ncid, 'b', nf90_double, dimids, b_varid,                                               &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'b', nf90_double, dimids, b_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, b_varid, 'units', 'meters'))
         CALL check(nf90_put_att(ncid, b_varid, 'long_name', 'bed elevation'))
 
-        CALL check(nf90_def_var(ncid, 'h', nf90_double, dimids, h_varid,                                               &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'h', nf90_double, dimids, h_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, h_varid, 'units', 'meters'))
         CALL check(nf90_put_att(ncid, h_varid, 'long_name', 'flow thickness'))
 
-        CALL check(nf90_def_var(ncid, 'eta', nf90_double, dimids, eta_varid,                                           &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'eta', nf90_double, dimids, eta_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, eta_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, eta_varid, 'long_name',                                                          &
-                                        'free surface elevation'))
+        CALL check(nf90_put_att(ncid, eta_varid, 'long_name', 'free surface elevation'))
 
-        CALL check(nf90_def_var(ncid, 'u', nf90_double, dimids, u_varid,                                               &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'u', nf90_double, dimids, u_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, u_varid, 'units', 'meters/seconds'))
-        CALL check(nf90_put_att(ncid, u_varid, 'long_name',                                                            &
-                                        'velocity x-component'))
+        CALL check(nf90_put_att(ncid, u_varid, 'long_name', 'velocity x-component'))
 
-        CALL check(nf90_def_var(ncid, 'v', nf90_double, dimids, v_varid,                                               &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'v', nf90_double, dimids, v_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, v_varid, 'units', 'meters/seconds'))
-        CALL check(nf90_put_att(ncid, v_varid, 'long_name',                                                            &
-                                        'velocity y-component'))
+        CALL check(nf90_put_att(ncid, v_varid, 'long_name', 'velocity y-component'))
 
-        CALL check(nf90_def_var(ncid, 'w', nf90_double, dimids, w_varid,                                               &
-                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'w', nf90_double, dimids, w_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, w_varid, 'units', 'meters/seconds'))
-        CALL check(nf90_put_att(ncid, w_varid, 'long_name',                                                            &
-                        'velocity z-component'))
+        CALL check(nf90_put_att(ncid, w_varid, 'long_name', 'velocity z-component'))
 
-        CALL check(nf90_def_var(ncid, 'T', nf90_double, dimids, Temp_varid,                                            &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'T', nf90_double, dimids, Temp_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, Temp_varid, 'units', 'kelvin'))
         CALL check(nf90_put_att(ncid, Temp_varid, 'long_name', 'flow temperature'))
 
@@ -7272,8 +7432,7 @@ CONTAINS
                                         nf90_double, dimids, solid_varid(i), deflate_level=5,                          &
                                         shuffle=.true.))
         CALL check(nf90_put_att(ncid, solid_varid(i), 'units', ''))
-        CALL check(nf90_put_att(ncid, solid_varid(i), 'long_name',                                                     &
-                                        'volume fraction of solid class '//TRIM(idx_string)))
+        CALL check(nf90_put_att(ncid, solid_varid(i), 'long_name', 'volume fraction of solid class '//TRIM(idx_string)))
 
         CALL check(nf90_def_var(ncid, 'deposit__'//trim(idx_string),                                                   &
                                         nf90_double, dimids, deposit_varid(i), deflate_level=5,                        &
@@ -7312,8 +7471,7 @@ CONTAINS
         CALL check(nf90_def_var(ncid, 'Zs_'//trim(idx_string), nf90_double,                                            &
                                         dimids, stoch_varid(i), deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, stoch_varid(i), 'units', ''))
-        CALL check(nf90_put_att(ncid, stoch_varid(i), 'long_name',                                                     &
-                                        'stochastic variable '//TRIM(idx_string)))
+        CALL check(nf90_put_att(ncid, stoch_varid(i), 'long_name', 'stochastic variable '//TRIM(idx_string)))
 
         END DO
 
@@ -7325,80 +7483,63 @@ CONTAINS
                                         nf90_double, dimids, pore_varid(i), deflate_level=5,                           &
                                         shuffle=.true.))
         CALL check(nf90_put_att(ncid, pore_varid(i), 'units', 'Pa'))
-        CALL check(nf90_put_att(ncid, pore_varid(i), 'long_name',                                                      &
-                                        'pore pressure '//TRIM(idx_string)))
+        CALL check(nf90_put_att(ncid, pore_varid(i), 'long_name', 'pore pressure '//TRIM(idx_string)))
 
         END DO
 
-        CALL check(nf90_def_var(ncid, 'hMax', nf90_double, dimids, hMax_varid,                                         &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'hMax', nf90_double, dimids, hMax_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, hMax_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, hMax_varid, 'long_name',                                                         &
-                                        'max flow thickness'))
+        CALL check(nf90_put_att(ncid, hMax_varid, 'long_name', 'max flow thickness'))
 
-        CALL check(nf90_def_var(ncid, 'pDynMax', nf90_double, dimids,                                                  &
-                                        pDynMax_varid, deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'pDynMax', nf90_double, dimids, pDynMax_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, pDynMax_varid, 'units', 'Pa'))
-        CALL check(nf90_put_att(ncid, pDynMax_varid, 'long_name',                                                      &
-                                        'max dynamic pressure'))
+        CALL check(nf90_put_att(ncid, pDynMax_varid, 'long_name', 'max dynamic pressure'))
 
         CALL check(nf90_def_var(ncid, 'modVelMax', nf90_double, dimids,                                                &
                                         modVelMax_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, modVelMax_varid, 'units', 'm/s'))
-        CALL check(nf90_put_att(ncid, modVelMax_varid, 'long_name',                                                    &
-                                        'max velocity magnitude'))
+        CALL check(nf90_put_att(ncid, modVelMax_varid, 'long_name', 'max velocity magnitude'))
 
-        CALL check(nf90_def_var(ncid, 'Ri', nf90_double, dimids, Ri2D_varid,                                           &
-                                        deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'Ri', nf90_double, dimids, Ri2D_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, Ri2D_varid, 'units', ''))
-        CALL check(nf90_put_att(ncid, Ri2D_varid, 'long_name',                                                         &
-                                        'Richardson number'))
+        CALL check(nf90_put_att(ncid, Ri2D_varid, 'long_name', 'Richardson number'))
 
-        CALL check(nf90_def_var(ncid, 'rhomix', nf90_double, dimids,                                                   &
-                                        rho_m2D_varid, deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'rhomix', nf90_double, dimids, rho_m2D_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, rho_m2D_varid, 'units', 'kg/m3'))
-        CALL check(nf90_put_att(ncid, rho_m2D_varid, 'long_name',                                                      &
-                                        'mixture density'))
+        CALL check(nf90_put_att(ncid, rho_m2D_varid, 'long_name', 'mixture density'))
 
         CALL check(nf90_def_var(ncid, 'red grav', nf90_double, dimids,                                                 &
                                         red_grav2D_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, red_grav2D_varid, 'long_name',                                                   &
-                                        'reduced gravity'))
+        CALL check(nf90_put_att(ncid, red_grav2D_varid, 'long_name', 'reduced gravity'))
 
         CALL check(nf90_put_att(ncid, red_grav2D_varid, 'units', 'm/s2'))
 
-        CALL check(nf90_def_var(ncid, 'mu eff', nf90_double, dimids,                                                   &
-                                        muEff_varid, deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'mu eff', nf90_double, dimids, muEff_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, muEff_varid, 'units', ''))
-        CALL check(nf90_put_att(ncid, muEff_varid, 'long_name',                                                        &
-                                        'effective friction coefficient'))
+        CALL check(nf90_put_att(ncid, muEff_varid, 'long_name', 'effective friction coefficient'))
 
-        CALL check(nf90_def_var(ncid, 'erodible', nf90_double, dimids,                                                 &
-                                        erodible_varid, deflate_level=5, shuffle=.true.))
+        CALL check(nf90_def_var(ncid, 'erodible', nf90_double, dimids, erodible_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, erodible_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, erodible_varid, 'long_name',                                                     &
-                                        'total available erodible thickness'))
+        CALL check(nf90_put_att(ncid, erodible_varid, 'long_name', 'total available erodible thickness'))
 
         CALL check(nf90_def_var(ncid, 'shear_velocity', nf90_double, dimids,                                           &
                                         shearVel_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, shearVel_varid, 'units', 'm/s'))
-        CALL check(nf90_put_att(ncid, shearVel_varid, 'long_name',                                                     &
-                                        'basal shear velocity'))
+        CALL check(nf90_put_att(ncid, shearVel_varid, 'long_name', 'basal shear velocity'))
 
         DO i = 1, n_solid
         WRITE (idx_string, '(I2.2)') i
         CALL check(nf90_def_var(ncid, 'Rouse_'//TRIM(idx_string), nf90_double,                                         &
                                         dimids, Rouse_varid(i), deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, Rouse_varid(i), 'units', ''))
-        CALL check(nf90_put_att(ncid, Rouse_varid(i), 'long_name',                                                     &
-                                        'Rouse number for solid class '//TRIM(idx_string)))
+        CALL check(nf90_put_att(ncid, Rouse_varid(i), 'long_name', 'Rouse number for solid class '//TRIM(idx_string)))
+
         END DO
 
         CALL check(nf90_def_var(ncid, 'inertial_number', nf90_double, dimids,                                          &
                                         inertialNumber_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, inertialNumber_varid, 'units', ''))
-        CALL check(nf90_put_att(ncid, inertialNumber_varid, 'long_name',                                               &
-                                        'granular inertial number'))
+        CALL check(nf90_put_att(ncid, inertialNumber_varid, 'long_name', 'granular inertial number'))
 
         ! End define mode. This writes the header to the file.
         CALL check(nf90_enddef(ncid))
@@ -7422,13 +7563,13 @@ CONTAINS
     !******************************************************************************
 
     SUBROUTINE write_netcdf_timestep(time_in, state)
-        USE netcdf
-        USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
-        USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
-        USE parameters_2d, ONLY: n_vars
-        USE state_conversion_2d, ONLY: mixt_var, primitive_to_volume_fractions
+    USE netcdf
+    USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
+    USE parameters_2d, ONLY: n_vars
+    USE state_conversion_2d, ONLY: mixt_var, primitive_to_volume_fractions
 
-        IMPLICIT NONE
+    IMPLICIT NONE
         REAL(wp), INTENT(IN) :: time_in
         CLASS(state_type), INTENT(IN) :: state
 
@@ -7489,8 +7630,8 @@ CONTAINS
 
             IF (state%qp(idx_h, j, k) .GT. dry_thickness_tolerance) THEN
 
-                CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c,                                    &
-                                r_red_grav, r_sp_heat_c, r_sp_heat_mix)
+                CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c,           &
+                    r_sp_heat_mix)
 
                 denom = state%q(idx_uEqn,j,k)**2 + state%q(idx_vEqn,j,k)**2
 
@@ -7527,15 +7668,16 @@ END IF
             vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                                                         &
                                             + r_v*B_prime_y_geom(j, k)
 
-            CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),                                               &
-                    r_alphas, r_alphag)
+            CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k), r_alphas, r_alphag)
             alphas2D(:,j,k) = r_alphas
             alphag2D(:,j,k) = r_alphag
+
             IF (slope_correction_flag) THEN
                 grav_coeff = 1.0_wp/(1.0_wp + B_prime_x_geom(j, k)**2 +                                                &
                                             B_prime_y_geom(j, k)**2)
             ELSE
                 grav_coeff = 1.0_wp
+
             END IF
 
             mod_hor_vel = SQRT(r_u**2 + r_v**2)
@@ -7548,6 +7690,7 @@ END IF
             ELSE IF (rheology_flag .AND.                                                                               &
                         (TRIM(rheology_model) .EQ. 'mui' .OR.                                                          &
                         TRIM(rheology_model) .EQ. 'mui_voellmy')) THEN
+
                 IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN
                 muEff(j, k) = mu_s
                 ELSE
@@ -7561,6 +7704,7 @@ END IF
                 ELSE
                     diam_characteristic = diam_s(1)
                     rho_particle = rho_s(1)
+
                 END IF
 
                 shear_rate = 2.5_wp*mod_hor_vel/r_h
@@ -7571,7 +7715,9 @@ END IF
                 muEff(j, k) = (mu_s*I_0 + mu_2*inertialNumber(j, k) +                                                  &
                                     muI_inf*inertialNumber(j, k)**2) /                                                 &
                                     (I_0 + inertialNumber(j, k))
+
                 END IF
+
             END IF
 
         END DO
@@ -7586,8 +7732,7 @@ END IF
         count1d = (/1/)
 
         ! Write the time value for the current record (as a one-element array)
-        CALL check(nf90_put_var(ncid, t_varid, (/time_in/), start=start1d,                                             &
-                                        count=count1d))
+        CALL check(nf90_put_var(ncid, t_varid, (/time_in/), start=start1d, count=count1d))
 
         ! Set up the start and count arrays to write a 2D slice
         start = (/1, 1, nc_time_idx/)
@@ -7602,30 +7747,31 @@ END IF
         temp_array(:, :) = state%qp(idx_h, :, :) + B_cent(:, :)
 
         ! Calculate and write the free surface elevation (eta = h + b)
-        CALL check(nf90_put_var(ncid, eta_varid, temp_array, start=start,                                              &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, eta_varid, temp_array, start=start, count=count))
 
         ! Write vertical velocity from horizontal velocity and bed slope.
-        CALL check(nf90_put_var(ncid, w_varid, vertical_velocity, start=start,                                         &
-                        count=count))
+        CALL check(nf90_put_var(ncid, w_varid, vertical_velocity, start=start, count=count))
 
         ! Write velocity components.  A cell classified as numerically dry has no
         ! meaningful physical velocity; mask residual q/rho-h ratios in the output.
         temp_array = 0.0_wp
         WHERE (state%qp(idx_h, :, :) .GT. dry_thickness_tolerance)
         temp_array = state%qp(idx_u, :, :)
+
         END WHERE
+
         CALL check(nf90_put_var(ncid, u_varid, temp_array, start=start, count=count))
 
         temp_array = 0.0_wp
         WHERE (state%qp(idx_h, :, :) .GT. dry_thickness_tolerance)
         temp_array = state%qp(idx_v, :, :)
+
         END WHERE
+
         CALL check(nf90_put_var(ncid, v_varid, temp_array, start=start, count=count))
 
         ! Write the flow temperature (T)
-        CALL check(nf90_put_var(ncid, Temp_varid, state%qp(idx_T, :, :), start=start,                                  &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, Temp_varid, state%qp(idx_T, :, :), start=start, count=count))
 
         temp_array = 0.0_wp   ! initialize to zero
 
@@ -7634,14 +7780,11 @@ END IF
 
         temp_array = alphas2D(i,:,:)
 
-        CALL check(nf90_put_var(ncid, solid_varid(i), temp_array, start=start,                                         &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, solid_varid(i), temp_array, start=start, count=count))
 
-        CALL check(nf90_put_var(ncid, deposit_varid(i), state%deposit(:, :, i),                                        &
-                                        start=start, count=count))
+        CALL check(nf90_put_var(ncid, deposit_varid(i), state%deposit(:, :, i), start=start, count=count))
 
-        CALL check(nf90_put_var(ncid, erosion_varid(i), state%erosion(:, :, i),                                        &
-                                        start=start, count=count))
+        CALL check(nf90_put_var(ncid, erosion_varid(i), state%erosion(:, :, i), start=start, count=count))
 
         END DO
 
@@ -7652,8 +7795,8 @@ END IF
 
         temp_array = alphag2D(i,:,:)
 
-        CALL check(nf90_put_var(ncid, gas_varid(i), temp_array,                                                        &
-                                        start=start, count=count))
+        CALL check(nf90_put_var(ncid, gas_varid(i), temp_array, start=start, count=count))
+
         END DO
 
         temp_array = 0.0_wp   ! initialize to zero
@@ -7663,8 +7806,8 @@ END IF
 
         ! Write stochastic variable
         DO i = 1, n_stoch_vars
-        CALL check(nf90_put_var(ncid, stoch_varid(i),                                                                  &
-                                        state%qp(idx_stoch + i - 1, :, :), start=start, count=count))
+        CALL check(nf90_put_var(ncid, stoch_varid(i), state%qp(idx_stoch + i - 1, :, :), start=start, count=count))
+
         END DO
 
         ! Write pore pressure variable
@@ -7672,9 +7815,11 @@ END IF
         temp_array = pres
         WHERE (state%qp(idx_h, :, :) .GE. dry_thickness_tolerance)
             temp_array = state%qp(idx_pore + i - 1, :, :) + pres
+
         END WHERE
-        CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start,                                          &
-                                        count=count))
+
+        CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start, count=count))
+
         END DO
 
         temp_array = 0.0_wp   ! reset to zero
@@ -7683,35 +7828,30 @@ END IF
         CALL check(nf90_put_var(ncid, hMax_varid, state%hmax, start=start, count=count))
 
         ! Write the max dynamic pressure (pdynmax)
-        CALL check(nf90_put_var(ncid, PDynMax_varid, state%pdynmax, start=start,                                       &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, PDynMax_varid, state%pdynmax, start=start, count=count))
 
         ! Write the max velocity magnitude
-        CALL check(nf90_put_var(ncid, ModVelMax_varid, state%mod_vel_max, start=start,                                 &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, ModVelMax_varid, state%mod_vel_max, start=start, count=count))
 
         ! Write the Richardson number
         CALL check(nf90_put_var(ncid, Ri2D_varid, Ri2D, start=start, count=count))
 
         ! Write the mixture density
-        CALL check(nf90_put_var(ncid, rho_m2D_varid, rho_m2D, start=start,                                             &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, rho_m2D_varid, rho_m2D, start=start, count=count))
 
         ! Write the reduced gravity
-        CALL check(nf90_put_var(ncid, red_grav2D_varid, red_grav2D, start=start,                                       &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, red_grav2D_varid, red_grav2D, start=start, count=count))
 
         CALL check(nf90_put_var(ncid, muEff_varid, muEff, start=start, count=count))
-        CALL check(nf90_put_var(ncid, erodible_varid, erodible2D, start=start,                                         &
-                                        count=count))
-        CALL check(nf90_put_var(ncid, shearVel_varid, shearVel, start=start,                                           &
-                                        count=count))
+        CALL check(nf90_put_var(ncid, erodible_varid, erodible2D, start=start, count=count))
+        CALL check(nf90_put_var(ncid, shearVel_varid, shearVel, start=start, count=count))
+
         DO i = 1, n_solid
-        CALL check(nf90_put_var(ncid, Rouse_varid(i), Rouse(i, :, :),                                                  &
-                                        start=start, count=count))
+        CALL check(nf90_put_var(ncid, Rouse_varid(i), Rouse(i, :, :), start=start, count=count))
+
         END DO
-        CALL check(nf90_put_var(ncid, inertialNumber_varid, inertialNumber,                                            &
-                                        start=start, count=count))
+
+        CALL check(nf90_put_var(ncid, inertialNumber_varid, inertialNumber, start=start, count=count))
 
         ! Increment the time record counter for the next write operation
         nc_time_idx = nc_time_idx + 1
@@ -7735,8 +7875,8 @@ END IF
     !******************************************************************************
 
     SUBROUTINE close_netcdf
-        USE netcdf
-        IMPLICIT NONE
+    USE netcdf
+    IMPLICIT NONE
         IF (verbose_level >= 0) WRITE (*, *) '*** SUCCESS: Closing NetCDF file ',                                      &
         TRIM(nc_filename)
         CALL check(nf90_close(ncid))
@@ -7749,11 +7889,13 @@ END IF
     !******************************************************************************
 
     SUBROUTINE check(status)
-        USE netcdf
+    USE netcdf
         INTEGER, INTENT(IN) :: status
+
         IF (status /= nf90_noerr) THEN
         PRINT *, 'FATAL NetCDF Error: ', TRIM(nf90_strerror(status))
         STOP "Stopped due to NetCDF error"
+
         END IF
     END SUBROUTINE check
 
@@ -7780,12 +7922,12 @@ END IF
     !******************************************************************************
 
     SUBROUTINE write_restart_file(filename, runtime, stochastic, state, domain)
-        USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                             &
+    USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                                 &
                                         n_pore_vars
-        USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
-        USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
+    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
 
-        IMPLICIT NONE
+    IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN) :: filename
         CLASS(runtime_state_type), INTENT(IN) :: runtime
         CLASS(stochastic_workspace_type), INTENT(IN) :: stochastic
@@ -7823,52 +7965,44 @@ END IF
         CALL check_restart_io(ierr, io_message, 'writing output state to', filename)
 
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
-        CALL check_restart_io(ierr, io_message, 'writing conservative state to',                                       &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing conservative state to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
-        CALL check_restart_io(ierr, io_message, 'writing nodal topography to',                                         &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing nodal topography to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erodible
-        CALL check_restart_io(ierr, io_message, 'writing erodible material to',                                        &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing erodible material to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit
         CALL check_restart_io(ierr, io_message, 'writing deposits to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erosion
         CALL check_restart_io(ierr, io_message, 'writing state%erosion to', filename)
 
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hmax
-        CALL check_restart_io(ierr, io_message, 'writing maximum thickness to',                                        &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing maximum thickness to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%pdynmax
-        CALL check_restart_io(ierr, io_message, 'writing maximum pressure to',                                         &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing maximum pressure to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%mod_vel_max
-        CALL check_restart_io(ierr, io_message, 'writing maximum velocity to',                                         &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing maximum velocity to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%vuln_table
-        CALL check_restart_io(ierr, io_message, 'writing vulnerability state to',                                      &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing vulnerability state to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hpos, state%hpos_old
         CALL check_restart_io(ierr, io_message, 'writing runout masks to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) domain%solve_mask_time
-        CALL check_restart_io(ierr, io_message, 'writing release-time mask to',                                        &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing release-time mask to', filename)
 
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
-        CALL check_restart_io(ierr, io_message, 'writing stochastic field to',                                         &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing stochastic field to', filename)
 
         seed_size = 0
         IF (stochastic_flag) CALL random_seed(SIZE=seed_size)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
-        CALL check_restart_io(ierr, io_message, 'writing random-seed size to',                                         &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'writing random-seed size to', filename)
+
         IF (seed_size > 0) THEN
         ALLOCATE(random_seed_state(seed_size))
         CALL random_seed(GET=random_seed_state)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) random_seed_state
         CALL check_restart_io(ierr, io_message, 'writing random state to', filename)
         DEALLOCATE(random_seed_state)
+
         END IF
 
         ! Append-only extension: canonical physical payload record indices stay
@@ -7917,13 +8051,13 @@ END IF
     !******************************************************************************
 
     SUBROUTINE read_restart_file(filename, runtime, stochastic, state, domain)
-        USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                             &
+    USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                                 &
                                         n_pore_vars
-        USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
-        USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
-        USE geometry_2d, ONLY: refresh_topography_geometry
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
+    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
+    USE geometry_2d, ONLY: refresh_topography_geometry
 
-        IMPLICIT NONE
+    IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN) :: filename
         CLASS(runtime_state_type), INTENT(INOUT) :: runtime
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
@@ -7949,18 +8083,22 @@ END IF
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) format_magic
         CALL check_restart_io(ierr, io_message, 'reading header from', filename)
+
         IF (format_magic /= restart_format_magic) THEN
         WRITE(*,*) 'ERROR: Unsupported or legacy binary restart file: ',                                               &
                 TRIM(filename)
         ERROR STOP 1
+
         END IF
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) format_version
         CALL check_restart_io(ierr, io_message, 'reading version from', filename)
+
         IF (format_version /= restart_format_version) THEN
         WRITE(*,*) 'ERROR: Unsupported restart format version:', format_version
         WRITE(*,*) 'The current restart format with lava deposition inventory is required.'
         ERROR STOP 1
+
         END IF
 
         ! Reject incompatible grid/component layouts before reading array payloads.
@@ -7977,6 +8115,7 @@ END IF
             ndynpres_check /= n_dyn_pres_levels) THEN
         WRITE(*,*) 'ERROR: Restart dimensions or equation layout do not match.'
         ERROR STOP 1
+
         END IF
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_check,                                               &
@@ -7989,6 +8128,7 @@ END IF
             (lava_check .NEQV. lava_flag)) THEN
         WRITE(*,*) 'ERROR: Restart carrier/stochastic/topography flags do not match.'
         ERROR STOP 1
+
         END IF
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,                                          &
@@ -7999,65 +8139,60 @@ END IF
         CALL check_restart_io(ierr, io_message, 'reading output state from', filename)
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
-        CALL check_restart_io(ierr, io_message, 'reading conservative state from',                                     &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading conservative state from', filename)
         ! Restore the authoritative nodal bed; shared face/centre elevations and
         ! derivative fields are regenerated later rather than checkpointed separately.
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
-        CALL check_restart_io(ierr, io_message, 'reading nodal topography from',                                       &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading nodal topography from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erodible
-        CALL check_restart_io(ierr, io_message, 'reading erodible material from',                                      &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading erodible material from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit
         CALL check_restart_io(ierr, io_message, 'reading deposits from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erosion
         CALL check_restart_io(ierr, io_message, 'reading state%erosion from', filename)
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hmax
-        CALL check_restart_io(ierr, io_message, 'reading maximum thickness from',                                      &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading maximum thickness from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%pdynmax
-        CALL check_restart_io(ierr, io_message, 'reading maximum pressure from',                                       &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading maximum pressure from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%mod_vel_max
-        CALL check_restart_io(ierr, io_message, 'reading maximum velocity from',                                       &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading maximum velocity from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%vuln_table
-        CALL check_restart_io(ierr, io_message, 'reading vulnerability state from',                                    &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading vulnerability state from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hpos, state%hpos_old
         CALL check_restart_io(ierr, io_message, 'reading runout masks from', filename)
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) domain%solve_mask_time
-        CALL check_restart_io(ierr, io_message, 'reading release-time mask from',                                      &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading release-time mask from', filename)
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
-        CALL check_restart_io(ierr, io_message, 'reading stochastic field from',                                       &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading stochastic field from', filename)
         CALL stochastic%refresh_effective
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
-        CALL check_restart_io(ierr, io_message, 'reading random-seed size from',                                       &
-            filename)
+        CALL check_restart_io(ierr, io_message, 'reading random-seed size from', filename)
         IF ((stochastic_flag .AND. seed_size <= 0) .OR.                                                                &
             ((.NOT. stochastic_flag) .AND. seed_size /= 0)) THEN
         WRITE(*,*) 'ERROR: Invalid random-seed state in restart:', seed_size
         ERROR STOP 1
+
         END IF
+
         IF (seed_size > 0) THEN
         CALL random_seed(SIZE=current_seed_size)
+
         IF (seed_size /= current_seed_size) THEN
             WRITE(*,*) 'ERROR: Restart random-seed size does not match:',                                              &
                     seed_size, current_seed_size
             ERROR STOP 1
+
         END IF
+
         ALLOCATE(random_seed_state(seed_size))
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) random_seed_state
-        CALL check_restart_io(ierr, io_message, 'reading random state from',                                           &
-                filename)
+        CALL check_restart_io(ierr, io_message, 'reading random state from', filename)
         CALL random_seed(PUT=random_seed_state)
         DEALLOCATE(random_seed_state)
+
         END IF
 
         READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) runout_check,                                                    &
@@ -8066,12 +8201,15 @@ END IF
         CALL check_restart_io(ierr, io_message, 'reading diagnostic configuration from', filename)
         IF (runout_check .NEQV. output_runout_flag)                                                                    &
             CALL fatal_error('Restart runout output flag does not match the configured run.')
+
         IF (output_runout_flag) THEN
         IF (dt_runout_check /= dt_runout .OR. eps_stop_check /= eps_stop .OR.                                          &
                 threshold_check /= alphas_threshold .OR.                                                               &
                 ANY(origin_check /= [x0_runout, y0_runout]))                                                           &
                 CALL fatal_error('Restart runout cadence, stopping threshold or origin configuration changed.')
+
         END IF
+
         READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%runout%initialized,                                      &
             runtime%runout%origin_x, runtime%runout%origin_y,                                                          &
             runtime%runout%initial_distance, runtime%runout%initial_distance_x,                                        &
@@ -8117,6 +8255,7 @@ END IF
         WRITE(*,*) 'ERROR: Failed ', TRIM(operation), ' restart file ',                                                &
                 TRIM(filename), ': ', TRIM(message)
         ERROR STOP 1
+
         END IF
 
     END SUBROUTINE check_restart_io

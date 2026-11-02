@@ -9,7 +9,7 @@
 !********************************************************************************
 
 MODULE domain_2d
-        USE parameters_2d, ONLY : idx_totMassEqn
+    USE parameters_2d, ONLY : idx_totMassEqn
 
     USE parameters_2d, ONLY : wp
     USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,                                           &
@@ -160,7 +160,7 @@ CONTAINS
 
     SUBROUTINE check_solve(this, q, t, solve_all)
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         CLASS(domain_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(:,:,:)
@@ -314,11 +314,16 @@ CONTAINS
         ! Preserve the former HP workset order: active cells, then neighbours.
         DO i = 1, this%hp_eta_cells
             this%hp_eta_mask(this%hp_eta_j(i),this%hp_eta_k(i)) = .FALSE.
+
         END DO
+
         this%hp_eta_cells = 0
+
         DO i = 1, this%solve_cells
             CALL append_hp_cell(this%j_cent(i),this%k_cent(i))
+
         END DO
+
         DO i = 1, this%solve_cells
             j = this%j_cent(i)
             k = this%k_cent(i)
@@ -326,14 +331,17 @@ CONTAINS
             IF (j .LT. comp_cells_x) CALL append_hp_cell(j+1,k)
             IF (k .GT. 1) CALL append_hp_cell(j,k-1)
             IF (k .LT. comp_cells_y) CALL append_hp_cell(j,k+1)
+
         END DO
 
         ! HP reconstruction reads a two-cell stencil around every evolved cell.
         ! Keep this read-only halo separate from solve_mask so no additional cells
         ! are advanced by the time integrator.
         this%reconstruction_mask = this%solve_mask
+
         DO i = 1,2
             this%solve_mask_temp = this%reconstruction_mask
+
             IF ( comp_cells_x .GT. 1 ) THEN
                 this%reconstruction_mask(2:comp_cells_x,:) =                                                           &
                     this%reconstruction_mask(2:comp_cells_x,:) .OR.                                                    &
@@ -341,7 +349,9 @@ CONTAINS
                 this%reconstruction_mask(1:comp_cells_x-1,:) =                                                         &
                     this%reconstruction_mask(1:comp_cells_x-1,:) .OR.                                                  &
                     this%solve_mask_temp(2:comp_cells_x,:)
+
             END IF
+
             IF ( comp_cells_y .GT. 1 ) THEN
                 this%reconstruction_mask(:,2:comp_cells_y) =                                                           &
                     this%reconstruction_mask(:,2:comp_cells_y) .OR.                                                    &
@@ -349,19 +359,28 @@ CONTAINS
                 this%reconstruction_mask(:,1:comp_cells_y-1) =                                                         &
                     this%reconstruction_mask(:,1:comp_cells_y-1) .OR.                                                  &
                     this%solve_mask_temp(:,2:comp_cells_y)
+
             END IF
+
         END DO
 
         i = 0
+
         DO k = 1,comp_cells_y
+
             DO j = 1,comp_cells_x
+
                 IF ( this%reconstruction_mask(j,k) ) THEN
                     i = i+1
                     this%j_reconstruction(i) = j
                     this%k_reconstruction(i) = k
+
                 END IF
+
             END DO
+
         END DO
+
         this%reconstruction_cells = i
         IF (this%reconstruction_cells/=COUNT(this%reconstruction_mask))                                                &
             CALL fatal_error('Lie OpenMP: inconsistent unique reconstruction worklist')

@@ -387,32 +387,47 @@ CONTAINS
         idx_addGasEqn_last=idx_add_gas_last
         next_index=idx_add_gas_last
         idx_stoch=0; idx_stochEqn=0
+
         IF (n_stoch_vars==1) THEN
             next_index=next_index+1
             idx_stoch=next_index; idx_stochEqn=next_index
+
         END IF
+
         idx_pore=0; idx_poreEqn=0
+
         IF (n_pore_vars==1) THEN
             next_index=next_index+1
             idx_pore=next_index; idx_poreEqn=next_index
+
         END IF
+
         idx_u=n_vars+1; idx_v=n_vars+2
     END SUBROUTINE configure_canonical_state_indices
 
     SUBROUTINE reset_mass_exchange_rates(r)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         IF (ALLOCATED(r%solid_mass_rate)) THEN
         IF (SIZE(r%solid_mass_rate)/=n_solid) DEALLOCATE(r%solid_mass_rate)
+
         END IF
+
         IF (ALLOCATED(r%add_gas_mass_rate)) THEN
         IF (SIZE(r%add_gas_mass_rate)/=n_add_gas) DEALLOCATE(r%add_gas_mass_rate)
+
         END IF
+
         IF (ALLOCATED(r%solid_erosion_rate)) THEN
         IF (SIZE(r%solid_erosion_rate)/=n_solid) DEALLOCATE(r%solid_erosion_rate)
+
         END IF
+
         IF (ALLOCATED(r%solid_deposition_rate)) THEN
         IF (SIZE(r%solid_deposition_rate)/=n_solid) DEALLOCATE(r%solid_deposition_rate)
+
         END IF
+
         IF (.NOT.ALLOCATED(r%solid_mass_rate)) ALLOCATE(r%solid_mass_rate(n_solid))
         IF (.NOT.ALLOCATED(r%add_gas_mass_rate)) ALLOCATE(r%add_gas_mass_rate(n_add_gas))
         IF (.NOT.ALLOCATED(r%solid_erosion_rate)) ALLOCATE(r%solid_erosion_rate(n_solid))

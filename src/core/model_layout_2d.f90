@@ -85,9 +85,8 @@ CONTAINS
     !> @param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
     !******************************************************************************
 
-    SUBROUTINE initialize_model_layout( this, n_layers, n_variables,                                                   &
-            n_equations, n_solid, n_additional_gas, n_stochastic,                                                      &
-            n_pore_pressure )
+    SUBROUTINE initialize_model_layout(this, n_layers, n_variables, n_equations, n_solid, n_additional_gas,            &
+        n_stochastic, n_pore_pressure)
 
         CLASS(model_layout_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: n_layers
@@ -103,18 +102,22 @@ CONTAINS
 
         IF ( .NOT. supported_layer_count(n_layers) ) THEN
             ERROR STOP 'Only N_LAYERS=1 is currently supported'
+
         END IF
 
         IF ( n_solid < 0 .OR. n_additional_gas < 0 ) THEN
             ERROR STOP 'Model layout component counts must be non-negative'
+
         END IF
 
         IF ( n_stochastic < 0 .OR. n_stochastic > 1 ) THEN
             ERROR STOP 'Model layout supports zero or one stochastic variable'
+
         END IF
 
         IF ( n_pore_pressure < 0 .OR. n_pore_pressure > 1 ) THEN
             ERROR STOP 'Model layout supports zero or one pore-pressure variable'
+
         END IF
 
         this%n_layers = n_layers
@@ -140,21 +143,26 @@ CONTAINS
         IF ( n_stochastic == 1 ) THEN
             next_index = next_index + 1
             this%idx_stochastic = next_index
+
         END IF
 
         IF ( n_pore_pressure == 1 ) THEN
             next_index = next_index + 1
             this%idx_pore_pressure = next_index
+
         END IF
+
         this%idx_velocity_x = n_variables + 1
         this%idx_velocity_y = n_variables + 2
 
         IF ( next_index /= n_variables ) THEN
             ERROR STOP 'Configured variable count is inconsistent with model layout'
+
         END IF
 
         IF ( n_equations /= n_variables ) THEN
             ERROR STOP 'Current model requires one equation per conservative variable'
+
         END IF
 
     END SUBROUTINE initialize_model_layout
