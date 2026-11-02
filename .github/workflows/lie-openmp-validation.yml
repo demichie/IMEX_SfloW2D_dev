@@ -77,6 +77,41 @@ jobs:
           path: evidence/
           if-no-files-found: warn
 
+
+  lie-end-to-end:
+    name: Lie end-to-end numeric comparison (1/2/4 threads)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake gfortran make liblapack-dev libnetcdff-dev libnetcdf-dev python3-numpy python3-netcdf4
+      - name: Compile production solver
+        env:
+          FC: gfortran
+        run: |
+          autoreconf -fi
+          ./configure --with-netcdf=/usr --enable-strict-debug
+          make -j2
+      - name: Compare complete solver fields across thread counts
+        env:
+          OMP_DYNAMIC: "FALSE"
+          OPENBLAS_NUM_THREADS: "1"
+        run: |
+          /usr/bin/python3 TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py \
+            --repo "$GITHUB_WORKSPACE" \
+            --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
+            --evidence "$GITHUB_WORKSPACE/evidence"
+      - name: Upload numeric comparison report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d20-lie-end-to-end-report
+          path: evidence/
+          if-no-files-found: warn
+
 # These existing suites exercise individual numerical kernels and conversions.
 # They do NOT establish whole-step Lie equivalence, race freedom or rollback
 # invariants; those require further integration tests.

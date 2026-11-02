@@ -209,3 +209,7 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 - **Audit statico:** esaminati tutti i 34 file `.f90` sotto `src/physics` per `SAVE`, `COMMON`, RNG e I/O diretto. Due scritture di errore/STOP in `pore_pressure_darcy_2d` dipendono da `N_inh<0`; introdotta una validazione preventiva nell'esecutore per i gruppi Darcy con inibizione STATIC/DYNAMIC. Questa e' una mitigazione mirata, non una prova di thread safety completa.
 - **Gate non superati:** impossibile clonare il repository nel container per errore DNS `github.com`; dunque non e' stata eseguita la compilazione e non sono stati effettuati test multi-thread end-to-end. I nuovi commit sono implementativi, non una certificazione OpenMP.
 
+
+## 10. Test end-to-end multithread (2026-11-02)
+
+Aggiunto `TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py` e il job `lie-end-to-end` nel workflow D20. Genera due fixture di produzione (`EXAMPLE_2D` e `EXAMPLE_2D_PP`) in directory temporanee isolate, imposta `SERIAL_FLAG=F`, verifica il numero effettivo di thread, esegue il solver completo con 1, 2 e 4 thread e confronta ogni variabile numerica NetCDF a ogni istante salvato con tolleranze dichiarate (rtol=5e-12, atol=1e-10). Scrive `report.json` e fallisce se manca un output, vi sono valori non finiti o i confronti eccedono le tolleranze. Il test non sostituisce ancora fixture dedicate per Newton, rollback forzato e topografia dinamica: rimangono gate esplicitamente aperti. **Non eseguito localmente; serve esecuzione Action.**
