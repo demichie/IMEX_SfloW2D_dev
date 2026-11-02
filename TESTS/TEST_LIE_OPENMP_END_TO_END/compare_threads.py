@@ -46,7 +46,7 @@ def prepare(repo, root, name):
     # N_RK belonged to the retired Runge-Kutta integrator. The production
     # solver now uses Lie splitting and does not accept N_RK in this namelist.
     # Remove only the obsolete option from temporary test inputs.
-    text = replace_one(text, r"^[ \t]*N_RK[ \t]*=.*$", "")
+    text = re.sub(r"^[ \t]*N_RK[ \t]*=.*$", "", text, flags=re.I | re.M)
     # The solver otherwise selects its serial path even with OMP_NUM_THREADS>1.
     if re.search(r"^\s*SERIAL_FLAG\s*=", text, re.I | re.M):
         text = replace_one(text, r"^\s*SERIAL_FLAG\s*=.*$", " SERIAL_FLAG=F,")
@@ -58,7 +58,7 @@ def prepare(repo, root, name):
     # Both legacy examples place exchange flags in transport namelists,
     # whereas the current solver reads them only from MASS_EXCHANGE_PARAMETERS.
     # Normalize this copied fixture, leaving the numerical settings unchanged.
-    if name in CASES:
+    if name in CASES and not re.search(r"^\s*&MASS_EXCHANGE_PARAMETERS\b", text, re.I | re.M):
         transferred = {}
         for key in ("SETTLING_FLAG", "EROSION_COEFF", "ENTRAINMENT_FLAG"):
             pattern = rf"^\s*{key}\s*=\s*([^,\n]+)\s*,?\s*$"
