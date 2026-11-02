@@ -247,7 +247,6 @@ CONTAINS
                         analytic_context,time_step,analytic_rate,status)
                     IF (status/=0) THEN
                         WRITE(cell_failure(cell),'(A,I0)') 'D19: analytic group status ',status
-                        ! Error stored in cell_failure(cell)
                         CYCLE cell_loop
                     END IF
                     IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
@@ -270,7 +269,7 @@ CONTAINS
                     END IF
                 CASE DEFAULT
                     cell_failure(cell)='D19: invalid group method'
-                    IF (step_failed) CYCLE cell_loop
+                    CYCLE cell_loop
                 END SELECT
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_group(1:n_eqns,j,k))) THEN
