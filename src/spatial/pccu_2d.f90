@@ -53,8 +53,8 @@ CONTAINS
     !>                               equation.
     !******************************************************************************
 
-    SUBROUTINE eval_hydrostatic_path( direction, h_left, gamma_left, eta_left,   &
-            grav_coeff_left, h_right, gamma_right, eta_right, grav_coeff_right,    &
+    SUBROUTINE eval_hydrostatic_path( direction, h_left, gamma_left, eta_left,                                         &
+            grav_coeff_left, h_right, gamma_right, eta_right, grav_coeff_right,                                        &
             path_contribution )
 
         INTEGER, INTENT(IN) :: direction
@@ -67,7 +67,7 @@ CONTAINS
         state_left = [ h_left, gamma_left, eta_left, grav_coeff_left ]
         state_right = [ h_right, gamma_right, eta_right, grav_coeff_right ]
 
-        CALL eval_path_contribution( direction, state_left, state_right,          &
+        CALL eval_path_contribution( direction, state_left, state_right,                                               &
             hydrostatic_integrand, path_contribution, n_quad=3 )
 
     END SUBROUTINE eval_hydrostatic_path
@@ -84,7 +84,7 @@ CONTAINS
     !> @param[out] value_right Oriented face value consumed by the positive/right adjacent cell.
     !******************************************************************************
 
-    SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution,       &
+    SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution,                                             &
             a_minus, a_plus, value_left, value_right )
 
         REAL(wp), INTENT(IN) :: numerical_flux(:), path_contribution(:)
@@ -93,8 +93,8 @@ CONTAINS
 
         REAL(wp) :: denominator
 
-        IF ( ( SIZE(path_contribution) .NE. SIZE(numerical_flux) ) .OR.           &
-            ( SIZE(value_left) .NE. SIZE(numerical_flux) ) .OR.                  &
+        IF ( ( SIZE(path_contribution) .NE. SIZE(numerical_flux) ) .OR.                                                &
+            ( SIZE(value_left) .NE. SIZE(numerical_flux) ) .OR.                                                        &
             ( SIZE(value_right) .NE. SIZE(numerical_flux) ) ) THEN
             ERROR STOP 'eval_oriented_pccu_pair: inconsistent array sizes'
         END IF
@@ -122,7 +122,7 @@ CONTAINS
     !> @param[out] numerical_flux Central-upwind conservative flux before the path split.
     !******************************************************************************
 
-    SUBROUTINE eval_central_upwind_flux( a_minus, a_plus, flux_left, flux_right, &
+    SUBROUTINE eval_central_upwind_flux( a_minus, a_plus, flux_left, flux_right,                                       &
             state_left, state_right, numerical_flux )
 
         REAL(wp), INTENT(IN) :: a_minus, a_plus
@@ -132,16 +132,16 @@ CONTAINS
 
         REAL(wp) :: denominator
 
-        IF ( ( SIZE(flux_right) .NE. SIZE(flux_left) ) .OR.                       &
-            ( SIZE(state_left) .NE. SIZE(flux_left) ) .OR.                       &
-            ( SIZE(state_right) .NE. SIZE(flux_left) ) .OR.                      &
+        IF ( ( SIZE(flux_right) .NE. SIZE(flux_left) ) .OR.                                                            &
+            ( SIZE(state_left) .NE. SIZE(flux_left) ) .OR.                                                             &
+            ( SIZE(state_right) .NE. SIZE(flux_left) ) .OR.                                                            &
             ( SIZE(numerical_flux) .NE. SIZE(flux_left) ) ) THEN
             ERROR STOP 'eval_central_upwind_flux: inconsistent array sizes'
         END IF
 
         denominator = a_plus - a_minus
         IF ( denominator .GT. pccu_speed_tolerance ) THEN
-            numerical_flux = ( a_plus*flux_left - a_minus*flux_right              &
+            numerical_flux = ( a_plus*flux_left - a_minus*flux_right                                                   &
                 + a_plus*a_minus*(state_right-state_left) ) / denominator
         ELSE
             numerical_flux = 0.5_wp * ( flux_left + flux_right )
@@ -157,7 +157,7 @@ CONTAINS
     !>                      coordinate.
     !> @param[out] integrand Model one-form contracted with the path tangent, one entry per equation.
 
-    SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds,         &
+    SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds,                                                &
             integrand )
 
         INTEGER, INTENT(IN) :: direction
@@ -188,7 +188,7 @@ CONTAINS
         gamma = path_state(2)
         grav_coeff = path_state(4)
         integrand = 0.0_wp
-        integrand(normal_momentum) = -grav_coeff * ( gamma*h*dstate_ds(3)        &
+        integrand(normal_momentum) = -grav_coeff * ( gamma*h*dstate_ds(3)                                              &
             + 0.5_wp*h*h*dstate_ds(2) )
 
     END SUBROUTINE hydrostatic_integrand

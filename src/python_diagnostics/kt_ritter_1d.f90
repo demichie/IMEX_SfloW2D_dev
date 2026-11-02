@@ -49,8 +49,8 @@ program kt_ritter_1d
         min_h=min(min_h,minval(qnext(:,1)))
         if (minval(qnext(:,1)) < -dry_tol) then
             i=minloc(qnext(:,1),dim=1)
-            write(*,'(A,ES14.6,A,I0,A,ES14.6)') &
-                    'FAIL: negative h=',qnext(i,1),' in cell ',i, &
+            write(*,'(A,ES14.6,A,I0,A,ES14.6)')                                                                        &
+                    'FAIL: negative h=',qnext(i,1),' in cell ',i,                                                      &
                     ' at t=',t+dt
             error stop 1
         end if
@@ -68,13 +68,13 @@ program kt_ritter_1d
     l1_error=sum(abs(h_num-h_exact))*dx
     linf_error=maxval(abs(h_num-h_exact))
     write(*,'(A)') 'Kurganov-Petrova (2007) 1-D Fortran diagnostic'
-    write(*,'(A,ES14.6,A,I0,A,ES14.6)') &
-            'case=ritter, momentum_reconstruction=u, t=',t, &
+    write(*,'(A,ES14.6,A,I0,A,ES14.6)')                                                                                &
+            'case=ritter, momentum_reconstruction=u, t=',t,                                                            &
             ' s, steps=',nstep,', min(raw h)=',min_h
-    write(*,'(A,ES14.6,A,ES14.6,A,ES14.6,A)') &
+    write(*,'(A,ES14.6,A,ES14.6,A,ES14.6,A)')                                                                          &
             'mass initial/final=',mass0,' / ',mass,' m^2'
-    write(*,'(A,ES14.6,A,ES14.6,A,ES14.6,A)') &
-            'mass error vs exact=',mass-exact_mass,' m^2, L1(cell-average h)=', &
+    write(*,'(A,ES14.6,A,ES14.6,A,ES14.6,A)')                                                                          &
+            'mass error vs exact=',mass-exact_mass,' m^2, L1(cell-average h)=',                                        &
             l1_error,' m^2, Linf=',linf_error,' m'
 
 contains
@@ -146,7 +146,7 @@ contains
         call limited_slope(state(:,1),hslope)
         ucenter=0.0_wp
         do j=1,nx
-            if (state(j,1) > dry_tol) &
+            if (state(j,1) > dry_tol)                                                                                  &
                 ucenter(j)=desingularized_u(state(j,1),state(j,2))
         end do
         call limited_slope(ucenter,uslope)
@@ -179,9 +179,9 @@ contains
             if (hright(j) <= dry_tol) uright(j)=0.0_wp
             mleft(j)=hleft(j)*uleft(j)
             mright(j)=hright(j)*uright(j)
-            am(j)=min(uleft(j)-sqrt(grav*hleft(j)), &
+            am(j)=min(uleft(j)-sqrt(grav*hleft(j)),                                                                    &
                 uright(j)-sqrt(grav*hright(j)),0.0_wp)
-            ap(j)=max(uleft(j)+sqrt(grav*hleft(j)), &
+            ap(j)=max(uleft(j)+sqrt(grav*hleft(j)),                                                                    &
                 uright(j)+sqrt(grav*hright(j)),0.0_wp)
             denom=ap(j)-am(j)
             flux(j,:)=0.0_wp
@@ -206,19 +206,19 @@ contains
     subroutine ritter_cell_averages(edges,time,hbar)
         real(wp), intent(in) :: edges(0:nx),time
         real(wp), intent(out) :: hbar(nx)
-        real(wp), parameter :: xg(12)=[ &
-            -0.9815606342467192_wp,-0.9041172563704749_wp, &
-            -0.7699026741943047_wp,-0.5873179542866175_wp, &
-            -0.3678314989981802_wp,-0.1252334085114689_wp, &
-                0.1252334085114689_wp, 0.3678314989981802_wp, &
-                0.5873179542866175_wp, 0.7699026741943047_wp, &
+        real(wp), parameter :: xg(12)=[                                                                                &
+            -0.9815606342467192_wp,-0.9041172563704749_wp,                                                             &
+            -0.7699026741943047_wp,-0.5873179542866175_wp,                                                             &
+            -0.3678314989981802_wp,-0.1252334085114689_wp,                                                             &
+                0.1252334085114689_wp, 0.3678314989981802_wp,                                                          &
+                0.5873179542866175_wp, 0.7699026741943047_wp,                                                          &
                 0.9041172563704749_wp, 0.9815606342467192_wp]
-        real(wp), parameter :: wg(12)=[ &
-            0.0471753363865118_wp,0.1069393259953184_wp, &
-            0.1600783285433462_wp,0.2031674267230659_wp, &
-            0.2334925365383548_wp,0.2491470458134028_wp, &
-            0.2491470458134028_wp,0.2334925365383548_wp, &
-            0.2031674267230659_wp,0.1600783285433462_wp, &
+        real(wp), parameter :: wg(12)=[                                                                                &
+            0.0471753363865118_wp,0.1069393259953184_wp,                                                               &
+            0.1600783285433462_wp,0.2031674267230659_wp,                                                               &
+            0.2334925365383548_wp,0.2491470458134028_wp,                                                               &
+            0.2491470458134028_wp,0.2334925365383548_wp,                                                               &
+            0.2031674267230659_wp,0.1600783285433462_wp,                                                               &
             0.1069393259953184_wp,0.0471753363865118_wp]
         real(wp) :: c0,x,xi,hpoint,total
         integer :: j,k
@@ -226,7 +226,7 @@ contains
         do j=1,nx
             total=0.0_wp
             do k=1,12
-                x=0.5_wp*(edges(j)-edges(j-1))*xg(k) &
+                x=0.5_wp*(edges(j)-edges(j-1))*xg(k)                                                                   &
                     +0.5_wp*(edges(j)+edges(j-1))
                 if (time <= 0.0_wp) then
                     hpoint=h0*max(0.0_wp,min(1.0_wp,(dam_x-edges(j-1))/dx))

@@ -34,7 +34,7 @@ MODULE nonconservative_2d
         !>                       equation.
         !***************************************************************************
 
-        SUBROUTINE nonconservative_integrand_callback( direction, path_state,  &
+        SUBROUTINE nonconservative_integrand_callback( direction, path_state,                                          &
                 dstate_ds, integrand )
             IMPORT :: wp
             INTEGER, INTENT(IN) :: direction
@@ -54,7 +54,7 @@ MODULE nonconservative_2d
         !>                       unit-interval coordinate.
         !***************************************************************************
 
-        SUBROUTINE path_state_callback( stateL, stateR, s, path_state,          &
+        SUBROUTINE path_state_callback( stateL, stateR, s, path_state,                                                 &
                 dstate_ds )
             IMPORT :: wp
             REAL(wp), INTENT(IN) :: stateL(:)
@@ -86,7 +86,7 @@ CONTAINS
     !>                          segment.
     !******************************************************************************
 
-    SUBROUTINE eval_path_contribution( direction, stateL, stateR, integrand_provider, &
+    SUBROUTINE eval_path_contribution( direction, stateL, stateR, integrand_provider,                                  &
             path_contribution, n_quad, path_provider )
 
         INTEGER, INTENT(IN) :: direction
@@ -124,7 +124,7 @@ CONTAINS
         DO i_quad = 1, n_quad_local
 
             IF ( PRESENT(path_provider) ) THEN
-                CALL path_provider( stateL, stateR, gauss_abscissa(i_quad),       &
+                CALL path_provider( stateL, stateR, gauss_abscissa(i_quad),                                            &
                     path_state, dstate_ds )
             ELSE
                 path_state = stateL + gauss_abscissa(i_quad) * (stateR - stateL)
@@ -133,7 +133,7 @@ CONTAINS
 
             integrand = 0.0_wp
             CALL integrand_provider( direction, path_state, dstate_ds, integrand )
-            path_contribution = path_contribution                               &
+            path_contribution = path_contribution                                                                      &
                 + gauss_weight(i_quad) * integrand
 
         END DO

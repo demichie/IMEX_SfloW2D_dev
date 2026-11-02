@@ -73,7 +73,7 @@ CONTAINS
     !>       are already included through path terms.
     !******************************************************************************
 
-    SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, &
+    SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain,                                        &
             boundary_source_enabled )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
@@ -83,10 +83,10 @@ CONTAINS
         CLASS(domain_type), INTENT(IN) :: domain
         LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
 
-        CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term, &
-            time, domain%solve_cells, domain%j_cent, domain%k_cent,              &
-            domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,        &
-            domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,        &
+        CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term,                                       &
+            time, domain%solve_cells, domain%j_cent, domain%k_cent,                                                    &
+            domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &
+            domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,                                               &
             source_boundary_enabled=boundary_source_enabled )
 
     END SUBROUTINE evaluate_spatial_operator
@@ -103,7 +103,7 @@ CONTAINS
     !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL evaluation.
     !******************************************************************************
 
-    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain,        &
+    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain,                                                &
             boundary_source_enabled )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
@@ -140,16 +140,16 @@ CONTAINS
         !$OMP END PARALLEL DO
 
         ! CFL speeds must use the same selected advective traces as the spatial operator.
-        CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,      &
-            domain%j_cent, domain%k_cent,                                       &
+        CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,                                            &
+            domain%j_cent, domain%k_cent,                                                                              &
             .TRUE., source_boundary_enabled=boundary_source_enabled )
 
         ! Match the KT face depths and desingularized velocities used by the
         ! spatial operator before evaluating the CFL wave speeds.
         CALL this%reconstruction%reconstruct_kt_eta( qp )
 
-        CALL this%hp_pccu%evaluate_speeds( this%reconstruction,                  &
-            domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,        &
+        CALL this%hp_pccu%evaluate_speeds( this%reconstruction,                                                        &
+            domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &
             domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
 
         max_a_x = 0.0_wp
@@ -162,7 +162,7 @@ CONTAINS
             j = domain%j_cent(l)
             k = domain%k_cent(l)
 
-            CALL accumulate_directional_face_speeds(this%hp_pccu,j,k,             &
+            CALL accumulate_directional_face_speeds(this%hp_pccu,j,k,                                                  &
                 max_a_x,max_a_y)
         END DO
         !$OMP END PARALLEL DO
@@ -207,16 +207,16 @@ CONTAINS
         INTEGER, INTENT(IN) :: j,k
         REAL(wp), INTENT(INOUT) :: max_a_x,max_a_y
 
-        max_a_x = MAX(max_a_x,                                                 &
-            speeds%a_interface_xPos(j,k),                                     &
-            -speeds%a_interface_xNeg(j,k),                                    &
-            speeds%a_interface_xPos(j+1,k),                                   &
+        max_a_x = MAX(max_a_x,                                                                                         &
+            speeds%a_interface_xPos(j,k),                                                                              &
+            -speeds%a_interface_xNeg(j,k),                                                                             &
+            speeds%a_interface_xPos(j+1,k),                                                                            &
             -speeds%a_interface_xNeg(j+1,k))
 
-        max_a_y = MAX(max_a_y,                                                 &
-            speeds%a_interface_yPos(j,k),                                     &
-            -speeds%a_interface_yNeg(j,k),                                    &
-            speeds%a_interface_yPos(j,k+1),                                   &
+        max_a_y = MAX(max_a_y,                                                                                         &
+            speeds%a_interface_yPos(j,k),                                                                              &
+            -speeds%a_interface_yNeg(j,k),                                                                             &
+            speeds%a_interface_yPos(j,k+1),                                                                            &
             -speeds%a_interface_yNeg(j,k+1))
     END SUBROUTINE accumulate_directional_face_speeds
 
@@ -239,7 +239,7 @@ CONTAINS
     SUBROUTINE prepare_spatial_hp_workset(this, domain)
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         CLASS(domain_type), INTENT(IN) :: domain
-        CALL this%reconstruction%prepare_hp_workset( &
+        CALL this%reconstruction%prepare_hp_workset(                                                                   &
             domain%hp_eta_cells, domain%hp_eta_j, domain%hp_eta_k)
     END SUBROUTINE prepare_spatial_hp_workset
 
