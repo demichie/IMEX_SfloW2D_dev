@@ -129,6 +129,8 @@ CONTAINS
 
             ALLOCATE(cell_failure(domain%solve_cells))
             cell_failure=''
+            ! q and qp remain immutable group-entry states until the serial commit.
+            ! Only q_group/qp_group candidates and per-cell staging are modified.
             ! Each active cell owns distinct candidate slices and staging slots.
             !$OMP PARALLEL DO DEFAULT(SHARED) &
             !$OMP& PRIVATE(cell,j,k,qpentry,q_candidate,qp_candidate,deposit_candidate, &
@@ -141,7 +143,7 @@ CONTAINS
                 IF (groups(group_index)%id==0) THEN
                     qpentry=qp_original(:,j,k)
                 ELSE
-                    qpentry=qp_group(:,j,k)
+                    qpentry=qp(:,j,k)
                 END IF
                 context='Lie source group'
                 analytic_context%Bprime_x=B_prime_x_geom(j,k)
@@ -188,7 +190,7 @@ CONTAINS
 
                 SELECT CASE(groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
-                    CALL assemble_lie_explicit_transaction(qpentry,q_group(1:n_eqns,j,k), &
+                    CALL assemble_lie_explicit_transaction(qpentry,q(1:n_eqns,j,k), &
                         time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k), &
                         total_rate,transfers,cell_has_exchange,ok,noise,B_zone(j,k),analytic_context, &
                         cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
@@ -202,7 +204,7 @@ CONTAINS
                         CYCLE cell_loop
                     END IF
                     ! Stage the entire local fluid/substrate transfer before committing it.
-                    q_candidate=q_group(:,j,k)
+                    q_candidate=q(:,j,k)
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                         cell_failure(cell)='D19: inadmissible conservative mass candidate'
@@ -254,7 +256,7 @@ CONTAINS
                 CASE(SOURCE_METHOD_ANALYTIC)
                     ! Group 0 evaluates on the immutable pre-spatial state;
                     ! its increment is applied to the post-spatial group candidate.
-                    analytic_input=q_group(:,j,k)
+                    analytic_input=q(:,j,k)
                     IF (groups(group_index)%id==0) analytic_input=q_original(:,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
                     CALL eval_source_analytic(groups(group_index),analytic_input, &
