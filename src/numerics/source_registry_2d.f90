@@ -30,6 +30,13 @@ MODULE source_registry_2d
         TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
     CONTAINS
 
+        PROCEDURE :: groups => copy_lie_groups
+        PROCEDURE :: initialize => initialize_lie_registry
+        PROCEDURE :: finalize => finalize_registry
+        PROCEDURE :: is_initialized => registry_is_initialized
+        PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
+    END TYPE source_registry_typeCONTAINS
+
     !> @brief Validate and store groups for the first-order Lie integrator.
     !> @details Rejects inconsistent methods, duplicated identities and invalid
     !>          equation footprints; updates registry ownership on successful validation.
@@ -208,13 +215,7 @@ MODULE source_registry_2d
         this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
         this%implicit_sources_flag=.FALSE.
     END SUBROUTINE finalize_registry
-        PROCEDURE :: groups => copy_lie_groups
-        PROCEDURE :: initialize => initialize_lie_registry
-        PROCEDURE :: finalize => finalize_registry
-        PROCEDURE :: is_initialized => registry_is_initialized
-        PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
-    END TYPE source_registry_type
-CONTAINS
+
     !> @brief Test whether a group schedules the named physical source.
     !> @param[in] group Lie group and its configured canonical identities.
     !> @param[in] name Canonical identity to search for.
