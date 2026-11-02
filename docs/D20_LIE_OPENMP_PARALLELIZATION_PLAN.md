@@ -195,4 +195,6 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 
 - **Ottimizzazione verifica worklist:** rimosso da `advance_lie` il doppio controllo tramite allocazione di `seen_cells` a ogni passo. La costruzione in `domain_2d%check_solve` è per scansione univoca, e ora verifica in fase di refresh `solve_cells==COUNT(solve_mask)` e `reconstruction_cells==COUNT(reconstruction_mask)`; questo controllo non intende rilevare mutazioni esterne delle liste *dopo* il refresh, che richiedono un contratto di incapsulamento dei campi.
 
+- **Validation harness:** aggiunto `.github/workflows/lie-openmp-validation.yml` (avvio manuale) con compilazione strict-debug del solver completo e matrice delle regressioni esistenti `TEST_RHEOLOGY_CELL_LOCAL`, `TEST_STATE_CONVERSION`, `TEST_MASS_EXCHANGE`, `TEST_SPATIAL_OPERATOR` a `OMP_NUM_THREADS=1,2,4`, con `OMP_DYNAMIC=FALSE` e BLAS single-thread. Gli artefatti conservano output compilatore e log per ogni suite/thread. **Non è ancora un test di equivalenza dell'intero passo Lie e non è stato eseguito in questa sessione.**
+
 **Nota di metodo:** questo piano deriva dalla lettura del codice di produzione alla data sopra indicata. Le proprietà di thread safety transitive sono *ipotesi da validare*, non garanzie; non è stata effettuata compilazione né esecuzione dei test come parte della redazione.
