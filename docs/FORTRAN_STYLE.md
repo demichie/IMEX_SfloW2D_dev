@@ -11,6 +11,16 @@ Applies to all production `src/**/*.f90` and to Fortran tests when edited.
 - Separate procedures visibly with a blank line and their own Doxygen header; use meaningful section comments rather than decorative banners inside procedures.
 - No trailing whitespace. Pure formatting changes must preserve all non-whitespace source tokens, floating-point expression order, runtime behavior and OpenMP directives.
 
+
+## Line width and continuation policy
+
+- Fortran executable code uses a maximum width of 120 columns.
+- An existing trailing continuation marker is aligned at column 120.
+- Pack as many complete arguments as will fit on each line; never split identifiers.
+- Doxygen prose is wrapped at a maximum width of 100 columns.
+- OpenMP directives and character literal continuations require syntax-aware handling.
+- Pure layout changes must preserve every executable token and expression order.
+
 ## Mandatory Doxygen coverage
 
 Document every module, derived type and significant field or variable (meaning, units, rank, ownership when relevant). Every FUNCTION and SUBROUTINE, including PRIVATE, PURE, ELEMENTAL, internal and type-bound procedures, must have an immediately preceding `!> @brief` header, `@details` when needed, and **one correctly directed** `@param[in]`, `@param[out]` or `@param[in,out]` for every dummy argument, including `this`; functions also require `@return`. Describe dimensions, units, preconditions, error behavior, side effects and thread-safety where applicable. Never invent generic documentation to satisfy a checker.
