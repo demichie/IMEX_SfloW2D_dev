@@ -85,8 +85,8 @@ CONTAINS
     !> @param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
     !******************************************************************************
 
-    SUBROUTINE initialize_model_layout( this, n_layers, n_variables,           &
-            n_equations, n_solid, n_additional_gas, n_stochastic,                &
+    SUBROUTINE initialize_model_layout( this, n_layers, n_variables,                                                   &
+            n_equations, n_solid, n_additional_gas, n_stochastic,                                                      &
             n_pore_pressure )
 
         CLASS(model_layout_type), INTENT(INOUT) :: this
@@ -205,33 +205,33 @@ CONTAINS
 
         CLASS(model_layout_type), INTENT(IN) :: this
 
-        model_layout_is_initialized = supported_layer_count(this%n_layers)      &
-            .AND. this%n_variables >= 4                                        &
-            .AND. this%n_solid >= 0                                            &
-            .AND. this%n_additional_gas >= 0                                   &
-            .AND. this%n_stochastic >= 0 .AND. this%n_stochastic <= 1           &
-            .AND. this%n_pore_pressure >= 0 .AND. this%n_pore_pressure <= 1     &
-            .AND. this%n_variables == 4 + this%n_solid                          &
-                    + this%n_additional_gas + this%n_stochastic                   &
-                    + this%n_pore_pressure                                        &
-            .AND. this%n_physical_variables == this%n_variables + 2            &
-            .AND. this%n_equations == this%n_variables                         &
-            .AND. this%idx_mass == 1                                           &
-            .AND. this%idx_momentum_x == 2                                     &
-            .AND. this%idx_momentum_y == 3                                     &
-            .AND. this%idx_energy == 4                                         &
-            .AND. this%idx_solid_first == 5                                    &
-            .AND. this%idx_solid_last == 4 + this%n_solid                      &
-            .AND. this%idx_additional_gas_first == 5 + this%n_solid            &
-            .AND. this%idx_additional_gas_last == 4 + this%n_solid             &
-                    + this%n_additional_gas                                       &
-            .AND. this%idx_stochastic == MERGE(                                &
-                    5 + this%n_solid + this%n_additional_gas, 0,                  &
-                    this%n_stochastic == 1)                                       &
-            .AND. this%idx_pore_pressure == MERGE(                             &
-                    5 + this%n_solid + this%n_additional_gas                      &
-                    + this%n_stochastic, 0, this%n_pore_pressure == 1)            &
-            .AND. this%idx_velocity_x == this%n_variables + 1                  &
+        model_layout_is_initialized = supported_layer_count(this%n_layers)                                             &
+            .AND. this%n_variables >= 4                                                                                &
+            .AND. this%n_solid >= 0                                                                                    &
+            .AND. this%n_additional_gas >= 0                                                                           &
+            .AND. this%n_stochastic >= 0 .AND. this%n_stochastic <= 1                                                  &
+            .AND. this%n_pore_pressure >= 0 .AND. this%n_pore_pressure <= 1                                            &
+            .AND. this%n_variables == 4 + this%n_solid                                                                 &
+                    + this%n_additional_gas + this%n_stochastic                                                        &
+                    + this%n_pore_pressure                                                                             &
+            .AND. this%n_physical_variables == this%n_variables + 2                                                    &
+            .AND. this%n_equations == this%n_variables                                                                 &
+            .AND. this%idx_mass == 1                                                                                   &
+            .AND. this%idx_momentum_x == 2                                                                             &
+            .AND. this%idx_momentum_y == 3                                                                             &
+            .AND. this%idx_energy == 4                                                                                 &
+            .AND. this%idx_solid_first == 5                                                                            &
+            .AND. this%idx_solid_last == 4 + this%n_solid                                                              &
+            .AND. this%idx_additional_gas_first == 5 + this%n_solid                                                    &
+            .AND. this%idx_additional_gas_last == 4 + this%n_solid                                                     &
+                    + this%n_additional_gas                                                                            &
+            .AND. this%idx_stochastic == MERGE(                                                                        &
+                    5 + this%n_solid + this%n_additional_gas, 0,                                                       &
+                    this%n_stochastic == 1)                                                                            &
+            .AND. this%idx_pore_pressure == MERGE(                                                                     &
+                    5 + this%n_solid + this%n_additional_gas                                                           &
+                    + this%n_stochastic, 0, this%n_pore_pressure == 1)                                                 &
+            .AND. this%idx_velocity_x == this%n_variables + 1                                                          &
             .AND. this%idx_velocity_y == this%n_variables + 2
 
     END FUNCTION model_layout_is_initialized

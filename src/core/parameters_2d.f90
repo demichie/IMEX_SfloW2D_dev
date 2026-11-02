@@ -371,11 +371,11 @@ CONTAINS
     !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
     SUBROUTINE configure_canonical_state_indices()
         INTEGER :: next_index
-        IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0) &
+        IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0)                                         &
             ERROR STOP 'Negative canonical component count'
-        IF (n_stoch_vars>1 .OR. n_pore_vars>1) &
+        IF (n_stoch_vars>1 .OR. n_pore_vars>1)                                                                         &
             ERROR STOP 'Unsupported optional component count'
-        IF (n_vars/=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars) &
+        IF (n_vars/=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars)                                                      &
             ERROR STOP 'Inconsistent canonical variable count'
         idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
         idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4

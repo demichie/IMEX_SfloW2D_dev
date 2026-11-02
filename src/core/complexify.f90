@@ -373,7 +373,8 @@ contains
     !>
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function max_cc(val1, val2)
@@ -390,7 +391,8 @@ contains
     !>
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function max_cr(val1, val2)
@@ -408,7 +410,8 @@ contains
     !>
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function max_rc(val1, val2)
@@ -427,7 +430,8 @@ contains
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val3 Operand 3; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function max_ccc(val1, val2, val3)
@@ -449,7 +453,8 @@ contains
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val3 Operand 3; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val4 Operand 4; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     function max_cccc(val1, val2, val3, val4)
@@ -477,7 +482,8 @@ contains
     !>
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function min_cc(val1, val2)
@@ -494,7 +500,8 @@ contains
     !>
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function min_cr(val1, val2)
@@ -512,7 +519,8 @@ contains
     !>
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function min_rc(val1, val2)
@@ -531,7 +539,8 @@ contains
     !> \param[in] val1 Operand 1; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val3 Operand 3; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     complex(wp) function min_ccc(val1, val2, val3)
@@ -553,7 +562,8 @@ contains
     !> \param[in] val2 Operand 2; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val3 Operand 3; the imaginary part carries a derivative perturbation when complex.
     !> \param[in] val4 Operand 4; the imaginary part carries a derivative perturbation when complex.
-    !> \return Selected operand including its derivative perturbation; a selected real value has zero
+    !> \return Selected operand including its derivative perturbation; a selected real value has
+    !> zero
     !>         imaginary part.
 
     function min_cccc(val1, val2, val3, val4)

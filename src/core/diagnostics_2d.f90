@@ -46,7 +46,7 @@ CONTAINS
 
         IF (omp_in_parallel()) THEN
             !$OMP CRITICAL(diagnostics_output)
-            WRITE(error_unit,*) 'DEBUG PAUSE SKIPPED inside OpenMP region: ',     &
+            WRITE(error_unit,*) 'DEBUG PAUSE SKIPPED inside OpenMP region: ',                                          &
                 TRIM(message)
             CALL FLUSH(error_unit)
             !$OMP END CRITICAL(diagnostics_output)
@@ -81,7 +81,7 @@ CONTAINS
         CALL FLUSH(error_unit)
         !$OMP END CRITICAL(diagnostics_output)
 
-        IF (interactive_debug_flag .AND. (.NOT. omp_in_parallel()))             &
+        IF (interactive_debug_flag .AND. (.NOT. omp_in_parallel()))                                                    &
             CALL debug_pause('fatal condition: '//TRIM(message))
 
         ERROR STOP 1

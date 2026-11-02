@@ -99,7 +99,7 @@ CONTAINS
 
     SUBROUTINE collapsing_volume(state)
 
-        USE state_conversion_2d, ONLY : qp_to_qc,                               &
+        USE state_conversion_2d, ONLY : qp_to_qc,                                                                      &
                 eval_mixture_properties_from_volume_fractions
 
         USE geometry_2d, ONLY : compute_cell_fract
@@ -108,7 +108,7 @@ CONTAINS
 
         USE parameters_2d, ONLY : n_vars
 
-        USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse , &
+        USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse ,                                  &
             h_collapse , alphas_collapse , alphag_collapse
 
         IMPLICIT NONE
@@ -137,7 +137,7 @@ CONTAINS
         qp0_init(5:4+n_solid) = 0.0_wp        ! solid mass fractions
         qp0_init(4+n_solid+1:4+n_solid+n_add_gas) = 0.0_wp        ! gas mass fractions
         qp0_init(5+n_solid+n_add_gas:4+n_solid+n_add_gas+n_stoch_vars) = 0.0_wp
-        qp0_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas+n_stoch_vars+ &
+        qp0_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas+n_stoch_vars+                                    &
             n_pore_vars) =  0.0_wp
         qp0_init(n_vars+1:n_vars+2) = 0.0_wp  ! u,v
 
@@ -150,9 +150,9 @@ CONTAINS
         qp_init(n_vars+1:n_vars+2) = 0.0_wp
 
         alphas_local = alphas_collapse(1:n_solid)
-        CALL eval_mixture_properties_from_volume_fractions(                     &
-                T_collapse, alphag_collapse(1:n_add_gas), alphas_local,            &
-                rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,               &
+        CALL eval_mixture_properties_from_volume_fractions(                                                            &
+                T_collapse, alphag_collapse(1:n_add_gas), alphas_local,                                                &
+                rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,                                                      &
                 xc, sp_heat_c, sp_heat_mix)
 
         qp_init(5:4+n_solid) = xs_collapse
@@ -166,10 +166,10 @@ CONTAINS
 
                     qp_init(1) = cell_fract(j,k) * h_collapse
 
-                    qp_init(5+n_solid+n_add_gas:4+n_solid+n_add_gas+n_stoch_vars) =    &
+                    qp_init(5+n_solid+n_add_gas:4+n_solid+n_add_gas+n_stoch_vars) =                                    &
                         1.0_wp
 
-                    qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas       &
+                    qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas                                       &
                         +n_stoch_vars+n_pore_vars) = 1.0_wp
 
                     CALL qp_to_qc( qp_init(1:n_vars+2) , state%q(1:n_vars,j,k) )

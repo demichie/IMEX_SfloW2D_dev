@@ -211,7 +211,8 @@ CONTAINS
     !>
     !> Function that calculates the pascal coefficients for the smooth transition of f_inhibit
     !>
-    !> \param[in] N_order Nonnegative transition-polynomial order; coefficients use indices 0:N_order.
+    !> \param[in] N_order Nonnegative transition-polynomial order; coefficients use indices
+    !> 0:N_order.
     !>
     !> \note Writes pascal_coeff(0:N_order) and pascal_coeff_precomputed in this module.
 
@@ -245,7 +246,7 @@ CONTAINS
             pascal1 = 1.0_wp
             IF (n > 0) THEN
                 DO k = 0, n-1
-                    pascal1 = pascal1 * ( -REAL(N_order,kind=wp) - 1.0_wp - &
+                    pascal1 = pascal1 * ( -REAL(N_order,kind=wp) - 1.0_wp -                                            &
                                         REAL(k, kind=wp) ) / REAL(k+1,kind=wp)
                 END DO
             END IF
@@ -253,7 +254,7 @@ CONTAINS
             pascal2 = 1.0_wp
             IF (N_order - n > 0) THEN
                 DO k = 0, N_order - n - 1
-                    pascal2 = pascal2 * (2.0_wp*REAL(N_order,kind=wp)+1.0_wp- &
+                    pascal2 = pascal2 * (2.0_wp*REAL(N_order,kind=wp)+1.0_wp-                                          &
                                         REAL(k,kind=wp) ) / REAL(k+1,kind=wp)
                 END DO
             END IF
