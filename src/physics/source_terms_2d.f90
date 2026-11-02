@@ -178,6 +178,16 @@ CONTAINS
         carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
         IF (carrier_consumption>0.0_wp) limiter=MIN(limiter, &
             MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
+        ! The limiting ratio places a depleted component exactly at zero in
+        ! real arithmetic. Two rounded products (dt*rate and limiter*rate)
+        ! can otherwise leave a tiny negative mass (~1e-24) at a dry front.
+        ! Stay a few representable steps inside the admissible interval,
+        ! only when an actual physical transfer is limited.
+        IF (limiter>0.0_wp .AND. limiter<1.0_wp) THEN
+            DO i=1,8
+                limiter=NEAREST(limiter,-1.0_wp)
+            END DO
+        END IF
         valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
     END SUBROUTINE limit_explicit_source_rates
 
