@@ -744,7 +744,14 @@ CONTAINS
         IF ( qp_adv_left_use(1) .LE. EPSILON(1.0_wp) ) u_normal_left=0.0_wp
         IF ( qp_adv_right_use(1) .LE. EPSILON(1.0_wp) ) u_normal_right=0.0_wp
 
-        IF ( denominator .GT. pccu_speed_tolerance ) THEN
+        IF (a_minus==0.0_wp .AND. a_plus>0.0_wp) THEN
+            ! Exactly one-sided speeds: upwind even below the absolute speed
+            ! tolerance. Central averaging here can drain a vanishing tracer
+            ! from the wrong donor cell and violate component positivity.
+            interface_flux=flux_left
+        ELSEIF (a_plus==0.0_wp .AND. a_minus<0.0_wp) THEN
+            interface_flux=flux_right
+        ELSEIF (denominator>pccu_speed_tolerance) THEN
             interface_flux=(a_plus*(u_normal_left-a_minus)*q_adv_left_use                                              &
                 -a_minus*(u_normal_right-a_plus)*q_adv_right_use)/denominator
         ELSE
