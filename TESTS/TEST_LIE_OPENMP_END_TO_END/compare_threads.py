@@ -50,6 +50,23 @@ def prepare(repo, root, name):
                            "&RUN_PARAMETERS\n SERIAL_FLAG=F,")
     text = replace_one(text, r"^\s*OUTPUT_NETCDF_FLAG\s*=.*$",
                        " OUTPUT_NETCDF_FLAG=T,")
+    # Legacy EXAMPLE_2D places exchange flags in transport namelists,
+    # whereas the current solver reads them only from MASS_EXCHANGE_PARAMETERS.
+    # Normalize this copied fixture, leaving the numerical settings unchanged.
+    if name == "EXAMPLE_2D":
+        transferred = {}
+        for key in ("SETTLING_FLAG", "EROSION_COEFF", "ENTRAINMENT_FLAG"):
+            pattern = rf"^\\s*{key}\\s*=\\s*([^,\\n]+)\\s*,?\\s*$"
+            found = re.findall(pattern, text, flags=re.I | re.M)
+            if len(found) != 1:
+                raise AssertionError(f"{name}: expected one legacy {key}, found {len(found)}")
+            transferred[key] = found[0].strip()
+            text = replace_one(text, pattern, "")
+        exchange = ("&MASS_EXCHANGE_PARAMETERS\\n"
+                    + "".join(f" {key}={value},\\n" for key, value in transferred.items())
+                    + " /\\n")
+        text = replace_one(text, r"^\\s*&GAS_TRANSPORT_PARAMETERS\\b",
+                           exchange + "&GAS_TRANSPORT_PARAMETERS")
     input_path.write_text(text)
     return fixture
 
