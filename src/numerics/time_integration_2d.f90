@@ -14,6 +14,8 @@ MODULE time_integration_2d
             initialize_dry_physical_cell,conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
     USE source_registry_2d, ONLY : source_registry_type,source_group_type
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON
+    USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,report_lie_source_profile
@@ -232,9 +234,24 @@ CONTAINS
             DO group_id=1,SIZE(this%lie_groups)
                 IF (.NOT.ALLOCATED(this%lie_groups(group_id)%source_names)) &
                     CALL fatal_error('Lie source group has no allocated source list')
+                SELECT CASE(this%lie_groups(group_id)%method)
+                CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
+                    CONTINUE
+                CASE DEFAULT
+                    CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
+                END SELECT
+                IF (ANY(this%lie_groups(group_id)%source_names=='pore_pressure_dissipation') .OR. &
+                    ANY(this%lie_groups(group_id)%source_names=='pore_pressure_darcy')) THEN
+                    IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR. &
+                        TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
+                        IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
+                    END IF
+                END IF
                 this%lie_exchange_group(group_id)= &
                     ANY(INDEX(this%lie_groups(group_id)%source_names,'mass_exchange_')==1)
                 IF (this%lie_exchange_group(group_id)) THEN
+                    IF (this%lie_groups(group_id)%method/=SOURCE_METHOD_EXPLICIT) &
+                        CALL fatal_error('D19: mass exchange requires explicit group method')
                     this%lie_has_exchange=.TRUE.
                     IF (topo_change_flag) this%lie_bed_group_id=this%lie_groups(group_id)%id
                 END IF
