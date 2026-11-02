@@ -171,7 +171,7 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 - [ ] Implementazione dello staging e diagnostica deterministica per cella.
 - [x] OpenMP attivato nei due cicli di `advance_lie` con raccolta seriale dell'esito. **Da compilare e validare**.
 - [x] Prima implementazione OpenMP nel ciclo celle di `execute_lie_source_groups` per EXPLICIT, ANALYTIC e NEWTON, con risultati per cella e scelta seriale deterministica dell'errore. **Da compilare e verificare per thread safety transitiva**.
-- [x] Verificata staticamente la costruzione ordinaria delle liste di celle mediante scansione delle maschere in `domain_2d` (una visita per coppia di indici). **Resta da testare** l'invariante e l'eventuale modifica esterna delle liste.
+- [x] Verificata staticamente la costruzione delle liste dalle maschere in `domain_2d`; inseriti anche controlli runtime che rifiutano indici fuori dominio e celle duplicate in entrambe le liste prima di entrare nelle regioni OpenMP. **Resta da eseguire** il test negativo con liste corrotte.
 - [ ] Confronti di correttezza `1/2/4/8` thread e test di rollback.
 - [ ] Analisi race e validazione prestazionale.
 - [ ] Integrazione finale con D19 e chiusura del piano.
@@ -189,5 +189,8 @@ Il controllo di unicità può essere eseguito durante la creazione/refresh del d
 - Conversione stato, commit `2df999f`: `enforce_mass_fraction_closure` accetta ora lo stato opzionale `accepted` per segnalare frazioni materialmente negative senza invocare un errore fatale. `qc_to_qp`, quando richiesto l'esito `accepted`, utilizza questo percorso recuperabile; i chiamanti tradizionali senza stato mantengono la diagnostica fatale. La verifica dei dati prima di `r_phys_var` e la reentrancy dei percorsi transitivi restano soggette a compilazione e test.
 
 - **Newton reentrant (2026-11-02):** eliminati i due scalari globali mutabili di perturbazione complex-step; `eval_jacobian` determina localmente `complex_step_perturbation` e il reciproco dalla configurazione `n_vars`, preservando la formula originale. Rimossi i corrispondenti entrypoint di inizializzazione/finalizzazione ormai superflui e le chiamate in `simulation_2d`. Nessuna modifica alle quattro interfacce dei termini fisici. **Validazione compilatore e confronto numerico ancora da eseguire.**
+
+- **Unicità delle celle (2026-11-02):** `advance_lie` ora controlla, prima di qualunque worker, che le worklist `reconstruction` e `solve` non contengano coordinate duplicate o fuori dominio. La verifica avviene in seriale e non altera l'operatore fisico o il limiter. Commit `6d8c5ee`. Il costo di un'allocazione della maschera a ogni timestep è da misurare; potrà essere trasferito alla costruzione/refresh del dominio preservando la verifica dell'invariante.
+- **Audit di campioni dei processi (2026-11-02):** controllati staticamente `rheology_lava_2d`, `rheology_analytic_utils_2d`, `mass_exchange_erosion_2d`, `mass_injection_2d` e `lapack_interfaces_2d` alla ricerca di dati `SAVE`, inizializzazioni locali mutabili e I/O; il controllo non è un audit transitivo completo. Rimangono errori fatali deliberati per trattamenti non supportati: non vanno rimossi per ottenere OpenMP.
 
 **Nota di metodo:** questo piano deriva dalla lettura del codice di produzione alla data sopra indicata. Le proprietà di thread safety transitive sono *ipotesi da validare*, non garanzie; non è stata effettuata compilazione né esecuzione dei test come parte della redazione.
