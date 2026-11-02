@@ -76,10 +76,6 @@ CONTAINS
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         INTEGER :: l,j,k,first_failure,eq
         INTEGER :: tick,tock,tick_rate
-        IF (this%profile_enabled) THEN
-            CALL SYSTEM_CLOCK(tick,tick_rate)
-            this%profile_calls=this%profile_calls+1
-        END IF
         INTEGER, ALLOCATABLE :: reconstruction_status(:),spatial_status(:)
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
@@ -91,6 +87,10 @@ CONTAINS
         CHARACTER(LEN=24) :: injection_value
         INTEGER :: injection_status
         LOGICAL :: check_injected_rollback,had_bed_change
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tick,tick_rate)
+            this%profile_calls=this%profile_calls+1
+        END IF
         IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
         ! Snapshot before evaluating any operator, including the primitive halo.
         injection_value=''
