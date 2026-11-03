@@ -5984,7 +5984,7 @@ CONTAINS
     !> \note Invalid histories are refused without automatic repair or truncation.
     !******************************************************************************
     SUBROUTINE validate_output_manifest(filename, header, next_index, next_time)
-    USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE parameters_2d, ONLY : ieee_is_finite
     USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode,                                     &
             ieee_overflow, ieee_set_flag, ieee_set_halting_mode
     USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
@@ -6569,7 +6569,7 @@ CONTAINS
     !> expected row refers to the last diagnostic sample, not the checkpoint time.
     !******************************************************************************
     SUBROUTINE validate_runout_csv(filename, header, expected_row, exists)
-    USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE parameters_2d, ONLY : ieee_is_finite
     USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode,                                     &
             ieee_overflow, ieee_set_flag, ieee_set_halting_mode
     USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end

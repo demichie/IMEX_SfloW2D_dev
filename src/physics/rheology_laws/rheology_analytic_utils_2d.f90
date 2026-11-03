@@ -6,7 +6,7 @@ MODULE rheology_analytic_utils_2d
 
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE parameters_2d, ONLY : ieee_is_finite
 
     IMPLICIT NONE
 

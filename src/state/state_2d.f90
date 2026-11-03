@@ -17,7 +17,7 @@ MODULE state_2d
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE model_layout_2d, ONLY : model_layout_type
 
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE parameters_2d, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
     USE parameters_2d, ONLY : wp,n_solid
     USE parameters_2d, ONLY : n_thickness_levels, n_dyn_pres_levels

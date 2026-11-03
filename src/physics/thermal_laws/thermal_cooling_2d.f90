@@ -3,7 +3,7 @@ MODULE thermal_cooling_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE parameters_2d, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit

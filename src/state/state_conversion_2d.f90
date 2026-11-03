@@ -7,7 +7,7 @@
 !********************************************************************************
 
 MODULE state_conversion_2d
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE parameters_2d, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn,                                                          &
             idx_uEqn, idx_vEqn, idx_engyEqn
 
