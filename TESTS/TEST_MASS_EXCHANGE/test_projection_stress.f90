@@ -124,7 +124,7 @@ CONTAINS
          state%erodible(ns,nx,ny),state%lava_deposit(nx,ny))
     ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
     state%deposit_tot=0.0_wp;state%erosion_tot=0.0_wp
-    ALLOCATE(B_nodata(nx,ny),B_zone(nx,ny),cell_source_fractions(nx,ny))
+    ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
     ALLOCATE(cell_fissure_fractions(nx,ny,n_fissures))
     ALLOCATE(cell_arc_perim(nx,ny),cell_arc_n_x(nx,ny),cell_arc_n_y(nx,ny))
     cell_fissure_fractions=0.0_wp
@@ -139,7 +139,7 @@ CONTAINS
     INTEGER :: a,b,l
     REAL(wp) :: x,y,carrier_mass
     state%deposit=0.0_wp; state%erosion=0.0_wp; state%erodible=0.0_wp; state%lava_deposit=0.0_wp
-    B_nodata=.FALSE.; B_zone=0; cell_source_fractions=0.0_wp
+    B_zone=0; cell_source_fractions=0.0_wp
     qp=0.0_wp; qp(4,:,:)=T_ambient
     l=0
     DO b=1,ny
@@ -469,7 +469,7 @@ CONTAINS
     CALL domain%finalize
     DEALLOCATE(q,qp,rate,nodes,weights,B_vertex,B_cent,B_face_x,B_face_y)
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
-    DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_nodata,B_zone,cell_source_fractions)
+    DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_zone,cell_source_fractions)
     DEALLOCATE(cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y)
     DEALLOCATE(state%deposit,state%erosion,state%erodible,state%lava_deposit, &
          state%deposit_tot,state%erosion_tot)
