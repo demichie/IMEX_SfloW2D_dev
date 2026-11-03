@@ -270,8 +270,8 @@ CONTAINS
                     .NOT.ALL(state%erosion==this%substrate_before%erosion) .OR.                                             &
                     .NOT.ALL(state%erodible==this%substrate_before%erodible) .OR.                                           &
                     .NOT.ALL(state%lava_deposit==this%substrate_before%lava_deposit) .OR.                                   &
-                    .NOT.ALL(state%deposit_tot==this%this%substrate_before%deposit_tot) .OR.                                     &
-                    .NOT.ALL(state%erosion_tot==this%this%substrate_before%erosion_tot))                                         &
+                    .NOT.ALL(state%deposit_tot==this%substrate_before%deposit_tot) .OR.                                     &
+                    .NOT.ALL(state%erosion_tot==this%substrate_before%erosion_tot))                                         &
                     CALL fatal_error('D20 rollback: physical inventories not restored')
                 IF (.NOT.ALL(B_vertex==bed_before) .OR.                                                                &
                     .NOT.ALL(B_cent==bed_cent_before) .OR.                                                             &

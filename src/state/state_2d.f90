@@ -216,7 +216,7 @@ CONTAINS
 
     !> @brief Snapshot all owned substrate inventories and their aggregates.
     !> @param[in] this Authoritative state before the Lie source sweep.
-    !> @param[out] snapshot Independent substrate snapshot for rollback.
+    !> @param[in,out] snapshot Reusable independent substrate snapshot for rollback.
     SUBROUTINE snapshot_substrate(this,snapshot)
         CLASS(state_type), INTENT(IN) :: this
         ! Reuse allocated rollback buffers across Lie steps. INTENT(OUT)
