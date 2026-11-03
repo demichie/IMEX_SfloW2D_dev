@@ -13,9 +13,7 @@ MODULE time_integration_2d
     USE state_2d, ONLY : state_type,substrate_snapshot_type,                                                           &
             initialize_dry_physical_cell,conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
-    USE source_registry_2d, ONLY : source_registry_type,source_group_type
-    USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON
-    USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
+    USE source_registry_2d, ONLY : source_registry_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
@@ -92,17 +90,13 @@ CONTAINS
         REAL(wp), ALLOCATABLE :: qp_authoritative(:,:,:),bed_before(:,:),                                              &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                        &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
-        CHARACTER(LEN=24) :: injection_value
-        INTEGER :: injection_status
         LOGICAL :: check_injected_rollback,had_bed_change
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
         END IF
         ! Snapshot before evaluating any operator, including the primitive halo.
-        injection_value=''
-        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', injection_value,STATUS=injection_status)
-        check_injected_rollback=injection_status==0 .AND. LEN_TRIM(injection_value)>0
+        check_injected_rollback=this%lie_executor%reject_active
 
         IF (check_injected_rollback) THEN
             qp_authoritative=state%qp

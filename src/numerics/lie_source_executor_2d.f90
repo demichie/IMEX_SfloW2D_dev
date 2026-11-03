@@ -29,6 +29,7 @@ MODULE lie_source_executor_2d
         LOGICAL, ALLOCATABLE :: exchange_group(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
+        LOGICAL :: reject_active=.FALSE.
         INTEGER :: bed_group_id=-1,reject_group=-1
         INTEGER, ALLOCATABLE :: failure_code(:),failure_group(:),failure_detail(:),failure_iterations(:)
         REAL(wp), ALLOCATABLE :: failure_mass(:),failure_components(:)
@@ -45,7 +46,8 @@ CONTAINS
     SUBROUTINE initialize_lie_source_executor(executor,source_registry)
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON
         USE parameters_2d, ONLY : topo_change_flag
-            USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
+        USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
+        USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         TYPE(source_registry_type), INTENT(IN) :: source_registry
         INTEGER :: group_index,env_status,parse_status,ncells
@@ -98,6 +100,7 @@ CONTAINS
             IF (parse_status/=0 .OR. executor%reject_group<1) &
                 CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
         END IF
+        executor%reject_active=ANY(executor%groups%id==executor%reject_group)
         ncells=comp_cells_x*comp_cells_y
         ALLOCATE(executor%failure_code(ncells))
         IF (executor%diagnostics_enabled) THEN
@@ -167,7 +170,6 @@ CONTAINS
     USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                                    &
             physical_cell_state_finite
     USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
-    USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
         TYPE(lie_source_executor_type), TARGET, INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(source_group_type), POINTER :: groups(:)
@@ -200,7 +202,7 @@ CONTAINS
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
-        INTEGER :: reject_group,tick,tock,clock_rate
+        INTEGER :: tick,tock,clock_rate
 
         IF (.NOT.executor%initialized) CALL fatal_error('Lie source executor not initialized')
         scratch=>executor
@@ -209,7 +211,6 @@ CONTAINS
         has_exchange_group=executor%has_exchange_group
         has_bed_group=executor%has_bed_group
         bed_group_id=executor%bed_group_id
-        reject_group=executor%reject_group
         diagnostics_enabled=executor%diagnostics_enabled
         newton_witness_active=executor%newton_witness
         step_failed=.FALSE.
@@ -543,12 +544,12 @@ CONTAINS
                 failure_reason='D19: source group conversion failed'
             CASE(6)
                 IF (diagnostics_enabled) THEN
-                j=domain%j_cent(first_failure)
-                k=domain%k_cent(first_failure)
-                WRITE(failure_reason,'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
-                    'D19: inadmissible source candidate group=',scratch%failure_group(first_failure), &
-                    ' cell=',j,',',k,' mass=',scratch%failure_mass(first_failure), &
-                    ' components=',scratch%failure_components(first_failure)
+                    j=domain%j_cent(first_failure)
+                    k=domain%k_cent(first_failure)
+                    WRITE(failure_reason,'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
+                        'D19: inadmissible source candidate group=',scratch%failure_group(first_failure), &
+                        ' cell=',j,',',k,' mass=',scratch%failure_mass(first_failure), &
+                        ' components=',scratch%failure_components(first_failure)
                 ELSE
                     failure_reason='D19: inadmissible source candidate'
                 END IF
@@ -609,7 +610,7 @@ CONTAINS
         END IF
         ! Inject after the deferred geometry refresh, so the D20 rollback
         ! witness still verifies restoration of genuinely changed geometry.
-        IF (ANY(groups%id==reject_group)) THEN
+        IF (executor%reject_active) THEN
             step_failed=.TRUE.
             failure_reason='D20_INJECTED_LATE_LIE_FAILURE'
             IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
