@@ -523,6 +523,7 @@ CONTAINS
         v_init = 0.0_wp
 
         !-- Inizialization of the Variables for the namelist newrun_parameters
+        sea_mass_removal_flag = .FALSE.
         topography_file = 'topography_dem.asc'
         nodata_topo = -9999.0_wp
         x0 = 0.0_wp
@@ -946,7 +947,6 @@ CONTAINS
         sp_heat_g = -1.0_wp
         sp_gas_const_g = -1.0_wp
         liquid_vaporization_flag = .FALSE.
-        sea_mass_removal_flag = .FALSE.
         water_level = -1.0E7_wp
         gamma_steam = -1.0_wp
         sutherland_flag = .FALSE.
