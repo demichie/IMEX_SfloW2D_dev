@@ -231,10 +231,17 @@ CONTAINS
     END SUBROUTINE restore_substrate
 
     !> @brief Recompute deposit and erosion thickness totals from per-solid mass.
-    !> @details Rejects invalid substrate porosity instead of silently clipping.
+    !> @details No solid species means zero deposit/erosion thickness without
+    !>          requiring substrate porosity. Otherwise invalid porosity is fatal.
     !> @param[in,out] this State whose aggregate diagnostic fields are refreshed.
     SUBROUTINE refresh_substrate_totals(this)
         CLASS(state_type), INTENT(INOUT) :: this
+        ! No solids: there is no solid bed layer to convert into thickness.
+        IF (n_solid==0) THEN
+            this%deposit_tot=0.0_wp
+            this%erosion_tot=0.0_wp
+            RETURN
+        END IF
         ! Totals include the carrier-filled pore volume of the deposited/eroded layer.
         ! A zero-solid-volume substrate (porosity=1) cannot define this conversion.
         IF (.NOT.ieee_is_finite(erodible_porosity) .OR.                                                                &
