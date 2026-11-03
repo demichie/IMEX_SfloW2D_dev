@@ -56,6 +56,22 @@ PROGRAM test_source_registry
   groups=registry%groups()
   CALL require(groups(3)%method==SOURCE_METHOD_ANALYTIC,'analytic method preserved')
   CALL registry%finalize()
+  ! Historical Etna lava uses a liquid carrier with the lava rheology.
+  ! Cooling and bottom fissural injection must remain valid in this phase.
+  rheology_model='lava'
+  thermal_method='NEWTON'
+  thermal_group=1
+  bottom_fissural_source_flag=.TRUE.
+  CALL initialize_configured_sources(registry,error)
+  CALL require(LEN_TRIM(error)==0,'Etna liquid-carrier lava configuration: '//TRIM(error))
+  groups=registry%groups()
+  CALL require(group_contains_name(groups(1),'bottom_fissural_injection'), &
+       'Etna fissural injection in explicit group zero')
+  CALL require(group_contains_name(groups(2),'rheology_lava'), &
+       'Etna lava rheology in Newton group')
+  CALL require(group_contains_name(groups(2),'thermal_cooling'), &
+       'Etna thermal cooling in Newton group')
+  CALL registry%finalize()
   PRINT *, 'PASS Lie registry complete Newton footprints, ordering and methods'
 CONTAINS
   SUBROUTINE require(ok,message)

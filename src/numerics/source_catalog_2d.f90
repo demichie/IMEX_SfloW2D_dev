@@ -38,7 +38,7 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
             source_term_type('rheology_lava',.TRUE.,.TRUE.,.TRUE.,                                                     &
                     default_method=SOURCE_METHOD_NEWTON,                                                               &
-                    allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.),                                    &
+                    allows_gas=.FALSE., allows_liquid=.TRUE., allows_lava=.TRUE.),                                    &
             source_term_type('rheology_lahar',.TRUE.,.TRUE.,.TRUE.,                                                    &
                     default_method=SOURCE_METHOD_NEWTON,                                                               &
                     allows_gas=.FALSE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                    &
