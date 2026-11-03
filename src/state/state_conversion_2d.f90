@@ -310,14 +310,29 @@ CONTAINS
     !> No conservative-to-primitive conversion is performed on this path.
     SUBROUTINE physical_state_from_qp(qp, state, bx, by, bxx, bxy, byy)
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
-        TYPE(physical_state_type), INTENT(OUT) :: state
+        TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         REAL(wp) :: geometry(5)
         REAL(wp) :: rho_c, inv_rho_c
         REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
-        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas),                                                       &
-            state%xs(n_solid), state%xg(n_add_gas))
+        ! Retain already allocated arrays when a source workspace is reused.
+        IF (ALLOCATED(state%alphas)) THEN
+            IF (SIZE(state%alphas)/=n_solid) DEALLOCATE(state%alphas)
+        END IF
+        IF (ALLOCATED(state%alphag)) THEN
+            IF (SIZE(state%alphag)/=n_add_gas) DEALLOCATE(state%alphag)
+        END IF
+        IF (ALLOCATED(state%xs)) THEN
+            IF (SIZE(state%xs)/=n_solid) DEALLOCATE(state%xs)
+        END IF
+        IF (ALLOCATED(state%xg)) THEN
+            IF (SIZE(state%xg)/=n_add_gas) DEALLOCATE(state%xg)
+        END IF
+        IF (.NOT.ALLOCATED(state%alphas)) ALLOCATE(state%alphas(n_solid))
+        IF (.NOT.ALLOCATED(state%alphag)) ALLOCATE(state%alphag(n_add_gas))
+        IF (.NOT.ALLOCATED(state%xs)) ALLOCATE(state%xs(n_solid))
+        IF (.NOT.ALLOCATED(state%xg)) ALLOCATE(state%xg(n_add_gas))
         state%xs = qp(idx_solid_first:idx_solid_last)
         state%xg = qp(idx_add_gas_first:idx_add_gas_last)
         state%h = qp(idx_h)
