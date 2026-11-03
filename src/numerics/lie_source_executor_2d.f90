@@ -220,7 +220,8 @@ CONTAINS
         USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                         &
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
-            B_zone,B_nodata, cell_source_fractions, cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
+            B_zone,B_nodata,cell_source_fractions,cell_fissure_fractions,                                              &
+            cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
@@ -325,7 +326,8 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
-        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,group_tick,                      &
+        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,                                 &
+        !$OMP& group_tick,
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
         tid=1
@@ -432,7 +434,8 @@ CONTAINS
                         executor%groups(group_index), erodible_local, total_rate,                                      &
                         executor%source_transfers(tid),cell_has_exchange,ok,                                          &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
-                        cell_fissure_fractions(j,k,:), cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k),         &
+                        cell_fissure_fractions(j,k,:),cell_arc_perim(j,k),cell_arc_n_x(j,k),                             &
+                        cell_arc_n_y(j,k),
                         dx*dy,
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid))
@@ -502,7 +505,7 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+                  &
+                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+                &
                             executor%source_transfers(tid)%dB_dt
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
@@ -639,8 +642,9 @@ CONTAINS
         IF (profiling_enabled) THEN
             DO group_index=1,SIZE(executor%groups)
                 group_profile(group_index)%elapsed=group_profile(group_index)%elapsed+SUM(thread_group(group_index,:))
-                group_profile(group_index)%physical=group_profile(group_index)%physical+SUM(thread_physics(group_index,:))
-                group_profile(group_index)%evaluated_cells=group_profile(group_index)%evaluated_cells+                  &
+                group_profile(group_index)%physical=group_profile(group_index)%physical+                             &
+                    SUM(thread_physics(group_index,:))
+                group_profile(group_index)%evaluated_cells=group_profile(group_index)%evaluated_cells+                &
                     SUM(thread_evaluations(group_index,:))
             END DO
             profile_thread_cell=profile_thread_cell+SUM(thread_cell)
