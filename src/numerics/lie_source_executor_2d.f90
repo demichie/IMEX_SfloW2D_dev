@@ -14,6 +14,7 @@ MODULE lie_source_executor_2d
     USE domain_2d, ONLY : domain_type
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE state_2d, ONLY : state_type
+    USE state_conversion_2d, ONLY : physical_state_type
 
     IMPLICIT NONE
 
@@ -34,6 +35,7 @@ MODULE lie_source_executor_2d
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
         TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
+        TYPE(physical_state_type), ALLOCATABLE :: source_physical_scratch(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
         LOGICAL :: reject_active=.FALSE.
@@ -165,6 +167,7 @@ CONTAINS
         IF (ALLOCATED(executor%exchange_group)) DEALLOCATE(executor%exchange_group)
         IF (ALLOCATED(executor%dry_noop_group)) DEALLOCATE(executor%dry_noop_group)
         IF (ALLOCATED(executor%non_exchange_groups)) DEALLOCATE(executor%non_exchange_groups)
+        IF (ALLOCATED(executor%source_physical_scratch)) DEALLOCATE(executor%source_physical_scratch)
         IF (ALLOCATED(executor%failure_code)) DEALLOCATE(executor%failure_code)
         IF (ALLOCATED(executor%failure_group)) DEALLOCATE(executor%failure_group)
         IF (ALLOCATED(executor%failure_detail)) DEALLOCATE(executor%failure_detail)
@@ -276,9 +279,16 @@ CONTAINS
                 group_profile(1)%setup=group_profile(1)%setup+REAL(tock-tick,wp)/REAL(clock_rate,wp)
             tick=tock
         END IF
+        ! Allocate one reusable physical-state record per available worker.
+        nthreads=1
+        !$ nthreads=omp_get_max_threads()
+        IF (ALLOCATED(executor%source_physical_scratch)) THEN
+            IF (SIZE(executor%source_physical_scratch)<nthreads)                                                       &
+                DEALLOCATE(executor%source_physical_scratch)
+        END IF
+        IF (.NOT.ALLOCATED(executor%source_physical_scratch))                                                         &
+            ALLOCATE(executor%source_physical_scratch(nthreads))
         IF (profiling_enabled) THEN
-            nthreads=1
-            !$ nthreads=omp_get_max_threads()
             ALLOCATE(thread_group(SIZE(executor%groups),nthreads))
             ALLOCATE(thread_physics(SIZE(executor%groups),nthreads))
             ALLOCATE(thread_evaluations(SIZE(executor%groups),nthreads))
@@ -291,7 +301,7 @@ CONTAINS
         ! Independent cells share a fixed geometry. Reduce the first failed
         ! worklist index without a separate serial scan.
         first_failure=HUGE(0)
-        !$OMP PARALLEL DO DEFAULT(SHARED)                                                                              &
+        !$OMP PARALLEL DEFAULT(SHARED)                                                                              &
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
         !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
@@ -301,12 +311,11 @@ CONTAINS
         !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,group_tick,                      &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
+        tid=1
+        !$ tid=omp_get_thread_num()+1
+        !$OMP DO
         cell_loop: DO cell=1,domain%solve_cells
-            IF (profiling_enabled) THEN
-                tid=1
-                !$ tid=omp_get_thread_num()+1
-                CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
-            END IF
+            IF (profiling_enabled) CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
             cell_error=0
             IF (executor%diagnostics_enabled) THEN
                 cell_detail=0
@@ -402,7 +411,8 @@ CONTAINS
                         executor%groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange, ok,    &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy, &
-                        executor%non_exchange_groups(group_index),executor%exchange_group(group_index))
+                        executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
+                        executor%source_physical_scratch(tid))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -600,7 +610,8 @@ CONTAINS
                 thread_cell(tid)=thread_cell(tid)+REAL(profile_tock-cell_tick,wp)/REAL(physical_tick_rate,wp)
             END IF
         END DO cell_loop
-        !$OMP END PARALLEL DO
+        !$OMP END DO
+        !$OMP END PARALLEL
         IF (profiling_enabled) THEN
             DO group_index=1,SIZE(executor%groups)
                 group_profile(group_index)%elapsed=group_profile(group_index)%elapsed+SUM(thread_group(group_index,:))
