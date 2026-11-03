@@ -15,6 +15,7 @@ MODULE lie_source_executor_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE state_2d, ONLY : state_type
     USE state_conversion_2d, ONLY : physical_state_type
+    USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
 
     IMPLICIT NONE
 
@@ -36,6 +37,8 @@ MODULE lie_source_executor_2d
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
         TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
         TYPE(physical_state_type), ALLOCATABLE :: source_physical_scratch(:)
+        TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
+        TYPE(mass_exchange_rates_type), ALLOCATABLE :: source_transfers(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
         LOGICAL :: reject_active=.FALSE.
@@ -168,6 +171,8 @@ CONTAINS
         IF (ALLOCATED(executor%dry_noop_group)) DEALLOCATE(executor%dry_noop_group)
         IF (ALLOCATED(executor%non_exchange_groups)) DEALLOCATE(executor%non_exchange_groups)
         IF (ALLOCATED(executor%source_physical_scratch)) DEALLOCATE(executor%source_physical_scratch)
+        IF (ALLOCATED(executor%source_exchange_scratch)) DEALLOCATE(executor%source_exchange_scratch)
+        IF (ALLOCATED(executor%source_transfers)) DEALLOCATE(executor%source_transfers)
         IF (ALLOCATED(executor%failure_code)) DEALLOCATE(executor%failure_code)
         IF (ALLOCATED(executor%failure_group)) DEALLOCATE(executor%failure_group)
         IF (ALLOCATED(executor%failure_detail)) DEALLOCATE(executor%failure_detail)
@@ -221,7 +226,6 @@ CONTAINS
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
-        TYPE(mass_exchange_rates_type) :: transfers
         TYPE(source_cell_context_type) :: cell_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
@@ -288,6 +292,15 @@ CONTAINS
         END IF
         IF (.NOT.ALLOCATED(executor%source_physical_scratch))                                                         &
             ALLOCATE(executor%source_physical_scratch(nthreads))
+        IF (ALLOCATED(executor%source_exchange_scratch)) THEN
+            IF (SIZE(executor%source_exchange_scratch)<nthreads) DEALLOCATE(executor%source_exchange_scratch)
+        END IF
+        IF (.NOT.ALLOCATED(executor%source_exchange_scratch))                                                         &
+            ALLOCATE(executor%source_exchange_scratch(nthreads))
+        IF (ALLOCATED(executor%source_transfers)) THEN
+            IF (SIZE(executor%source_transfers)<nthreads) DEALLOCATE(executor%source_transfers)
+        END IF
+        IF (.NOT.ALLOCATED(executor%source_transfers)) ALLOCATE(executor%source_transfers(nthreads))
         IF (profiling_enabled) THEN
             ALLOCATE(thread_group(SIZE(executor%groups),nthreads))
             ALLOCATE(thread_physics(SIZE(executor%groups),nthreads))
@@ -306,7 +319,7 @@ CONTAINS
         !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
-        !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,              &
+        !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
         !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,group_tick,                      &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
@@ -408,11 +421,12 @@ CONTAINS
                     ! Evaluate source rates without committing partial transfers.
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
-                        executor%groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange, ok,    &
+                        executor%groups(group_index), erodible_local, total_rate,                                      &
+                        executor%source_transfers(tid),cell_has_exchange,ok,                                          &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy, &
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
-                        executor%source_physical_scratch(tid))
+                        executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -443,12 +457,12 @@ CONTAINS
                     END IF
 
                     IF (executor%exchange_group(group_index)) THEN
-                        deposit_candidate=deposit_local+time_step*transfers%solid_deposition_rate
-                        erosion_candidate=erosion_local+time_step*transfers%solid_erosion_rate
-                        erodible_candidate=erodible_local-time_step*transfers%solid_erosion_rate
+                        deposit_candidate=deposit_local+time_step*executor%source_transfers(tid)%solid_deposition_rate
+                        erosion_candidate=erosion_local+time_step*executor%source_transfers(tid)%solid_erosion_rate
+                        erodible_candidate=erodible_local-time_step*executor%source_transfers(tid)%solid_erosion_rate
                         IF (erodible_deposit_flag) erodible_candidate=                                                 &
-                            erodible_candidate+time_step*transfers%solid_deposition_rate
-                        lava_candidate=lava_local+time_step*transfers%lava_deposit_rate
+                            erodible_candidate+time_step*executor%source_transfers(tid)%solid_deposition_rate
+                        lava_candidate=lava_local+time_step*executor%source_transfers(tid)%lava_deposit_rate
                         IF (.NOT.ALL(ieee_is_finite(deposit_candidate))                                                &
                             .OR. .NOT.ALL(ieee_is_finite(erosion_candidate))                                           &
                             .OR. .NOT.ALL(ieee_is_finite(erodible_candidate))                                          &
@@ -479,7 +493,7 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+transfers%dB_dt
+                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+executor%source_transfers(tid)%dB_dt
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
                     ! Group 0 evaluates on the immutable pre-spatial state;
