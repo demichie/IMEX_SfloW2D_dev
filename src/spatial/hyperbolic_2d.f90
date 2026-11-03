@@ -688,14 +688,14 @@ CONTAINS
 
         REAL(wp), INTENT(IN) :: eta_left, eta_right, bed_face
         REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
-        REAL(wp), INTENT(IN) :: qp_adv_left(:), qp_adv_right(:)
+        REAL(wp), INTENT(IN) :: qp_adv_left(n_vars+2), qp_adv_right(n_vars+2)
         REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
         INTEGER, INTENT(IN) :: direction, normal_momentum_index
         INTEGER, INTENT(IN) :: face_i, face_j
         LOGICAL, INTENT(IN) :: use_dry_donor
         LOGICAL, INTENT(IN) :: dry_donor_left,dry_donor_right
         REAL(wp), INTENT(IN) :: t
-        REAL(wp), INTENT(OUT) :: value_left(:), value_right(:)
+        REAL(wp), INTENT(OUT) :: value_left(n_eqns), value_right(n_eqns)
 
         REAL(wp) :: q_adv_left_use(n_vars), q_adv_right_use(n_vars)
         REAL(wp) :: qp_adv_left_use(n_vars+2), qp_adv_right_use(n_vars+2)

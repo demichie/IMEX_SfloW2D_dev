@@ -93,6 +93,7 @@ state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
 # Scope this GNU Fortran optimization to this object: global -fstack-arrays would
 # risk moving unrelated large grid temporaries onto thread stacks.
 state/state_conversion_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                 \
