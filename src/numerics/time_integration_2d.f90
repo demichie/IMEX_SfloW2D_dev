@@ -56,7 +56,6 @@ CONTAINS
             this%profile_enabled=status==0 .AND. TRIM(value)=='1'
         END BLOCK
         ALLOCATE(this%spatial_rate(n_eqns,comp_cells_x,comp_cells_y))
-        ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
         ALLOCATE(this%q_trial(n_vars,comp_cells_x,comp_cells_y))
         ALLOCATE(this%qp_trial(n_vars+2,comp_cells_x,comp_cells_y))
         ALLOCATE(this%cell_status(comp_cells_x*comp_cells_y))
@@ -124,8 +123,10 @@ CONTAINS
         IF (reuse_cfl_traces) THEN
             qp_pre=>state%qp
         ELSE
-            ! Preserve the old halo semantics for direct callers: reconstruction
-            ! may read outside the current worklist if a specialized stencil does.
+            ! This full halo buffer exists only for direct/non-CFL callers.
+            ! Preserve their original reconstruction-stencil semantics.
+            IF (.NOT.ALLOCATED(this%qp_before))                                                                     &
+                ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
             this%qp_before=state%qp
             qp_pre=>this%qp_before
         END IF
