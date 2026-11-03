@@ -1277,15 +1277,11 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[in,out] this Reconstruction workspace and output face traces.
     !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
     SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
-    USE parameters_2d, ONLY : limiter,reconstr_coeff
-    USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
     USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
-    USE constitutive_parameters_2d, ONLY : grav
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
-        REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
-        REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
+        REAL(wp) :: slope_hx,slope_hy,eta_center
         REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
         REAL(wp) :: eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm
         REAL(wp) :: slope_eta2_x,slope_eta2_y
