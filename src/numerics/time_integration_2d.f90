@@ -25,10 +25,12 @@ MODULE time_integration_2d
     TYPE :: time_integration_workspace_type
         !> Spatial residual, dimensioned by conservative equation and cell.
         REAL(wp), ALLOCATABLE :: spatial_rate(:,:,:)
-        !> Immutable conservative and primitive pre-step snapshots.
-        REAL(wp), ALLOCATABLE :: q_before(:,:,:), qp_before(:,:,:)
-        !> Candidate cell states, published only after all groups succeed.
+        !> Optional pre-spatial primitive halo when CFL traces cannot be reused.
+        REAL(wp), ALLOCATABLE :: qp_before(:,:,:)
+        !> Candidate fields: only worklist entries are initialized or published.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
+        !> Persistent status worklist for primitive and spatial checks.
+        INTEGER, ALLOCATABLE :: cell_status(:)
         TYPE(lie_source_executor_type) :: lie_executor
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
@@ -54,10 +56,10 @@ CONTAINS
             this%profile_enabled=status==0 .AND. TRIM(value)=='1'
         END BLOCK
         ALLOCATE(this%spatial_rate(n_eqns,comp_cells_x,comp_cells_y))
-        ALLOCATE(this%q_before(n_vars,comp_cells_x,comp_cells_y))
         ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
         ALLOCATE(this%q_trial(n_vars,comp_cells_x,comp_cells_y))
         ALLOCATE(this%qp_trial(n_vars+2,comp_cells_x,comp_cells_y))
+        ALLOCATE(this%cell_status(comp_cells_x*comp_cells_y))
         CALL initialize_lie_source_executor(this%lie_executor,source_registry)
     END SUBROUTINE initialize_time_integration
 
@@ -74,22 +76,22 @@ CONTAINS
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
     SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,domain,spatial_operator,pre_spatial_primitives_ready)
-        CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
-        CLASS(state_type), INTENT(INOUT) :: state
+        CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
+        CLASS(state_type), TARGET, INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt,stochastic_values(comp_cells_x,comp_cells_y)
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
+        REAL(wp), POINTER :: qp_pre(:,:,:)
         INTEGER :: l,j,k,first_failure,eq
         INTEGER :: tick,tock,tick_rate
-        INTEGER, ALLOCATABLE :: reconstruction_status(:),spatial_status(:)
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
         TYPE(substrate_snapshot_type) :: substrate_before
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
-        REAL(wp), ALLOCATABLE :: qp_authoritative(:,:,:),bed_before(:,:),                                              &
+        REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:),qp_authoritative(:,:,:),bed_before(:,:),                                              &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                        &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
         LOGICAL :: check_injected_rollback,had_bed_change
@@ -101,6 +103,7 @@ CONTAINS
         check_injected_rollback=this%lie_executor%reject_active
 
         IF (check_injected_rollback) THEN
+            q_authoritative=state%q
             qp_authoritative=state%qp
             bed_before=B_vertex
             bed_cent_before=B_cent
@@ -112,32 +115,29 @@ CONTAINS
 
         END IF
 
-        IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
-        this%q_before=state%q
-        this%qp_before=state%qp
-        this%q_trial=state%q
-        this%qp_trial=state%qp
-        IF (this%profile_enabled) THEN
-            CALL SYSTEM_CLOCK(tock)
-            this%profile_state_snapshot=this%profile_state_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
-        END IF
+        ! The conservative state remains immutable until commit. Trial buffers
+        ! are initialized only on active cells, avoiding four full-grid copies.
         ! Production CFL already converted this unchanged pre-spatial state.
         ! Direct callers retain the original preflight unless they explicitly opt in.
         reuse_cfl_traces=.FALSE.
         IF (PRESENT(pre_spatial_primitives_ready)) reuse_cfl_traces=pre_spatial_primitives_ready
+        IF (reuse_cfl_traces) THEN
+            qp_pre=>state%qp
+        ELSE
+            qp_pre=>this%qp_before
+        END IF
         IF (.NOT.reuse_cfl_traces) THEN
-        ! Each cell writes a distinct primitive slice; collect failures by cell.
-        ALLOCATE(reconstruction_status(domain%reconstruction_cells))
-        reconstruction_status=0
+            ! Each cell writes a distinct primitive slice; collect failures by cell.
+            this%cell_status(1:domain%reconstruction_cells)=0
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
         DO l=1,domain%reconstruction_cells
             j=domain%j_reconstruction(l)
             k=domain%k_reconstruction(l)
 
-            IF (this%q_before(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL qc_to_qp(this%q_before(:,j,k), this%qp_before(:,j,k), pd, 'Lie pre-spatial reconstruction state', &
-                    conversion_ok)
-                IF (.NOT.conversion_ok) reconstruction_status(l)=1
+            IF (state%q(idx_totMassEqn,j,k)>0.0_wp) THEN
+                CALL qc_to_qp(state%q(:,j,k),this%qp_before(:,j,k),pd,                                                 &
+                    'Lie pre-spatial reconstruction state',conversion_ok)
+                IF (.NOT.conversion_ok) this%cell_status(l)=1
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
 
@@ -145,25 +145,26 @@ CONTAINS
 
         END DO
         !$OMP END PARALLEL DO
-        first_failure=MINLOC(reconstruction_status,1,MASK=reconstruction_status/=0)
+        first_failure=MINLOC(this%cell_status(1:domain%reconstruction_cells),1,                                      &
+            MASK=this%cell_status(1:domain%reconstruction_cells)/=0)
         IF (first_failure/=0)                                                                                          &
             CALL fatal_error('Lie pre-spatial state conversion rejected')
-        DEALLOCATE(reconstruction_status)
         END IF
 
         ! The spatial step is conservative; only admissibility is checked.
-        CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain,                                      &
+        CALL spatial_operator%evaluate(qp_pre,this%spatial_rate,t,domain,                                               &
             reuse_cfl_traces=reuse_cfl_traces)
-        ALLOCATE(spatial_status(domain%solve_cells))
-        spatial_status=0
+        this%cell_status(1:domain%solve_cells)=0
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
-            this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
+            ! Initialize this candidate only where spatial and source groups act.
+            this%q_trial(:,j,k)=state%q(:,j,k)
+            this%q_trial(1:n_eqns,j,k)=state%q(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
             ! Spatial admissibility check. Do not limit or clip its conservative rate.
             IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) THEN
-                spatial_status(l)=1
+                this%cell_status(l)=1
                 CYCLE
 
             END IF
@@ -178,7 +179,7 @@ CONTAINS
 
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
-                IF (.NOT.conversion_ok) spatial_status(l)=2
+                IF (.NOT.conversion_ok) this%cell_status(l)=2
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
 
@@ -186,7 +187,8 @@ CONTAINS
 
         END DO
         !$OMP END PARALLEL DO
-        first_failure=MINLOC(spatial_status,1,MASK=spatial_status/=0)
+        first_failure=MINLOC(this%cell_status(1:domain%solve_cells),1,                                                &
+            MASK=this%cell_status(1:domain%solve_cells)/=0)
 
         IF (first_failure/=0) THEN
             ! Diagnose the first failing cell outside the OpenMP region.
@@ -195,30 +197,28 @@ CONTAINS
             k=domain%k_cent(first_failure)
             WRITE(*,'(A,2(I0,1X),A,ES23.15,A,ES23.15)') &
                 'LIE_SPATIAL_FAILURE cell(j,k)=',j,k,' t=',t,' dt=',dt
-            WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',spatial_status(first_failure)
+            WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',this%cell_status(first_failure)
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
-                'LIE_SPATIAL_FAILURE mass_before=',this%q_before(idx_totMassEqn,j,k), &
+                'LIE_SPATIAL_FAILURE mass_before=',state%q(idx_totMassEqn,j,k), &
                 ' mass_after=',this%q_trial(idx_totMassEqn,j,k)
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
                 'LIE_SPATIAL_FAILURE components_before=', &
-                SUM(this%q_before(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
-                SUM(this%q_before(idx_add_gas_first:idx_add_gas_last,j,k)), &
+                SUM(state%q(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
+                SUM(state%q(idx_add_gas_first:idx_add_gas_last,j,k)), &
                 ' components_after=', &
                 SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
                 SUM(this%q_trial(idx_add_gas_first:idx_add_gas_last,j,k))
             DO eq=1,n_eqns
                 WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
-                    ' before/rate/after=',this%q_before(eq,j,k), &
+                    ' before/rate/after=',state%q(eq,j,k), &
                     this%spatial_rate(eq,j,k),this%q_trial(eq,j,k)
                 CALL spatial_operator%diagnose_cell(j,k,eq)
             END DO
-            IF (spatial_status(first_failure)==1)                                                                      &
+            IF (this%cell_status(first_failure)==1)                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')
             CALL fatal_error('Lie spatial state conversion rejected')
 
         END IF
-
-        DEALLOCATE(spatial_status)
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
@@ -241,7 +241,7 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
-            stochastic_values,t,this%q_before,this%qp_before,source_step_failed,source_failure)
+            stochastic_values,t,state%q,qp_pre,source_step_failed,source_failure)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -258,8 +258,8 @@ CONTAINS
                     CALL fatal_error('D20 rollback: failpoint did not trigger')
                 IF (.NOT.had_bed_change)                                                                               &
                     CALL fatal_error('D20 rollback: failpoint had no prior bed change')
-                IF (.NOT.ALL(state%q==this%q_before) .OR.                                                              &
-                    .NOT.ALL(state%qp==qp_authoritative))                                                              &
+                IF (.NOT.ALL(state%q==q_authoritative) .OR.                                                           &
+                    .NOT.ALL(state%qp==qp_authoritative))                                                             &
                     CALL fatal_error('D20 rollback: published fluid state changed')
                 IF (.NOT.ALL(state%deposit==substrate_before%deposit) .OR.                                             &
                     .NOT.ALL(state%erosion==substrate_before%erosion) .OR.                                             &
@@ -291,8 +291,15 @@ CONTAINS
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
         IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
-        state%q=this%q_trial
-        state%qp=this%qp_trial
+        ! Publish only the active worklist; inactive cells remain unchanged.
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k)
+        DO l=1,domain%solve_cells
+            j=domain%j_cent(l)
+            k=domain%k_cent(l)
+            state%q(:,j,k)=this%q_trial(:,j,k)
+            state%qp(:,j,k)=this%qp_trial(:,j,k)
+        END DO
+        !$OMP END PARALLEL DO
         ! The source executor refreshed substrate aggregates after its cell sweep.
         ! Recomputing them here would traverse the whole domain a second time.
         IF (needs_geometry_snapshot) CALL commit_geometry_transaction
@@ -318,10 +325,10 @@ CONTAINS
         END IF
         CALL finalize_lie_source_executor(this%lie_executor)
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
-        IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
         IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
         IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
+        IF (ALLOCATED(this%cell_status)) DEALLOCATE(this%cell_status)
     END SUBROUTINE finalize_time_integration
 
 END MODULE time_integration_2d
