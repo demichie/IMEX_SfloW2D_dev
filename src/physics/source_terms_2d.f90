@@ -64,7 +64,7 @@ CONTAINS
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                    &
-            non_exchange_group,exchange_selected)
+            non_exchange_group,exchange_selected,physical_scratch)
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -75,6 +75,7 @@ CONTAINS
         ! Prepartitioned immutable metadata supplied by the Lie executor.
         TYPE(source_group_type), INTENT(IN), OPTIONAL :: non_exchange_group
         LOGICAL, INTENT(IN), OPTIONAL :: exchange_selected
+        TYPE(physical_state_type), INTENT(INOUT), OPTIONAL :: physical_scratch
         REAL(wp), INTENT(IN) :: inventory(n_solid)
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -82,8 +83,11 @@ CONTAINS
         LOGICAL, INTENT(OUT) :: has_exchange,valid
         TYPE(source_group_type) :: non_exchange
         REAL(wp) :: physical(n_eqns),exchange(n_eqns),coverage,scale
-        has_exchange=ANY(INDEX(group%source_names,'mass_exchange_')==1)
-        IF (PRESENT(exchange_selected)) has_exchange=exchange_selected
+        IF (PRESENT(exchange_selected)) THEN
+            has_exchange=exchange_selected
+        ELSE
+            has_exchange=ANY(INDEX(group%source_names,'mass_exchange_')==1)
+        END IF
         valid=.FALSE.
         physical=0.0_wp
         exchange=0.0_wp
@@ -94,12 +98,12 @@ CONTAINS
                 CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                           &
                     context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                          &
                     context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                               &
-                    arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value)
+                    arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch)
         ELSEIF (.NOT.has_exchange) THEN
             CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,group,stochastic_value)
+                arc_perim,arc_n_x,arc_n_y,cell_area,group,stochastic_value,physical_scratch)
         ELSEIF (ANY(INDEX(group%source_names,'mass_exchange_')/=1)) THEN
             non_exchange=group
             non_exchange%source_names=PACK(group%source_names,                                                         &
@@ -107,13 +111,13 @@ CONTAINS
             CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value)
+                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value,physical_scratch)
         END IF
 
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_names,transfer,exchange)
+                group%source_names,transfer,exchange,physical_scratch)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -498,7 +502,7 @@ CONTAINS
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
-            lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value )
+            lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,                                           &
             time_param , bottom_radial_source_flag,                                                                    &
@@ -534,6 +538,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: cell_area_jk
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: stochastic_value
+        TYPE(physical_state_type), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -542,7 +547,8 @@ CONTAINS
 
 
 
-        TYPE(physical_state_type) :: physical_state
+        TYPE(physical_state_type), TARGET :: local_state
+        TYPE(physical_state_type), POINTER :: physical_state
 
 
         REAL(wp) :: q1
@@ -562,6 +568,8 @@ CONTAINS
                     ALL(cell_fissure_fract .EQ. 0.0_wp) ) RETURN
 
         ! Injection into a dry cell still needs density and pore-pressure state.
+        physical_state=>local_state
+        IF (PRESENT(physical_scratch)) physical_state=>physical_scratch
         CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y,                                         &
             Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
 
@@ -672,15 +680,19 @@ CONTAINS
     !> \param[out] eqns_term Conservative equation source-rate vector.
     !> \param[out] topo_term Proposed bed-elevation rate.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,selected_names,rates,eqns_term)
+            erodible,dt,selected_names,rates,eqns_term,physical_scratch)
         REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
         CHARACTER(*), INTENT(IN) :: selected_names(:)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        TYPE(physical_state_type) :: exchange_state
+        TYPE(physical_state_type), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
+        TYPE(physical_state_type), TARGET :: local_state
+        TYPE(physical_state_type), POINTER :: exchange_state
 
+        exchange_state=>local_state
+        IF (PRESENT(physical_scratch)) exchange_state=>physical_scratch
         CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
         CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
             erodible,dt,selected_names,rates,eqns_term)
