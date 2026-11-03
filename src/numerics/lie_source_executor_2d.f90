@@ -389,10 +389,6 @@ CONTAINS
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
-                IF (profiling_enabled) THEN
-                    CALL SYSTEM_CLOCK(group_tick)
-                    thread_evaluations(group_index,tid)=thread_evaluations(group_index,tid)+1
-                END IF
                 ! Group zero reads the pre-spatial primitive state; subsequent
                 ! groups read the previous group's accepted local state.
                 IF (executor%groups(group_index)%id==0) THEN
@@ -404,6 +400,10 @@ CONTAINS
                 ! Do not skip groups containing injection or other dry-cell sources.
                 IF (executor%dry_noop_group(group_index)) THEN
                     IF (qpentry(idx_h)<=0.0_wp) CYCLE group_loop
+                END IF
+                IF (profiling_enabled) THEN
+                    CALL SYSTEM_CLOCK(group_tick)
+                    thread_evaluations(group_index,tid)=thread_evaluations(group_index,tid)+1
                 END IF
 
                 context='Lie source group'
