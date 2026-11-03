@@ -4,11 +4,11 @@
 !>          fully accepted timestep publishes fluid, substrate and geometry.
 MODULE time_integration_2d
     USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                  &
-            idx_add_gas_first,idx_add_gas_last,topo_change_flag
+            idx_add_gas_first,idx_add_gas_last,topo_change_flag,sea_mass_removal_flag
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
-            B_prime_x_geom,B_prime_y_geom,grav_coeff
+            B_prime_x_geom,B_prime_y_geom,grav_coeff,B_zone,B_nodata
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : state_type,substrate_snapshot_type,                                                           &
             initialize_dry_physical_cell,conservative_mass_admissible
@@ -157,6 +157,14 @@ CONTAINS
                 spatial_status(l)=1
                 CYCLE
 
+            END IF
+
+            ! A sea cell is an absorbing sink after the spatial step, before ALL Lie sources.
+            ! Keep this inside the existing OpenMP sweep and synchronize q/qp.
+            IF (B_nodata(j,k) .OR. (sea_mass_removal_flag .AND. B_zone(j,k)==1)) THEN
+                this%q_trial(:,j,k)=0.0_wp
+                CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
+                CYCLE
             END IF
 
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN

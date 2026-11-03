@@ -189,13 +189,13 @@ CONTAINS
         USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                         &
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
-            B_zone, cell_source_fractions, cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
+            B_zone,B_nodata, cell_source_fractions, cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
-        USE state_conversion_2d, ONLY : qc_to_qp
+        USE state_conversion_2d, ONLY : qc_to_qp,mixt_var
         USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, physical_cell_state_finite
-        USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
+        USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(mass_exchange_rates_type) :: transfers
@@ -221,6 +221,7 @@ CONTAINS
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
+        REAL(wp) :: ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
@@ -259,7 +260,8 @@ CONTAINS
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,              &
-        !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components)                            &
+        !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
+        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix)                            &
         !$OMP& REDUCTION(MIN:first_failure)
         cell_loop: DO cell=1,domain%solve_cells
             cell_error=0
@@ -273,6 +275,8 @@ CONTAINS
             ! Load the candidate state and optional substrate inventories.
             j=domain%j_cent(cell)
             k=domain%k_cent(cell)
+            ! Group zero uses the pre-spatial snapshot: never evaluate it over absorbing cells.
+            IF (B_nodata(j,k) .OR. (sea_mass_removal_flag .AND. B_zone(j,k)==1)) CYCLE cell_loop
             q_local=q(:,j,k)
             qp_local=qp(:,j,k)
             IF (executor%has_exchange_group) THEN
@@ -477,6 +481,15 @@ CONTAINS
 
             END DO group_loop
 
+            ! Restore the v2 buoyancy removal after all mass-exchange groups.
+            ! This is a physical sink, not a numerical limiter on the source rates.
+            IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
+                CALL mixt_var(qp_local,ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix)
+                IF (red_grav<=0.0_wp) THEN
+                    q_local=0.0_wp
+                    CALL initialize_dry_physical_cell(qp_local)
+                END IF
+            END IF
             ! Publish this cell only after every group has succeeded.
             IF (cell_error==0) THEN
                 q(:,j,k)=q_local

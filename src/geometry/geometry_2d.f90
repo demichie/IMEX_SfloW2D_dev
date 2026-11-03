@@ -190,7 +190,7 @@ CONTAINS
             angle_source
     USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,                                            &
                 width_fissures
-    USE parameters_2d, ONLY : liquid_vaporization_flag
+    USE parameters_2d, ONLY : liquid_vaporization_flag,sea_mass_removal_flag
 
     IMPLICIT none
 
@@ -362,7 +362,7 @@ CONTAINS
 
         B_zone = 0
 
-        IF ( liquid_vaporization_flag ) CALL topography_zones
+        IF ( liquid_vaporization_flag .OR. sea_mass_removal_flag ) CALL topography_zones
 
         pi_g = 4.0_wp * ATAN(1.0_wp)
 

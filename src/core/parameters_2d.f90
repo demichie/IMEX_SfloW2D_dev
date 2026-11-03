@@ -118,6 +118,9 @@ MODULE parameters_2d
     !> .
     LOGICAL :: liquid_vaporization_flag
 
+    !> Remove transported flow material entering the identified sea zone.
+    LOGICAL :: sea_mass_removal_flag = .FALSE.
+
     LOGICAL :: stoch_transport_flag
 
     LOGICAL :: pore_pressure_flag

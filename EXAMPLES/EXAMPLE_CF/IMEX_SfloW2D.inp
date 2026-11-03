@@ -24,6 +24,7 @@
  TOPO_CHANGE_FLAG = F,
  RADIAL_SOURCE_FLAG = F,
  COLLAPSING_VOLUME_FLAG = T ,
+ SEA_MASS_REMOVAL_FLAG = T ,
  slope_correction_flag = T, 
  curvature_term_flag = T ,
  /
@@ -118,4 +119,5 @@
  KIN_VISC_A = 1.48D-5 ,
  PRES = 101300.D0 ,
  T_AMBIENT = 300.D0 ,
+ WATER_LEVEL = 0.D0 ,
  /

@@ -136,7 +136,7 @@ MODULE inpout_2d
             kin_visc_a, pres, T_ambient, entrainment_flag, sp_heat_g,                                                  &
             sp_gas_const_g, gamma_steam, Tref_Suth, muRef_Suth, S_mu
 
-    USE parameters_2d, ONLY: liquid_vaporization_flag, sutherland_flag,                                                &
+    USE parameters_2d, ONLY: liquid_vaporization_flag, sea_mass_removal_flag, sutherland_flag,                                                &
                                     water_level
 
     ! --- Variables for the namelist LIQUID_TRANSPORT_PARAMETERS
@@ -353,7 +353,7 @@ MODULE inpout_2d
         bottom_radial_source_flag, slope_correction_flag, curvature_term_flag,                                         &
         lateral_source_flag, bottom_fissural_source_flag, n_fissures,                                                  &
         stochastic_flag, n_layers,                                                                                     &
-        pore_pressure_flag
+        pore_pressure_flag, sea_mass_removal_flag
 
     NAMELIST /initial_conditions/ T_init, T_ambient
 
@@ -945,6 +945,7 @@ CONTAINS
         sp_heat_g = -1.0_wp
         sp_gas_const_g = -1.0_wp
         liquid_vaporization_flag = .FALSE.
+        sea_mass_removal_flag = .FALSE.
         water_level = -1.0E7_wp
         gamma_steam = -1.0_wp
         sutherland_flag = .FALSE.
@@ -1433,6 +1434,13 @@ CONTAINS
 
         END IF
 
+        IF (sea_mass_removal_flag .AND. liquid_vaporization_flag) THEN
+            CALL fatal_error('Sea mass removal and liquid vaporization cannot both be enabled')
+        END IF
+        IF ((sea_mass_removal_flag .OR. liquid_vaporization_flag) .AND. water_level==-1.0E7_wp) THEN
+            CALL fatal_error('WATER_LEVEL is required when a sea process is enabled')
+        END IF
+
         IF (liquid_vaporization_flag) THEN
 
         IF (.NOT. gas_flag) THEN
@@ -1475,7 +1483,7 @@ CONTAINS
 
         ELSE
 
-            IF (.NOT. liquid_vaporization_flag) THEN
+            IF (.NOT. liquid_vaporization_flag .AND. .NOT. sea_mass_removal_flag) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
                 WRITE (*, *) 'water_level =', water_level
