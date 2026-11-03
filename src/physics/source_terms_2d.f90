@@ -32,15 +32,15 @@ MODULE source_terms_2d
         MODULE PROCEDURE eval_geometry_cell_source_explicit, eval_mass_exchange_source_explicit
     END INTERFACE
     PUBLIC :: eval_source_semi_implicit, eval_source_implicit, eval_source_analytic
-    PUBLIC :: analytic_term_context_type
+    PUBLIC :: source_cell_context_type
     PUBLIC :: eval_geometry_curvature_explicit
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
     ! Cell-local geometry and stochastic context for analytic source solves.
-    TYPE :: analytic_term_context_type
+    TYPE :: source_cell_context_type
         REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
         REAL(wp) :: Bsecond_xx=0.0_wp, Bsecond_xy=0.0_wp, Bsecond_yy=0.0_wp
         REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
-    END TYPE analytic_term_context_type
+    END TYPE source_cell_context_type
 CONTAINS
 
     !> Apply a uniform physical factor to all coupled exchange rates.
@@ -66,7 +66,7 @@ CONTAINS
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area)
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
-        TYPE(analytic_term_context_type), INTENT(IN) :: context
+        TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: arc_perim,arc_n_x,arc_n_y,cell_area
         REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
@@ -214,7 +214,7 @@ CONTAINS
     SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
-        TYPE(analytic_term_context_type), INTENT(IN) :: context
+        TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER, INTENT(OUT) :: status
         REAL(wp) :: q_after(n_vars)
@@ -240,7 +240,7 @@ CONTAINS
     RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
-        TYPE(analytic_term_context_type), INTENT(IN) :: context
+        TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: q_after(n_vars)
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_type) :: physical_state

@@ -190,7 +190,7 @@ CONTAINS
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
             B_zone, cell_source_fractions, cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
-        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,analytic_term_context_type
+        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversion_2d, ONLY : qc_to_qp
@@ -199,7 +199,7 @@ CONTAINS
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(mass_exchange_rates_type) :: transfers
-        TYPE(analytic_term_context_type) :: analytic_context
+        TYPE(source_cell_context_type) :: cell_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
@@ -257,7 +257,7 @@ CONTAINS
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
         !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
-        !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context,                                           &
+        !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,              &
         !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components)                            &
         !$OMP& REDUCTION(MIN:first_failure)
@@ -282,15 +282,15 @@ CONTAINS
                 lava_local=state%lava_deposit(j,k)
             END IF
             ! Capture cell-local geometry and stochastic forcing for all groups.
-            analytic_context%Bprime_x=B_prime_x_geom(j,k)
-            analytic_context%Bprime_y=B_prime_y_geom(j,k)
-            analytic_context%Bsecond_xx=B_second_xx_geom(j,k)
-            analytic_context%Bsecond_xy=B_second_xy_geom(j,k)
-            analytic_context%Bsecond_yy=B_second_yy_geom(j,k)
-            analytic_context%grav_coeff=grav_coeff(j,k)
+            cell_context%Bprime_x=B_prime_x_geom(j,k)
+            cell_context%Bprime_y=B_prime_y_geom(j,k)
+            cell_context%Bsecond_xx=B_second_xx_geom(j,k)
+            cell_context%Bsecond_xy=B_second_xy_geom(j,k)
+            cell_context%Bsecond_yy=B_second_yy_geom(j,k)
+            cell_context%grav_coeff=grav_coeff(j,k)
             noise=0.0_wp
             IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
-            analytic_context%Zij=noise
+            cell_context%Zij=noise
 
             IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR. .NOT.ieee_is_finite(B_prime_y_geom(j,k))                 &
                 .OR. .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR. .NOT.ieee_is_finite(B_second_xy_geom(j,k))        &
@@ -343,7 +343,7 @@ CONTAINS
                     ! Evaluate source rates without committing partial transfers.
                     CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
                         executor%groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange, ok,    &
-                        noise, B_zone(j,k), analytic_context, cell_source_fractions(j,k),                              &
+                        noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy)
 
                     IF (cell_has_exchange .NEQV. executor%exchange_group(group_index)) THEN
@@ -414,7 +414,7 @@ CONTAINS
                     analytic_input=q_local
                     IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
-                    CALL eval_source_analytic(executor%groups(group_index), analytic_input, analytic_context,          &
+                    CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
                         time_step, analytic_rate, status)
 
                     IF (status/=0) THEN
@@ -434,7 +434,7 @@ CONTAINS
                     IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
                     q_candidate=q_local
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
-                        analytic_context%Bprime_x, analytic_context%Bprime_y, analytic_context%grav_coeff, noise,      &
+                        cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
                         iterations, ok, linear_info, failed)
                     IF (executor%newton_witness                                                                        &
                         .AND. ALLOCATED(executor%newton_iterations))                                                   &
