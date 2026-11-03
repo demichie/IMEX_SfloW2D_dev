@@ -16,6 +16,7 @@ MODULE reconstruction_2d
     USE parameters_2d, ONLY : lateral_source_flag, radial_source_flag
     USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
     USE parameters_2d, ONLY : idx_u, idx_v
+    USE parameters_2d, ONLY : limiter, reconstr_coeff
 
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
@@ -23,6 +24,9 @@ MODULE reconstruction_2d
     USE geometry_2d, ONLY : source_cell
     USE geometry_2d, ONLY : one_by_dx, one_by_dy, dx, dy
     USE geometry_2d, ONLY : limit
+    USE geometry_2d, ONLY : x_comp, y_comp, dx2, dy2
+
+    USE constitutive_parameters_2d, ONLY : grav
 
     IMPLICIT NONE
 
@@ -818,9 +822,6 @@ CONTAINS
     !> @param[in] j X index of the workset cell.
     !> @param[in] k Y index of the workset cell.
     SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k)
-    USE parameters_2d, ONLY : limiter,reconstr_coeff
-    USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
-    USE constitutive_parameters_2d, ONLY : grav
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
         INTEGER, INTENT(IN) :: j,k
