@@ -25,6 +25,12 @@ MODULE mass_exchange_2d
 
     PUBLIC :: eval_mass_exchange_explicit, eval_mass_exchange_semi_implicit
     PUBLIC :: eval_mass_exchange_implicit, solve_mass_exchange_analytic
+    PUBLIC :: mass_exchange_scratch_type
+
+    !> Reusable cell-local mass-exchange accumulators, owned by the invoking worker.
+    TYPE :: mass_exchange_scratch_type
+        TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates
+    END TYPE mass_exchange_scratch_type
 
 CONTAINS
 
@@ -38,7 +44,8 @@ CONTAINS
         !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
-    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,selected_names,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,selected_names,total_rates,eqns_term,     &
+            scratch)
 
             TYPE(physical_state_type), INTENT(IN) :: physical_state
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
@@ -46,13 +53,19 @@ CONTAINS
             CHARACTER(*), INTENT(IN) :: selected_names(:)
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-            TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates
+            TYPE(mass_exchange_scratch_type), TARGET, INTENT(INOUT), OPTIONAL :: scratch
+            TYPE(mass_exchange_scratch_type), TARGET :: local_scratch
+            TYPE(mass_exchange_scratch_type), POINTER :: work
             REAL(wp) :: alpha
             REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
             REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
             REAL(wp) :: solid_deposition,packing_factor,erosion_factor
             LOGICAL :: do_erosion,do_deposition,do_liquid_loss,do_entrainment,do_vaporization,do_lava
 
+            work=>local_scratch
+            IF (PRESENT(scratch)) work=>scratch
+            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                       &
+                liquid_loss_rates=>work%liquid_loss_rates)
             do_erosion=ANY(selected_names=='mass_exchange_erosion')
             do_deposition=ANY(selected_names=='mass_exchange_deposition')
             do_liquid_loss=ANY(selected_names=='mass_exchange_carrier_liquid_loss')
@@ -145,6 +158,7 @@ CONTAINS
                 CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
             END IF
+            END ASSOCIATE
 
     END SUBROUTINE eval_mass_exchange_explicit
 
