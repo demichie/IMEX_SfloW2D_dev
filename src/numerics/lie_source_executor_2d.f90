@@ -32,7 +32,8 @@ MODULE lie_source_executor_2d
     !>          grid. Detailed failure diagnostics are disabled by default.
     TYPE :: lie_source_executor_type
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
-        LOGICAL, ALLOCATABLE :: exchange_group(:)
+        LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
+        TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
         LOGICAL :: reject_active=.FALSE.
@@ -67,8 +68,11 @@ CONTAINS
         IF (executor%initialized) CALL fatal_error('Lie source executor already initialized')
         ! Cache the groups and classify their methods once per simulation.
         executor%groups=source_registry%groups()
-        ALLOCATE(executor%exchange_group(SIZE(executor%groups)))
+        ALLOCATE(executor%exchange_group(SIZE(executor%groups)),                                                       &
+            executor%dry_noop_group(SIZE(executor%groups)),                                                           &
+            executor%non_exchange_groups(SIZE(executor%groups)))
         executor%exchange_group=.FALSE.
+        executor%dry_noop_group=.FALSE.
         DO group_index=1,SIZE(executor%groups)
             IF (.NOT.ALLOCATED(executor%groups(group_index)%source_names)) CALL fatal_error('D20: Lie source group has &
                 no allocated source list')
@@ -87,6 +91,16 @@ CONTAINS
             END IF
             executor%exchange_group(group_index)=                                                                      &
                 ANY(INDEX(executor%groups(group_index)%source_names,'mass_exchange_')==1)
+            ! Cache the non-exchange subset before entering the OpenMP cell sweep.
+            executor%non_exchange_groups(group_index)=executor%groups(group_index)
+            IF (executor%exchange_group(group_index)) THEN
+                executor%non_exchange_groups(group_index)%source_names=                                               &
+                    PACK(executor%groups(group_index)%source_names,                                                    &
+                    INDEX(executor%groups(group_index)%source_names,'mass_exchange_')/=1)
+            END IF
+            executor%dry_noop_group(group_index)=                                                                     &
+                ALL(executor%groups(group_index)%source_names=='geometry_curvature' .OR.                               &
+                    executor%groups(group_index)%source_names=='mass_exchange_deposition')
             IF (executor%exchange_group(group_index)) THEN
                 IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) CALL fatal_error('D19: mass exchange  &
                     requires explicit group method')
@@ -149,6 +163,8 @@ CONTAINS
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         IF (ALLOCATED(executor%groups)) DEALLOCATE(executor%groups)
         IF (ALLOCATED(executor%exchange_group)) DEALLOCATE(executor%exchange_group)
+        IF (ALLOCATED(executor%dry_noop_group)) DEALLOCATE(executor%dry_noop_group)
+        IF (ALLOCATED(executor%non_exchange_groups)) DEALLOCATE(executor%non_exchange_groups)
         IF (ALLOCATED(executor%failure_code)) DEALLOCATE(executor%failure_code)
         IF (ALLOCATED(executor%failure_group)) DEALLOCATE(executor%failure_group)
         IF (ALLOCATED(executor%failure_detail)) DEALLOCATE(executor%failure_detail)
@@ -198,7 +214,7 @@ CONTAINS
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversion_2d, ONLY : qc_to_qp,mixt_var
         USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, physical_cell_state_finite
-        USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag
+        USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
@@ -352,6 +368,11 @@ CONTAINS
                 ELSE
                     qpentry=qp_local
                 END IF
+                ! Curvature and deposition cannot create flow in a dry input cell.
+                ! Do not skip groups containing injection or other dry-cell sources.
+                IF (executor%dry_noop_group(group_index)) THEN
+                    IF (qpentry(idx_h)<=0.0_wp) CYCLE group_loop
+                END IF
 
                 context='Lie source group'
                 ! Validate constitutive inputs before dispatch. Model/method errors
@@ -380,7 +401,8 @@ CONTAINS
                     CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
                         executor%groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange, ok,    &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
-                        cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy)
+                        cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy, &
+                        executor%non_exchange_groups(group_index),executor%exchange_group(group_index))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

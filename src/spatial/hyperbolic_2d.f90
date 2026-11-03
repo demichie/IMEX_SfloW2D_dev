@@ -169,7 +169,7 @@ CONTAINS
     SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                                                            &
             divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,                                           &
             j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y,                                                &
-            source_boundary_enabled )
+            source_boundary_enabled,reuse_cfl_traces )
 
     IMPLICIT NONE
 
@@ -183,7 +183,8 @@ CONTAINS
         INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
         INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
         INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
-        LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled
+        LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled,reuse_cfl_traces
+        LOGICAL :: use_cached_traces
 
         INTEGER :: l , i, j, k      !< loop counters
         INTEGER :: tick,tock,tick_rate
@@ -192,15 +193,17 @@ CONTAINS
             this%profile_calls=this%profile_calls+1
         END IF
 
-        ! Linear reconstruction of the physical variables at the interfaces
-        CALL recon%reconstruct( qp_expl, t, solve_cells, j_cent, k_cent, .TRUE.,                                       &
-            source_boundary_enabled=source_boundary_enabled )
-
-        CALL recon%reconstruct_kt_eta(qp_expl)
-
-        ! Evaluation of the maximum local speeds at the interfaces
-        CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,                                                &
-            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
+        ! The CFL pass has already reconstructed the same unchanged state and
+        ! evaluated these face speeds. Only production explicitly opts in.
+        use_cached_traces=.FALSE.
+        IF (PRESENT(reuse_cfl_traces)) use_cached_traces=reuse_cfl_traces
+        IF (.NOT.use_cached_traces) THEN
+            CALL recon%reconstruct( qp_expl, t, solve_cells, j_cent, k_cent, .TRUE.,                                    &
+                source_boundary_enabled=source_boundary_enabled )
+            CALL recon%reconstruct_kt_eta(qp_expl)
+            CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,                                            &
+                k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
+        END IF
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)

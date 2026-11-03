@@ -122,9 +122,10 @@ CONTAINS
     !>          OU preparation, full Lie spatial/source advancement, then one clock advance.
     !> \param[in,out] this Initialized simulation context.
     !> \param[in] observer Optional test hook called after each completed phase.
-    SUBROUTINE advance_simulation_timestep(this,observer)
+    SUBROUTINE advance_simulation_timestep(this,observer,pre_spatial_primitives_ready)
         CLASS(simulation_context_type), INTENT(INOUT) :: this
         PROCEDURE(timestep_event_observer), OPTIONAL :: observer
+        LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         REAL(wp) :: step_start,step_length
 
         step_start=this%runtime%t
@@ -139,7 +140,7 @@ CONTAINS
 
         CALL this%time_integration%advance(this%state,step_start,                                                      &
             step_length,this%stochastic%effective_Z,                                                                   &
-            this%domain,this%spatial_operator)
+            this%domain,this%spatial_operator,pre_spatial_primitives_ready=pre_spatial_primitives_ready)
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 
 

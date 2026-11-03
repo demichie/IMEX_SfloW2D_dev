@@ -84,7 +84,8 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : n_solid
     USE parameters_2d, ONLY : n_vars
     USE parameters_2d, ONLY : radial_source_flag
-    USE parameters_2d, ONLY : lateral_source_flag
+    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, bottom_fissural_source_flag,            &
+        stochastic_flag, cfl
     USE parameters_2d, ONLY : collapsing_volume_flag
     USE parameters_2d, ONLY : serial_flag
 
@@ -472,7 +473,12 @@ PROGRAM IMEX_SfloW2D
         simulation%runtime%dt_old_old = simulation%runtime%dt_old
         simulation%runtime%dt_old = simulation%runtime%dt
 
-        CALL simulation%advance_timestep()
+        ! CFL has already prepared unchanged q/qp and HP-PCCU traces.
+        ! Injection, stochastic transport and disabled CFL keep the full path.
+        CALL simulation%advance_timestep(pre_spatial_primitives_ready=                                              &
+            cfl/=-1.0_wp .AND. .NOT.stochastic_flag .AND. .NOT.radial_source_flag .AND.                              &
+            .NOT.lateral_source_flag .AND. .NOT.bottom_radial_source_flag .AND.                                      &
+            .NOT.bottom_fissural_source_flag)
 
         !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
         !$OMP & thickness_exceeds,pressure_exceeds, &

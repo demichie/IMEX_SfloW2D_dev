@@ -63,7 +63,8 @@ CONTAINS
     !> Assemble and limit a complete explicit Lie group, without committing state.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
-            B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area)
+            B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                    &
+            non_exchange_group,exchange_selected)
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -71,6 +72,9 @@ CONTAINS
         REAL(wp), INTENT(IN) :: arc_perim,arc_n_x,arc_n_y,cell_area
         REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
         TYPE(source_group_type), INTENT(IN) :: group
+        ! Prepartitioned immutable metadata supplied by the Lie executor.
+        TYPE(source_group_type), INTENT(IN), OPTIONAL :: non_exchange_group
+        LOGICAL, INTENT(IN), OPTIONAL :: exchange_selected
         REAL(wp), INTENT(IN) :: inventory(n_solid)
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -79,17 +83,32 @@ CONTAINS
         TYPE(source_group_type) :: non_exchange
         REAL(wp) :: physical(n_eqns),exchange(n_eqns),coverage,scale
         has_exchange=ANY(INDEX(group%source_names,'mass_exchange_')==1)
-        non_exchange=group
-        IF (has_exchange) non_exchange%source_names=PACK(group%source_names,                                           &
-            INDEX(group%source_names,'mass_exchange_')/=1)
+        IF (PRESENT(exchange_selected)) has_exchange=exchange_selected
         valid=.FALSE.
         physical=0.0_wp
         exchange=0.0_wp
-        IF (SIZE(non_exchange%source_names)>0)                                                                         &
-            CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
+        ! Production groups use a one-time partition. Preserve the original
+        ! interface for standalone callers, including mixed explicit groups.
+        IF (PRESENT(non_exchange_group)) THEN
+            IF (SIZE(non_exchange_group%source_names)>0)                                                               &
+                CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                           &
                     context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                          &
                     context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                               &
-                    arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value)
+                    arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value)
+        ELSEIF (.NOT.has_exchange) THEN
+            CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
+                context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
+                context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
+                arc_perim,arc_n_x,arc_n_y,cell_area,group,stochastic_value)
+        ELSEIF (ANY(INDEX(group%source_names,'mass_exchange_')/=1)) THEN
+            non_exchange=group
+            non_exchange%source_names=PACK(group%source_names,                                                         &
+                INDEX(group%source_names,'mass_exchange_')/=1)
+            CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
+                context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
+                context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
+                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value)
+        END IF
 
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &

@@ -96,20 +96,21 @@ CONTAINS
     !>       are already included through path terms.
     !******************************************************************************
 
-    SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, boundary_source_enabled )
+    SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, boundary_source_enabled,               &
+        reuse_cfl_traces )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(OUT) :: spatial_term(n_eqns,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time
         CLASS(domain_type), INTENT(IN) :: domain
-        LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
+        LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled,reuse_cfl_traces
 
         CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term,                                       &
             time, domain%solve_cells, domain%j_cent, domain%k_cent,                                                    &
             domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &
             domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,                                               &
-            source_boundary_enabled=boundary_source_enabled )
+            source_boundary_enabled=boundary_source_enabled, reuse_cfl_traces=reuse_cfl_traces )
 
     END SUBROUTINE evaluate_spatial_operator
 

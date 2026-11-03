@@ -73,12 +73,14 @@ CONTAINS
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
-    SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,domain,spatial_operator)
+    SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,domain,spatial_operator,pre_spatial_primitives_ready)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt,stochastic_values(comp_cells_x,comp_cells_y)
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
+        LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
+        LOGICAL :: reuse_cfl_traces
         INTEGER :: l,j,k,first_failure,eq
         INTEGER :: tick,tock,tick_rate
         INTEGER, ALLOCATABLE :: reconstruction_status(:),spatial_status(:)
@@ -119,6 +121,11 @@ CONTAINS
             CALL SYSTEM_CLOCK(tock)
             this%profile_state_snapshot=this%profile_state_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
         END IF
+        ! Production CFL already converted this unchanged pre-spatial state.
+        ! Direct callers retain the original preflight unless they explicitly opt in.
+        reuse_cfl_traces=.FALSE.
+        IF (PRESENT(pre_spatial_primitives_ready)) reuse_cfl_traces=pre_spatial_primitives_ready
+        IF (.NOT.reuse_cfl_traces) THEN
         ! Each cell writes a distinct primitive slice; collect failures by cell.
         ALLOCATE(reconstruction_status(domain%reconstruction_cells))
         reconstruction_status=0
@@ -142,9 +149,11 @@ CONTAINS
         IF (first_failure/=0)                                                                                          &
             CALL fatal_error('Lie pre-spatial state conversion rejected')
         DEALLOCATE(reconstruction_status)
+        END IF
 
         ! The spatial step is conservative; only admissibility is checked.
-        CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain)
+        CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain,                                      &
+            reuse_cfl_traces=reuse_cfl_traces)
         ALLOCATE(spatial_status(domain%solve_cells))
         spatial_status=0
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
