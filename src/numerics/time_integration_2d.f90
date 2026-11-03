@@ -130,10 +130,10 @@ CONTAINS
             qp_pre=>this%qp_before
         END IF
         IF (.NOT.reuse_cfl_traces) THEN
-            ! Each cell writes a distinct primitive slice; collect failures by cell.
-            this%cell_status(1:domain%reconstruction_cells)=0
+            ! Each cell initializes its own status in the conversion sweep.
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
         DO l=1,domain%reconstruction_cells
+            this%cell_status(l)=0
             j=domain%j_reconstruction(l)
             k=domain%k_reconstruction(l)
 
@@ -157,14 +157,14 @@ CONTAINS
         ! The spatial step is conservative; only admissibility is checked.
         CALL spatial_operator%evaluate(qp_pre,this%spatial_rate,t,domain,                                            &
             reuse_cfl_traces=reuse_cfl_traces)
-        this%cell_status(1:domain%solve_cells)=0
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
         DO l=1,domain%solve_cells
+            this%cell_status(l)=0
             j=domain%j_cent(l)
             k=domain%k_cent(l)
-            ! Initialize this candidate only where spatial and source groups act.
-            this%q_trial(:,j,k)=state%q(:,j,k)
+            ! Fuse candidate initialization and conservative update in one sweep.
             this%q_trial(1:n_eqns,j,k)=state%q(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
+            IF (n_vars>n_eqns) this%q_trial(n_eqns+1:n_vars,j,k)=state%q(n_eqns+1:n_vars,j,k)
             ! Spatial admissibility check. Do not limit or clip its conservative rate.
             IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) THEN
                 this%cell_status(l)=1
