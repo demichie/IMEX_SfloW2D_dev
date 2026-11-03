@@ -772,7 +772,7 @@ CONTAINS
         IF ( qp_adv_left_use(1) .LE. EPSILON(1.0_wp) ) u_normal_left=0.0_wp
         IF ( qp_adv_right_use(1) .LE. EPSILON(1.0_wp) ) u_normal_right=0.0_wp
 
-        CALL eval_pccu_advective_flux(a_minus,a_plus,u_normal_left,u_normal_right,                                      &
+        CALL eval_pccu_advective_flux(a_minus,a_plus,u_normal_left,u_normal_right,                                  &
             q_adv_left_use,q_adv_right_use,flux_left,flux_right,interface_flux)
 
         CALL limit_component_mass_flux(interface_flux)
