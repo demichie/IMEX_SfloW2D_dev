@@ -80,7 +80,8 @@ CONTAINS
         REAL(wp), INTENT(IN) :: inventory(n_solid)
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
-        TYPE(mass_exchange_rates_type), INTENT(OUT) :: transfer
+        ! Retain allocations in the thread-owned transfer record across cells.
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
         LOGICAL, INTENT(OUT) :: has_exchange,valid
         TYPE(source_group_type) :: non_exchange
         REAL(wp) :: physical(n_eqns),exchange(n_eqns),coverage,scale
