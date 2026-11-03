@@ -249,7 +249,7 @@ CONTAINS
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
-        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok
+        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
@@ -324,7 +324,7 @@ CONTAINS
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
-        !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
+        !$OMP& cell_error,cell_updated,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,              &
         !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,                                         &
         !$OMP& cell_tick,group_tick,                                                                                 &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
@@ -335,6 +335,7 @@ CONTAINS
         cell_loop: DO cell=1,domain%solve_cells
             IF (profiling_enabled) CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
             cell_error=0
+            cell_updated=.FALSE.
             IF (executor%diagnostics_enabled) THEN
                 cell_detail=0
                 cell_iterations=0
@@ -392,7 +393,7 @@ CONTAINS
 
                 context='Lie source group'
                 IF (executor%exchange_group(group_index)) THEN
-                    IF (ANY(erodible_local<0.0_wp) .OR. ANY(deposit_local<0.0_wp) .OR.                                  &
+                    IF (ANY(erodible_local<0.0_wp) .OR. ANY(deposit_local<0.0_wp) .OR.                             &
                         ANY(erosion_local<0.0_wp) .OR. lava_local<0.0_wp) THEN
                         cell_error=3
                         EXIT group_loop
@@ -447,7 +448,7 @@ CONTAINS
                         IF (erodible_deposit_flag) erodible_candidate=                                                 &
                             erodible_candidate+time_step*executor%source_transfers(tid)%solid_deposition_rate
                         lava_candidate=lava_local+time_step*executor%source_transfers(tid)%lava_deposit_rate
-                        IF (ANY(erodible_candidate<0.0_wp) .OR. ANY(deposit_candidate<0.0_wp) .OR.                      &
+                        IF (ANY(erodible_candidate<0.0_wp) .OR. ANY(deposit_candidate<0.0_wp) .OR.                 &
                             ANY(erosion_candidate<0.0_wp) .OR. lava_candidate<0.0_wp) THEN
                             cell_error=7
                             EXIT group_loop
@@ -467,6 +468,7 @@ CONTAINS
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
                     qp_local=qp_candidate
+                    cell_updated=.TRUE.
 
                     IF (executor%exchange_group(group_index)) THEN
                         deposit_local=deposit_candidate
@@ -557,6 +559,7 @@ CONTAINS
 
                 q_local=q_candidate
                 qp_local=qp_candidate
+                cell_updated=.TRUE.
                 IF (profiling_enabled) THEN
                     CALL SYSTEM_CLOCK(profile_tock)
                     thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &
@@ -572,12 +575,13 @@ CONTAINS
                 IF (red_grav<=0.0_wp) THEN
                     q_local=0.0_wp
                     CALL initialize_dry_physical_cell(qp_local)
+                    cell_updated=.TRUE.
                 END IF
             END IF
             ! One finite-state check per cell, after ALL Lie groups and buoyancy.
             ! The conservative and primitive states and the substrate transaction
             ! must be finite before any cell-local changes become authoritative.
-            IF (cell_error==0) THEN
+            IF (cell_error==0 .AND. cell_updated) THEN
                 IF (.NOT.ALL(ieee_is_finite(q_local)) .OR. .NOT.physical_cell_state_finite(qp_local))                  &
                     cell_error=2
                 IF (executor%has_exchange_group .AND. cell_error==0) THEN
