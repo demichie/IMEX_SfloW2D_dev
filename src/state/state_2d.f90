@@ -219,7 +219,9 @@ CONTAINS
     !> @param[out] snapshot Independent substrate snapshot for rollback.
     SUBROUTINE snapshot_substrate(this,snapshot)
         CLASS(state_type), INTENT(IN) :: this
-        TYPE(substrate_snapshot_type), INTENT(OUT) :: snapshot
+        ! Reuse allocated rollback buffers across Lie steps. INTENT(OUT)
+        ! would deallocate allocatable snapshot components on every entry.
+        TYPE(substrate_snapshot_type), INTENT(INOUT) :: snapshot
         snapshot%deposit=this%deposit
         snapshot%erosion=this%erosion
         snapshot%erodible=this%erodible

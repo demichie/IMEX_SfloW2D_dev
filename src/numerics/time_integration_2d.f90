@@ -32,6 +32,8 @@ MODULE time_integration_2d
         !> Persistent status worklist for primitive and spatial checks.
         INTEGER, ALLOCATABLE :: cell_status(:)
         TYPE(lie_source_executor_type) :: lie_executor
+        ! Retain rollback storage between steps to avoid repeated allocation/free.
+        TYPE(substrate_snapshot_type) :: substrate_before
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
@@ -88,7 +90,6 @@ CONTAINS
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
-        TYPE(substrate_snapshot_type) :: substrate_before
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
         REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:),qp_authoritative(:,:,:),bed_before(:,:),                      &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
@@ -237,7 +238,7 @@ CONTAINS
         ! The metadata is immutable within a timestep; no per-cell scan is needed.
         needs_substrate_snapshot=this%lie_executor%has_exchange_group
         needs_geometry_snapshot=this%lie_executor%has_bed_group
-        IF (needs_substrate_snapshot) CALL state%snapshot_substrate(substrate_before)
+        IF (needs_substrate_snapshot) CALL state%snapshot_substrate(this%substrate_before)
         IF (needs_geometry_snapshot) CALL begin_geometry_transaction
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
@@ -254,7 +255,7 @@ CONTAINS
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
             IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
-            IF (needs_substrate_snapshot) CALL state%restore_substrate(substrate_before)
+            IF (needs_substrate_snapshot) CALL state%restore_substrate(this%substrate_before)
             IF (needs_geometry_snapshot) CALL rollback_geometry_transaction
 
             IF (check_injected_rollback) THEN
@@ -265,12 +266,12 @@ CONTAINS
                 IF (.NOT.ALL(state%q==q_authoritative) .OR.                                                           &
                     .NOT.ALL(state%qp==qp_authoritative))                                                             &
                     CALL fatal_error('D20 rollback: published fluid state changed')
-                IF (.NOT.ALL(state%deposit==substrate_before%deposit) .OR.                                             &
-                    .NOT.ALL(state%erosion==substrate_before%erosion) .OR.                                             &
-                    .NOT.ALL(state%erodible==substrate_before%erodible) .OR.                                           &
-                    .NOT.ALL(state%lava_deposit==substrate_before%lava_deposit) .OR.                                   &
-                    .NOT.ALL(state%deposit_tot==substrate_before%deposit_tot) .OR.                                     &
-                    .NOT.ALL(state%erosion_tot==substrate_before%erosion_tot))                                         &
+                IF (.NOT.ALL(state%deposit==this%substrate_before%deposit) .OR.                                             &
+                    .NOT.ALL(state%erosion==this%substrate_before%erosion) .OR.                                             &
+                    .NOT.ALL(state%erodible==this%substrate_before%erodible) .OR.                                           &
+                    .NOT.ALL(state%lava_deposit==this%substrate_before%lava_deposit) .OR.                                   &
+                    .NOT.ALL(state%deposit_tot==this%this%substrate_before%deposit_tot) .OR.                                     &
+                    .NOT.ALL(state%erosion_tot==this%this%substrate_before%erosion_tot))                                         &
                     CALL fatal_error('D20 rollback: physical inventories not restored')
                 IF (.NOT.ALL(B_vertex==bed_before) .OR.                                                                &
                     .NOT.ALL(B_cent==bed_cent_before) .OR.                                                             &
@@ -333,6 +334,12 @@ CONTAINS
         IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
         IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
         IF (ALLOCATED(this%cell_status)) DEALLOCATE(this%cell_status)
+        IF (ALLOCATED(this%substrate_before%deposit)) DEALLOCATE(this%substrate_before%deposit)
+        IF (ALLOCATED(this%substrate_before%erosion)) DEALLOCATE(this%substrate_before%erosion)
+        IF (ALLOCATED(this%substrate_before%erodible)) DEALLOCATE(this%substrate_before%erodible)
+        IF (ALLOCATED(this%substrate_before%lava_deposit)) DEALLOCATE(this%substrate_before%lava_deposit)
+        IF (ALLOCATED(this%substrate_before%deposit_tot)) DEALLOCATE(this%substrate_before%deposit_tot)
+        IF (ALLOCATED(this%substrate_before%erosion_tot)) DEALLOCATE(this%substrate_before%erosion_tot)
     END SUBROUTINE finalize_time_integration
 
 END MODULE time_integration_2d
