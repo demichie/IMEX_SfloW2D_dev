@@ -87,6 +87,13 @@ state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
                                      state/mixture_heat_capacity.inc          \
                                      state/mixture_from_mass.inc
 
+# Keep runtime-sized, cell-local phase scratch on each OpenMP thread's stack.
+# In this hot state-conversion unit, automatic arrays otherwise trigger frequent
+# malloc/free calls for n_solid and n_add_gas scratch inside PCCU and speed bounds.
+# Scope this GNU Fortran optimization to this object: global -fstack-arrays would
+# risk moving unrelated large grid temporaries onto thread stacks.
+state/state_conversion_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                 \
                                 core/diagnostics_2d.$(OBJEXT)                 \
