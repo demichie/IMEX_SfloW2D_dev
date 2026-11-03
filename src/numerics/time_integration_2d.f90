@@ -83,7 +83,7 @@ CONTAINS
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
-        REAL(wp), POINTER :: qp_pre(:,:,:)
+        REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:)
         INTEGER :: l,j,k,first_failure,eq
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: source_step_failed,conversion_ok
