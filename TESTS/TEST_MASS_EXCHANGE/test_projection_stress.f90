@@ -7,7 +7,8 @@ PROGRAM test_projection_stress
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
-  USE lie_source_executor_2d, ONLY : execute_lie_source_groups
+  USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
+       finalize_lie_source_executor,lie_source_executor_type
   USE state_conversion_2d, ONLY : qc_to_qp
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -172,6 +173,7 @@ CONTAINS
   !> Use the production rate evaluator, executor and geometry update.
   SUBROUTINE check_lie_exchange_transaction
     TYPE(source_registry_type) :: registry
+    TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
@@ -196,7 +198,8 @@ CONTAINS
     q_before=q;qp_before=qp
     deposited_before=state%deposit;eroded_before=state%erosion
     bed_before=B_vertex;available_before=state%erodible
-    CALL execute_lie_source_groups(state,q,qp,1.0_wp,domain,registry, &
+    CALL initialize_lie_source_executor(executor,registry)
+    CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message)
     IF (failed) THEN
@@ -223,6 +226,7 @@ CONTAINS
     IF (fluid_delta<0.0_wp .OR. solid_delta<0.0_wp .OR. inventory_delta<0.0_wp) &
          ERROR STOP 'Lie erosion transfer changed sign'
     CALL check_geometry
+    CALL finalize_lie_source_executor(executor)
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
   END SUBROUTINE check_lie_exchange_transaction
@@ -232,6 +236,7 @@ CONTAINS
   !> partially updated fluid trial is never published.
   SUBROUTINE check_lie_rejected_transaction
     TYPE(source_registry_type) :: registry
+    TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
     TYPE(substrate_snapshot_type) :: substrate_before
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
@@ -272,7 +277,8 @@ CONTAINS
     qp_invalid(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
     CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
-    CALL execute_lie_source_groups(state,q_trial,qp_trial,1.0_wp,domain,registry, &
+    CALL initialize_lie_source_executor(executor,registry)
+    CALL execute_lie_source_groups(executor,state,q_trial,qp_trial,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_invalid, &
          step_failed=failed,failure_message=message)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
@@ -288,6 +294,7 @@ CONTAINS
     IF (ANY(state%deposit/=deposited_before) .OR. ANY(state%erosion/=eroded_before) .OR. &
          ANY(state%erodible/=erodible_before) .OR. ANY(state%lava_deposit/=lava_before)) &
          ERROR STOP 'Lie inventory rollback mismatch'
+    CALL finalize_lie_source_executor(executor)
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
   END SUBROUTINE check_lie_rejected_transaction

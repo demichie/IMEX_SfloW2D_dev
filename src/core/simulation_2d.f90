@@ -109,7 +109,7 @@ CONTAINS
         CALL this%spatial_operator%initialize
         CALL this%domain%initialize
 
-        CALL this%time_integration%initialize
+        CALL this%time_integration%initialize(this%source_registry)
 
         CALL this%stochastic%initialize
 
@@ -139,7 +139,7 @@ CONTAINS
 
         CALL this%time_integration%advance(this%state,step_start,                                                      &
             step_length,this%stochastic%effective_Z,                                                                   &
-            this%source_registry,this%domain,this%spatial_operator)
+            this%domain,this%spatial_operator)
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 
 

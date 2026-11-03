@@ -18,7 +18,8 @@ MODULE time_integration_2d
     USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
-    USE lie_source_executor_2d, ONLY : execute_lie_source_groups,report_lie_source_profile,lie_source_scratch_type
+    USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
+        finalize_lie_source_executor,report_lie_source_profile,lie_source_executor_type
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: time_integration_workspace_type
@@ -30,11 +31,7 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: q_before(:,:,:), qp_before(:,:,:)
         !> Candidate cell states, published only after all groups succeed.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
-        TYPE(lie_source_scratch_type) :: lie_scratch
-        TYPE(source_group_type), ALLOCATABLE :: lie_groups(:)
-        LOGICAL :: lie_has_exchange=.FALSE.,lie_has_bed=.FALSE.
-        LOGICAL, ALLOCATABLE :: lie_exchange_group(:)
-        INTEGER :: lie_bed_group_id=-1
+        TYPE(lie_source_executor_type) :: lie_executor
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
@@ -48,8 +45,9 @@ MODULE time_integration_2d
 CONTAINS
     !> @brief Allocate integration workspaces from the configured domain sizes.
     !> @param[in,out] this Integration workspace to allocate.
-    SUBROUTINE initialize_time_integration(this)
+    SUBROUTINE initialize_time_integration(this,source_registry)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
+        TYPE(source_registry_type), INTENT(IN) :: source_registry
         BLOCK
             CHARACTER(LEN=8) :: value
             INTEGER :: status
@@ -62,6 +60,7 @@ CONTAINS
         ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
         ALLOCATE(this%q_trial(n_vars,comp_cells_x,comp_cells_y))
         ALLOCATE(this%qp_trial(n_vars+2,comp_cells_x,comp_cells_y))
+        CALL initialize_lie_source_executor(this%lie_executor,source_registry)
     END SUBROUTINE initialize_time_integration
 
     !> @brief Advance one timestep with spatial update followed by Lie source groups.
@@ -76,11 +75,10 @@ CONTAINS
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
-    SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,source_registry,domain,spatial_operator)
+    SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,domain,spatial_operator)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt,stochastic_values(comp_cells_x,comp_cells_y)
-        TYPE(source_registry_type), INTENT(IN) :: source_registry
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         INTEGER :: l,j,k,first_failure,eq
@@ -90,9 +88,7 @@ CONTAINS
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
         TYPE(substrate_snapshot_type) :: substrate_before
-        TYPE(source_group_type), ALLOCATABLE :: configured_groups(:)
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
-        INTEGER :: group_id
         REAL(wp), ALLOCATABLE :: qp_authoritative(:,:,:),bed_before(:,:),                                              &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                        &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
@@ -103,7 +99,6 @@ CONTAINS
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
         END IF
-        IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
         ! Snapshot before evaluating any operator, including the primitive halo.
         injection_value=''
         CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', injection_value,STATUS=injection_status)
@@ -225,42 +220,8 @@ CONTAINS
         ! fields until the full trial succeeds.
         ! Snapshot only fields a configured source can actually change.
         ! The metadata is immutable within a timestep; no per-cell scan is needed.
-        IF (.NOT.ALLOCATED(this%lie_groups)) THEN
-            IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
-            this%lie_groups=source_registry%groups()
-            this%lie_has_exchange=.FALSE.
-            ALLOCATE(this%lie_exchange_group(SIZE(this%lie_groups)))
-            this%lie_exchange_group=.FALSE.
-            this%lie_bed_group_id=-1
-            DO group_id=1,SIZE(this%lie_groups)
-                IF (.NOT.ALLOCATED(this%lie_groups(group_id)%source_names)) &
-                    CALL fatal_error('Lie source group has no allocated source list')
-                SELECT CASE(this%lie_groups(group_id)%method)
-                CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
-                    CONTINUE
-                CASE DEFAULT
-                    CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
-                END SELECT
-                IF (ANY(this%lie_groups(group_id)%source_names=='pore_pressure_dissipation') .OR. &
-                    ANY(this%lie_groups(group_id)%source_names=='pore_pressure_darcy')) THEN
-                    IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR. &
-                        TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
-                        IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
-                    END IF
-                END IF
-                this%lie_exchange_group(group_id)= &
-                    ANY(INDEX(this%lie_groups(group_id)%source_names,'mass_exchange_')==1)
-                IF (this%lie_exchange_group(group_id)) THEN
-                    IF (this%lie_groups(group_id)%method/=SOURCE_METHOD_EXPLICIT) &
-                        CALL fatal_error('D19: mass exchange requires explicit group method')
-                    this%lie_has_exchange=.TRUE.
-                    IF (topo_change_flag) this%lie_bed_group_id=this%lie_groups(group_id)%id
-                END IF
-            END DO
-            this%lie_has_bed=this%lie_has_exchange .AND. topo_change_flag
-        END IF
-        needs_substrate_snapshot=this%lie_has_exchange
-        needs_geometry_snapshot=this%lie_has_bed
+        needs_substrate_snapshot=this%lie_executor%has_exchange_group
+        needs_geometry_snapshot=this%lie_executor%has_bed_group
         IF (needs_substrate_snapshot) CALL state%snapshot_substrate(substrate_before)
         IF (needs_geometry_snapshot) CALL begin_geometry_transaction
         IF (this%profile_enabled) THEN
@@ -268,9 +229,8 @@ CONTAINS
             this%profile_substrate_snapshot=this%profile_substrate_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
             tick=tock
         END IF
-        CALL execute_lie_source_groups(state, this%q_trial, this%qp_trial, dt, domain, source_registry,                &
-            stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure, this%lie_groups, &
-            this%lie_exchange_group, this%lie_bed_group_id, this%lie_scratch)
+        CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
+            stochastic_values,t,this%q_before,this%qp_before,source_step_failed,source_failure)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -345,8 +305,7 @@ CONTAINS
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_executor_seconds=',this%profile_source_executor
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE publish_seconds=',this%profile_publish
         END IF
-        IF (ALLOCATED(this%lie_groups)) DEALLOCATE(this%lie_groups)
-        IF (ALLOCATED(this%lie_exchange_group)) DEALLOCATE(this%lie_exchange_group)
+        CALL finalize_lie_source_executor(this%lie_executor)
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
