@@ -194,7 +194,6 @@ CONTAINS
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(source_group_type), POINTER :: groups(:)
         LOGICAL, POINTER :: exchange_group(:)
-        TYPE(lie_source_executor_type), POINTER :: scratch
         TYPE(mass_exchange_rates_type) :: transfers
         TYPE(analytic_term_context_type) :: analytic_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -225,7 +224,6 @@ CONTAINS
         INTEGER :: tick,tock,clock_rate
 
         IF (.NOT.executor%initialized) CALL fatal_error('Lie source executor not initialized')
-        scratch=>executor
         groups=>executor%groups
         exchange_group=>executor%exchange_group
         has_exchange_group=executor%has_exchange_group
@@ -247,9 +245,9 @@ CONTAINS
                 group_profile(group_index)%calls=group_profile(group_index)%calls+1
             END DO
         END IF
-        IF (has_bed_group) scratch%bed_rate_cell=0.0_wp
-        IF (ALLOCATED(scratch%newton_iterations)) &
-            scratch%newton_iterations(1:domain%solve_cells,:)=0
+        IF (has_bed_group) executor%bed_rate_cell=0.0_wp
+        IF (ALLOCATED(executor%newton_iterations)) &
+            executor%newton_iterations(1:domain%solve_cells,:)=0
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             IF (SIZE(group_profile)>0) &
@@ -301,7 +299,7 @@ CONTAINS
                 .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR.                                        &
                 .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
                 cell_error=1
-                scratch%failure_code(cell)=cell_error
+                executor%failure_code(cell)=cell_error
                 first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
 
@@ -309,7 +307,7 @@ CONTAINS
 
             IF (.NOT.ieee_is_finite(noise)) THEN
                 cell_error=2
-                scratch%failure_code(cell)=cell_error
+                executor%failure_code(cell)=cell_error
                 first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
             END IF
@@ -429,8 +427,8 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) scratch%bed_rate_cell(j,k)= &
-                            scratch%bed_rate_cell(j,k)+transfers%dB_dt
+                        IF (topo_change_flag) executor%bed_rate_cell(j,k)= &
+                            executor%bed_rate_cell(j,k)+transfers%dB_dt
 
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
@@ -463,8 +461,8 @@ CONTAINS
                         analytic_context%Bprime_x, analytic_context%Bprime_y, analytic_context%grav_coeff, noise, &
                         iterations, ok, linear_info, &
                         failed)
-                    IF (newton_witness_active .AND. ALLOCATED(scratch%newton_iterations)) &
-                        scratch%newton_iterations(cell,group_index)=iterations
+                    IF (newton_witness_active .AND. ALLOCATED(executor%newton_iterations)) &
+                        executor%newton_iterations(cell,group_index)=iterations
 
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                         cell_error=11
@@ -518,13 +516,13 @@ CONTAINS
                 END IF
             END IF
             IF (cell_error/=0) THEN
-                scratch%failure_code(cell)=cell_error
+                executor%failure_code(cell)=cell_error
                 IF (diagnostics_enabled) THEN
-                    scratch%failure_group(cell)=cell_group
-                    scratch%failure_detail(cell)=cell_detail
-                    scratch%failure_iterations(cell)=cell_iterations
-                    scratch%failure_mass(cell)=cell_mass
-                    scratch%failure_components(cell)=cell_components
+                    executor%failure_group(cell)=cell_group
+                    executor%failure_detail(cell)=cell_detail
+                    executor%failure_iterations(cell)=cell_iterations
+                    executor%failure_mass(cell)=cell_mass
+                    executor%failure_components(cell)=cell_components
                 END IF
                 first_failure=MIN(first_failure,cell)
             END IF
@@ -539,7 +537,7 @@ CONTAINS
         END IF
         IF (first_failure/=HUGE(0)) THEN
             step_failed=.TRUE.
-            SELECT CASE(scratch%failure_code(first_failure))
+            SELECT CASE(executor%failure_code(first_failure))
             CASE(1)
                 failure_reason='D19: non-finite source-group geometry'
             CASE(2)
@@ -567,47 +565,47 @@ CONTAINS
                     j=domain%j_cent(first_failure)
                     k=domain%k_cent(first_failure)
                     WRITE(failure_reason,'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
-                        'D19: inadmissible source candidate group=',scratch%failure_group(first_failure), &
-                        ' cell=',j,',',k,' mass=',scratch%failure_mass(first_failure), &
-                        ' components=',scratch%failure_components(first_failure)
+                        'D19: inadmissible source candidate group=',executor%failure_group(first_failure), &
+                        ' cell=',j,',',k,' mass=',executor%failure_mass(first_failure), &
+                        ' components=',executor%failure_components(first_failure)
                 ELSE
                     failure_reason='D19: inadmissible source candidate'
                 END IF
             CASE(9)
                 failure_reason='D19: analytic source group failed'
                 IF (diagnostics_enabled) WRITE(failure_reason,'(A,I0)') &
-                    'D19: analytic group status ',scratch%failure_detail(first_failure)
+                    'D19: analytic group status ',executor%failure_detail(first_failure)
             CASE(11)
                 failure_reason='D19: Newton source group failed'
                 IF (diagnostics_enabled) WRITE(failure_reason,'(A,I0,A,I0)') &
-                    'D19: Newton failed, linear_info=',scratch%failure_detail(first_failure), &
-                    ', iterations=',scratch%failure_iterations(first_failure)
+                    'D19: Newton failed, linear_info=',executor%failure_detail(first_failure), &
+                    ', iterations=',executor%failure_iterations(first_failure)
             CASE DEFAULT
                 failure_reason='D19: unknown cell failure'
             END SELECT
             IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
             RETURN
         END IF
-        IF (ALLOCATED(scratch%newton_iterations)) THEN
+        IF (ALLOCATED(executor%newton_iterations)) THEN
             DO group_index=1,SIZE(groups)
                 IF (groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
                 WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
                     groups(group_index)%id,' solved_cells=', &
-                    COUNT(scratch%newton_iterations(1:domain%solve_cells,group_index)>0), &
-                    ' total_iterations=',SUM(scratch%newton_iterations(1:domain%solve_cells,group_index))
+                    COUNT(executor%newton_iterations(1:domain%solve_cells,group_index)>0), &
+                    ' total_iterations=',SUM(executor%newton_iterations(1:domain%solve_cells,group_index))
             END DO
         END IF
         ! Geometry is the same for every source group in the step. Project
         ! all mass-exchange bed rates only once, after the cell sweep.
         IF (has_bed_group) THEN
-            bed_accepted=ALL(ieee_is_finite(scratch%bed_rate_cell))
+            bed_accepted=ALL(ieee_is_finite(executor%bed_rate_cell))
             IF (bed_accepted) THEN
-                CALL project_cell_field_to_vertices(scratch%bed_rate_cell,scratch%bed_rate_vertex)
-                bed_accepted=ALL(ieee_is_finite(scratch%bed_rate_vertex))
+                CALL project_cell_field_to_vertices(executor%bed_rate_cell,executor%bed_rate_vertex)
+                bed_accepted=ALL(ieee_is_finite(executor%bed_rate_vertex))
             END IF
             IF (bed_accepted) THEN
-                scratch%bed_candidate=B_vertex+time_step*scratch%bed_rate_vertex
-                IF (.NOT.ALL(ieee_is_finite(scratch%bed_candidate))) bed_accepted=.FALSE.
+                executor%bed_candidate=B_vertex+time_step*executor%bed_rate_vertex
+                IF (.NOT.ALL(ieee_is_finite(executor%bed_candidate))) bed_accepted=.FALSE.
             END IF
             IF (.NOT.bed_accepted) THEN
                 CALL reject_cell('D19: invalid candidate projected bed')
@@ -616,9 +614,9 @@ CONTAINS
             END IF
             IF (diagnostics_enabled .OR. executor%reject_active) THEN
                 WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',bed_group_id, &
-                    ' max_abs_delta=',MAXVAL(ABS(scratch%bed_candidate-B_vertex))
+                    ' max_abs_delta=',MAXVAL(ABS(executor%bed_candidate-B_vertex))
             END IF
-            CALL assign_topography_vertices(scratch%bed_candidate,bed_accepted)
+            CALL assign_topography_vertices(executor%bed_candidate,bed_accepted)
             IF (.NOT.bed_accepted) THEN
                 CALL reject_cell('D19: invalid refreshed geometry')
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
