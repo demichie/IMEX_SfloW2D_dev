@@ -198,7 +198,7 @@ CONTAINS
         use_cached_traces=.FALSE.
         IF (PRESENT(reuse_cfl_traces)) use_cached_traces=reuse_cfl_traces
         IF (.NOT.use_cached_traces) THEN
-            CALL recon%reconstruct( qp_expl, t, solve_cells, j_cent, k_cent, .TRUE.,                                    &
+            CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE.,                                       &
                 source_boundary_enabled=source_boundary_enabled )
             CALL recon%reconstruct_kt_eta(qp_expl)
             CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,                                            &

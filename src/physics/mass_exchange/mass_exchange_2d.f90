@@ -64,7 +64,7 @@ CONTAINS
 
             work=>local_scratch
             IF (PRESENT(scratch)) work=>scratch
-            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                       &
+            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                    &
                 liquid_loss_rates=>work%liquid_loss_rates)
             do_erosion=ANY(selected_names=='mass_exchange_erosion')
             do_deposition=ANY(selected_names=='mass_exchange_deposition')
