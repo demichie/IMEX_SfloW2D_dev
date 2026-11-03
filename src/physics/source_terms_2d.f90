@@ -13,7 +13,7 @@ MODULE source_terms_2d
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
-    USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
+    USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
             eval_rheology_implicit, eval_rheology_semi_implicit,                                                       &
             eval_rheology_explicit
@@ -64,7 +64,7 @@ CONTAINS
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                    &
-            non_exchange_group,exchange_selected,physical_scratch)
+            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch)
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -76,6 +76,7 @@ CONTAINS
         TYPE(source_group_type), INTENT(IN), OPTIONAL :: non_exchange_group
         LOGICAL, INTENT(IN), OPTIONAL :: exchange_selected
         TYPE(physical_state_type), INTENT(INOUT), OPTIONAL :: physical_scratch
+        TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         REAL(wp), INTENT(IN) :: inventory(n_solid)
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -117,7 +118,7 @@ CONTAINS
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_names,transfer,exchange,physical_scratch)
+                group%source_names,transfer,exchange,physical_scratch,exchange_scratch)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -680,7 +681,7 @@ CONTAINS
     !> \param[out] eqns_term Conservative equation source-rate vector.
     !> \param[out] topo_term Proposed bed-elevation rate.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,selected_names,rates,eqns_term,physical_scratch)
+            erodible,dt,selected_names,rates,eqns_term,physical_scratch,exchange_scratch)
         REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -688,6 +689,7 @@ CONTAINS
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
         TYPE(physical_state_type), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
+        TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         TYPE(physical_state_type), TARGET :: local_state
         TYPE(physical_state_type), POINTER :: exchange_state
 
@@ -695,6 +697,6 @@ CONTAINS
         IF (PRESENT(physical_scratch)) exchange_state=>physical_scratch
         CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
         CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
-            erodible,dt,selected_names,rates,eqns_term)
+            erodible,dt,selected_names,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d
