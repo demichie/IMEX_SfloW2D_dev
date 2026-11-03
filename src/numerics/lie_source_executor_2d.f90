@@ -229,9 +229,8 @@ CONTAINS
         ! Profiling counters are thread-owned: no atomics inside the cell loop.
         REAL(wp), ALLOCATABLE :: thread_group(:,:),thread_physics(:,:),thread_cell(:)
         INTEGER, ALLOCATABLE :: thread_evaluations(:,:)
-        INTEGER :: nthreads,tid,cell_tick,group_tick,physical_tick,profile_tock
-        REAL(wp) :: group_physical_elapsed
-        INTEGER :: physical_tick_rate
+        INTEGER :: nthreads,tid
+        INTEGER(KIND=8) :: cell_tick,group_tick,physical_tick,profile_tock,physical_tick_rate
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
@@ -284,7 +283,7 @@ CONTAINS
         !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,              &
         !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
         !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,group_tick,                      &
-        !$OMP& physical_tick,profile_tock,group_physical_elapsed,physical_tick_rate)                                   &
+        !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
         cell_loop: DO cell=1,domain%solve_cells
             IF (profiling_enabled) THEN
