@@ -9,6 +9,7 @@
 !********************************************************************************
 
 MODULE state_2d
+    USE, INTRINSIC :: iso_fortran_env, ONLY : int64
     USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T,                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
@@ -27,7 +28,7 @@ MODULE state_2d
     PRIVATE
     PUBLIC :: initialize_dry_physical_cell
     PUBLIC :: conservative_mass_admissible
-    PUBLIC :: physical_cell_state_finite
+    PUBLIC :: physical_cell_state_finite, finite_real_value
     PUBLIC :: substrate_snapshot_type
 
     !> Pre-step substrate inventory snapshot for transactional time integration.
@@ -84,12 +85,24 @@ MODULE state_2d
 CONTAINS
 
 
+    !> @brief Check binary64 finite values without IEEE runtime state management.
+    !> @details The working precision is binary64 in supported GNU builds.
+    !>          Testing its exponent bits detects both NaN and infinities;
+    !>          this is not a physical admissibility check.
+    PURE ELEMENTAL LOGICAL FUNCTION finite_real_value(value) RESULT(valid)
+        REAL(wp), INTENT(IN) :: value
+        INTEGER(int64), PARAMETER :: exponent_mask=INT(Z'7FF0000000000000',int64)
+        INTEGER(int64) :: bits
+        bits=TRANSFER(value,0_int64)
+        valid=IAND(bits,exponent_mask)/=exponent_mask
+    END FUNCTION finite_real_value
+
     !> @brief Check that all primitive cell components are finite.
     !> @param[in] qp_cell One cell's physical variables, including velocities.
     !> @return True if every entry is finite; this procedure does not change state.
     PURE LOGICAL FUNCTION physical_cell_state_finite(qp_cell) RESULT(valid)
         REAL(wp), INTENT(IN) :: qp_cell(:)
-        valid=ALL(ieee_is_finite(qp_cell))
+        valid=ALL(finite_real_value(qp_cell))
     END FUNCTION physical_cell_state_finite
 
 

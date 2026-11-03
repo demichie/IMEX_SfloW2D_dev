@@ -6,7 +6,6 @@
 !********************************************************************************
 
 MODULE lie_source_executor_2d
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type, idx_totMassEqn,                   &
         idx_solidEqn_first, idx_solidEqn_last
@@ -226,7 +225,8 @@ CONTAINS
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversion_2d, ONLY : qc_to_qp,mixt_var
-        USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, physical_cell_state_finite
+        USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                               &
+            physical_cell_state_finite,finite_real_value
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
@@ -335,7 +335,6 @@ CONTAINS
         cell_loop: DO cell=1,domain%solve_cells
             IF (profiling_enabled) CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
             cell_error=0
-            cell_updated=.FALSE.
             IF (executor%diagnostics_enabled) THEN
                 cell_detail=0
                 cell_iterations=0
@@ -468,7 +467,6 @@ CONTAINS
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
                     qp_local=qp_candidate
-                    cell_updated=.TRUE.
 
                     IF (executor%exchange_group(group_index)) THEN
                         deposit_local=deposit_candidate
@@ -559,7 +557,6 @@ CONTAINS
 
                 q_local=q_candidate
                 qp_local=qp_candidate
-                cell_updated=.TRUE.
                 IF (profiling_enabled) THEN
                     CALL SYSTEM_CLOCK(profile_tock)
                     thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &
@@ -575,19 +572,31 @@ CONTAINS
                 IF (red_grav<=0.0_wp) THEN
                     q_local=0.0_wp
                     CALL initialize_dry_physical_cell(qp_local)
-                    cell_updated=.TRUE.
                 END IF
             END IF
-            ! One finite-state check per cell, after ALL Lie groups and buoyancy.
-            ! The conservative and primitive states and the substrate transaction
-            ! must be finite before any cell-local changes become authoritative.
-            IF (cell_error==0 .AND. cell_updated) THEN
-                IF (.NOT.ALL(ieee_is_finite(q_local)) .OR. .NOT.physical_cell_state_finite(qp_local))                  &
-                    cell_error=2
-                IF (executor%has_exchange_group .AND. cell_error==0) THEN
-                    IF (.NOT.ALL(ieee_is_finite(deposit_local)) .OR.                                                   &
-                        .NOT.ALL(ieee_is_finite(erosion_local)) .OR.                                                   &
-                        .NOT.ALL(ieee_is_finite(erodible_local)) .OR. .NOT.ieee_is_finite(lava_local)) cell_error=3
+            ! Check finiteness only for cells actually changed by the complete
+            ! spatial + Lie update. Test once, after all groups and buoyancy,
+            ! before publishing the local fluid/substrate candidate.
+            IF (cell_error==0) THEN
+                cell_updated=ANY(q_local/=q_original(:,j,k))
+                IF (.NOT.cell_updated) cell_updated=ANY(qp_local/=qp_original(:,j,k))
+                IF (executor%has_exchange_group .AND. .NOT.cell_updated) THEN
+                    cell_updated=ANY(deposit_local/=state%deposit(j,k,1:n_solid)) .OR.                              &
+                        ANY(erosion_local/=state%erosion(j,k,1:n_solid)) .OR.                                        &
+                        ANY(erodible_local/=state%erodible(1:n_solid,j,k)) .OR.                                      &
+                        lava_local/=state%lava_deposit(j,k)
+                END IF
+                IF (executor%has_bed_group .AND. .NOT.cell_updated)                                                  &
+                    cell_updated=executor%bed_rate_cell(j,k)/=0.0_wp
+                IF (cell_updated) THEN
+                    IF (.NOT.ALL(finite_real_value(q_local)) .OR. .NOT.physical_cell_state_finite(qp_local))         &
+                        cell_error=2
+                    IF (executor%has_exchange_group .AND. cell_error==0) THEN
+                        IF (.NOT.ALL(finite_real_value(deposit_local)) .OR.                                           &
+                            .NOT.ALL(finite_real_value(erosion_local)) .OR.                                           &
+                            .NOT.ALL(finite_real_value(erodible_local)) .OR.                                          &
+                            .NOT.finite_real_value(lava_local)) cell_error=3
+                    END IF
                 END IF
             END IF
             ! Publish this cell only after the final numerical check.
