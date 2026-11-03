@@ -2268,8 +2268,9 @@ CONTAINS
 
         ELSE
 
-            sa = a / ABS(a)
-            sb = b / ABS(b)
+            ! SIGN avoids two divisions while preserving the existing limiter formula.
+            sa = SIGN(1.0_wp,a)
+            sb = SIGN(1.0_wp,b)
 
             minmod = 0.5_wp * ( sa+sb ) * MIN( ABS(a) , ABS(b) )
 
@@ -2295,8 +2296,9 @@ CONTAINS
 
         ELSE
 
-            sa = a / ABS(a)
-            sb = b / ABS(b)
+            ! SIGN avoids two divisions while preserving the existing limiter formula.
+            sa = SIGN(1.0_wp,a)
+            sb = SIGN(1.0_wp,b)
 
             maxmod = 0.5_wp * ( sa+sb ) * MAX( ABS(a) , ABS(b) )
 
