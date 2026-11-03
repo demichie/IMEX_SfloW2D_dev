@@ -299,7 +299,6 @@ CONTAINS
                 executor%failure_code(cell)=cell_error
                 first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
-
             END IF
 
             IF (.NOT.ieee_is_finite(noise)) THEN
@@ -317,7 +316,6 @@ CONTAINS
                     qpentry=qp_original(:,j,k)
                 ELSE
                     qpentry=qp_local
-
                 END IF
 
                 context='Lie source group'
@@ -326,7 +324,6 @@ CONTAINS
                 IF (.NOT.physical_cell_state_finite(qpentry)) THEN
                     cell_error=2
                     EXIT group_loop
-
                 END IF
 
                 IF (executor%exchange_group(group_index)) THEN
@@ -338,9 +335,7 @@ CONTAINS
                         .OR. lava_local<0.0_wp) THEN
                         cell_error=3
                         EXIT group_loop
-
                     END IF
-
                 END IF
 
                 SELECT CASE(executor%groups(group_index)%method)
@@ -354,13 +349,11 @@ CONTAINS
                     IF (cell_has_exchange .NEQV. executor%exchange_group(group_index)) THEN
                         cell_error=4
                         EXIT group_loop
-
                     END IF
 
                     IF (.NOT.ok) THEN
                         cell_error=5
                         EXIT group_loop
-
                     END IF
                     ! Stage the entire local fluid/substrate transfer before committing it.
                     q_candidate=q_local
@@ -374,13 +367,12 @@ CONTAINS
                             cell_components=SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
                         END IF
                         EXIT group_loop
-
                     END IF
 
                     IF (executor%exchange_group(group_index)) THEN
-                        deposit_candidate=deposit_local+ time_step*transfers%solid_deposition_rate
-                        erosion_candidate=erosion_local+ time_step*transfers%solid_erosion_rate
-                        erodible_candidate=erodible_local- time_step*transfers%solid_erosion_rate
+                        deposit_candidate=deposit_local+time_step*transfers%solid_deposition_rate
+                        erosion_candidate=erosion_local+time_step*transfers%solid_erosion_rate
+                        erodible_candidate=erodible_local-time_step*transfers%solid_erosion_rate
                         IF (erodible_deposit_flag) erodible_candidate=                                                 &
                             erodible_candidate+time_step*transfers%solid_deposition_rate
                         lava_candidate=lava_local+time_step*transfers%lava_deposit_rate
@@ -392,9 +384,7 @@ CONTAINS
                             .OR. lava_candidate<0.0_wp) THEN
                             cell_error=7
                             EXIT group_loop
-
                         END IF
-
                     END IF
 
                     IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
@@ -403,11 +393,9 @@ CONTAINS
                         IF (.NOT.conversion_ok) THEN
                             cell_error=8
                             EXIT group_loop
-
                         END IF
                     ELSE
                         CALL initialize_dry_physical_cell(qp_candidate)
-
                     END IF
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
@@ -418,8 +406,7 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) executor%bed_rate_cell(j,k)= executor%bed_rate_cell(j,k)+transfers%dB_dt
-
+                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+transfers%dB_dt
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
                     ! Group 0 evaluates on the immutable pre-spatial state;
@@ -434,13 +421,11 @@ CONTAINS
                         cell_error=9
                         IF (executor%diagnostics_enabled) cell_detail=status
                         EXIT group_loop
-
                     END IF
 
                     IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
                         cell_error=10
                         EXIT group_loop
-
                     END IF
                     q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
@@ -462,7 +447,6 @@ CONTAINS
                             cell_iterations=iterations
                         END IF
                         EXIT group_loop
-
                     END IF
                 CASE DEFAULT
                     cell_error=12
@@ -475,7 +459,6 @@ CONTAINS
                 IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                     cell_error=13
                     EXIT group_loop
-
                 END IF
 
                 IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
@@ -484,11 +467,9 @@ CONTAINS
                     IF (.NOT.conversion_ok) THEN
                         cell_error=14
                         EXIT group_loop
-
                     END IF
                 ELSE
                     CALL initialize_dry_physical_cell(qp_candidate)
-
                 END IF
 
                 q_local=q_candidate
