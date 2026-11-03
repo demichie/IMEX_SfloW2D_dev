@@ -271,7 +271,6 @@ CONTAINS
         IF (PRESENT(failure_message)) failure_message=''
         source_time=0.0_wp
         IF (PRESENT(step_start_time)) source_time=step_start_time
-        IF (.NOT.ieee_is_finite(time_step)) CALL fatal_error('D19: non-finite Lie timestep')
         IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tick,clock_rate)
@@ -371,21 +370,6 @@ CONTAINS
             IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
             cell_context%Zij=noise
 
-            IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR. .NOT.ieee_is_finite(B_prime_y_geom(j,k))                 &
-                .OR. .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR. .NOT.ieee_is_finite(B_second_xy_geom(j,k))        &
-                .OR. .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR. .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
-                cell_error=1
-                executor%failure_code(cell)=cell_error
-                first_failure=MIN(first_failure,cell)
-                CYCLE cell_loop
-            END IF
-
-            IF (.NOT.ieee_is_finite(noise)) THEN
-                cell_error=2
-                executor%failure_code(cell)=cell_error
-                first_failure=MIN(first_failure,cell)
-                CYCLE cell_loop
-            END IF
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
@@ -407,20 +391,9 @@ CONTAINS
                 END IF
 
                 context='Lie source group'
-                ! Validate constitutive inputs before dispatch. Model/method errors
-                ! remain configuration errors, not recoverable timestep rejections.
-                IF (.NOT.physical_cell_state_finite(qpentry)) THEN
-                    cell_error=2
-                    EXIT group_loop
-                END IF
-
                 IF (executor%exchange_group(group_index)) THEN
-                    ! All immobilized and erodible inventories are nonnegative.
-                    ! Validate the group input before computing any exchange rate.
-                    IF (.NOT.ALL(ieee_is_finite(erodible_local)) .OR. .NOT.ALL(ieee_is_finite(deposit_local))          &
-                        .OR. .NOT.ALL(ieee_is_finite(erosion_local)) .OR. .NOT.ieee_is_finite(lava_local)              &
-                        .OR. ANY(erodible_local<0.0_wp) .OR. ANY(deposit_local<0.0_wp) .OR. ANY(erosion_local<0.0_wp)  &
-                        .OR. lava_local<0.0_wp) THEN
+                    IF (ANY(erodible_local<0.0_wp) .OR. ANY(deposit_local<0.0_wp) .OR.                                  &
+                        ANY(erosion_local<0.0_wp) .OR. lava_local<0.0_wp) THEN
                         cell_error=3
                         EXIT group_loop
                     END IF
@@ -474,12 +447,8 @@ CONTAINS
                         IF (erodible_deposit_flag) erodible_candidate=                                                 &
                             erodible_candidate+time_step*executor%source_transfers(tid)%solid_deposition_rate
                         lava_candidate=lava_local+time_step*executor%source_transfers(tid)%lava_deposit_rate
-                        IF (.NOT.ALL(ieee_is_finite(deposit_candidate))                                                &
-                            .OR. .NOT.ALL(ieee_is_finite(erosion_candidate))                                           &
-                            .OR. .NOT.ALL(ieee_is_finite(erodible_candidate))                                          &
-                            .OR. .NOT.ieee_is_finite(lava_candidate) .OR. ANY(erodible_candidate<0.0_wp)               &
-                            .OR. ANY(deposit_candidate<0.0_wp) .OR. ANY(erosion_candidate<0.0_wp)                      &
-                            .OR. lava_candidate<0.0_wp) THEN
+                        IF (ANY(erodible_candidate<0.0_wp) .OR. ANY(deposit_candidate<0.0_wp) .OR.                      &
+                            ANY(erosion_candidate<0.0_wp) .OR. lava_candidate<0.0_wp) THEN
                             cell_error=7
                             EXIT group_loop
                         END IF
@@ -528,10 +497,6 @@ CONTAINS
                         EXIT group_loop
                     END IF
 
-                    IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
-                        cell_error=10
-                        EXIT group_loop
-                    END IF
                     q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
@@ -609,7 +574,19 @@ CONTAINS
                     CALL initialize_dry_physical_cell(qp_local)
                 END IF
             END IF
-            ! Publish this cell only after every group has succeeded.
+            ! One finite-state check per cell, after ALL Lie groups and buoyancy.
+            ! The conservative and primitive states and the substrate transaction
+            ! must be finite before any cell-local changes become authoritative.
+            IF (cell_error==0) THEN
+                IF (.NOT.ALL(ieee_is_finite(q_local)) .OR. .NOT.physical_cell_state_finite(qp_local))                  &
+                    cell_error=2
+                IF (executor%has_exchange_group .AND. cell_error==0) THEN
+                    IF (.NOT.ALL(ieee_is_finite(deposit_local)) .OR.                                                   &
+                        .NOT.ALL(ieee_is_finite(erosion_local)) .OR.                                                   &
+                        .NOT.ALL(ieee_is_finite(erodible_local)) .OR. .NOT.ieee_is_finite(lava_local)) cell_error=3
+                END IF
+            END IF
+            ! Publish this cell only after the final numerical check.
             IF (cell_error==0) THEN
                 q(:,j,k)=q_local
                 qp(:,j,k)=qp_local
@@ -721,20 +698,8 @@ CONTAINS
         ! Geometry is the same for every source group in the step. Project
         ! all mass-exchange bed rates only once, after the cell sweep.
         IF (executor%has_bed_group) THEN
-            bed_accepted=ALL(ieee_is_finite(executor%bed_rate_cell))
-            IF (bed_accepted) THEN
-                CALL project_cell_field_to_vertices(executor%bed_rate_cell,executor%bed_rate_vertex)
-                bed_accepted=ALL(ieee_is_finite(executor%bed_rate_vertex))
-            END IF
-            IF (bed_accepted) THEN
-                executor%bed_candidate=B_vertex+time_step*executor%bed_rate_vertex
-                IF (.NOT.ALL(ieee_is_finite(executor%bed_candidate))) bed_accepted=.FALSE.
-            END IF
-            IF (.NOT.bed_accepted) THEN
-                CALL reject_cell('D19: invalid candidate projected bed')
-                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
-                RETURN
-            END IF
+            CALL project_cell_field_to_vertices(executor%bed_rate_cell,executor%bed_rate_vertex)
+            executor%bed_candidate=B_vertex+time_step*executor%bed_rate_vertex
             IF (executor%diagnostics_enabled .OR. executor%reject_active) THEN
                 WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',executor%bed_group_id,                             &
                     ' max_abs_delta=',MAXVAL(ABS(executor%bed_candidate-B_vertex))

@@ -65,7 +65,6 @@ CONTAINS
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                    &
             non_exchange_group,exchange_selected,physical_scratch,exchange_scratch)
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -123,7 +122,6 @@ CONTAINS
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
-                IF (.NOT.ieee_is_finite(coverage)) RETURN
                 IF (coverage<0.0_wp .OR. coverage>1.0_wp) RETURN
                 exchange=coverage*exchange
                 CALL scale_mass_exchange_transfer(transfer,coverage)
@@ -133,11 +131,6 @@ CONTAINS
         END IF
 
         rate=physical+exchange
-
-        IF (has_exchange) THEN
-            IF (.NOT.mass_exchange_transfer_is_finite(transfer)) RETURN
-
-        END IF
 
         IF (has_exchange) THEN
             CALL limit_explicit_source_rates(q_recipient,inventory,dt,rate,                                            &
@@ -151,37 +144,13 @@ CONTAINS
         IF (.NOT.valid) RETURN
         rate=scale*rate
         IF (has_exchange) CALL scale_mass_exchange_transfer(transfer,scale)
-        valid=ALL(ieee_is_finite(rate))
-        IF (has_exchange) valid=valid .AND. mass_exchange_transfer_is_finite(transfer)
     END SUBROUTINE assemble_lie_explicit_transaction
-
-    !> Validate every part of a coupled physical transfer before and after
-    !> applying coverage and the common group limiter.
-    LOGICAL FUNCTION mass_exchange_transfer_is_finite(transfer) RESULT(valid)
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
-        TYPE(mass_exchange_rates_type), INTENT(IN) :: transfer
-        valid=.FALSE.
-        IF (.NOT.ALL(ieee_is_finite(transfer%solid_deposition_rate))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(transfer%solid_erosion_rate))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(transfer%solid_mass_rate))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(transfer%add_gas_mass_rate))) RETURN
-        IF (.NOT.ieee_is_finite(transfer%mixture_mass_rate)) RETURN
-        IF (.NOT.ieee_is_finite(transfer%energy_rate)) RETURN
-        IF (.NOT.ieee_is_finite(transfer%carrier_erosion_rate)) RETURN
-        IF (.NOT.ieee_is_finite(transfer%carrier_deposition_rate)) RETURN
-        IF (.NOT.ieee_is_finite(transfer%carrier_withdrawal_volume_rate)) RETURN
-        IF (.NOT.ieee_is_finite(transfer%lava_deposit_rate)) RETURN
-        IF (.NOT.ieee_is_finite(transfer%dB_dt)) RETURN
-        valid=.TRUE.
-    END FUNCTION mass_exchange_transfer_is_finite
-
 
     !> Scale a complete cell-local physical source transaction only after
     !> assembling all explicit source rates. Reference inventories belong to
     !> the post-spatial Lie state; group zero rate evaluation stays at q^n.
     SUBROUTINE limit_explicit_source_rates(q_reference,inventory,dt,rate,                                              &
             solid_erosion_rate,limiter,valid)
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         REAL(wp), INTENT(IN) :: q_reference(n_eqns),inventory(:),dt
         REAL(wp), INTENT(IN) :: rate(n_eqns),solid_erosion_rate(:)
         REAL(wp), INTENT(OUT) :: limiter
@@ -190,11 +159,7 @@ CONTAINS
         INTEGER :: solid_eq,i
         limiter=1.0_wp
         valid=.FALSE.
-        IF (.NOT.ALL(ieee_is_finite(q_reference))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(rate))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(inventory))) RETURN
-        IF (.NOT.ALL(ieee_is_finite(solid_erosion_rate))) RETURN
-        IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
+        IF (dt<=0.0_wp) RETURN
         IF (SIZE(inventory)/=SIZE(solid_erosion_rate)) RETURN
         IF (rate(idx_totMassEqn)<0.0_wp) limiter=MIN(limiter,                                                          &
             MAX(0.0_wp,q_reference(idx_totMassEqn)/(-dt*rate(idx_totMassEqn))))
@@ -231,7 +196,7 @@ CONTAINS
 
         END IF
 
-        valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
+        valid=limiter>=0.0_wp .AND. limiter<=1.0_wp
     END SUBROUTINE limit_explicit_source_rates
 
     !> Return the conservative equivalent rate of the exact source substep.

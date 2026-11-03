@@ -7,7 +7,6 @@
 !********************************************************************************
 
 MODULE state_conversion_2d
-    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn,                                                          &
             idx_uEqn, idx_vEqn, idx_engyEqn
 
@@ -1098,7 +1097,6 @@ CONTAINS
             accepted=.FALSE.
             qp=0.0_wp
             p_dyn=0.0_wp
-            IF (.NOT.ALL(ieee_is_finite(qc))) RETURN
             IF (qc(idx_totMassEqn)<0.0_wp) RETURN
 
             IF (qc(idx_totMassEqn)>EPSILON(1.0_wp)) THEN
@@ -1106,8 +1104,6 @@ CONTAINS
                 IF (ANY(qc(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
                 r_xs=qc(idx_solid_first:idx_solid_last)/qc(idx_totMassEqn)
                 r_xg=qc(idx_add_gas_first:idx_add_gas_last)/qc(idx_totMassEqn)
-                IF (.NOT.ALL(ieee_is_finite(r_xs)) .OR.                                                                &
-                    .NOT.ALL(ieee_is_finite(r_xg))) RETURN
                 IF (SUM(r_xs)+SUM(r_xg)>1.0_wp+mass_fraction_roundoff_tolerance) RETURN
 
             END IF
@@ -1154,7 +1150,6 @@ CONTAINS
         qp(idx_v) = r_v
 
         IF (PRESENT(accepted)) THEN
-            IF (.NOT.ALL(ieee_is_finite(qp)) .OR. .NOT.ieee_is_finite(p_dyn)) RETURN
             accepted=.TRUE.
 
         END IF

@@ -192,7 +192,6 @@ CONTAINS
     PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
         REAL(wp), INTENT(IN) :: q_cell(n_eqns)
         valid=.FALSE.
-        IF (.NOT.ALL(ieee_is_finite(q_cell))) RETURN
         IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
         IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
         IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
