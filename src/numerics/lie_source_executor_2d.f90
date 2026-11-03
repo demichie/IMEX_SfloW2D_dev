@@ -134,7 +134,27 @@ CONTAINS
     !> @brief Release all Lie executor resources after the simulation.
     SUBROUTINE finalize_lie_source_executor(executor)
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
-        executor=lie_source_executor_type()
+        IF (ALLOCATED(executor%groups)) DEALLOCATE(executor%groups)
+        IF (ALLOCATED(executor%exchange_group)) DEALLOCATE(executor%exchange_group)
+        IF (ALLOCATED(executor%failure_code)) DEALLOCATE(executor%failure_code)
+        IF (ALLOCATED(executor%failure_group)) DEALLOCATE(executor%failure_group)
+        IF (ALLOCATED(executor%failure_detail)) DEALLOCATE(executor%failure_detail)
+        IF (ALLOCATED(executor%failure_iterations)) DEALLOCATE(executor%failure_iterations)
+        IF (ALLOCATED(executor%failure_mass)) DEALLOCATE(executor%failure_mass)
+        IF (ALLOCATED(executor%failure_components)) DEALLOCATE(executor%failure_components)
+        IF (ALLOCATED(executor%newton_iterations)) DEALLOCATE(executor%newton_iterations)
+        IF (ALLOCATED(executor%bed_rate_cell)) DEALLOCATE(executor%bed_rate_cell)
+        IF (ALLOCATED(executor%bed_rate_vertex)) DEALLOCATE(executor%bed_rate_vertex)
+        IF (ALLOCATED(executor%bed_candidate)) DEALLOCATE(executor%bed_candidate)
+        executor%has_exchange_group=.FALSE.
+        executor%has_bed_group=.FALSE.
+        executor%has_newton_group=.FALSE.
+        executor%diagnostics_enabled=.FALSE.
+        executor%newton_witness=.FALSE.
+        executor%reject_active=.FALSE.
+        executor%reject_group=-1
+        executor%bed_group_id=-1
+        executor%initialized=.FALSE.
     END SUBROUTINE finalize_lie_source_executor
 
     !> @brief Evaluate and commit each ordered Lie physical-source group.
@@ -594,8 +614,10 @@ CONTAINS
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
             END IF
-            WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',bed_group_id,                                           &
-                ' max_abs_delta=',MAXVAL(ABS(scratch%bed_candidate-B_vertex))
+            IF (diagnostics_enabled .OR. executor%reject_active) THEN
+                WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',bed_group_id, &
+                    ' max_abs_delta=',MAXVAL(ABS(scratch%bed_candidate-B_vertex))
+            END IF
             CALL assign_topography_vertices(scratch%bed_candidate,bed_accepted)
             IF (.NOT.bed_accepted) THEN
                 CALL reject_cell('D19: invalid refreshed geometry')

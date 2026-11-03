@@ -125,6 +125,8 @@ def run_case(solver, fixture, root, case, threads, evidence):
                OPENBLAS_NUM_THREADS="1")
     if case == "EXAMPLE_2D_NEWTON":
         env["IMEX_NEWTON_WITNESS"] = "1"
+    if case == "EXAMPLE_2D_TOPO":
+        env["IMEX_LIE_DIAGNOSTICS"] = "1"
     result = subprocess.run([str(solver)], cwd=target, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=240)
