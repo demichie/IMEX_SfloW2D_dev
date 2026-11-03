@@ -326,8 +326,8 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
-        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,                                 &
-        !$OMP& group_tick,
+        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,                                         &
+        !$OMP& cell_tick,group_tick,                                                                                 &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
         tid=1
@@ -434,7 +434,7 @@ CONTAINS
                         executor%groups(group_index), erodible_local, total_rate,                                      &
                         executor%source_transfers(tid),cell_has_exchange,ok,                                          &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
-                        cell_fissure_fractions(j,k,:),cell_arc_perim(j,k),cell_arc_n_x(j,k),                             &
+                        cell_fissure_fractions(j,k,:),cell_arc_perim(j,k),cell_arc_n_x(j,k),                         &
                         cell_arc_n_y(j,k),
                         dx*dy,
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
