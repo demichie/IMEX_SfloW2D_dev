@@ -1,0 +1,75 @@
+name: Profile EXAMPLE_CF settling (serial)
+
+on:
+  workflow_dispatch:
+    inputs:
+      end_time:
+        description: "Simulation end time in seconds"
+        required: true
+        default: "150"
+        type: choice
+        options: ["20", "50", "150"]
+
+permissions:
+  contents: read
+
+jobs:
+  serial-settling-profile:
+    name: GNU gprof call graph - settling only - 1 thread
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Fortran and profiling dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake gfortran make binutils liblapack-dev libnetcdff-dev unzip
+      - name: Build with subroutine-level gprof instrumentation
+        env:
+          FC: gfortran
+          FCFLAGS: "-O2 -g -pg -fno-inline -fno-omit-frame-pointer"
+        run: |
+          autoreconf -fi
+          ./configure --with-netcdf=/usr
+          make -j2
+      - name: Run EXAMPLE_CF without curvature, one OpenMP thread
+        env:
+          OMP_NUM_THREADS: "1"
+          OMP_DYNAMIC: "FALSE"
+          IMEX_PROFILE_LIE: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p profile-artifacts
+          cd EXAMPLES/EXAMPLE_CF
+          unzip -oq topo.zip
+          cp IMEX_SfloW2D.inp profile-original.inp
+          sed -E \
+            -e 's/^([[:space:]]*CURVATURE_TERM_FLAG[[:space:]]*=[[:space:]]*)T/\1F/I' \
+            -e 's/^[[:space:]]*T_END[[:space:]]*=.*/ T_END= ${{ inputs.end_time }}.0D0,/' \
+            profile-original.inp > IMEX_SfloW2D.inp
+          grep -i 'CURVATURE_TERM_FLAG' IMEX_SfloW2D.inp
+          grep -i 'SETTLING_FLAG' IMEX_SfloW2D.inp
+          /usr/bin/time -v ../../src/IMEX_SfloW2D \
+            > ../../profile-artifacts/solver.log \
+            2> ../../profile-artifacts/time.txt
+          test -s gmon.out
+          mv gmon.out ../../profile-artifacts/gmon.out
+          cp IMEX_SfloW2D.inp ../../profile-artifacts/profile.inp
+      - name: Produce function and call-graph reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          gprof -b src/IMEX_SfloW2D profile-artifacts/gmon.out > profile-artifacts/gprof.txt
+          gprof -b -p src/IMEX_SfloW2D profile-artifacts/gmon.out > profile-artifacts/flat-profile.txt
+          gprof -b -q src/IMEX_SfloW2D profile-artifacts/gmon.out > profile-artifacts/call-graph.txt
+          head -n 150 profile-artifacts/flat-profile.txt > profile-artifacts/top150.txt
+          git rev-parse HEAD > profile-artifacts/revision.txt
+      - name: Upload profiling reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-cf-serial-settling-gprof-${{ github.run_id }}
+          path: profile-artifacts/
+          if-no-files-found: warn
+          retention-days: 30
