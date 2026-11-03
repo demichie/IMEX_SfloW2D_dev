@@ -44,37 +44,53 @@ def check():
     assert "idx_add_gas_first:idx_add_gas_last" in conservative.group(0)
     assert "idx_solidEqn_first:idx_solidEqn_last" in conservative.group(0)
 
+    # The authoritative q/qp remains unchanged throughout the transaction.
+    # No whole-domain fluid snapshot or publication is allowed in normal runs.
+    assert "this%q_before" not in time
+    assert "this%q_trial=state%q" not in time
+    assert "this%qp_trial=state%qp" not in time
+    assert "state%q=this%q_trial" not in time
+    assert "state%qp=this%qp_trial" not in time
+    assert "qp_pre=>state%qp" in time
+    assert "qp_pre=>this%qp_before" in time
+    assert "this%qp_before=state%qp" in time
+    assert "this%cell_status(1:domain%solve_cells)=0" in time
+    assert "CALL initialize_dry_physical_cell(this%qp_before(:,j,k))" in time
+    assert "CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))" in time
+
     ordered(time, [
-        r"this%q_before\s*=\s*state%q",
+        r"qp_pre=>state%qp",
         r"call\s+spatial_operator%evaluate",
+        r"this%q_trial\(:,j,k\)\s*=\s*state%q\(:,j,k\)",
         r"this%q_trial\(1:n_eqns,j,k\)\s*=",
         r"conservative_mass_admissible\(this%q_trial",
         r"call\s+state%snapshot_substrate",
         r"call\s+begin_geometry_transaction",
         r"call\s+execute_lie_source_groups",
         r"if\s*\(source_step_failed\)",
-        r"state%q\s*=\s*this%q_trial",
-        r"state%qp\s*=\s*this%qp_trial",
+        r"state%q\(:,j,k\)\s*=\s*this%q_trial\(:,j,k\)",
+        r"state%qp\(:,j,k\)\s*=\s*this%qp_trial\(:,j,k\)",
         r"call\s+commit_geometry_transaction",
     ])
     assert "CALL state%restore_substrate(substrate_before)" in time
     assert "CALL rollback_geometry_transaction" in time
-    assert "CALL initialize_dry_physical_cell(this%qp_before(:,j,k))" in time
-    assert "CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))" in time
+    assert "state%q==q_authoritative" in time
+    assert "state%qp==qp_authoritative" in time
+
+    # Source groups still operate locally, and source failure is checked
+    # before any authoritative fluid candidate is published.
     ordered(executor, [
-        r"q_group\s*=\s*q",
-        r"qp_group\s*=\s*qp",
         r"cell_loop:\s*do",
-        r"if\s*\(step_failed\)\s*then",
-        r"if\s*\(with_exchange\s*\.and\.\s*topo_change_flag\)",
+        r"group_loop:\s*do",
+        r"if\s*\(cell_error==0\)",
+        r"q\(:,j,k\)\s*=\s*q_local",
+        r"qp\(:,j,k\)\s*=\s*qp_local",
+        r"if\s*\(first_failure/=huge\(0\)\)",
         r"call\s+assign_topography_vertices",
-        r"state%deposit\(j,k,1:n_solid\)\s*=",
         r"call\s+state%refresh_substrate_totals",
-        r"q\s*=\s*q_group",
-        r"qp\s*=\s*qp_group",
     ])
     assert "CALL initialize_dry_physical_cell(qp_candidate)" in executor
-    assert "CALL initialize_dry_physical_cell(qp_group(:,j,k))" in executor
+    assert "q_original(idx_totMassEqn,j,k)" in executor
     print("PASS: D19 Lie post-spatial guards, group publication and rollback")
 
 
