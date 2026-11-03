@@ -91,15 +91,15 @@ CONTAINS
         REAL(wp) :: pd
         TYPE(substrate_snapshot_type) :: substrate_before
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
-        REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:),qp_authoritative(:,:,:),bed_before(:,:),                                              &
-            bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                        &
+        REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:),qp_authoritative(:,:,:),bed_before(:,:),                      &
+            bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
         LOGICAL :: check_injected_rollback,had_bed_change
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
         END IF
-        ! Snapshot before evaluating any operator, including the primitive halo.
+        ! Retain full pre-step snapshots only for the D20 injected rollback test.
         check_injected_rollback=this%lie_executor%reject_active
 
         IF (check_injected_rollback) THEN
@@ -124,6 +124,9 @@ CONTAINS
         IF (reuse_cfl_traces) THEN
             qp_pre=>state%qp
         ELSE
+            ! Preserve the old halo semantics for direct callers: reconstruction
+            ! may read outside the current worklist if a specialized stencil does.
+            this%qp_before=state%qp
             qp_pre=>this%qp_before
         END IF
         IF (.NOT.reuse_cfl_traces) THEN
@@ -152,7 +155,7 @@ CONTAINS
         END IF
 
         ! The spatial step is conservative; only admissibility is checked.
-        CALL spatial_operator%evaluate(qp_pre,this%spatial_rate,t,domain,                                               &
+        CALL spatial_operator%evaluate(qp_pre,this%spatial_rate,t,domain,                                            &
             reuse_cfl_traces=reuse_cfl_traces)
         this%cell_status(1:domain%solve_cells)=0
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
@@ -214,7 +217,7 @@ CONTAINS
                     this%spatial_rate(eq,j,k),this%q_trial(eq,j,k)
                 CALL spatial_operator%diagnose_cell(j,k,eq)
             END DO
-            IF (this%cell_status(first_failure)==1)                                                                      &
+            IF (this%cell_status(first_failure)==1)                                                                  &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')
             CALL fatal_error('Lie spatial state conversion rejected')
 
