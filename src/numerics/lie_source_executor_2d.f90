@@ -80,8 +80,8 @@ CONTAINS
         executor%exchange_group=.FALSE.
         executor%dry_noop_group=.FALSE.
         DO group_index=1,SIZE(executor%groups)
-            IF (.NOT.ALLOCATED(executor%groups(group_index)%source_names)) CALL fatal_error('D20: Lie source group has '// &
-                'no allocated source list')
+            IF (.NOT.ALLOCATED(executor%groups(group_index)%source_names))                                        &
+                CALL fatal_error('D20: Lie source group has no allocated source list')
             IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE
             SELECT CASE(executor%groups(group_index)%method)
             CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
@@ -108,8 +108,8 @@ CONTAINS
                 ALL(executor%groups(group_index)%source_names=='geometry_curvature' .OR.                               &
                     executor%groups(group_index)%source_names=='mass_exchange_deposition')
             IF (executor%exchange_group(group_index)) THEN
-                IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) CALL fatal_error('D19: mass exchange '// &
-                    'requires explicit group method')
+                IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                   &
+                    CALL fatal_error('D19: mass exchange requires explicit group method')
                 executor%has_exchange_group=.TRUE.
                 IF (topo_change_flag) executor%bed_group_id=executor%groups(group_index)%id
             END IF
@@ -129,7 +129,8 @@ CONTAINS
         CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP',env_value,STATUS=env_status)
         IF (env_status==0 .AND. LEN_TRIM(env_value)>0) THEN
             READ(env_value,*,IOSTAT=parse_status) executor%reject_group
-            IF (parse_status/=0 .OR. executor%reject_group<1) CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
+            IF (parse_status/=0 .OR. executor%reject_group<1)                                                       &
+                CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
         END IF
         executor%reject_active=ANY(executor%groups%id==executor%reject_group)
         ! Allocate for the maximum worklist size; only enabled diagnostics
