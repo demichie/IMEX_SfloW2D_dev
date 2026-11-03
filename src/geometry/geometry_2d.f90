@@ -11,7 +11,7 @@
 
 MODULE geometry_2d
 
-    USE parameters_2d, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : wp , sp, xinf
     USE parameters_2d, ONLY : verbose_level
 

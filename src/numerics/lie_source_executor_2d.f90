@@ -6,7 +6,7 @@
 !********************************************************************************
 
 MODULE lie_source_executor_2d
-    USE parameters_2d, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type, idx_totMassEqn,                   &
         idx_solidEqn_first, idx_solidEqn_last

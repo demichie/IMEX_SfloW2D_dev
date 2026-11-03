@@ -65,7 +65,7 @@ CONTAINS
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                    &
             non_exchange_group,exchange_selected,physical_scratch,exchange_scratch)
-    USE parameters_2d, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -158,7 +158,7 @@ CONTAINS
     !> Validate every part of a coupled physical transfer before and after
     !> applying coverage and the common group limiter.
     LOGICAL FUNCTION mass_exchange_transfer_is_finite(transfer) RESULT(valid)
-    USE parameters_2d, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         TYPE(mass_exchange_rates_type), INTENT(IN) :: transfer
         valid=.FALSE.
         IF (.NOT.ALL(ieee_is_finite(transfer%solid_deposition_rate))) RETURN
@@ -181,7 +181,7 @@ CONTAINS
     !> the post-spatial Lie state; group zero rate evaluation stays at q^n.
     SUBROUTINE limit_explicit_source_rates(q_reference,inventory,dt,rate,                                              &
             solid_erosion_rate,limiter,valid)
-    USE parameters_2d, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
         REAL(wp), INTENT(IN) :: q_reference(n_eqns),inventory(:),dt
         REAL(wp), INTENT(IN) :: rate(n_eqns),solid_erosion_rate(:)
         REAL(wp), INTENT(OUT) :: limiter

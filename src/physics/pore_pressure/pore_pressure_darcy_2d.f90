@@ -17,7 +17,7 @@ MODULE pore_pressure_darcy_2d
     USE geometry_2d, ONLY : pi_g
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                                  &
             mixt_var_state
-    USE parameters_2d, ONLY : ieee_is_finite
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
     IMPLICIT NONE
 

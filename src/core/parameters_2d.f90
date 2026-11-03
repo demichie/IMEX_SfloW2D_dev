@@ -370,14 +370,6 @@ MODULE parameters_2d
     TYPE(bc), ALLOCATABLE :: bcN(:)
 
 CONTAINS
-    !> TEMPORARY PERFORMANCE EXPERIMENT - DO NOT USE FOR SCIENTIFIC RUNS.
-    !> Bypass all IEEE_IS_FINITE checks while preserving array ranks and all
-    !> unrelated physical/admissibility tests. Revert this commit after profiling.
-    ELEMENTAL LOGICAL FUNCTION ieee_is_finite(value) RESULT(finite)
-        REAL(wp), INTENT(IN) :: value
-        finite=.TRUE.
-    END FUNCTION ieee_is_finite
-
     !> Configure canonical physical and conservative indices for a complete state.
     !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
     SUBROUTINE configure_canonical_state_indices()
