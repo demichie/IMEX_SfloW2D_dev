@@ -40,6 +40,7 @@ MODULE lie_source_executor_2d
         TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
         TYPE(mass_exchange_rates_type), ALLOCATABLE :: source_transfers(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
+        LOGICAL :: all_groups_dry_noop=.FALSE.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
         LOGICAL :: reject_active=.FALSE.
         INTEGER :: bed_group_id=-1,reject_group=-1
@@ -114,6 +115,8 @@ CONTAINS
             END IF
             IF (executor%groups(group_index)%method==SOURCE_METHOD_NEWTON) executor%has_newton_group=.TRUE.
         END DO
+        executor%all_groups_dry_noop=ALL(executor%dry_noop_group .OR.                                   &
+            [(SIZE(executor%groups(group_index)%source_names)==0,group_index=1,SIZE(executor%groups))])
         executor%has_bed_group=executor%has_exchange_group .AND. topo_change_flag
         ! Read diagnostic and D20 test settings only at startup.
         env_value=''
@@ -186,6 +189,7 @@ CONTAINS
         executor%has_exchange_group=.FALSE.
         executor%has_bed_group=.FALSE.
         executor%has_newton_group=.FALSE.
+        executor%all_groups_dry_noop=.FALSE.
         executor%diagnostics_enabled=.FALSE.
         executor%newton_witness=.FALSE.
         executor%reject_active=.FALSE.
@@ -342,6 +346,10 @@ CONTAINS
             k=domain%k_cent(cell)
             ! Group zero uses the pre-spatial snapshot: never evaluate it over absorbing cells.
             IF (B_nodata(j,k) .OR. (sea_mass_removal_flag .AND. B_zone(j,k)==1)) CYCLE cell_loop
+            ! No configured group can create mass in a dry cell in this case.
+            IF (executor%all_groups_dry_noop) THEN
+                IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. q_original(idx_totMassEqn,j,k)<=0.0_wp) CYCLE cell_loop
+            END IF
             q_local=q(:,j,k)
             qp_local=qp(:,j,k)
             IF (executor%has_exchange_group) THEN
@@ -424,7 +432,8 @@ CONTAINS
                         executor%groups(group_index), erodible_local, total_rate,                                      &
                         executor%source_transfers(tid),cell_has_exchange,ok,                                          &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
-                        cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy, &
+                        cell_fissure_fractions(j,k,:), cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k),         &
+                        dx*dy,
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid))
                     IF (profiling_enabled) THEN
@@ -493,7 +502,8 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+executor%source_transfers(tid)%dB_dt
+                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+                  &
+                            executor%source_transfers(tid)%dB_dt
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
                     ! Group 0 evaluates on the immutable pre-spatial state;
