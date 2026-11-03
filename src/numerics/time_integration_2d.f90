@@ -8,7 +8,7 @@ MODULE time_integration_2d
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
-            B_prime_x_geom,B_prime_y_geom,grav_coeff,B_zone,B_nodata
+            B_prime_x_geom,B_prime_y_geom,grav_coeff,B_zone
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : state_type,substrate_snapshot_type,                                                           &
             initialize_dry_physical_cell,conservative_mass_admissible
@@ -176,7 +176,7 @@ CONTAINS
 
             ! A sea cell is an absorbing sink after the spatial step, before ALL Lie sources.
             ! Keep this inside the existing OpenMP sweep and synchronize q/qp.
-            IF (B_nodata(j,k) .OR. (sea_mass_removal_flag .AND. B_zone(j,k)==1)) THEN
+            IF (sea_mass_removal_flag .AND. B_zone(j,k)==1) THEN
                 this%q_trial(:,j,k)=0.0_wp
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
                 CYCLE

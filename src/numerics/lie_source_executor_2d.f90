@@ -219,7 +219,7 @@ CONTAINS
         USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                         &
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
-            B_zone,B_nodata,cell_source_fractions,cell_fissure_fractions,                                              &
+            B_zone,cell_source_fractions,cell_fissure_fractions,                                              &
             cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
@@ -346,7 +346,7 @@ CONTAINS
             j=domain%j_cent(cell)
             k=domain%k_cent(cell)
             ! Group zero uses the pre-spatial snapshot: never evaluate it over absorbing cells.
-            IF (B_nodata(j,k) .OR. (sea_mass_removal_flag .AND. B_zone(j,k)==1)) CYCLE cell_loop
+            IF (sea_mass_removal_flag .AND. B_zone(j,k)==1) CYCLE cell_loop
             ! No configured group can create mass in a dry cell in this case.
             IF (executor%all_groups_dry_noop) THEN
                 IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. q_original(idx_totMassEqn,j,k)<=0.0_wp) CYCLE cell_loop

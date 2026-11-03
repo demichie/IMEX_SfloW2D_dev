@@ -1094,6 +1094,7 @@ CONTAINS
         INTEGER :: i_file
 
         INTEGER :: i, i_solid, j, k
+        INTEGER :: dem_ix_first,dem_ix_last,dem_iy_first,dem_iy_last
 
         INTEGER :: dot_idx
         CHARACTER(LEN=4) :: restart_extension
@@ -3646,6 +3647,46 @@ CONTAINS
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) ''
 
         CLOSE (2001)
+
+        ! Validate the DEM samples contributing to the computational vertex grid.
+        ! Missing data elsewhere in a larger raster do not affect this simulation.
+        IF (.NOT.finite_input_value(cellsize)) &
+            CALL fatal_error('Invalid DEM: non-finite pixel size')
+        IF (cellsize<=0.0_wp .OR. ncols<1 .OR. nrows<1 .OR. (ncols==1 .AND. nrows==1)) &
+            CALL fatal_error('Invalid DEM: require positive pixel size and an interpolation axis')
+        IF (.NOT.finite_input_value(nodata_topo)) &
+            CALL fatal_error('Invalid DEM: non-finite NODATA_value')
+
+        dem_ix_first=1
+        dem_ix_last=ncols
+        IF (ncols>1) THEN
+            IF (x0<xllcorner+0.5_wp*cellsize .OR. &
+                x0+comp_cells_x*cell_size>xllcorner+(ncols-0.5_wp)*cellsize) &
+                CALL fatal_error('Invalid DEM: x extent does not cover computational vertices')
+            dem_ix_first=MAX(1,MIN(ncols-1, &
+                FLOOR((x0-xllcorner-0.5_wp*cellsize)/cellsize)+1))
+            dem_ix_last=MAX(1,MIN(ncols-1, &
+                FLOOR((x0+comp_cells_x*cell_size-xllcorner-0.5_wp*cellsize)/cellsize)+1))+1
+        END IF
+        dem_iy_first=1
+        dem_iy_last=nrows
+        IF (nrows>1) THEN
+            IF (y0<yllcorner+0.5_wp*cellsize .OR. &
+                y0+comp_cells_y*cell_size>yllcorner+(nrows-0.5_wp)*cellsize) &
+                CALL fatal_error('Invalid DEM: y extent does not cover computational vertices')
+            dem_iy_first=MAX(1,MIN(nrows-1, &
+                FLOOR((y0-yllcorner-0.5_wp*cellsize)/cellsize)+1))
+            dem_iy_last=MAX(1,MIN(nrows-1, &
+                FLOOR((y0+comp_cells_y*cell_size-yllcorner-0.5_wp*cellsize)/cellsize)+1))+1
+        END IF
+        DO k=dem_iy_first,dem_iy_last
+            DO j=dem_ix_first,dem_ix_last
+                IF (.NOT.finite_input_value(topography_profile(3,j,k))) &
+                    CALL fatal_error('Invalid DEM: non-finite elevation within computational domain')
+                IF (topography_profile(3,j,k)==nodata_topo) &
+                    CALL fatal_error('Invalid DEM: NODATA elevation within computational domain')
+            END DO
+        END DO
 
         ! ----------- READ vulnerability_table_parameters NAMELIST ------------------
 
@@ -6202,7 +6243,7 @@ CONTAINS
 
     SUBROUTINE output_esri(output_idx, state)
 
-    USE geometry_2d, ONLY: B_cent, grid_output, B_nodata
+    USE geometry_2d, ONLY: B_cent, grid_output
     USE geometry_2d, ONLY: B_zone
         ! USE geometry_2d, ONLY : comp_interfaces_x , comp_interfaces_y
     IMPLICIT NONE
@@ -6230,24 +6271,6 @@ CONTAINS
         DO j = comp_cells_y, 1, -1
 
             WRITE (dem_esri_unit, *) B_cent(1:comp_cells_x, j)
-
-        END DO
-
-        CLOSE (dem_esri_unit)
-
-        OPEN (dem_esri_unit, FILE=output_file_path('terrain', 'dem_esri_nodata.asc'),                                  &
-                status='unknown', form='formatted')
-
-        WRITE (dem_esri_unit, '(A,I5)') 'ncols ', comp_cells_x
-        WRITE (dem_esri_unit, '(A,I5)') 'nrows ', comp_cells_y
-        WRITE (dem_esri_unit, '(A,F15.3)') 'xllcorner ', x0
-        WRITE (dem_esri_unit, '(A,F15.3)') 'yllcorner ', y0
-        WRITE (dem_esri_unit, '(A,F15.3)') 'cellsize ', cell_size
-        WRITE (dem_esri_unit, '(A,I5)') 'NODATA_value ', -9999
-
-        DO j = comp_cells_y, 1, -1
-
-            WRITE (dem_esri_unit, *) MERGE(1, 0, B_nodata(1:comp_cells_x, j))
 
         END DO
 

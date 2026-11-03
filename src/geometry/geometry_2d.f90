@@ -58,8 +58,6 @@ MODULE geometry_2d
     !> Topography at cell centers, derived from B_vertex.
     REAL(wp), ALLOCATABLE :: B_cent(:,:)
 
-    LOGICAL, ALLOCATABLE :: B_nodata(:,:)
-
     INTEGER, ALLOCATABLE :: B_zone(:,:)
 
 
@@ -234,8 +232,6 @@ CONTAINS
         ALLOCATE( B_face_y(comp_cells_x,comp_interfaces_y) )
         ALLOCATE( B_cent(comp_cells_x,comp_cells_y) )
 
-        ALLOCATE( B_nodata(comp_cells_x,comp_cells_y) )
-
         ALLOCATE( B_prime_x_geom(comp_cells_x,comp_cells_y) )
         ALLOCATE( B_prime_y_geom(comp_cells_x,comp_cells_y) )
 
@@ -330,18 +326,7 @@ CONTAINS
 
         END DO
 
-        DO k=1,comp_cells_y
-
-            DO j=1,comp_cells_x
-
-                CALL interp_2d_nodata(topography_profile(1,:,:) , topography_profile(2,:,:),                           &
-                    topography_profile(3,:,:) , x_comp(j), y_comp(k) , B_nodata(j,k))
-
-            END DO
-
-        ENDDO
-
-        topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
+topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
 
         ! Sample the input topography directly at computational vertices. All
         ! center and face elevations are derived from this continuous Q1 field.
@@ -467,78 +452,6 @@ CONTAINS
 
     END SUBROUTINE interp_2d_scalar
 
-    !-----------------------------------------------------------------------------
-    !> \brief Check whether a bilinear interpolation stencil includes missing DEM data.
-    !>
-    !> Scalar interpolation (2D)
-    !
-    !> This subroutine interpolate the values of the  array f1, defined on the
-    !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
-    !> \date OCTOBER 2016
-    !>
-    !> \param[in] x1 X coordinates of the original interpolation grid.
-    !> \param[in] y1 Y coordinates of the original interpolation grid.
-    !> \param[in] f1 Scalar values on the original grid.
-    !> \param[in] x2 X coordinate of the requested interpolation point [m].
-    !> \param[in] y2 Y coordinate of the requested interpolation point [m].
-    !> \param[out] f2 True if any required input stencil value equals nodata_topo.
-    !-----------------------------------------------------------------------------
-
-    SUBROUTINE interp_2d_nodata(x1, y1, f1, x2, y2, f2)
-    IMPLICIT NONE
-
-        REAL(wp), INTENT(IN), DIMENSION(:,:) :: x1, y1, f1
-        REAL(wp), INTENT(IN) :: x2, y2
-        LOGICAL, INTENT(OUT) :: f2
-
-        INTEGER :: ix , iy
-        REAL(wp) :: alfa_x , alfa_y
-
-        IF ( size(x1,1) .GT. 1 ) THEN
-
-            ix = FLOOR( ( x2 - x1(1,1) ) / ( x1(2,1) - x1(1,1) ) ) + 1
-            ix = MIN( ix , SIZE(x1,1)-1 )
-            alfa_x = ( x1(ix+1,1) - x2 ) / (  x1(ix+1,1) - x1(ix,1) )
-
-        ELSE
-
-            ix = 1
-            alfa_x = 0.0_wp
-
-        END IF
-
-        IF ( size(x1,2) .GT. 1 ) THEN
-
-            iy = FLOOR( ( y2 - y1(1,1) ) / ( y1(1,2) - y1(1,1) ) ) + 1
-            iy = MIN( iy , SIZE(x1,2)-1 )
-            alfa_y = ( y1(1,iy+1) - y2 ) / (  y1(1,iy+1) - y1(1,iy) )
-
-        ELSE
-
-            iy = 1
-            alfa_y = 0.0_wp
-
-        END IF
-
-        f2 = .FALSE.
-
-        IF ( size(x1,1) .EQ. 1 ) THEN
-
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )
-
-        ELSEIF ( size(x1,2) .EQ. 1 ) THEN
-
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix+1,iy) .EQ. nodata_topo )
-
-        ELSE
-
-            f2 = ( f1(ix,iy) .EQ. nodata_topo ) .OR. ( f1(ix,iy+1) .EQ. nodata_topo )                                  &
-                .OR. ( f1(ix+1,iy) .EQ. nodata_topo )                                                                  &
-                .OR. ( f1(ix+1,iy+1) .EQ. nodata_topo )
-
-        END IF
-
-    END SUBROUTINE interp_2d_nodata
 
     ! Fissural rectangle/cell intersections follow the segment-and-width source
     ! geometry introduced by Elisa Biagioli in BiElisa/IMEX_LavaFlow.
