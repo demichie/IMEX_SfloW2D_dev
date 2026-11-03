@@ -24,6 +24,8 @@ MODULE lie_source_executor_2d
     TYPE :: group_profile_type
         INTEGER :: id=0,method=0,calls=0
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
+        REAL(wp) :: elapsed=0.0_wp,physical=0.0_wp
+        INTEGER :: evaluated_cells=0
     END TYPE group_profile_type
     !> @brief Stable Lie configuration and reusable per-simulation work arrays.
     !> @details Initialized once; cell-indexed buffers are sized for the full
@@ -43,6 +45,7 @@ MODULE lie_source_executor_2d
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
     REAL(wp), SAVE :: profile_cell_sweep=0.0_wp,profile_final_commit=0.0_wp
+    REAL(wp), SAVE :: profile_thread_cell=0.0_wp
 
 CONTAINS
 
@@ -196,6 +199,7 @@ CONTAINS
         USE state_conversion_2d, ONLY : qc_to_qp,mixt_var
         USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, physical_cell_state_finite
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag
+        !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(mass_exchange_rates_type) :: transfers
@@ -222,6 +226,12 @@ CONTAINS
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
         REAL(wp) :: ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix
+        ! Profiling counters are thread-owned: no atomics inside the cell loop.
+        REAL(wp), ALLOCATABLE :: thread_group(:,:),thread_physics(:,:),thread_cell(:)
+        INTEGER, ALLOCATABLE :: thread_evaluations(:,:)
+        INTEGER :: nthreads,tid,cell_tick,group_tick,physical_tick,profile_tock
+        REAL(wp) :: group_physical_elapsed
+        INTEGER :: physical_tick_rate
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
@@ -251,6 +261,18 @@ CONTAINS
                 group_profile(1)%setup=group_profile(1)%setup+REAL(tock-tick,wp)/REAL(clock_rate,wp)
             tick=tock
         END IF
+        IF (profiling_enabled) THEN
+            nthreads=1
+            !$ nthreads=omp_get_max_threads()
+            ALLOCATE(thread_group(SIZE(executor%groups),nthreads))
+            ALLOCATE(thread_physics(SIZE(executor%groups),nthreads))
+            ALLOCATE(thread_evaluations(SIZE(executor%groups),nthreads))
+            ALLOCATE(thread_cell(nthreads))
+            thread_group=0.0_wp
+            thread_physics=0.0_wp
+            thread_evaluations=0
+            thread_cell=0.0_wp
+        END IF
         ! Independent cells share a fixed geometry. Reduce the first failed
         ! worklist index without a separate serial scan.
         first_failure=HUGE(0)
@@ -261,9 +283,15 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& transfers,cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,              &
         !$OMP& cell_error,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,                           &
-        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix)                            &
+        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,cell_tick,group_tick,                      &
+        !$OMP& physical_tick,profile_tock,group_physical_elapsed,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
         cell_loop: DO cell=1,domain%solve_cells
+            IF (profiling_enabled) THEN
+                tid=1
+                !$ tid=omp_get_thread_num()+1
+                CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
+            END IF
             cell_error=0
             IF (executor%diagnostics_enabled) THEN
                 cell_detail=0
@@ -314,6 +342,10 @@ CONTAINS
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
+                IF (profiling_enabled) THEN
+                    CALL SYSTEM_CLOCK(group_tick)
+                    thread_evaluations(group_index,tid)=thread_evaluations(group_index,tid)+1
+                END IF
                 ! Group zero reads the pre-spatial primitive state; subsequent
                 ! groups read the previous group's accepted local state.
                 IF (executor%groups(group_index)%id==0) THEN
@@ -345,10 +377,16 @@ CONTAINS
                 SELECT CASE(executor%groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
                     ! Evaluate source rates without committing partial transfers.
+                    IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
                         executor%groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange, ok,    &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy)
+                    IF (profiling_enabled) THEN
+                        CALL SYSTEM_CLOCK(profile_tock)
+                        thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
+                            REAL(profile_tock-physical_tick,wp)/REAL(physical_tick_rate,wp)
+                    END IF
 
                     IF (cell_has_exchange .NEQV. executor%exchange_group(group_index)) THEN
                         cell_error=4
@@ -418,8 +456,14 @@ CONTAINS
                     analytic_input=q_local
                     IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
+                    IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
                         time_step, analytic_rate, status)
+                    IF (profiling_enabled) THEN
+                        CALL SYSTEM_CLOCK(profile_tock)
+                        thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
+                            REAL(profile_tock-physical_tick,wp)/REAL(physical_tick_rate,wp)
+                    END IF
 
                     IF (status/=0) THEN
                         cell_error=9
@@ -437,9 +481,15 @@ CONTAINS
                     ! Solve the coupled implicit update on a cell-local candidate.
                     IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
                     q_candidate=q_local
+                    IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
                         cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
                         iterations, ok, linear_info, failed)
+                    IF (profiling_enabled) THEN
+                        CALL SYSTEM_CLOCK(profile_tock)
+                        thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
+                            REAL(profile_tock-physical_tick,wp)/REAL(physical_tick_rate,wp)
+                    END IF
                     IF (executor%newton_witness                                                                        &
                         .AND. ALLOCATED(executor%newton_iterations))                                                   &
                         executor%newton_iterations(cell,group_index)=iterations
@@ -458,7 +508,14 @@ CONTAINS
 
                 END SELECT
                 ! Explicit candidates were already validated and converted above.
-                IF (executor%groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE group_loop
+                IF (executor%groups(group_index)%method==SOURCE_METHOD_EXPLICIT) THEN
+                    IF (profiling_enabled) THEN
+                        CALL SYSTEM_CLOCK(profile_tock)
+                        thread_group(group_index,tid)=thread_group(group_index,tid)+                              &
+                            REAL(profile_tock-group_tick,wp)/REAL(physical_tick_rate,wp)
+                    END IF
+                    CYCLE group_loop
+                END IF
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                     cell_error=13
@@ -478,6 +535,11 @@ CONTAINS
 
                 q_local=q_candidate
                 qp_local=qp_candidate
+                IF (profiling_enabled) THEN
+                    CALL SYSTEM_CLOCK(profile_tock)
+                    thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &
+                        REAL(profile_tock-group_tick,wp)/REAL(physical_tick_rate,wp)
+                END IF
 
             END DO group_loop
 
@@ -512,8 +574,22 @@ CONTAINS
                 END IF
                 first_failure=MIN(first_failure,cell)
             END IF
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(profile_tock)
+                thread_cell(tid)=thread_cell(tid)+REAL(profile_tock-cell_tick,wp)/REAL(physical_tick_rate,wp)
+            END IF
         END DO cell_loop
         !$OMP END PARALLEL DO
+        IF (profiling_enabled) THEN
+            DO group_index=1,SIZE(executor%groups)
+                group_profile(group_index)%elapsed=group_profile(group_index)%elapsed+SUM(thread_group(group_index,:))
+                group_profile(group_index)%physical=group_profile(group_index)%physical+SUM(thread_physics(group_index,:))
+                group_profile(group_index)%evaluated_cells=group_profile(group_index)%evaluated_cells+                  &
+                    SUM(thread_evaluations(group_index,:))
+            END DO
+            profile_thread_cell=profile_thread_cell+SUM(thread_cell)
+            DEALLOCATE(thread_group,thread_physics,thread_evaluations,thread_cell)
+        END IF
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             ! With cell-major traversal this is a *whole-sweep* wall-clock time,
@@ -637,8 +713,8 @@ CONTAINS
         END SUBROUTINE reject_cell
     END SUBROUTINE execute_lie_source_groups
 
-    !> @brief Report cumulative group counts and sweep/commit wall times.
-    !> @details Separate group wall times are not defined for the cell-major sweep.
+    !> @brief Report cell-major sweep wall time and per-group summed thread times.
+    !> @details Group times are summed thread CPU-like times, not wall-clock durations.
     SUBROUTINE report_lie_source_profile()
         INTEGER :: n
         IF (.NOT.profiling_initialized) RETURN
@@ -649,6 +725,19 @@ CONTAINS
                 ' method=',group_profile(n)%method, ' calls=',group_profile(n)%calls
         END DO
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_END'
+        WRITE(*,'(A)') 'LIE_SOURCE_DETAIL_BEGIN'
+        DO n=1,SIZE(group_profile)
+            WRITE(*,'(A,I0,A,I0,A,ES15.7,A,ES15.7,A,ES15.7)')                                     &
+                'LIE_SOURCE_DETAIL id=',group_profile(n)%id,                                                     &
+                ' evaluated_cells=',group_profile(n)%evaluated_cells,                                             &
+                ' thread_seconds=',group_profile(n)%elapsed,                                                      &
+                ' physics_thread_seconds=',group_profile(n)%physical,                                              &
+                ' overhead_thread_seconds=',MAX(0.0_wp,group_profile(n)%elapsed-group_profile(n)%physical)
+        END DO
+        WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL cell_thread_seconds=',profile_thread_cell
+        WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL outside_groups_thread_seconds=',                                  &
+            MAX(0.0_wp,profile_thread_cell-SUM(group_profile%elapsed))
+        WRITE(*,'(A)') 'LIE_SOURCE_DETAIL_END'
         WRITE(*,'(A,ES15.7)') 'LIE_CELL_SWEEP_PROFILE seconds=',profile_cell_sweep
         WRITE(*,'(A,ES15.7)') 'LIE_GEOMETRY_COMMIT_PROFILE seconds=',profile_final_commit
     END SUBROUTINE report_lie_source_profile
