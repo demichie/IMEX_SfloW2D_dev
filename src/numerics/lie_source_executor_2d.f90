@@ -190,10 +190,8 @@ CONTAINS
     USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                                    &
             physical_cell_state_finite
     USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
-        TYPE(lie_source_executor_type), TARGET, INTENT(INOUT) :: executor
+        TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
-        TYPE(source_group_type), POINTER :: groups(:)
-        LOGICAL, POINTER :: exchange_group(:)
         TYPE(mass_exchange_rates_type) :: transfers
         TYPE(analytic_term_context_type) :: analytic_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -213,9 +211,8 @@ CONTAINS
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
-        LOGICAL :: with_exchange,cell_has_exchange,ok,failed,bed_accepted,conversion_ok
-        LOGICAL :: has_bed_group,has_exchange_group,newton_witness_active,diagnostics_enabled
-        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,bed_group_id
+        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok
+        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
 
@@ -224,13 +221,6 @@ CONTAINS
         INTEGER :: tick,tock,clock_rate
 
         IF (.NOT.executor%initialized) CALL fatal_error('Lie source executor not initialized')
-        groups=>executor%groups
-        exchange_group=>executor%exchange_group
-        has_exchange_group=executor%has_exchange_group
-        has_bed_group=executor%has_bed_group
-        bed_group_id=executor%bed_group_id
-        diagnostics_enabled=executor%diagnostics_enabled
-        newton_witness_active=executor%newton_witness
         step_failed=.FALSE.
         failure_reason=''
         IF (PRESENT(failure_message)) failure_message=''
@@ -240,12 +230,12 @@ CONTAINS
         IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tick,clock_rate)
-            DO group_index=1,SIZE(groups)
-                IF (SIZE(groups(group_index)%source_names)==0) CYCLE
+            DO group_index=1,SIZE(executor%groups)
+                IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE
                 group_profile(group_index)%calls=group_profile(group_index)%calls+1
             END DO
         END IF
-        IF (has_bed_group) executor%bed_rate_cell=0.0_wp
+        IF (executor%has_bed_group) executor%bed_rate_cell=0.0_wp
         IF (ALLOCATED(executor%newton_iterations)) &
             executor%newton_iterations(1:domain%solve_cells,:)=0
         IF (profiling_enabled) THEN
@@ -256,7 +246,7 @@ CONTAINS
         END IF
         first_failure=HUGE(0)
         !$OMP PARALLEL DO DEFAULT(SHARED) &
-        !$OMP& PRIVATE(cell,j,k,group_index,with_exchange,qpentry,q_candidate,qp_candidate, &
+        !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate, &
         !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local, &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate, &
         !$OMP& analytic_rate,analytic_input,pressure,noise,analytic_context, &
@@ -265,7 +255,7 @@ CONTAINS
         !$OMP& REDUCTION(MIN:first_failure)
         cell_loop: DO cell=1,domain%solve_cells
             cell_error=0
-            IF (diagnostics_enabled) THEN
+            IF (executor%diagnostics_enabled) THEN
                 cell_detail=0
                 cell_iterations=0
                 cell_group=0
@@ -276,7 +266,7 @@ CONTAINS
             k=domain%k_cent(cell)
             q_local=q(:,j,k)
             qp_local=qp(:,j,k)
-            IF (has_exchange_group) THEN
+            IF (executor%has_exchange_group) THEN
                 deposit_local=state%deposit(j,k,1:n_solid)
                 erosion_local=state%erosion(j,k,1:n_solid)
                 erodible_local=state%erodible(1:n_solid,j,k)
@@ -311,10 +301,9 @@ CONTAINS
                 first_failure=MIN(first_failure,cell)
                 CYCLE cell_loop
             END IF
-            group_loop: DO group_index=1,SIZE(groups)
-                IF (SIZE(groups(group_index)%source_names)==0) CYCLE group_loop
-                with_exchange=exchange_group(group_index)
-                IF (groups(group_index)%id==0) THEN
+            group_loop: DO group_index=1,SIZE(executor%groups)
+                IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
+                IF (executor%groups(group_index)%id==0) THEN
                     qpentry=qp_original(:,j,k)
                 ELSE
                     qpentry=qp_local
@@ -330,7 +319,7 @@ CONTAINS
 
                 END IF
 
-                IF (with_exchange) THEN
+                IF (executor%exchange_group(group_index)) THEN
                     ! All immobilized and erodible inventories are nonnegative.
                     ! Validate the group input before computing any exchange rate.
                     IF (.NOT.ALL(ieee_is_finite(erodible_local)) .OR.                                   &
@@ -348,14 +337,14 @@ CONTAINS
 
                 END IF
 
-                SELECT CASE(groups(group_index)%method)
+                SELECT CASE(executor%groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
                     CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
-                        groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange,  &
+                        executor%groups(group_index), erodible_local, total_rate, transfers, cell_has_exchange,  &
                         ok, noise, B_zone(j,k), analytic_context, cell_source_fractions(j,k),                          &
                         cell_fissure_fractions(j,k,:), cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k), dx*dy)
 
-                    IF (cell_has_exchange .NEQV. with_exchange) THEN
+                    IF (cell_has_exchange .NEQV. executor%exchange_group(group_index)) THEN
                         cell_error=4
                         EXIT group_loop
 
@@ -372,8 +361,8 @@ CONTAINS
 
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                         cell_error=6
-                        IF (diagnostics_enabled) THEN
-                            cell_group=groups(group_index)%id
+                        IF (executor%diagnostics_enabled) THEN
+                            cell_group=executor%groups(group_index)%id
                             cell_mass=q_candidate(idx_totMassEqn)
                             cell_components=SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
                         END IF
@@ -381,7 +370,7 @@ CONTAINS
 
                     END IF
 
-                    IF (with_exchange) THEN
+                    IF (executor%exchange_group(group_index)) THEN
                         deposit_candidate=deposit_local+                                                &
                             time_step*transfers%solid_deposition_rate
                         erosion_candidate=erosion_local+                                                &
@@ -422,7 +411,7 @@ CONTAINS
                     q_local=q_candidate
                     qp_local=qp_candidate
 
-                    IF (with_exchange) THEN
+                    IF (executor%exchange_group(group_index)) THEN
                         deposit_local=deposit_candidate
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
@@ -435,14 +424,14 @@ CONTAINS
                     ! Group 0 evaluates on the immutable pre-spatial state;
                     ! its increment is applied to the post-spatial group candidate.
                     analytic_input=q_local
-                    IF (groups(group_index)%id==0) analytic_input=q_original(:,j,k)
+                    IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
-                    CALL eval_source_analytic(groups(group_index), analytic_input, analytic_context, time_step,        &
+                    CALL eval_source_analytic(executor%groups(group_index), analytic_input, analytic_context, time_step,        &
                         analytic_rate, status)
 
                     IF (status/=0) THEN
                         cell_error=9
-                        IF (diagnostics_enabled) cell_detail=status
+                        IF (executor%diagnostics_enabled) cell_detail=status
                         EXIT group_loop
 
                     END IF
@@ -457,16 +446,16 @@ CONTAINS
                 CASE(SOURCE_METHOD_NEWTON)
                     IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
                     q_candidate=q_local
-                    CALL solve_backward_euler_group(groups(group_index), q_candidate, time_step,                      &
+                    CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,                      &
                         analytic_context%Bprime_x, analytic_context%Bprime_y, analytic_context%grav_coeff, noise, &
                         iterations, ok, linear_info, &
                         failed)
-                    IF (newton_witness_active .AND. ALLOCATED(executor%newton_iterations)) &
+                    IF (executor%newton_witness .AND. ALLOCATED(executor%newton_iterations)) &
                         executor%newton_iterations(cell,group_index)=iterations
 
                     IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                         cell_error=11
-                        IF (diagnostics_enabled) THEN
+                        IF (executor%diagnostics_enabled) THEN
                             cell_detail=linear_info
                             cell_iterations=iterations
                         END IF
@@ -479,7 +468,7 @@ CONTAINS
 
                 END SELECT
                 ! Explicit candidates were already validated and converted above.
-                IF (groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE group_loop
+                IF (executor%groups(group_index)%method==SOURCE_METHOD_EXPLICIT) CYCLE group_loop
                 ! Only check admissibility: never clip the accepted source update.
                 IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                     cell_error=13
@@ -508,7 +497,7 @@ CONTAINS
             IF (cell_error==0) THEN
                 q(:,j,k)=q_local
                 qp(:,j,k)=qp_local
-                IF (has_exchange_group) THEN
+                IF (executor%has_exchange_group) THEN
                     state%deposit(j,k,1:n_solid)=deposit_local
                     state%erosion(j,k,1:n_solid)=erosion_local
                     state%erodible(1:n_solid,j,k)=erodible_local
@@ -517,7 +506,7 @@ CONTAINS
             END IF
             IF (cell_error/=0) THEN
                 executor%failure_code(cell)=cell_error
-                IF (diagnostics_enabled) THEN
+                IF (executor%diagnostics_enabled) THEN
                     executor%failure_group(cell)=cell_group
                     executor%failure_detail(cell)=cell_detail
                     executor%failure_iterations(cell)=cell_iterations
@@ -561,7 +550,7 @@ CONTAINS
             CASE(14)
                 failure_reason='D19: source group conversion failed'
             CASE(6)
-                IF (diagnostics_enabled) THEN
+                IF (executor%diagnostics_enabled) THEN
                     j=domain%j_cent(first_failure)
                     k=domain%k_cent(first_failure)
                     WRITE(failure_reason,'(A,I0,A,I0,A,I0,A,ES12.4,A,ES12.4)') &
@@ -573,11 +562,11 @@ CONTAINS
                 END IF
             CASE(9)
                 failure_reason='D19: analytic source group failed'
-                IF (diagnostics_enabled) WRITE(failure_reason,'(A,I0)') &
+                IF (executor%diagnostics_enabled) WRITE(failure_reason,'(A,I0)') &
                     'D19: analytic group status ',executor%failure_detail(first_failure)
             CASE(11)
                 failure_reason='D19: Newton source group failed'
-                IF (diagnostics_enabled) WRITE(failure_reason,'(A,I0,A,I0)') &
+                IF (executor%diagnostics_enabled) WRITE(failure_reason,'(A,I0,A,I0)') &
                     'D19: Newton failed, linear_info=',executor%failure_detail(first_failure), &
                     ', iterations=',executor%failure_iterations(first_failure)
             CASE DEFAULT
@@ -587,17 +576,17 @@ CONTAINS
             RETURN
         END IF
         IF (ALLOCATED(executor%newton_iterations)) THEN
-            DO group_index=1,SIZE(groups)
-                IF (groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
+            DO group_index=1,SIZE(executor%groups)
+                IF (executor%groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
                 WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
-                    groups(group_index)%id,' solved_cells=', &
+                    executor%groups(group_index)%id,' solved_cells=', &
                     COUNT(executor%newton_iterations(1:domain%solve_cells,group_index)>0), &
                     ' total_iterations=',SUM(executor%newton_iterations(1:domain%solve_cells,group_index))
             END DO
         END IF
         ! Geometry is the same for every source group in the step. Project
         ! all mass-exchange bed rates only once, after the cell sweep.
-        IF (has_bed_group) THEN
+        IF (executor%has_bed_group) THEN
             bed_accepted=ALL(ieee_is_finite(executor%bed_rate_cell))
             IF (bed_accepted) THEN
                 CALL project_cell_field_to_vertices(executor%bed_rate_cell,executor%bed_rate_vertex)
@@ -612,8 +601,8 @@ CONTAINS
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
             END IF
-            IF (diagnostics_enabled .OR. executor%reject_active) THEN
-                WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',bed_group_id, &
+            IF (executor%diagnostics_enabled .OR. executor%reject_active) THEN
+                WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',executor%bed_group_id, &
                     ' max_abs_delta=',MAXVAL(ABS(executor%bed_candidate-B_vertex))
             END IF
             CALL assign_topography_vertices(executor%bed_candidate,bed_accepted)
@@ -623,7 +612,7 @@ CONTAINS
                 RETURN
             END IF
         END IF
-        IF (has_exchange_group) CALL state%refresh_substrate_totals()
+        IF (executor%has_exchange_group) CALL state%refresh_substrate_totals()
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)
