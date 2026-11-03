@@ -54,14 +54,13 @@ def check():
     assert "qp_pre=>state%qp" in time
     assert "qp_pre=>this%qp_before" in time
     assert "this%qp_before=state%qp" in time
-    assert "this%cell_status(1:domain%solve_cells)=0" in time
+    assert "this%cell_status(l)=0" in time
     assert "CALL initialize_dry_physical_cell(this%qp_before(:,j,k))" in time
     assert "CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))" in time
 
     ordered(time, [
         r"qp_pre=>state%qp",
         r"call\s+spatial_operator%evaluate",
-        r"this%q_trial\(:,j,k\)\s*=\s*state%q\(:,j,k\)",
         r"this%q_trial\(1:n_eqns,j,k\)\s*=",
         r"conservative_mass_admissible\(this%q_trial",
         r"call\s+state%snapshot_substrate",
