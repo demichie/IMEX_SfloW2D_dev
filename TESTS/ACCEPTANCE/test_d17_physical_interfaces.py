@@ -100,9 +100,22 @@ def main() -> int:
     for fragment in ("groups(1)%id/=0", "groups(1)%method/=SOURCE_METHOD_EXPLICIT",
                      "SOURCE_METHOD_NEWTON", "source_newton_affected_equations"):
         require(fragment.lower() in registry.lower(), f"registry contract: {fragment}", failures)
-    for fragment in ("qpentry=qp_original(:,j,k)", "qpentry=qp_group(:,j,k)",
-                     "q_group=q", "qp_group=qp", "CALL state%refresh_substrate_totals()"):
+    # D20 cell-major Lie execution: each worklist cell owns local candidates
+    # throughout all source groups. Do not require retired full-domain group
+    # snapshots (q_group/qp_group): they would duplicate storage and defeat the
+    # cell-local parallel execution contract.
+    for fragment in ("q_local=q(:,j,k)", "qp_local=qp(:,j,k)",
+                     "qpentry=qp_original(:,j,k)", "qpentry=qp_local",
+                     "q_local=q_candidate", "qp_local=qp_candidate",
+                     "q(:,j,k)=q_local", "qp(:,j,k)=qp_local",
+                     "CALL state%refresh_substrate_totals()"):
         require(fragment.lower() in executor.lower(), f"Lie executor contract: {fragment}", failures)
+    executor_lower = executor.lower()
+    ordered_fragments = ("group_loop: do group_index=1,size(executor%groups)",
+                         "q(:,j,k)=q_local", "qp(:,j,k)=qp_local")
+    positions = [executor_lower.find(fragment) for fragment in ordered_fragments]
+    require(all(position >= 0 for position in positions) and positions == sorted(positions),
+            "Lie executor contract: ordered cell-local groups before state publication", failures)
     for fragment in ("snapshot_substrate", "restore_substrate", "begin_geometry_transaction",
                      "rollback_geometry_transaction", "conservative_mass_admissible"):
         require(fragment.lower() in integrator.lower(), f"Lie rollback contract: {fragment}", failures)
