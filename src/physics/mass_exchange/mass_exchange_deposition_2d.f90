@@ -171,73 +171,65 @@ CONTAINS
 
     END SUBROUTINE eval_deposition_volume_kernel
 
-        !> @brief Iteratively evaluate terminal settling speed using the configured drag closure.
+        !> @brief Evaluate the terminal settling speed with continuous high-Re drag.
+        !> @details Schiller-Naumann (with the optional collective correction)
+        !>          is retained up to the physical particle Reynolds number 1000.
+        !>          Beyond that point C_D is held at C_D(1000), continuously.
+        !>          This is a constitutive choice; it replaces the former
+        !>          discontinuous shortcut C_D=1 at the *initial* Reynolds.
         !> @param[in] diam Solid particle diameter [m].
         !> @param[in] rhos Solid particle density [kg/m3].
         !> @param[in] rhoc Carrier density [kg/m3].
         !> @param[in] inv_kin_visc Inverse carrier kinematic viscosity [s/m2].
-        !> @return Computed physical quantity from the selected closure.
         REAL(wp) FUNCTION settling_velocity(diam, rhos, rhoc, inv_kin_visc)
 
-            REAL(wp), INTENT(IN) :: diam
-            REAL(wp), INTENT(IN) :: rhos
-            REAL(wp), INTENT(IN) :: rhoc
-            REAL(wp), INTENT(IN) :: inv_kin_visc
-
-            REAL(wp) :: Rey
-            REAL(wp) :: inv_sqrt_C_D
+            REAL(wp), INTENT(IN) :: diam, rhos, rhoc, inv_kin_visc
+            REAL(wp), PARAMETER :: transition_re=1000.0_wp
+            REAL(wp) :: Rey, inv_sqrt_C_D, drag_transition, initial_re
+            REAL(wp) :: const_part, set_vel_old
             INTEGER :: i
-            REAL(wp) :: const_part
-            REAL(wp) :: set_vel_old
-
-            inv_sqrt_C_D = 1.0_wp
 
             IF (rhos <= rhoc) THEN
-                    settling_velocity = 0.0_wp
-                    RETURN
-
+                settling_velocity=0.0_wp
+                RETURN
             END IF
 
-            const_part = SQRT((4.0_wp / 3.0_wp) * (rhos / rhoc - 1.0_wp) * diam * grav)
+            const_part=SQRT((4.0_wp/3.0_wp)*(rhos/rhoc-1.0_wp)*diam*grav)
 
-            settling_velocity = const_part * inv_sqrt_C_D
-            Rey = diam * settling_velocity * inv_kin_visc
+            ! Match the low-Re constitutive law exactly at Re=1000. For
+            ! collective settling, include its logarithmic drag contribution.
+            drag_transition=24.0_wp*(1.0_wp+0.15_wp*transition_re**0.687_wp)/transition_re
+            IF (collective_settling_flag) drag_transition=drag_transition+                                       &
+                A_drag*(LOG(transition_re)-B_drag)
+            IF (drag_transition<=0.0_wp) CALL fatal_error('settling: nonpositive drag at Re=1000')
 
-            ! Iterate the drag coefficient because Reynolds number depends on terminal speed.
-            IF (Rey <= 1000.0_wp) THEN
-
-                    C_D_loop: DO i = 1, 20
-                            set_vel_old = settling_velocity
-
-                            IF (collective_settling_flag) THEN
-                                    inv_sqrt_C_D = SQRT(1.0_wp / (24.0_wp * (1.0_wp +                                  &
-                                                0.15_wp * Rey**(0.687_wp)) / Rey +                                     &
-                                                A_drag * (LOG(Rey) - B_drag)))
-
-                            ELSE
-
-                                    inv_sqrt_C_D = SQRT(Rey / (24.0_wp * (1.0_wp +                                     &
-                                                0.15_wp * Rey**(0.687_wp))))
-
-                            END IF
-
-                            settling_velocity = const_part * inv_sqrt_C_D
-
-                            IF (ABS(set_vel_old - settling_velocity) / set_vel_old                                     &
-                                        < 1.0E-6_wp) THEN
-                                    RETURN
-
-                            END IF
-
-                            Rey = diam * settling_velocity * inv_kin_visc
-
-                    END DO C_D_loop
-
+            initial_re=diam*const_part*inv_kin_visc
+            ! Re^2*C_D(Re)=Re0^2. The transition occurs at the physical
+            ! Reynolds Re=1000, i.e. Re0=1000*sqrt(C_D(1000)), not Re0=1000.
+            IF (initial_re>=transition_re*SQRT(drag_transition)) THEN
+                settling_velocity=const_part/SQRT(drag_transition)
+                RETURN
             END IF
 
-            RETURN
+            ! Keep the established fixed-point solver below the transition.
+            ! This isolates the drag-model correction from a future separate
+            ! comparison of Newton and fixed-point convergence.
+            settling_velocity=const_part
+            Rey=initial_re
+            C_D_loop: DO i=1,20
+                set_vel_old=settling_velocity
+                IF (collective_settling_flag) THEN
+                    inv_sqrt_C_D=SQRT(1.0_wp/(24.0_wp*(1.0_wp+0.15_wp*Rey**0.687_wp)/Rey+                     &
+                        A_drag*(LOG(Rey)-B_drag)))
+                ELSE
+                    inv_sqrt_C_D=SQRT(Rey/(24.0_wp*(1.0_wp+0.15_wp*Rey**0.687_wp)))
+                END IF
+                settling_velocity=const_part*inv_sqrt_C_D
+                IF (ABS(set_vel_old-settling_velocity)/set_vel_old<1.0E-6_wp) RETURN
+                Rey=diam*settling_velocity*inv_kin_visc
+            END DO C_D_loop
 
-    END FUNCTION settling_velocity
+        END FUNCTION settling_velocity
 
         !> @brief Select carrier density and inverse kinematic viscosity for settling.
         !> @param[in] model_name Canonical rheology closure identifier.
