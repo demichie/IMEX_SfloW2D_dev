@@ -88,6 +88,20 @@ for label in ("G1", "slope", "slope_curvature"):
     print(f"{label} outside masses [kg]: {outside}")
     print(f"{label} relative outside mass: {relative_outside:.3e}")
 PY
+
+    # Extended wet/dry boundary regression. The original short-time fixture
+    # stops before the Neumann dry-face failure observed near t=1.69 s.
+    # Restore the base physics and integrate beyond that time; a dry physical
+    # boundary must not attempt to impose a finite extrapolated discharge.
+    sed -i.bak \
+        -e 's/T_END=1.0D-3/T_END=3.0D0/' \
+        -e 's/DT_OUTPUT=1.0D-3/DT_OUTPUT=3.0D0/' \
+        -e 's/SLOPE_CORRECTION_FLAG=T/SLOPE_CORRECTION_FLAG=F/' \
+        -e 's/CURVATURE_TERM_FLAG=T/CURVATURE_TERM_FLAG=F/' \
+        IMEX_SfloW2D.inp
+    OMP_NUM_THREADS=4 "$executable" > run_dry_boundary_3s.log
+    grep -q 'Total time taken by the code' run_dry_boundary_3s.log
 )
 
 echo "PASS: G=1, slope, and slope-plus-curvature runs are thread-reproducible with no resolved uphill/lateral transport across the Q1 excavation crest"
+echo "PASS: extended inclined excavation completes across dry Neumann boundaries"

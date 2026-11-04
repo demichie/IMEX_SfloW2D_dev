@@ -18,6 +18,22 @@ for expected in ("discharge_bc_to_velocity", "enforce_boundary_discharge",
                  "froude_h_blend_weight", "reconstruct_kt_eta_traces"):
     assert expected in r, expected
 
+# The first face-depth estimate may be dry even when the accepted HP depth
+# is wet. Zero provisional velocity must not be treated as an invalid inlet.
+# At the final HP face a dry Neumann boundary has zero transport; a genuinely
+# prescribed nonzero Dirichlet discharge remains an explicit input error.
+first_pass = r.split("SUBROUTINE discharge_bc_to_velocity(", 1)[1].split(
+    "END SUBROUTINE discharge_bc_to_velocity", 1
+)[0]
+final_pass = r.split("SUBROUTINE enforce_boundary_discharge(", 1)[1].split(
+    "END SUBROUTINE enforce_boundary_discharge", 1
+)[0]
+assert "Nonzero boundary discharge at dry first-pass reconstruction" not in first_pass
+assert "velocity_bc%value=0.0_wp" in first_pass
+assert "discharge_bc%flag==0" in final_pass
+assert "Nonzero Dirichlet discharge at a dry HP boundary" in final_pass
+assert "trace(idx)=0.0_wp" in final_pass
+
 # The regular 2-D interior must use contiguous component stencils. The
 # boundary path retains the scalar, condition-aware reconstruction.
 interior = r.split("IF ( regular_interior ) THEN", 1)[1].split(

@@ -1457,8 +1457,12 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         velocity_bc%value=0.0_wp
         IF (hface>dry_thickness_tolerance) THEN
             velocity_bc%value=discharge/hface
-        ELSEIF (ABS(discharge)>dry_thickness_tolerance) THEN
-            ERROR STOP 'Nonzero boundary discharge at dry first-pass reconstruction'
+        ELSE
+            ! The first-pass h trace is only a provisional limiter candidate.
+            ! It can be dry even when the subsequent HP selection is wet.
+            ! Use a zero provisional velocity rather than dividing by a dry
+            ! depth; the physical hu/hv constraint is applied after HP.
+            velocity_bc%value=0.0_wp
         END IF
     END SUBROUTINE discharge_bc_to_velocity
 
@@ -1503,10 +1507,17 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         CALL boundary_discharge_value(discharge_bc,qcenter(idx_h)*qcenter(idx),                                        &
             qneighbor(idx_h)*qneighbor(idx),half,inv_dx,side,normal,discharge)
         IF (hselected>dry_thickness_tolerance) THEN
+            ! A wet HP face retains the prescribed discharge, including the
+            ! original Neumann gradient in hu/hv rather than in u/v.
             trace(idx)=discharge/hselected
-        ELSEIF (ABS(discharge)>dry_thickness_tolerance) THEN
-            ERROR STOP 'Nonzero prescribed discharge at a dry HP boundary'
         ELSE
+            ! An empty face cannot transport mass or momentum. For Neumann
+            ! conditions the extrapolated discharge is not an imposed inflow:
+            ! its admissible dry-face value is zero.
+            ! A nonzero Dirichlet discharge is a genuine incompatible inlet
+            ! prescription, so reject it instead of silently dropping mass.
+            IF (discharge_bc%flag==0 .AND. ABS(discharge)>dry_thickness_tolerance)                                      &
+                ERROR STOP 'Nonzero Dirichlet discharge at a dry HP boundary'
             trace(idx)=0.0_wp
         END IF
     END SUBROUTINE enforce_boundary_discharge
