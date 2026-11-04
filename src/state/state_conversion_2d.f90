@@ -463,13 +463,28 @@ CONTAINS
     !> Construct real physical properties from the current conservative state.
     SUBROUTINE real_physical_state_from_q(q, state, bx, by, bxx, bxy, byy)
         REAL(wp), INTENT(IN) :: q(n_vars)
-        TYPE(physical_state_type), INTENT(OUT) :: state
+        TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         REAL(wp) :: geometry(5)
         REAL(wp) :: p_dyn
 
-        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas),                                                       &
-            state%xs(n_solid), state%xg(n_add_gas))
+        ! Retain per-worker phase buffers across successive Newton cells.
+        IF (ALLOCATED(state%alphas)) THEN
+            IF (SIZE(state%alphas)/=n_solid) DEALLOCATE(state%alphas)
+        END IF
+        IF (ALLOCATED(state%alphag)) THEN
+            IF (SIZE(state%alphag)/=n_add_gas) DEALLOCATE(state%alphag)
+        END IF
+        IF (ALLOCATED(state%xs)) THEN
+            IF (SIZE(state%xs)/=n_solid) DEALLOCATE(state%xs)
+        END IF
+        IF (ALLOCATED(state%xg)) THEN
+            IF (SIZE(state%xg)/=n_add_gas) DEALLOCATE(state%xg)
+        END IF
+        IF (.NOT.ALLOCATED(state%alphas)) ALLOCATE(state%alphas(n_solid))
+        IF (.NOT.ALLOCATED(state%alphag)) ALLOCATE(state%alphag(n_add_gas))
+        IF (.NOT.ALLOCATED(state%xs)) ALLOCATE(state%xs(n_solid))
+        IF (.NOT.ALLOCATED(state%xg)) ALLOCATE(state%xg(n_add_gas))
         CALL r_phys_var(q, state%h, state%u, state%v, state%alphas,                                                    &
             state%rho_m, state%T, state%alphag, state%red_grav,                                                        &
             p_dyn, state%Zs, state%exc_pore_pres)

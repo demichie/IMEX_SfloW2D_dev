@@ -41,6 +41,12 @@ PROGRAM test_source_registry
   CALL require(SIZE(groups(2)%equation_ids)==3,'union has three unique equations')
   CALL require(ALL(groups(2)%equation_ids==[2,3,4]),'complete conservative footprint')
   CALL require(group_contains_name(groups(2),'thermal_cooling'),'cooling registered')
+  CALL require(BTEST(groups(2)%source_mask,RHEOLOGY_ID_VOELLMY-1), &
+       'numeric source mask contains rheology')
+  CALL require(BTEST(groups(2)%source_mask,SOURCE_ID_THERMAL_COOLING-1), &
+       'numeric source mask contains cooling')
+  CALL require(.NOT.BTEST(groups(2)%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1), &
+       'numeric source mask excludes inactive curvature')
    CALL require(groups(2)%rheology_name=='rheology_voellmy','cached rheology identity')
    CALL require(groups(2)%rheology_id==RHEOLOGY_ID_VOELLMY,'cached numeric rheology ID')
    CALL require(groups(2)%rheology_implicit,'cached implicit role')

@@ -22,6 +22,7 @@ MODULE source_registry_2d
         LOGICAL :: rheology_implicit=.FALSE. !< Cached Newton implicit-rheology role.
         LOGICAL :: thermal_active=.FALSE. !< Cached thermal source presence.
         INTEGER :: rheology_id=RHEOLOGY_ID_NONE !< Cached numeric source dispatch.
+        INTEGER :: source_mask=0 !< Immutable bitset of validated catalogue IDs.
     END TYPE source_group_type
 
     !> \brief Validated metadata owned and finalized by one simulation context.
@@ -58,7 +59,7 @@ CONTAINS
         CHARACTER(*), INTENT(OUT) :: error
         TYPE(source_term_type) :: term
         CHARACTER(LEN=64), ALLOCATABLE :: seen(:)
-        INTEGER :: i,j,mass_group,k,eq,rheology_count
+        INTEGER :: i,j,mass_group,k,eq,rheology_count,source_id
         INTEGER, ALLOCATABLE :: expected(:),affected(:)
         CALL this%finalize()
         mass_group=-1
@@ -168,9 +169,13 @@ CONTAINS
             this%lie_entries(i)%rheology_name=''
             this%lie_entries(i)%rheology_id=RHEOLOGY_ID_NONE
             this%lie_entries(i)%rheology_implicit=.FALSE.
+            this%lie_entries(i)%source_mask=0
             this%lie_entries(i)%thermal_active=.FALSE.
 
             DO j=1,SIZE(this%lie_entries(i)%source_names)
+                source_id=source_term_id_by_name(this%lie_entries(i)%source_names(j))
+                IF (source_id<=0) RETURN
+                this%lie_entries(i)%source_mask=IBSET(this%lie_entries(i)%source_mask,source_id-1)
                 IF (INDEX(TRIM(this%lie_entries(i)%source_names(j)),'rheology_')==1) THEN
                     this%lie_entries(i)%rheology_name=this%lie_entries(i)%source_names(j)
                     this%lie_entries(i)%rheology_id=rheology_source_id(this%lie_entries(i)%rheology_name)

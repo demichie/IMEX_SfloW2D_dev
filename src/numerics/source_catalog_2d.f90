@@ -9,7 +9,19 @@ MODULE source_catalog_2d
     PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
     PUBLIC :: source_newton_affected_equations
     PUBLIC :: canonical_rheology_source_name, rheology_name_has_role, canonical_rheology_catalog_unique
-    PUBLIC :: rheology_source_id
+    PUBLIC :: rheology_source_id, source_term_id_by_name, source_id_mask
+    ! Catalogue indices are stable internal dispatch IDs, not user-facing group IDs.
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_THERMAL_COOLING=12
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_BOTTOM_CIRCULAR_INJECTION=14
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_BOTTOM_FISSURAL_INJECTION=15
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_RADIAL_INJECTION=16
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_GEOMETRY_CURVATURE=17
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_LAVA_DEPOSITION=18
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_EROSION=19
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_DEPOSITION=20
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS=21
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_ENTRAINMENT=22
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_VAPORIZATION=23
     INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_NEWTON_BLOCK=1, SOURCE_SOLVE_ANALYTIC_VELOCITY=2
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_ANALYTIC_TEMPERATURE=3, SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE=4
@@ -115,6 +127,25 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.)                                     &
             ]
 CONTAINS
+    !> Resolve source names at initialization only, never in cell kernels.
+    PURE INTEGER FUNCTION source_term_id_by_name(name) RESULT(id)
+        CHARACTER(*), INTENT(IN) :: name
+        INTEGER :: i
+        id=0
+        DO i=1,SOURCE_TERM_COUNT
+            IF (TRIM(name)==TRIM(SOURCE_CATALOG(i)%name)) THEN
+                id=i
+                RETURN
+            END IF
+        END DO
+    END FUNCTION source_term_id_by_name
+
+    !> Single integer stores the complete active-source set (currently 23 entries).
+    PURE INTEGER FUNCTION source_id_mask(id) RESULT(mask)
+        INTEGER, INTENT(IN) :: id
+        mask=0
+        IF (id>=1 .AND. id<=SOURCE_TERM_COUNT) mask=IBSET(mask,id-1)
+    END FUNCTION source_id_mask
     !> Resolve a canonical rheology once; -1 indicates an unknown source.
     PURE INTEGER FUNCTION rheology_source_id(name) RESULT(id)
         CHARACTER(*), INTENT(IN) :: name

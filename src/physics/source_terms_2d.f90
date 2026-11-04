@@ -20,7 +20,9 @@ MODULE source_terms_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
-    USE source_registry_2d, ONLY : source_group_type, group_contains_name
+    USE source_registry_2d, ONLY : source_group_type
+    USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_BOTTOM_CIRCULAR_INJECTION,                &
+        SOURCE_ID_BOTTOM_FISSURAL_INJECTION, SOURCE_ID_RADIAL_INJECTION, SOURCE_ID_THERMAL_COOLING
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_source_explicit
@@ -71,8 +73,8 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
         TYPE(source_group_type), INTENT(IN) :: group
         ! Prepartitioned immutable metadata supplied by the Lie executor.
-        TYPE(source_group_type), INTENT(IN), OPTIONAL :: non_exchange_group
-        LOGICAL, INTENT(IN), OPTIONAL :: exchange_selected
+        TYPE(source_group_type), INTENT(IN) :: non_exchange_group
+        LOGICAL, INTENT(IN) :: exchange_selected
         TYPE(physical_state_type), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         REAL(wp), INTENT(IN) :: inventory(n_solid)
@@ -81,43 +83,24 @@ CONTAINS
         ! Retain allocations in the thread-owned transfer record across cells.
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
         LOGICAL, INTENT(OUT) :: has_exchange,valid
-        TYPE(source_group_type) :: non_exchange
         REAL(wp) :: physical(n_eqns),exchange(n_eqns),coverage,scale
-        IF (PRESENT(exchange_selected)) THEN
-            has_exchange=exchange_selected
-        ELSE
-            has_exchange=ANY(INDEX(group%source_names,'mass_exchange_')==1)
-        END IF
+        has_exchange=exchange_selected
         valid=.FALSE.
         physical=0.0_wp
         exchange=0.0_wp
-        ! Production groups use a one-time partition. Preserve the original
-        ! interface for standalone callers, including mixed explicit groups.
-        IF (PRESENT(non_exchange_group)) THEN
-            IF (SIZE(non_exchange_group%source_names)>0)                                                               &
-                CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                           &
-                    context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                          &
-                    context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                               &
-                    arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch)
-        ELSEIF (.NOT.has_exchange) THEN
+        ! Partitioned immutable metadata comes from the Lie registry/executor.
+        ! Never copy allocatable group members or PACK source names inside cells.
+        IF (non_exchange_group%source_mask/=0) THEN
             CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,group,stochastic_value,physical_scratch)
-        ELSEIF (ANY(INDEX(group%source_names,'mass_exchange_')/=1)) THEN
-            non_exchange=group
-            non_exchange%source_names=PACK(group%source_names,                                                         &
-                INDEX(group%source_names,'mass_exchange_')/=1)
-            CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
-                context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
-                context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value,physical_scratch)
+                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch)
         END IF
 
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_names,transfer,exchange,physical_scratch,exchange_scratch)
+                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -327,12 +310,14 @@ CONTAINS
     !> Evaluate the frozen semi-implicit contribution of one Newton Lie group.
     !> All inputs refer to one cell; no domain indices or shared-state writes.
     SUBROUTINE eval_source_semi_implicit(group,q_cell,Bprime_x,Bprime_y,                                               &
-            grav_correction,stochastic_value,rate)
+            grav_correction,stochastic_value,rate,physical_scratch)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
-        TYPE(physical_state_type) :: physical_state
+        TYPE(physical_state_type), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
+        TYPE(physical_state_type), TARGET :: local_state
+        TYPE(physical_state_type), POINTER :: physical_state
 
         rate=0.0_wp
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
@@ -341,6 +326,8 @@ CONTAINS
         IF (q_cell(idx_totMassEqn)<=0.0_wp) RETURN
 
         IF (group%rheology_id==0) RETURN
+        physical_state=>local_state
+        IF (PRESENT(physical_scratch)) physical_state=>physical_scratch
         CALL real_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                       &
             0.0_wp,0.0_wp,0.0_wp)
         CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
@@ -424,7 +411,7 @@ CONTAINS
         END IF
 
         IF (selected_thermal) THEN
-            CALL eval_thermal_implicit(['thermal_cooling'],physical_state,                                             &
+            CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                             &
                 radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
 
         END IF
@@ -502,7 +489,6 @@ CONTAINS
 
         REAL(wp) :: rheology_rate(2), thermal_rate, pressure_rate
         REAL(wp) :: injection_rate(n_eqns)
-        CHARACTER(LEN=64) :: active_rheology
 
 
         expl_term(1:n_eqns) = 0.0_wp
@@ -531,7 +517,7 @@ CONTAINS
 
             q1 = r_h * r_rho_m
 
-            IF ( group_contains_name(group,'geometry_curvature') .AND.                                                 &
+            IF ( BTEST(group%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1) .AND.                                         &
                 r_h .GT. dry_thickness_tolerance ) THEN
 
                 ! Hydrostatic pressure and the ordinary bed-slope source are already
@@ -551,10 +537,8 @@ CONTAINS
 
             ! Source rates are evaluated at the same unmodified stage state.
             ! The construction of EXPLICIT stays inside each physical module.
-            active_rheology=group%rheology_name
-            IF (LEN_TRIM(active_rheology)>0 .AND.                                                                      &
-                r_h>dry_thickness_tolerance) THEN
-                CALL eval_rheology_explicit([active_rheology], physical_state,                                         &
+            IF (group%rheology_id>0 .AND. r_h>dry_thickness_tolerance) THEN
+                CALL eval_rheology_explicit(group%rheology_id,physical_state,                                          &
                     grav_coeff, pore_pressure_flag,                                                                    &
                     stochastic_flag, stochastic_value, rheology_rate)
                 expl_term(2:3)=expl_term(2:3)+rheology_rate
@@ -562,7 +546,7 @@ CONTAINS
             END IF
 
             IF (group%thermal_active) THEN
-                CALL eval_thermal_explicit(['thermal_cooling'],physical_state,                                         &
+                CALL eval_thermal_explicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                         &
                     radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
 
@@ -572,9 +556,9 @@ CONTAINS
 
         CALL eval_mass_injection_explicit(physical_state,time,cell_fract_jk,                                           &
             cell_fissure_fract,lat_arc_perim_jk,lat_n_x_jk,lat_n_y_jk,cell_area_jk,                                    &
-            group_contains_name(group,'bottom_circular_injection'),                                                    &
-            group_contains_name(group,'bottom_fissural_injection'),                                                    &
-            group_contains_name(group,'radial_injection'),injection_rate)
+            BTEST(group%source_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                          &
+            BTEST(group%source_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                           &
+            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate)
         expl_term=expl_term+injection_rate
 
         RETURN
@@ -627,11 +611,11 @@ CONTAINS
     !> \param[out] eqns_term Conservative equation source-rate vector.
     !> \param[out] topo_term Proposed bed-elevation rate.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,selected_names,rates,eqns_term,physical_scratch,exchange_scratch)
+            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch)
         REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
-        CHARACTER(*), INTENT(IN) :: selected_names(:)
+        INTEGER, INTENT(IN) :: source_mask
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
         TYPE(physical_state_type), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
@@ -643,6 +627,6 @@ CONTAINS
         IF (PRESENT(physical_scratch)) exchange_state=>physical_scratch
         CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
         CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
-            erodible,dt,selected_names,rates,eqns_term,exchange_scratch)
+            erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d

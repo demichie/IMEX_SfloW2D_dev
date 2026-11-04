@@ -19,7 +19,7 @@ MODULE nonlinear_solver_2d
     USE source_registry_2d, ONLY : source_group_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit
-    USE state_conversion_2d, ONLY : complex_physical_state_type
+    USE state_conversion_2d, ONLY : complex_physical_state_type, physical_state_type
 
     IMPLICIT NONE
 
@@ -34,7 +34,8 @@ CONTAINS
     !> Solve the entire structurally affected conservative equation set.
     !> Every other conservative component remains fixed at its group input value.
     SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
-        stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace)
+        stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace,            &
+        real_workspace)
         TYPE(source_group_type), INTENT(IN) :: source_group
         REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,grav_correction,stochastic_value
@@ -44,6 +45,9 @@ CONTAINS
         TYPE(complex_physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: complex_workspace
         TYPE(complex_physical_state_type), TARGET :: local_complex_workspace
         TYPE(complex_physical_state_type), POINTER :: active_workspace
+        TYPE(physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: real_workspace
+        TYPE(physical_state_type), TARGET :: local_real_workspace
+        TYPE(physical_state_type), POINTER :: active_real_workspace
         REAL(wp) :: q_in(n_vars),q_si(n_vars),semi_rate(n_eqns),coeff_f(n_eqns)
         REAL(wp) :: semi_scale,delta_momentum
         INTEGER :: n_active,i
@@ -66,7 +70,10 @@ CONTAINS
         ! Freeze the semi-implicit rate and limit its entire increment by one
         ! nonnegative factor, so neither momentum component crosses zero.
         ! Components initially at rest must not acquire a sign from friction.
-        CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y, grav_correction,stochastic_value,semi_rate)
+        active_real_workspace=>local_real_workspace
+        IF (PRESENT(real_workspace)) active_real_workspace=>real_workspace
+        CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y,grav_correction,stochastic_value,            &
+            semi_rate,active_real_workspace)
         semi_scale=1.0_wp
 
         DO i=2,3

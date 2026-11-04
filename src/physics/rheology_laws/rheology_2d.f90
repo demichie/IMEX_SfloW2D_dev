@@ -89,54 +89,47 @@ CONTAINS
     END SUBROUTINE limit_rheology_momentum_reversal
 
 
-    SUBROUTINE eval_rheology_explicit(models, state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value,  &
+    SUBROUTINE eval_rheology_explicit(model_id, state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value,  &
         rate)
-        CHARACTER(*), INTENT(IN) :: models(:)
+        INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
-        INTEGER :: i
         rate=0.0_wp
-
-        DO i=1,SIZE(models)
-            process_rate = 0.0_wp
-
-            SELECT CASE(TRIM(models(i)))
-            CASE('rheology_voellmy')
+        process_rate=0.0_wp
+        SELECT CASE(model_id)
+            CASE(RHEOLOGY_ID_VOELLMY)
                 CALL eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,              &
                     stochastic_value, process_rate)
-            CASE('rheology_plastic')
+            CASE(RHEOLOGY_ID_PLASTIC)
                 CALL eval_rheology_plastic_explicit(state, process_rate)
-            CASE('rheology_lava')
+            CASE(RHEOLOGY_ID_LAVA)
                 CALL eval_rheology_lava_explicit(state, process_rate)
-            CASE('rheology_lahar')
+            CASE(RHEOLOGY_ID_LAHAR)
                 CALL eval_rheology_lahar_explicit(state, process_rate)
-            CASE('rheology_empirical')
+            CASE(RHEOLOGY_ID_EMPIRICAL)
                 CALL eval_rheology_empirical_explicit(state, process_rate)
-            CASE('rheology_quadratic')
+            CASE(RHEOLOGY_ID_QUADRATIC)
                 CALL eval_rheology_quadratic_explicit(state, process_rate)
-            CASE('rheology_newmodel')
+            CASE(RHEOLOGY_ID_NEWMODEL)
                 CALL eval_rheology_newmodel_explicit(state, process_rate)
-            CASE('rheology_froude')
+            CASE(RHEOLOGY_ID_FROUDE)
                 CALL eval_rheology_froude_explicit(state, grav_coeff, use_stochastic, stochastic_value, process_rate)
-            CASE('rheology_lucas')
+            CASE(RHEOLOGY_ID_LUCAS)
                 CALL eval_rheology_lucas_explicit(state, grav_coeff, use_stochastic, stochastic_value, process_rate)
-            CASE('rheology_mui')
+            CASE(RHEOLOGY_ID_MUI)
                 CALL eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, process_rate)
-            CASE('rheology_mui_voellmy')
+            CASE(RHEOLOGY_ID_MUI_VOELLMY)
                 CALL eval_rheology_mui_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,          &
                     stochastic_value, process_rate)
             CASE DEFAULT
                 CALL fatal_error('Invalid rheology name in explicit dispatch')
 
         END SELECT
-
-            rate=rate+process_rate
-
-        END DO
+        rate=process_rate
     END SUBROUTINE eval_rheology_explicit
 
 

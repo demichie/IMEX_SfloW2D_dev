@@ -12,6 +12,8 @@ MODULE lie_source_executor_2d
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE domain_2d, ONLY : domain_type
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
+    USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
+        SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
     USE state_2d, ONLY : state_type
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
@@ -68,7 +70,7 @@ CONTAINS
         USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         TYPE(source_registry_type), INTENT(IN) :: source_registry
-        INTEGER :: group_index,env_status,parse_status,ncells
+        INTEGER :: group_index,env_status,parse_status,ncells,source_id
         CHARACTER(LEN=24) :: env_value
 
         IF (.NOT.source_registry%is_initialized()) CALL fatal_error('D19: uninitialized Lie source registry')
@@ -96,18 +98,22 @@ CONTAINS
                     IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
                 END IF
             END IF
+            ! Resolved catalogue IDs 18:23 are all mass-exchange processes.
             executor%exchange_group(group_index)=                                                                      &
-                ANY(INDEX(executor%groups(group_index)%source_names,'mass_exchange_')==1)
-            ! Cache the non-exchange subset before entering the OpenMP cell sweep.
+                IAND(executor%groups(group_index)%source_mask,                                                        &
+                ISHFT(IBITS(NOT(0),0,SOURCE_ID_EXCHANGE_VAPORIZATION-SOURCE_ID_EXCHANGE_LAVA_DEPOSITION+1),           &
+                SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1))/=0
             executor%non_exchange_groups(group_index)=executor%groups(group_index)
             IF (executor%exchange_group(group_index)) THEN
-                executor%non_exchange_groups(group_index)%source_names=                                               &
-                    PACK(executor%groups(group_index)%source_names,                                                    &
-                    INDEX(executor%groups(group_index)%source_names,'mass_exchange_')/=1)
+                DO source_id=SOURCE_ID_EXCHANGE_LAVA_DEPOSITION,SOURCE_ID_EXCHANGE_VAPORIZATION
+                    executor%non_exchange_groups(group_index)%source_mask=                                            &
+                        IBCLR(executor%non_exchange_groups(group_index)%source_mask,source_id-1)
+                END DO
             END IF
             executor%dry_noop_group(group_index)=                                                                     &
-                ALL(executor%groups(group_index)%source_names=='geometry_curvature' .OR.                               &
-                    executor%groups(group_index)%source_names=='mass_exchange_deposition')
+                IAND(executor%groups(group_index)%source_mask,                                                        &
+                NOT(IOR(IBSET(0,SOURCE_ID_GEOMETRY_CURVATURE-1),                                                       &
+                IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1))))==0
             IF (executor%exchange_group(group_index)) THEN
                 IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                   &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
@@ -517,7 +523,8 @@ CONTAINS
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
                         cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
-                        iterations, ok, linear_info, failed, executor%source_complex_scratch(tid))
+                        iterations, ok, linear_info, failed, executor%source_complex_scratch(tid),                    &
+                        executor%source_physical_scratch(tid))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

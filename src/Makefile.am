@@ -94,6 +94,10 @@ state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
 # risk moving unrelated large grid temporaries onto thread stacks.
 state/state_conversion_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Newton's small runtime-sized cell work arrays remain thread-private on stack.
+numerics/nonlinear_solver_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Explicit source cell kernels hold only bounded per-cell scratch, never grids.
+physics/source_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                 \

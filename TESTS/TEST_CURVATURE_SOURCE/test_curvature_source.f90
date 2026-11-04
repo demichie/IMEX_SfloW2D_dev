@@ -8,7 +8,8 @@ PROGRAM test_curvature_source
   USE source_terms_2d, ONLY : eval_geometry_curvature_explicit
   USE source_terms_2d, ONLY : eval_source_explicit
   USE mass_injection_coefficients_2d, ONLY : set_source_time_coefficients
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE,                                &
+       SOURCE_ID_BOTTOM_CIRCULAR_INJECTION, SOURCE_ID_BOTTOM_FISSURAL_INJECTION, SOURCE_ID_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type
 
   IMPLICIT NONE
@@ -33,12 +34,16 @@ PROGRAM test_curvature_source
 
   curvature_group%method=SOURCE_METHOD_EXPLICIT
   curvature_group%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
+  curvature_group%source_mask=IBSET(0,SOURCE_ID_GEOMETRY_CURVATURE-1)
   circular_injection_group%method=SOURCE_METHOD_EXPLICIT
   circular_injection_group%source_names=[CHARACTER(LEN=64)::'bottom_circular_injection']
+  circular_injection_group%source_mask=IBSET(0,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1)
   fissural_injection_group%method=SOURCE_METHOD_EXPLICIT
   fissural_injection_group%source_names=[CHARACTER(LEN=64)::'bottom_fissural_injection']
+  fissural_injection_group%source_mask=IBSET(0,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1)
   radial_injection_group%method=SOURCE_METHOD_EXPLICIT
   radial_injection_group%source_names=[CHARACTER(LEN=64)::'radial_injection']
+  radial_injection_group%source_mask=IBSET(0,SOURCE_ID_RADIAL_INJECTION-1)
 
   expected_acceleration = Bxx*u*u + 2.0_wp*Bxy*u*v + Byy*v*v
   CALL assert_small( 'curvature acceleration',                             &

@@ -9,7 +9,7 @@ PROGRAM test_spatial_operator
   USE state_conversion_2d, ONLY : qp_to_qc
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE source_terms_2d, ONLY : eval_source_explicit
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_group_type
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -46,8 +46,10 @@ PROGRAM test_spatial_operator
   CALL initialize_fixture
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
-  IF (curvature_term_flag) &
+  IF (curvature_term_flag) THEN
        explicit_group%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
+       explicit_group%source_mask=IBSET(0,SOURCE_ID_GEOMETRY_CURVATURE-1)
+  END IF
   READ(input_unit,*) B_vertex
   READ(input_unit,*) q
   CLOSE(input_unit)

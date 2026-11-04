@@ -3,6 +3,7 @@
 MODULE thermal_laws_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
+    USE source_catalog_2d, ONLY : SOURCE_ID_THERMAL_COOLING
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit,                                                      &
             eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit,                                         &
@@ -22,28 +23,22 @@ CONTAINS
     !> @param[in] convective Convective heat-exchange coefficient.
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] rate Assembled real thermal source rate.
-    SUBROUTINE eval_thermal_explicit(models,state,radiative,convective,ambient,rate)
-        CHARACTER(*), INTENT(IN) :: models(:)
+    SUBROUTINE eval_thermal_explicit(model_id,state,radiative,convective,ambient,rate)
+        INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: rate
         REAL(wp) :: process_rate
-        INTEGER :: i
         rate=0.0_wp
 
-        DO i=1,SIZE(models)
-
-        SELECT CASE (TRIM(models(i)))
-        CASE ('thermal_cooling')
+        SELECT CASE (model_id)
+        CASE (SOURCE_ID_THERMAL_COOLING)
             CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,process_rate)
         CASE DEFAULT
-            CALL fatal_error('Unknown explicit thermal model: '//TRIM(models(i)))
+            CALL fatal_error('Unknown explicit thermal model ID')
 
         END SELECT
-
-        rate=rate+process_rate
-
-        END DO
+        rate=process_rate
     END SUBROUTINE eval_thermal_explicit
 
 
@@ -88,28 +83,22 @@ CONTAINS
     !> @param[in] convective Convective heat-exchange coefficient.
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] rate Assembled complex thermal source rate.
-    SUBROUTINE eval_thermal_implicit(models,state,radiative,convective,ambient,rate)
-        CHARACTER(*), INTENT(IN) :: models(:)
+    SUBROUTINE eval_thermal_implicit(model_id,state,radiative,convective,ambient,rate)
+        INTEGER, INTENT(IN) :: model_id
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         COMPLEX(wp), INTENT(OUT) :: rate
         COMPLEX(wp) :: process_rate
-        INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
 
-        DO i=1,SIZE(models)
-
-        SELECT CASE (TRIM(models(i)))
-        CASE ('thermal_cooling')
+        SELECT CASE (model_id)
+        CASE (SOURCE_ID_THERMAL_COOLING)
             CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,process_rate)
         CASE DEFAULT
-            CALL fatal_error('Unknown implicit thermal model: '//TRIM(models(i)))
+            CALL fatal_error('Unknown implicit thermal model ID')
 
         END SELECT
-
-        rate=rate+process_rate
-
-        END DO
+        rate=process_rate
     END SUBROUTINE eval_thermal_implicit
 
 
