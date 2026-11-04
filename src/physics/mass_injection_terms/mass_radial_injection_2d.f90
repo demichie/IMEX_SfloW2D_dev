@@ -2,7 +2,6 @@
 !> @details Injection physics uses local state and geometric values; unsupported
 !>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_radial_injection_2d
-    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
@@ -27,13 +26,6 @@ CONTAINS
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
-    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
-            time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
-            pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
-            radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
-            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
-            xs_fissures, xg_fissures
-    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk

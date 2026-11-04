@@ -13,12 +13,12 @@ MODULE nonlinear_solver_2d
 
     USE lapack_interfaces_2d, ONLY : solve_dense_system
 
-    USE parameters_2d, ONLY : wp, n_eqns, n_vars, verbose_level
+    USE parameters_2d, ONLY : wp, n_eqns, n_vars, verbose_level, tol_abs, tol_rel, max_nl_iter
 
 
     USE source_registry_2d, ONLY : source_group_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
-    USE source_terms_2d, ONLY : eval_source_semi_implicit
+    USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit
     USE state_conversion_2d, ONLY : complex_physical_state_type
 
     IMPLICIT NONE
@@ -35,7 +35,6 @@ CONTAINS
     !> Every other conservative component remains fixed at its group input value.
     SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
         stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace)
-    USE parameters_2d, ONLY : tol_abs,tol_rel
         TYPE(source_group_type), INTENT(IN) :: source_group
         REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,grav_correction,stochastic_value
@@ -124,7 +123,6 @@ CONTAINS
         coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed,           &
         implicit_scratch)
 
-    USE parameters_2d, ONLY : max_nl_iter
 
     IMPLICIT NONE
 
@@ -779,7 +777,6 @@ CONTAINS
     SUBROUTINE eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y , f_nl , scal_f, Zij,             &
         active_equations, source_group, implicit_scratch)
 
-    USE source_terms_2d, ONLY : eval_source_implicit
 
     IMPLICIT NONE
 
@@ -856,7 +853,6 @@ CONTAINS
     SUBROUTINE eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,                 &
         active_equations, source_group, implicit_scratch)
 
-    USE source_terms_2d, ONLY : eval_source_implicit
 
     IMPLICIT NONE
 
