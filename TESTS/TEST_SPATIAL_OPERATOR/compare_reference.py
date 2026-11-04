@@ -82,7 +82,7 @@ def write_fixture(path, vertices, q, slope, curvature, limiter):
 
 
 def read_payload(path):
-    """Decode version-two test stream; Fortran variable-first is a C-last NumPy view."""
+    """Decode the five-component primitive stream; Fortran variable-first is a C-last NumPy view."""
     raw = np.fromfile(path, dtype=np.float64)
     fields = {}
     cursor = 0
@@ -94,7 +94,7 @@ def read_payload(path):
         cursor += count
 
     take("dt", (1,))
-    for name, components in (("q", 5), ("qp", 7), ("spatial", 5), ("sources", 5)):
+    for name, components in (("q", 5), ("qp", 5), ("spatial", 5), ("sources", 5)):
         take(name, (NY, NX, components))
     take("active", (NY, NX))
     take("vertices", (NY+1, NX+1))
@@ -110,7 +110,7 @@ def read_payload(path):
         take("q_"+name, shape+(5,))
     for name, shape in (("xL", (NY, NX+1)), ("xR", (NY, NX+1)),
                         ("yB", (NY+1, NX)), ("yT", (NY+1, NX))):
-        take("qp_"+name, shape+(7,))
+        take("qp_"+name, shape+(5,))
     for name, shape in (("xL", (NY, NX+1)), ("xR", (NY, NX+1)),
                         ("yB", (NY+1, NX)), ("yT", (NY+1, NX))):
         take("eta_"+name, shape)
@@ -233,7 +233,7 @@ def compare(fields, q, vertices, bed, params, name):
         for side in sides:
             qc = fields[f"q_{normal}{side}"]
             qp = fields[f"qp_{normal}{side}"]
-            for component, velocity, direction in ((1, 5, "u"), (2, 6, "v")):
+            for component, velocity, direction in ((1, 1, "u"), (2, 2, "v")):
                 check(f"trace_{normal}{side}_momentum_{direction}_from_velocity",
                       qc[..., component], qc[..., 0]*qp[..., velocity], mask)
             # The single-solid closure must use the same mass density on all
@@ -267,7 +267,7 @@ def negative_controls(fields, q, vertices, bed, params):
     mutations = (
         ("residual_mass", "spatial", (8, 9, 0), 1.0),
         ("trace_xL_momentum_v_from_velocity", "q_xL", (8, 9, 2), 1.0),
-        ("primitive_trace_finite", "qp_xL", (8, 9, 5), float("inf")),
+        ("primitive_trace_finite", "qp_xL", (8, 9, 1), float("inf")),
         ("G_x_faces", "Gx", (8, 9), 0.1),
         ("wave_x_plus", "ax_plus", (8, 9), 0.1),
         ("retained_IMEX_dt_policy", "dt", (0,), 0.01),
