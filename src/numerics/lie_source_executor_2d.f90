@@ -13,7 +13,7 @@ MODULE lie_source_executor_2d
     USE domain_2d, ONLY : domain_type
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE state_2d, ONLY : state_type
-    USE state_conversion_2d, ONLY : physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
 
     IMPLICIT NONE
@@ -36,6 +36,8 @@ MODULE lie_source_executor_2d
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
         TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
         TYPE(physical_state_type), ALLOCATABLE :: source_physical_scratch(:)
+        ! Per-worker complex-step workspace persists across cells and timesteps.
+        TYPE(complex_physical_state_type), ALLOCATABLE :: source_complex_scratch(:)
         TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
         TYPE(mass_exchange_rates_type), ALLOCATABLE :: source_transfers(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
@@ -173,6 +175,7 @@ CONTAINS
         IF (ALLOCATED(executor%dry_noop_group)) DEALLOCATE(executor%dry_noop_group)
         IF (ALLOCATED(executor%non_exchange_groups)) DEALLOCATE(executor%non_exchange_groups)
         IF (ALLOCATED(executor%source_physical_scratch)) DEALLOCATE(executor%source_physical_scratch)
+        IF (ALLOCATED(executor%source_complex_scratch)) DEALLOCATE(executor%source_complex_scratch)
         IF (ALLOCATED(executor%source_exchange_scratch)) DEALLOCATE(executor%source_exchange_scratch)
         IF (ALLOCATED(executor%source_transfers)) DEALLOCATE(executor%source_transfers)
         IF (ALLOCATED(executor%failure_code)) DEALLOCATE(executor%failure_code)
@@ -296,6 +299,14 @@ CONTAINS
         END IF
         IF (.NOT.ALLOCATED(executor%source_physical_scratch))                                                         &
             ALLOCATE(executor%source_physical_scratch(nthreads))
+        IF (executor%has_newton_group) THEN
+            IF (ALLOCATED(executor%source_complex_scratch)) THEN
+                IF (SIZE(executor%source_complex_scratch)<nthreads)                                                   &
+                    DEALLOCATE(executor%source_complex_scratch)
+            END IF
+            IF (.NOT.ALLOCATED(executor%source_complex_scratch))                                                       &
+                ALLOCATE(executor%source_complex_scratch(nthreads))
+        END IF
         IF (ALLOCATED(executor%source_exchange_scratch)) THEN
             IF (SIZE(executor%source_exchange_scratch)<nthreads) DEALLOCATE(executor%source_exchange_scratch)
         END IF
@@ -506,7 +517,7 @@ CONTAINS
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
                         cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
-                        iterations, ok, linear_info, failed)
+                        iterations, ok, linear_info, failed, executor%source_complex_scratch(tid))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

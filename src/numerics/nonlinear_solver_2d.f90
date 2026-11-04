@@ -34,13 +34,17 @@ CONTAINS
     !> Solve the entire structurally affected conservative equation set.
     !> Every other conservative component remains fixed at its group input value.
     SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
-        stochastic_value, iterations_used, converged, linear_info, line_search_failed)
+        stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace)
     USE parameters_2d, ONLY : tol_abs,tol_rel
         TYPE(source_group_type), INTENT(IN) :: source_group
         REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,grav_correction,stochastic_value
         INTEGER, INTENT(OUT) :: iterations_used,linear_info
         LOGICAL, INTENT(OUT) :: converged,line_search_failed
+        ! Optional reusable per-worker workspace; the fallback stays cell-local.
+        TYPE(complex_physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: complex_workspace
+        TYPE(complex_physical_state_type), TARGET :: local_complex_workspace
+        TYPE(complex_physical_state_type), POINTER :: active_workspace
         REAL(wp) :: q_in(n_vars),q_si(n_vars),semi_rate(n_eqns),coeff_f(n_eqns)
         REAL(wp) :: semi_scale,delta_momentum
         INTEGER :: n_active,i
@@ -89,8 +93,14 @@ CONTAINS
         q_cell=q_si
         coeff_f=1.0_wp
         linear_info=0
+        IF (PRESENT(complex_workspace)) THEN
+            active_workspace => complex_workspace
+        ELSE
+            active_workspace => local_complex_workspace
+        END IF
         CALL solve_newton_group(source_group, source_group%equation_ids, q_cell, q_si, dt, Bprime_x, Bprime_y,         &
-            stochastic_value, coeff_f, tol_abs, tol_rel, iterations_used, converged, linear_info, line_search_failed)
+            stochastic_value, coeff_f, tol_abs, tol_rel, iterations_used, converged, linear_info, line_search_failed,  &
+            active_workspace)
         IF (.NOT.converged) q_cell=q_in
     END SUBROUTINE solve_backward_euler_group
 
@@ -111,7 +121,8 @@ CONTAINS
     !> \param[out] linear_info Linear solver status; zero denotes success.
     !> \param[out] line_search_failed True if backtracking cannot accept a step.
     SUBROUTINE solve_newton_group(source_group, group_equations, qj, q_group_input, dt_step, Bprimej_x, Bprimej_y, Zij,&
-        coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed)
+        coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed,           &
+        implicit_scratch)
 
     USE parameters_2d, ONLY : max_nl_iter
 
@@ -135,7 +146,7 @@ CONTAINS
         REAL(wp) :: stpmax
         REAL(wp) :: group_matrix(SIZE(group_equations),SIZE(group_equations))
         REAL(wp) :: group_rhs(SIZE(group_equations))
-        TYPE(complex_physical_state_type) :: implicit_scratch
+        TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
         INTEGER :: group_pivot(SIZE(group_equations))
         INTEGER :: nl_iter, i, j, ok
         LOGICAL :: check
@@ -789,6 +800,7 @@ CONTAINS
         TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
 
         REAL(wp) :: nh_term_impl(n_eqns)
+        INTEGER :: i, equation
         REAL(wp) :: Rj(n_eqns)
         ! Keep the conservative difference separate from the forcing even under
         ! -Ofast reassociation. Otherwise q + (dt*R-q_old) can lose a small forcing
@@ -801,34 +813,18 @@ CONTAINS
         Rj = -nh_term_impl
 
         delta_q = qj - q_group_input
-        f_nl = delta_q + dt_step * Rj
-        f_nl = coeff_f * f_nl
-        WHERE (.NOT. equation_is_active(active_equations))
-            f_nl = 0.0_wp
-
-        END WHERE
+        ! Avoid a logical mask and WHERE temporaries at every residual evaluation.
+        f_nl = 0.0_wp
+        DO i = 1, SIZE(active_equations)
+            equation = active_equations(i)
+            f_nl(equation) = coeff_f(equation) * (delta_q(equation) + dt_step * Rj(equation))
+        END DO
 
         scal_f = 0.5_wp * DOT_PRODUCT( f_nl , f_nl )
 
         RETURN
 
     END SUBROUTINE eval_f
-
-    !> \brief Return a mask selecting residual rows in one implicit group.
-    !> \param[in] active_equations Equation indices in the group.
-    !> \return Logical mask over all equations, true for active indices.
-    PURE FUNCTION equation_is_active(active_equations) RESULT(mask)
-        INTEGER, INTENT(IN) :: active_equations(:)
-        LOGICAL :: mask(n_eqns)
-        INTEGER :: i
-
-        mask = .FALSE.
-
-        DO i = 1, SIZE(active_equations)
-            mask(active_equations(i)) = .TRUE.
-
-        END DO
-    END FUNCTION equation_is_active
 
     !******************************************************************************
     !> \brief Build the scaled backward-Euler group Jacobian using complex-step differentiation.
@@ -880,7 +876,6 @@ CONTAINS
         TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
 
         REAL(wp) :: complex_step_perturbation,inverse_complex_step_perturbation
-        REAL(wp) :: Jacob_relax(n_eqns,n_vars)
         COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
         COMPLEX(wp) :: qj_cmplx(n_vars) , qj_rel_cmplx(n_vars)
         COMPLEX(wp) :: qj_rel_cmplx_init(n_vars)
@@ -894,7 +889,6 @@ CONTAINS
         ! initialize the matrix of the linearized system and the Jacobian
 
         left_matrix(1:n_eqns,1:n_vars) = 0.0_wp
-        Jacob_relax(1:n_eqns,1:n_vars) = 0.0_wp
 
         ! Differentiate only implicit columns. A tiny imaginary perturbation of
         ! one normalized conservative variable produces a derivative without
@@ -917,17 +911,13 @@ CONTAINS
             CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij, c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,    &
                 group=source_group, physical_scratch=implicit_scratch)
 
+            ! Assemble only the active Jacobian rows; inactive rows remain zero.
+            ! No full-sized intermediate derivative matrix is required.
             DO j = 1, SIZE(active_equations)
-                Jacob_relax(active_equations(j),equation) =                                                            &
-                    coeff_f(active_equations(j)) *                                                                     &
-                    AIMAG(nh_terms_cmplx_impl(active_equations(j))) * inverse_complex_step_perturbation
-
-            END DO
-
-            DO j = 1, n_eqns
-                left_matrix(j,equation) = left_matrix(j,equation) -                                                    &
-                    dt_step*Jacob_relax(j,equation)
-
+                left_matrix(active_equations(j),equation) =                                                            &
+                    left_matrix(active_equations(j),equation) - dt_step * (                                           &
+                    coeff_f(active_equations(j)) * AIMAG(nh_terms_cmplx_impl(active_equations(j))) *                  &
+                    inverse_complex_step_perturbation)
             END DO
 
         END DO
