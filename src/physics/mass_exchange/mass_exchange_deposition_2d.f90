@@ -185,9 +185,11 @@ CONTAINS
 
             REAL(wp), INTENT(IN) :: diam, rhos, rhoc, inv_kin_visc
             REAL(wp), PARAMETER :: transition_re=1000.0_wp
-            REAL(wp) :: Rey, inv_sqrt_C_D, drag_transition, initial_re
-            REAL(wp) :: const_part, set_vel_old
-            INTEGER :: i
+            REAL(wp), PARAMETER :: solver_tolerance=1.0E-11_wp
+            REAL(wp) :: drag_transition, initial_re, initial_re_squared
+            REAL(wp) :: const_part, reynolds, lower_re, upper_re
+            REAL(wp) :: residual, derivative, candidate, reynolds_squared
+            INTEGER :: iteration
 
             IF (rhos <= rhoc) THEN
                 settling_velocity=0.0_wp
@@ -195,40 +197,72 @@ CONTAINS
             END IF
 
             const_part=SQRT((4.0_wp/3.0_wp)*(rhos/rhoc-1.0_wp)*diam*grav)
+            initial_re=diam*const_part*inv_kin_visc
+            IF (initial_re<=0.0_wp) THEN
+                settling_velocity=0.0_wp
+                RETURN
+            END IF
 
-            ! Match the low-Re constitutive law exactly at Re=1000. For
-            ! collective settling, include its logarithmic drag contribution.
+            ! C_D(Re) is Schiller-Naumann, optionally including collective
+            ! drag, through the physical Reynolds number Re=1000.
+            ! Above that point C_D stays constant at its transition value.
             drag_transition=24.0_wp*(1.0_wp+0.15_wp*transition_re**0.687_wp)/transition_re
-            IF (collective_settling_flag) drag_transition=drag_transition+                                       &
+            IF (collective_settling_flag) drag_transition=drag_transition+                                           &
                 A_drag*(LOG(transition_re)-B_drag)
             IF (drag_transition<=0.0_wp) CALL fatal_error('settling: nonpositive drag at Re=1000')
 
-            initial_re=diam*const_part*inv_kin_visc
-            ! Re^2*C_D(Re)=Re0^2. The transition occurs at the physical
-            ! Reynolds Re=1000, i.e. Re0=1000*sqrt(C_D(1000)), not Re0=1000.
+            ! Re^2*C_D(Re)=Re0^2: compare the Reynolds of the solution,
+            ! not the original C_D=1 estimate. The upper branch is explicit.
             IF (initial_re>=transition_re*SQRT(drag_transition)) THEN
                 settling_velocity=const_part/SQRT(drag_transition)
                 RETURN
             END IF
 
-            ! Keep the established fixed-point solver below the transition.
-            ! This isolates the drag-model correction from a future separate
-            ! comparison of Newton and fixed-point convergence.
-            settling_velocity=const_part
-            Rey=initial_re
-            C_D_loop: DO i=1,20
-                set_vel_old=settling_velocity
-                IF (collective_settling_flag) THEN
-                    inv_sqrt_C_D=SQRT(1.0_wp/(24.0_wp*(1.0_wp+0.15_wp*Rey**0.687_wp)/Rey+                     &
-                        A_drag*(LOG(Rey)-B_drag)))
-                ELSE
-                    inv_sqrt_C_D=SQRT(Rey/(24.0_wp*(1.0_wp+0.15_wp*Rey**0.687_wp)))
-                END IF
-                settling_velocity=const_part*inv_sqrt_C_D
-                IF (ABS(set_vel_old-settling_velocity)/set_vel_old<1.0E-6_wp) RETURN
-                Rey=diam*settling_velocity*inv_kin_visc
-            END DO C_D_loop
+            ! Solve F(Re)=Re^2*C_D(Re)-Re0^2=0 on [0,1000].
+            ! In this interval F(0)<0 and F(1000)>0. Schiller-Naumann
+            ! has a unique root; the collective term is evaluated using its
+            ! original logarithmic correction without approximating drag.
+            initial_re_squared=initial_re*initial_re
+            lower_re=0.0_wp
+            upper_re=transition_re
 
+            ! The Stokes and inertial asymptotes give a cheap starting point.
+            ! Safeguarding below guarantees the root stays bracketed even if
+            ! this estimate is inaccurate for collective settling.
+            reynolds=MIN(transition_re,initial_re_squared/24.0_wp,                                                   &
+                (initial_re_squared/3.6_wp)**(1.0_wp/1.687_wp))
+            reynolds=MAX(reynolds,TINY(reynolds))
+
+            ! Safeguarded Newton: use the exact derivative of Re^2*C_D(Re),
+            ! reject nonphysical or out-of-bracket Newton steps, and bisect
+            ! when necessary. The rate and all updates remain strictly local.
+            DO iteration=1,64
+                reynolds_squared=reynolds*reynolds
+                residual=24.0_wp*reynolds*(1.0_wp+0.15_wp*reynolds**0.687_wp)                                         &
+                    -initial_re_squared
+                derivative=24.0_wp+6.0732_wp*reynolds**0.687_wp
+                IF (collective_settling_flag) THEN
+                    residual=residual+A_drag*reynolds_squared*(LOG(reynolds)-B_drag)
+                    derivative=derivative+A_drag*reynolds*(2.0_wp*(LOG(reynolds)-B_drag)+1.0_wp)
+                END IF
+                IF (ABS(residual)<=solver_tolerance*initial_re_squared) EXIT
+                IF (residual>0.0_wp) THEN
+                    upper_re=reynolds
+                ELSE
+                    lower_re=reynolds
+                END IF
+                candidate=0.5_wp*(lower_re+upper_re)
+                IF (derivative>0.0_wp) THEN
+                    ! Newton is accepted only when it preserves the bracket.
+                    ! This also avoids division by a nonpositive derivative.
+                    IF (reynolds-residual/derivative>lower_re .AND.                                                    &
+                        reynolds-residual/derivative<upper_re) candidate=reynolds-residual/derivative
+                END IF
+                reynolds=candidate
+            END DO
+            IF (iteration>64) CALL fatal_error('settling: safeguarded Newton did not converge')
+
+            settling_velocity=reynolds/(diam*inv_kin_visc)
         END FUNCTION settling_velocity
 
         !> @brief Select carrier density and inverse kinematic viscosity for settling.

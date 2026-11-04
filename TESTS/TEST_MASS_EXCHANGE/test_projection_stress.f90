@@ -37,6 +37,7 @@ PROGRAM test_projection_stress
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
   CALL check_settling_drag_transition
+  CALL check_settling_newton_roots
   DO dimension=1,2
      DO level=0,2
         nx=16*2**level; ny=1
@@ -115,7 +116,7 @@ CONTAINS
   !> \brief Check continuity of the settling drag closure at physical Re=1000.
   !> \details The threshold belongs to the converged Reynolds number rather
   !>          than the initial C_D=1 estimate. Exercise both supported drag
-  !>          laws while leaving the nonlinear low-Re solver unchanged.
+  !>          laws with safeguarded Newton on the low-Re branch.
   SUBROUTINE check_settling_drag_transition
     USE mass_exchange_deposition_2d, ONLY : settling_velocity
     REAL(wp), PARAMETER :: re_transition=1000.0_wp, delta=1.0E-6_wp
@@ -164,6 +165,46 @@ CONTAINS
     IF (settling_velocity(diam,carrier_density,carrier_density,inv_visc)/=0.0_wp) &
          ERROR STOP 'no buoyant settling at equal density'
   END SUBROUTINE check_settling_drag_transition
+
+  !> \brief Recover prescribed Reynolds roots of both piecewise drag laws.
+  !> \details Construct inverse viscosity from Re^2*C_D(Re)=Re0^2.
+  !>          Thus the expected solution is independent of the implementation
+  !>          of Newton, including the crossover and the constant-drag branch.
+  SUBROUTINE check_settling_newton_roots
+    USE mass_exchange_deposition_2d, ONLY : settling_velocity
+    REAL(wp), PARAMETER :: diam=1.0E-4_wp, solid_density=2000.0_wp, carrier_density=1.2_wp
+    REAL(wp), PARAMETER :: reference_re(*)=[1.0E-5_wp,1.0E-2_wp,1.0_wp,10.0_wp, &
+         100.0_wp,500.0_wp,999.0_wp,1000.0_wp,1100.0_wp,3000.0_wp]
+    REAL(wp) :: cd_transition, cd, reference, inv_visc, speed, actual_re, k
+    INTEGER :: mode,i
+
+    k=SQRT((4.0_wp/3.0_wp)*(solid_density/carrier_density-1.0_wp)*diam*grav)
+    DO mode=1,2
+       collective_settling_flag=(mode==2)
+       A_drag=0.01_wp
+       B_drag=1.0_wp
+       cd_transition=24.0_wp*(1.0_wp+0.15_wp*1000.0_wp**0.687_wp)/1000.0_wp
+       IF (collective_settling_flag) cd_transition=cd_transition+ &
+            A_drag*(LOG(1000.0_wp)-B_drag)
+       DO i=1,SIZE(reference_re)
+          reference=reference_re(i)
+          IF (reference<=1000.0_wp) THEN
+             cd=24.0_wp*(1.0_wp+0.15_wp*reference**0.687_wp)/reference
+             IF (collective_settling_flag) cd=cd+A_drag*(LOG(reference)-B_drag)
+          ELSE
+             cd=cd_transition
+          END IF
+          inv_visc=reference*SQRT(cd)/(diam*k)
+          speed=settling_velocity(diam,solid_density,carrier_density,inv_visc)
+          actual_re=diam*speed*inv_visc
+          IF (ABS(actual_re-reference)>1.0E-8_wp*reference) THEN
+             WRITE(*,*) 'FAIL: settling root',mode,reference,actual_re
+             ERROR STOP 'incorrect safeguarded settling root'
+          END IF
+       END DO
+    END DO
+    collective_settling_flag=.FALSE.
+  END SUBROUTINE check_settling_newton_roots
 
   !> \brief Allocate the rectangular production grid and independent oracle buffers.
   SUBROUTINE allocate_grid
