@@ -27,7 +27,7 @@ PROGRAM test_curvature_source
   REAL(wp) :: acceleration, expected_acceleration
   REAL(wp) :: source_x, source_y, expected_x, expected_y
   REAL(wp) :: tolerance, ramp_mean
-  REAL(wp) :: physical(7), original(7), explicit_source(5)
+  REAL(wp) :: physical(5), original(5), explicit_source(5)
   TYPE(source_group_type) :: curvature_group, circular_injection_group
   TYPE(source_group_type) :: fissural_injection_group, radial_injection_group
   INTEGER :: sample
@@ -84,7 +84,9 @@ PROGRAM test_curvature_source
   physical=0.0_wp; physical(4)=300.0_wp
   DO sample=1,2
      physical(1)=dry_thickness_tolerance*REAL(sample,wp)/2.0_wp
-     physical(6)=1.0E150_wp; physical(7)=-1.0E150_wp
+     ! In the canonical primitive layout velocities occupy components 2/3.
+     ! Test large unresolved velocities without using obsolete qp(6:7).
+     physical(idx_u)=1.0E150_wp; physical(idx_v)=-1.0E150_wp
      original=physical
      CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
           0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
@@ -92,7 +94,7 @@ PROGRAM test_curvature_source
      CALL assert_small('dry curvature source',MAXVAL(ABS(explicit_source)),0.0_wp)
      CALL assert_small('dry physical state retained',MAXVAL(ABS(physical-original)),0.0_wp)
   END DO
-  physical(1)=2.0_wp*dry_thickness_tolerance; physical(6)=u; physical(7)=v
+  physical(1)=2.0_wp*dry_thickness_tolerance; physical(idx_u)=u; physical(idx_v)=v
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
        curvature_group,0.0_wp)
