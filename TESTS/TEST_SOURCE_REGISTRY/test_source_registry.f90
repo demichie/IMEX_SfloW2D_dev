@@ -41,6 +41,9 @@ PROGRAM test_source_registry
   CALL require(SIZE(groups(2)%equation_ids)==3,'union has three unique equations')
   CALL require(ALL(groups(2)%equation_ids==[2,3,4]),'complete conservative footprint')
   CALL require(group_contains_name(groups(2),'thermal_cooling'),'cooling registered')
+   CALL require(groups(2)%rheology_name=='rheology_voellmy','cached rheology identity')
+   CALL require(groups(2)%rheology_implicit,'cached implicit role')
+   CALL require(groups(2)%thermal_active,'cached Newton thermal term')
   CALL registry%finalize()
   thermal_group=2
   CALL initialize_configured_sources(registry,error)
@@ -49,12 +52,17 @@ PROGRAM test_source_registry
   CALL require(SIZE(groups)==3,'three ordered Lie groups')
   CALL require(ALL(groups(2)%equation_ids==[2,3]),'momentum group footprint')
   CALL require(ALL(groups(3)%equation_ids==[4]),'energy group footprint')
+   CALL require(groups(2)%rheology_implicit .AND. .NOT.groups(2)%thermal_active, &
+        'separated Newton rheology metadata')
+   CALL require(groups(3)%thermal_active .AND. .NOT.groups(3)%rheology_implicit, &
+        'separated Newton cooling metadata')
   CALL registry%finalize()
   thermal_method='ANALYTIC'
   CALL initialize_configured_sources(registry,error)
   CALL require(LEN_TRIM(error)==0,'mixed Newton/analytic groups')
   groups=registry%groups()
   CALL require(groups(3)%method==SOURCE_METHOD_ANALYTIC,'analytic method preserved')
+   CALL require(groups(3)%thermal_active,'analytic cooling metadata')
   CALL registry%finalize()
   ! Historical Etna lava uses a liquid carrier with the lava rheology.
   ! Cooling and bottom fissural injection must remain valid in this phase.

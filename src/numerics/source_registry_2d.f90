@@ -18,6 +18,9 @@ MODULE source_registry_2d
         INTEGER :: method=0 !< Explicit, Newton or analytic.
         CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
         INTEGER, ALLOCATABLE :: equation_ids(:) !< Full structurally affected Newton equation set or explicit footprint.
+        CHARACTER(LEN=64) :: rheology_name='' !< Validated canonical name, cached for every cell.
+        LOGICAL :: rheology_implicit=.FALSE. !< Cached Newton implicit-rheology role.
+        LOGICAL :: thermal_active=.FALSE. !< Cached thermal source presence.
     END TYPE source_group_type
 
     !> \brief Validated metadata owned and finalized by one simulation context.
@@ -159,6 +162,22 @@ CONTAINS
         this%n_equations=n_equations
         this%pore_equation=pore_equation
         this%lie_entries=groups
+        ! Resolve source identities and capabilities once, outside all cell loops.
+        DO i=1,SIZE(this%lie_entries)
+            this%lie_entries(i)%rheology_name=''
+            this%lie_entries(i)%rheology_implicit=.FALSE.
+            this%lie_entries(i)%thermal_active=.FALSE.
+
+            DO j=1,SIZE(this%lie_entries(i)%source_names)
+                IF (INDEX(TRIM(this%lie_entries(i)%source_names(j)),'rheology_')==1) THEN
+                    this%lie_entries(i)%rheology_name=this%lie_entries(i)%source_names(j)
+                    this%lie_entries(i)%rheology_implicit=                                                    &
+                        rheology_name_has_role(this%lie_entries(i)%rheology_name,SOURCE_ROLE_IMPLICIT)
+                ELSEIF (this%lie_entries(i)%source_names(j)=='thermal_cooling') THEN
+                    this%lie_entries(i)%thermal_active=.TRUE.
+                END IF
+            END DO
+        END DO
         this%implicit_sources_flag=ANY(groups%method==SOURCE_METHOD_NEWTON)
         this%initialized=.TRUE.
         error=''

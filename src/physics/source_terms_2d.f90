@@ -18,8 +18,7 @@ MODULE source_terms_2d
             eval_rheology_implicit, eval_rheology_semi_implicit,                                                       &
             eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
-    USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT,                                          &
-            rheology_name_has_role
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
     USE source_registry_2d, ONLY : source_group_type, group_contains_name
     IMPLICIT NONE
@@ -325,30 +324,6 @@ CONTAINS
     END SUBROUTINE eval_source_analytic_state
 
 
-    !> Recover the rheology directly from a validated group's canonical sources.
-    !> Numerical equation identifiers are not physical model identifiers.
-    PURE FUNCTION group_rheology_name(group) RESULT(name)
-        TYPE(source_group_type), INTENT(IN) :: group
-        CHARACTER(LEN=64) :: name
-        INTEGER :: i
-        name=''
-        IF (.NOT.ALLOCATED(group%source_names)) RETURN
-
-        DO i=1,SIZE(group%source_names)
-            IF (INDEX(TRIM(group%source_names(i)),'rheology_')/=1) CYCLE
-            name=group%source_names(i)
-            RETURN
-
-        END DO
-    END FUNCTION group_rheology_name
-
-    PURE LOGICAL FUNCTION group_has_role(group,role) RESULT(found)
-        TYPE(source_group_type), INTENT(IN) :: group
-        INTEGER, INTENT(IN) :: role
-        found=rheology_name_has_role(group_rheology_name(group),role)
-    END FUNCTION group_has_role
-
-
     !> Evaluate the frozen semi-implicit contribution of one Newton Lie group.
     !> All inputs refer to one cell; no domain indices or shared-state writes.
     SUBROUTINE eval_source_semi_implicit(group,q_cell,Bprime_x,Bprime_y,                                               &
@@ -363,10 +338,10 @@ CONTAINS
         rate=0.0_wp
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
             CALL fatal_error('eval_source_semi_implicit requires a Newton Lie group')
-        IF (.NOT.group_has_role(group,SOURCE_ROLE_IMPLICIT)) RETURN
+        IF (.NOT.group%rheology_implicit) RETURN
         IF (q_cell(idx_totMassEqn)<=0.0_wp) RETURN
 
-        selected_model_name=group_rheology_name(group)
+        selected_model_name=group%rheology_name
         IF (LEN_TRIM(selected_model_name)==0) RETURN
         CALL real_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                       &
             0.0_wp,0.0_wp,0.0_wp)
@@ -423,9 +398,9 @@ CONTAINS
 
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
             CALL fatal_error('eval_source_implicit requires a Newton Lie group')
-        selected_model_name=group_rheology_name(group)
-        selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
-        selected_thermal=group_contains_name(group,'thermal_cooling')
+        selected_model_name=group%rheology_name
+        selected_rheology=group%rheology_implicit
+        selected_thermal=group%thermal_active
 
         ! initialize the source terms
         source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
@@ -571,7 +546,7 @@ CONTAINS
 
             ! Source rates are evaluated at the same unmodified stage state.
             ! The construction of EXPLICIT stays inside each physical module.
-            active_rheology=group_rheology_name(group)
+            active_rheology=group%rheology_name
             IF (LEN_TRIM(active_rheology)>0 .AND.                                                                      &
                 r_h>dry_thickness_tolerance) THEN
                 CALL eval_rheology_explicit([active_rheology], physical_state,                                         &
@@ -581,7 +556,7 @@ CONTAINS
 
             END IF
 
-            IF (group_contains_name(group,'thermal_cooling')) THEN
+            IF (group%thermal_active) THEN
                 CALL eval_thermal_explicit(['thermal_cooling'],physical_state,                                         &
                     radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
