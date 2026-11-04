@@ -156,7 +156,8 @@ CONTAINS
         ! External procedures
     USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
     USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
-    USE parameters_2d, ONLY : limiter
+    USE parameters_2d, ONLY : limiter, theta
+    USE geometry_2d, ONLY : minmod
 
     USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
 
@@ -205,12 +206,17 @@ CONTAINS
 
         LOGICAL :: regular_interior
         LOGICAL :: use_boundary_source
+        LOGICAL :: uniform_generalized_minmod
 
         ! Keep the same constant candidates for inactive neighbours, but initialize
         ! only cells that can contribute to an active HP trace.
         use_boundary_source=lateral_source_flag
         IF (PRESENT(source_boundary_enabled))                                                                          &
             use_boundary_source=source_boundary_enabled
+        ! The configured limiter is constant across cells for this stage.
+        ! A uniform generalized-minmod configuration can use a component-wise
+        ! array kernel without choosing the limiter on every component.
+        uniform_generalized_minmod=ALL(limiter(1:n_vars)==3)
         IF (.NOT. this%hp_workset_prepared)                                                                            &
             CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
 
@@ -288,22 +294,45 @@ CONTAINS
                 x_stencil = [x_comp(j-1),x_comp(j),x_comp(j+1)]
                 y_stencil = [y_comp(k-1),y_comp(k),y_comp(k+1)]
 
-                ! Each component is independent once the five stencil vectors
-                ! have been loaded. DO CONCURRENT expresses this dependency
-                ! contract to the compiler without changing the limiter formula.
-                ! Limiters are PURE and receive their own three-point stencils.
-                DO CONCURRENT (i=1:n_vars)
-                    CALL limit([west_state(i),center_state(i),east_state(i)],                                          &
-                        x_stencil,limiter(i),qrec_prime_x(i))
-                    CALL limit([south_state(i),center_state(i),north_state(i)],                                        &
-                        y_stencil,limiter(i),qrec_prime_y(i))
+                IF (uniform_generalized_minmod) THEN
+                    ! Specialized interior kernel for limiter=3 on all components.
+                    ! These array expressions expose the five-component primitive
+                    ! direction to the compiler without a per-component SELECT CASE.
+                    ! Denominators and nested minmod follow geometry_2d::limit.
+                    ! Using the original coordinate differences also preserves
+                    ! the established nonuniform-grid arithmetic where applicable.
+                    qrec_prime_x=minmod(                                                                                 &
+                        (east_state-west_state)/(x_stencil(3)-x_stencil(1)),                                          &
+                        theta*minmod(                                                                                  &
+                        (east_state-center_state)/(x_stencil(3)-x_stencil(2)),                                        &
+                        (center_state-west_state)/(x_stencil(2)-x_stencil(1))))
+                    qrec_prime_y=minmod(                                                                                 &
+                        (north_state-south_state)/(y_stencil(3)-y_stencil(1)),                                        &
+                        theta*minmod(                                                                                  &
+                        (north_state-center_state)/(y_stencil(3)-y_stencil(2)),                                       &
+                        (center_state-south_state)/(y_stencil(2)-y_stencil(1))))
 
-                    ! Reconstruct opposite faces with symmetric limited slopes.
-                    qrecW(i) = center_state(i)-reconstr_coeff*dx2*qrec_prime_x(i)
-                    qrecE(i) = center_state(i)+reconstr_coeff*dx2*qrec_prime_x(i)
-                    qrecS(i) = center_state(i)-reconstr_coeff*dy2*qrec_prime_y(i)
-                    qrecN(i) = center_state(i)+reconstr_coeff*dy2*qrec_prime_y(i)
-                END DO
+                    ! Opposite faces share a limited slope; this matches the
+                    ! previous symmetric reconstruction for every component.
+                    qrecW=center_state-reconstr_coeff*dx2*qrec_prime_x
+                    qrecE=center_state+reconstr_coeff*dx2*qrec_prime_x
+                    qrecS=center_state-reconstr_coeff*dy2*qrec_prime_y
+                    qrecN=center_state+reconstr_coeff*dy2*qrec_prime_y
+
+                ELSE
+                    ! General fallback preserves every configured limiter,
+                    ! including mixtures of methods across primitive variables.
+                    DO CONCURRENT (i=1:n_vars)
+                        CALL limit([west_state(i),center_state(i),east_state(i)],                                      &
+                            x_stencil,limiter(i),qrec_prime_x(i))
+                        CALL limit([south_state(i),center_state(i),north_state(i)],                                    &
+                            y_stencil,limiter(i),qrec_prime_y(i))
+                        qrecW(i)=center_state(i)-reconstr_coeff*dx2*qrec_prime_x(i)
+                        qrecE(i)=center_state(i)+reconstr_coeff*dx2*qrec_prime_x(i)
+                        qrecS(i)=center_state(i)-reconstr_coeff*dy2*qrec_prime_y(i)
+                        qrecN(i)=center_state(i)+reconstr_coeff*dy2*qrec_prime_y(i)
+                    END DO
+                END IF
             ELSE
 
             vars_loop:DO i=1,n_vars

@@ -2156,6 +2156,8 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
 
     !******************************************************************************
     !> \brief Return the smaller same-sign slope, or zero for incompatible slopes.
+    !> ELEMENTAL permits both scalar limit() calls and component-wise SIMD array
+    !> expressions to share the identical numerical threshold and sign formula.
     !
     !> This function compute the minmod between two real numbers
     !> \date 2021/04/30
@@ -2167,7 +2169,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> \return Same-sign minimum-magnitude slope, or zero near zero/opposite signs.
     !******************************************************************************
 
-    PURE REAL(wp) FUNCTION minmod(a,b)
+    PURE ELEMENTAL REAL(wp) FUNCTION minmod(a,b)
 
     IMPLICIT none
 

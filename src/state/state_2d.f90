@@ -46,7 +46,7 @@ MODULE state_2d
         !> Conservative variables: M=rho_m*h, M*u, M*v, M*cp*T, then transported masses.
         REAL(wp), ALLOCATABLE :: q(:,:,:)
 
-        !> Physical variables: h, h*u, h*v, T, mass fractions, and appended u and v.
+        !> Primitive variables: h, u, v, T, then transported mass fractions and scalars.
         REAL(wp), ALLOCATABLE :: qp(:,:,:)
 
         !> Physical substrate inventories owned by the same simulation state as q and qp.
@@ -219,6 +219,9 @@ CONTAINS
     !> @param[in,out] snapshot Reusable independent substrate snapshot for rollback.
     SUBROUTINE snapshot_substrate(this,snapshot)
         CLASS(state_type), INTENT(IN) :: this
+        ! Keep all substrate fields in the snapshot: exchange groups can update
+        ! inventories and their diagnostic totals before a later Lie group fails.
+        ! Partial snapshots need a separate write-set audit and rollback tests.
         ! Reuse allocated rollback buffers across Lie steps. INTENT(OUT)
         ! would deallocate allocatable snapshot components on every entry.
         TYPE(substrate_snapshot_type), INTENT(INOUT) :: snapshot

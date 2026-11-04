@@ -26,14 +26,17 @@ interior = r.split("IF ( regular_interior ) THEN", 1)[1].split(
 for component in ("center_state", "west_state", "east_state",
                   "south_state", "north_state"):
     assert component in interior, component
+assert "uniform_generalized_minmod" in interior
 assert "DO CONCURRENT (i=1:n_vars)" in interior
+assert "qrec_prime_x=minmod(" in interior
+assert "qrec_prime_y=minmod(" in interior
 assert "reconstruction_cell_value" not in interior.split("DO CONCURRENT (i=1:n_vars)", 1)[1], (
     "interior limiter still fetches scalar neighbours repeatedly"
 )
 assert "CALL limit([west_state(i),center_state(i),east_state(i)]" in interior
 assert "CALL limit([south_state(i),center_state(i),north_state(i)]" in interior
 geometry = (root / "src/geometry/geometry_2d.f90").read_text()
-for pure_declaration in ("PURE SUBROUTINE limit(", "PURE REAL(wp) FUNCTION minmod(",
+for pure_declaration in ("PURE SUBROUTINE limit(", "PURE ELEMENTAL REAL(wp) FUNCTION minmod(",
                          "PURE REAL(wp) function maxmod("):
     assert pure_declaration in geometry, pure_declaration
 

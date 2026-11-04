@@ -44,6 +44,7 @@ PROGRAM test_spatial_operator
   READ(input_unit,*) nx,ny,slope,curvature,limiter_id
   READ(input_unit,*) dx,dy
   CALL initialize_fixture
+  CALL check_uniform_minmod_kernel
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) THEN
@@ -275,6 +276,31 @@ CONTAINS
     CALL reconstruction%initialize
     CALL hyperbolic%initialize
   END SUBROUTINE initialize_fixture
+
+  !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.
+  !> \details Uses mixed-sign and near-zero component stencils, including the
+  !> same coordinate spacing as the production grid. This guards the numerical
+  !> formula independently from the spatial reference comparison.
+  SUBROUTINE check_uniform_minmod_kernel
+    REAL(wp) :: west(5),center(5),east(5),a(5),b(5),c(5),vector_slope(5)
+    REAL(wp) :: scalar_slope,coords(3),scale
+    INTEGER :: i
+    west=[0.1_wp,-0.5_wp,1.0E-45_wp,3.0_wp,4.0_wp]
+    center=[0.5_wp,0.2_wp,0.0_wp,3.0_wp,2.0_wp]
+    east=[0.9_wp,-0.1_wp,-1.0E-45_wp,1.0_wp,3.0_wp]
+    coords=[x_comp(2),x_comp(3),x_comp(4)]
+    a=(east-center)/(coords(3)-coords(2))
+    b=(center-west)/(coords(2)-coords(1))
+    c=(east-west)/(coords(3)-coords(1))
+    vector_slope=minmod(c,theta*minmod(a,b))
+    DO i=1,5
+       CALL limit([west(i),center(i),east(i)],coords,3,scalar_slope)
+       scale=MAX(1.0_wp,ABS(scalar_slope))
+       IF (ABS(vector_slope(i)-scalar_slope)>32.0_wp*EPSILON(1.0_wp)*scale) THEN
+          ERROR STOP 'generalized minmod array kernel differs from scalar limiter'
+       END IF
+    END DO
+  END SUBROUTINE check_uniform_minmod_kernel
 
   !> \brief Zero diagnostic entries outside the production active-face contract before serialization.
   SUBROUTINE normalize_inactive_face_payloads
