@@ -242,17 +242,17 @@ CONTAINS
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(source_cell_context_type) :: cell_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
         CLASS(domain_type), INTENT(IN) :: domain
         REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
         REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
         REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(IN) :: qp_original(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp_original(n_vars,comp_cells_x,comp_cells_y)
         LOGICAL, INTENT(OUT) :: step_failed
         CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
-        REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
-        REAL(wp) :: q_local(n_vars),qp_local(n_vars+2)
+        REAL(wp) :: qpentry(n_vars),q_candidate(n_vars),qp_candidate(n_vars)
+        REAL(wp) :: q_local(n_vars),qp_local(n_vars)
         REAL(wp) :: deposit_local(n_solid),erosion_local(n_solid),erodible_local(n_solid),lava_local
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate

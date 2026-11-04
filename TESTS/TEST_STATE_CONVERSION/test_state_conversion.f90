@@ -70,7 +70,7 @@ CONTAINS
     REAL(wp) :: Ri, density, carrier_density, reduced_gravity
     REAL(wp) :: carrier_heat_capacity, mixture_heat_capacity, expected
     CALL configure_layout(.TRUE.)
-    ALLOCATE(qp(n_vars+2))
+    ALLOCATE(qp(n_vars))
     CALL make_wet_state(qp)
     CALL mixt_var(qp, Ri, density, carrier_density, reduced_gravity, &
          carrier_heat_capacity, mixture_heat_capacity)
@@ -79,13 +79,10 @@ CONTAINS
          ERROR STOP 'ordinary Richardson formula changed'
     qp(idx_u) = 1.0E-120_wp
     qp(idx_v) = 0.0_wp
-    qp(2) = qp(1)*qp(idx_u)
-    qp(3) = 0.0_wp
     CALL mixt_var(qp, Ri, density, carrier_density, reduced_gravity, &
          carrier_heat_capacity, mixture_heat_capacity)
     IF (Ri /= 1.E15_wp) ERROR STOP 'near-rest Richardson cap failed'
     qp(idx_u) = 0.0_wp
-    qp(2) = 0.0_wp
     CALL mixt_var(qp, Ri, density, carrier_density, reduced_gravity, &
          carrier_heat_capacity, mixture_heat_capacity)
     IF (Ri /= 0.0_wp) ERROR STOP 'exact-rest Richardson convention changed'
@@ -101,7 +98,7 @@ CONTAINS
 
     DO phase_case = 1, 2
        CALL configure_layout(phase_case==2)
-       ALLOCATE(qp(n_vars+2), q(n_vars), cq(n_vars))
+       ALLOCATE(qp(n_vars), q(n_vars), cq(n_vars))
        CALL make_wet_state(qp)
        CALL qp_to_qc(qp, q)
        cq = CMPLX(q, 0.0_wp, wp)
@@ -202,7 +199,7 @@ CONTAINS
 
   SUBROUTINE make_wet_state(qp)
 
-    REAL(wp), INTENT(OUT) :: qp(n_vars + 2)
+    REAL(wp), INTENT(OUT) :: qp(n_vars)
 
     REAL(wp), PARAMETER :: h = 2.0_wp
     REAL(wp), PARAMETER :: u = 1.5_wp
@@ -214,8 +211,8 @@ CONTAINS
 
     qp = 0.0_wp
     qp(1) = h
-    qp(2) = h*u
-    qp(3) = h*v
+    qp(2) = u
+    qp(3) = v
     qp(idx_T) = 450.0_wp
 
     qp(idx_solid_first:idx_solid_last) = xs
@@ -239,7 +236,7 @@ CONTAINS
     REAL(wp) :: p_dyn
 
     CALL configure_layout(has_liquid)
-    ALLOCATE (qp0(n_vars + 2), qp1(n_vars + 2), q0(n_vars), q1(n_vars))
+    ALLOCATE (qp0(n_vars), qp1(n_vars), q0(n_vars), q1(n_vars))
     ALLOCATE (flux_x(n_eqns), flux_y(n_eqns))
 
     CALL make_wet_state(qp0)
@@ -269,7 +266,7 @@ CONTAINS
   SUBROUTINE check_thermodynamic_kernels(label, qp, q, tolerance)
 
     CHARACTER(LEN=*), INTENT(IN) :: label
-    REAL(wp), INTENT(IN) :: qp(n_vars + 2), q(n_vars), tolerance
+    REAL(wp), INTENT(IN) :: qp(n_vars), q(n_vars), tolerance
 
     REAL(wp) :: alphas_qp(n_solid), alphag_qp(n_add_gas)
     REAL(wp) :: alphas_mass(n_solid), alphag_mass(n_add_gas)
@@ -350,7 +347,7 @@ CONTAINS
     REAL(wp) :: explicit_total
 
     CALL configure_layout(.TRUE.)
-    ALLOCATE (qp(n_vars + 2), qp_corrected(n_vars + 2), q(n_vars))
+    ALLOCATE (qp(n_vars), qp_corrected(n_vars), q(n_vars))
 
     qp = 0.0_wp
     qp(1) = 1.0_wp
@@ -359,8 +356,6 @@ CONTAINS
     qp(4) = 400.0_wp
     qp(idx_solid_first:idx_solid_last) = [0.8_wp, 0.4_wp]
     qp(idx_add_gas_first:idx_add_gas_last) = 0.1_wp
-    qp(idx_u) = qp(2)/qp(1)
-    qp(idx_v) = qp(3)/qp(1)
 
     explicit_total = SUM(qp(idx_solid_first:idx_solid_last))                   &
          + SUM(qp(idx_add_gas_first:idx_add_gas_last))
@@ -393,8 +388,8 @@ CONTAINS
     REAL(wp) :: p_dyn
 
     CALL configure_layout(.FALSE.)
-    ALLOCATE (qp_cold(n_vars+2), qp_hot(n_vars+2), q(n_vars),                  &
-              qp_roundtrip(n_vars+2))
+    ALLOCATE (qp_cold(n_vars), qp_hot(n_vars), q(n_vars),                  &
+              qp_roundtrip(n_vars))
 
     CALL make_wet_state(qp_cold)
     qp_hot = qp_cold
@@ -470,7 +465,7 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: source_state(:), expected(:)
 
     CALL configure_layout(.TRUE.)
-    ALLOCATE (source_state(n_vars+2), expected(n_vars+2))
+    ALLOCATE (source_state(n_vars), expected(n_vars))
 
     h_source = 2.0_wp
     vel_source = 3.0_wp
@@ -482,7 +477,7 @@ CONTAINS
     time_param = [10.0_wp, 4.0_wp, 0.0_wp, 100.0_wp]
 
     expected = 0.0_wp
-    expected(1:4) = [2.0_wp, 3.6_wp, 4.8_wp, T_source]
+    expected(1:4) = [2.0_wp, 1.8_wp, 2.4_wp, T_source]
     expected(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
     expected(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
     expected(idx_u) = 1.8_wp
@@ -513,7 +508,7 @@ CONTAINS
     REAL(wp) :: p_dyn
 
     CALL configure_layout(.FALSE.)
-    ALLOCATE (q0(n_vars), q1(n_vars), qp(n_vars + 2))
+    ALLOCATE (q0(n_vars), q1(n_vars), qp(n_vars))
 
     q0 = 0.0_wp
     CALL qc_to_qp(q0, qp, p_dyn)
@@ -586,7 +581,7 @@ CONTAINS
     CHARACTER(LEN=80) :: derivative_label
 
     CALL configure_layout(.FALSE.)
-    ALLOCATE (qp(n_vars + 2), q(n_vars), q_plus(n_vars), q_minus(n_vars), cq(n_vars))
+    ALLOCATE (qp(n_vars), q(n_vars), q_plus(n_vars), q_minus(n_vars), cq(n_vars))
     CALL make_wet_state(qp)
     CALL qp_to_qc(qp, q)
 

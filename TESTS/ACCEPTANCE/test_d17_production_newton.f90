@@ -18,7 +18,7 @@ PROGRAM test_d17_production_newton
   idx_solid_first=5;idx_solid_last=4
   idx_solidEqn_first=5;idx_solidEqn_last=4
   idx_add_gas_first=5;idx_add_gas_last=4
-  idx_pore=0;idx_poreEqn=0;idx_stoch=0;idx_u=5;idx_v=6
+  idx_pore=0;idx_poreEqn=0;idx_stoch=0;idx_u=2;idx_v=3
   rheology_flag=.TRUE.;rheology_model='newmodel'
   pore_pressure_flag=.FALSE.;thermal_cooling_flag=.FALSE.
   slope_correction_flag=.FALSE.;curvature_term_flag=.FALSE.

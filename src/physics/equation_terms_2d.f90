@@ -46,7 +46,7 @@ CONTAINS
     !> dry state.
     !>
     !> \param[in] qcj Local conservative state vector associated with qpj.
-    !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
+    !> \param[in] qpj Local physical state of length n_vars with component mass fractions.
     !> \param[in] dir Cartesian flux direction: 1 for x, 2 for y.
     !> \param[out] flux Conservative flux vector, one entry per balance equation.
     !******************************************************************************
@@ -54,7 +54,7 @@ CONTAINS
     SUBROUTINE eval_inertial_flux(qcj,qpj,dir,flux)
 
         REAL(wp), INTENT(IN) :: qcj(n_vars)
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+        REAL(wp), INTENT(IN) :: qpj(n_vars)
         INTEGER, INTENT(IN) :: dir
         REAL(wp), INTENT(OUT) :: flux(n_eqns)
 
@@ -83,7 +83,7 @@ CONTAINS
     !> \f$\Gamma=\rho_mg'\f$ is recomputed from the final reconstructed primitive state;
     !> no derived thermodynamic quantity is reconstructed independently.
     !>
-    !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
+    !> \param[in] qpj Local physical state of length n_vars with component mass fractions.
     !> \param[out] reduced_gravity Buoyancy-reduced gravitational acceleration g prime [m s^-2].
     !> \param[out] gamma Hydrostatic pressure coefficient \f$\Gamma=\rho_mg'\f$
     !>                   [kg m^-2 s^-2].
@@ -91,7 +91,7 @@ CONTAINS
 
     SUBROUTINE eval_hydrostatic_coefficient(qpj,reduced_gravity,gamma)
 
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+        REAL(wp), INTENT(IN) :: qpj(n_vars)
         REAL(wp), INTENT(OUT) :: reduced_gravity, gamma
 
         REAL(wp) :: Richardson, rho_m, rho_c
@@ -108,7 +108,7 @@ CONTAINS
     !>          \f$\lambda_{\min,\max}=u_n\mp\sqrt{Gg'h}\f$. If the radicand is
     !>          negative, both bounds are set to u_n; a zero radicand also gives
     !>          equal bounds.
-    !> \param[in] qpj Local physical state of length n_vars+2: depth, temperature, component
+    !> \param[in] qpj Local physical state of length n_vars: depth, temperature, component
     !>                fractions and appended x/y velocities.
     !> \param[in] grav_coeff Large-slope gravity factor G at the state location.
     !> \param[in] normal_velocity_index Index of the normal velocity in qpj (idx_u for x,
@@ -117,7 +117,7 @@ CONTAINS
     !> \param[out] vel_max Upper characteristic speed [m s^-1].
     !> \note normal_velocity_index must identify one of the two Cartesian velocity components.
     SUBROUTINE eval_local_speeds_direction(qpj, grav_coeff, normal_velocity_index, vel_min, vel_max)
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2), grav_coeff
+        REAL(wp), INTENT(IN) :: qpj(n_vars), grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: vel_min, vel_max
         REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav

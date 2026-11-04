@@ -31,7 +31,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: t_rem, t_coeff, h_dot
-        REAL(wp) :: qp_source(n_vars+2)
+        REAL(wp) :: qp_source(n_vars)
         REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
 

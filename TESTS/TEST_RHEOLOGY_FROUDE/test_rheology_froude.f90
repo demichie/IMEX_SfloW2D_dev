@@ -12,7 +12,7 @@ PROGRAM test_rheology_froude
 
   IMPLICIT NONE
 
-  REAL(wp) :: qp(8), source(6), expected(6)
+  REAL(wp) :: qp(6), source(6), expected(6)
   COMPLEX(wp) :: complex_source(6)
   TYPE(physical_state_type) :: local_state
   TYPE(complex_physical_state_type) :: complex_state
@@ -136,8 +136,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: height, temperature, solid_fraction, u, v
     qp = 0.0_wp
     qp(1) = height
-    qp(2) = height*u
-    qp(3) = height*v
     qp(idx_T) = temperature
     qp(5) = solid_fraction
     qp(idx_u) = u

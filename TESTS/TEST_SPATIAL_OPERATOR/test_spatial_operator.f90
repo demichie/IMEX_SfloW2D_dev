@@ -253,7 +253,7 @@ CONTAINS
     ALLOCATE(bcW(n_vars),bcE(n_vars),bcS(n_vars),bcN(n_vars))
     bcW%flag=1; bcW%value=0.0_wp; bcE%flag=1; bcE%value=0.0_wp
     bcS%flag=1; bcS%value=0.0_wp; bcN%flag=1; bcN%value=0.0_wp
-    ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars+2,nx,ny))
+    ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars,nx,ny))
     ALLOCATE(term(n_eqns,nx,ny),direct(n_eqns,nx,ny),cell_sources(n_eqns,nx,ny))
     ALLOCATE(B_vertex(nx+1,ny+1),B_cent(nx,ny),B_face_x(nx+1,ny),B_face_y(nx,ny+1))
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))

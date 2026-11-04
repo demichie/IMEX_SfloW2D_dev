@@ -73,7 +73,7 @@ PROGRAM IMEX_SfloW2D
 
     USE inpout_2d, ONLY : restart
 
-    USE parameters_2d, ONLY : wp, idx_h, idx_T, idx_totMassEqn
+    USE parameters_2d, ONLY : wp, idx_h, idx_T, idx_u, idx_v, idx_totMassEqn
 
     USE parameters_2d, ONLY : t_start
     USE parameters_2d, ONLY : t_end
@@ -310,13 +310,13 @@ PROGRAM IMEX_SfloW2D
 
         IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars+2,j,k), p_dyn)
+            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars,j,k), p_dyn)
 
             IF ( .NOT. is_binary_restart )                                                                             &
                     simulation%state%hmax(j,k) = simulation%state%qp(idx_h,j,k)
 
-            r_u = simulation%state%qp(n_vars+1,j,k)
-            r_v = simulation%state%qp(n_vars+2,j,k)
+            r_u = simulation%state%qp(idx_u,j,k)
+            r_v = simulation%state%qp(idx_v,j,k)
 
             mod_vel2 = r_u**2 + r_v**2
             mod_vel = SQRT( mod_vel2 )
@@ -492,13 +492,13 @@ PROGRAM IMEX_SfloW2D
 
             IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-                CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars+2,j,k), p_dyn)
+                CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars,j,k), p_dyn)
 
                 simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),                                           &
                         simulation%state%qp(idx_h,j,k))
 
-                r_u = simulation%state%qp(n_vars+1,j,k)
-                r_v = simulation%state%qp(n_vars+2,j,k)
+                r_u = simulation%state%qp(idx_u,j,k)
+                r_v = simulation%state%qp(idx_v,j,k)
 
                 mod_vel2 = r_u**2 + r_v**2
                 mod_vel = SQRT( mod_vel2 )
@@ -538,7 +538,7 @@ PROGRAM IMEX_SfloW2D
 
             ELSE
 
-                simulation%state%qp(1:n_vars+2,j,k) = 0.0_wp
+                simulation%state%qp(1:n_vars,j,k) = 0.0_wp
                 simulation%state%qp(idx_T,j,k) = T_ambient
 
             END IF

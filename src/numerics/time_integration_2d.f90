@@ -59,7 +59,7 @@ CONTAINS
         END BLOCK
         ALLOCATE(this%spatial_rate(n_eqns,comp_cells_x,comp_cells_y))
         ALLOCATE(this%q_trial(n_vars,comp_cells_x,comp_cells_y))
-        ALLOCATE(this%qp_trial(n_vars+2,comp_cells_x,comp_cells_y))
+        ALLOCATE(this%qp_trial(n_vars,comp_cells_x,comp_cells_y))
         ALLOCATE(this%cell_status(comp_cells_x*comp_cells_y))
         CALL initialize_lie_source_executor(this%lie_executor,source_registry)
     END SUBROUTINE initialize_time_integration
@@ -127,7 +127,7 @@ CONTAINS
             ! This full halo buffer exists only for direct/non-CFL callers.
             ! Preserve their original reconstruction-stencil semantics.
             IF (.NOT.ALLOCATED(this%qp_before))                                                                     &
-                ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
+                ALLOCATE(this%qp_before(n_vars,comp_cells_x,comp_cells_y))
             this%qp_before=state%qp
             qp_pre=>this%qp_before
         END IF

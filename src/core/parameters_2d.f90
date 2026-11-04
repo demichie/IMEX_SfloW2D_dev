@@ -405,7 +405,7 @@ CONTAINS
 
         END IF
 
-        idx_u=n_vars+1; idx_v=n_vars+2
+        idx_u=2; idx_v=3
     END SUBROUTINE configure_canonical_state_indices
 
     SUBROUTINE reset_mass_exchange_rates(r)

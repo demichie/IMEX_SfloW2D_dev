@@ -60,18 +60,18 @@ CONTAINS
 
         INTEGER :: j,k
 
-        REAL(wp) :: qp_init(n_vars+2)
+        REAL(wp) :: qp_init(n_vars)
 
         WRITE(*,*) 'Initialization with zero thickness flow'
 
-        qp_init(1:n_vars+2) = 0.0_wp
+        qp_init(1:n_vars) = 0.0_wp
         qp_init(4) = T_ambient
 
         DO j = 1,comp_cells_x
 
             DO k = 1,comp_cells_y
 
-                CALL qp_to_qc( qp_init(1:n_vars+2) , state%q(1:n_vars,j,k) )
+                CALL qp_to_qc( qp_init(1:n_vars) , state%q(1:n_vars,j,k) )
 
 
             END DO
@@ -117,7 +117,7 @@ CONTAINS
 
         INTEGER :: j,k
 
-        REAL(wp) :: qp_init(n_vars+2) ,  qp0_init(n_vars+2)
+        REAL(wp) :: qp_init(n_vars) ,  qp0_init(n_vars)
         REAL(wp) :: xs_collapse(n_solid), xg_collapse(n_add_gas)
         REAL(wp) :: alphas_local(n_solid)
         REAL(wp) :: rho_m, inv_rhom, rho_c, xc, sp_heat_c, sp_heat_mix
@@ -131,15 +131,15 @@ CONTAINS
         ! values outside the collapsing volume
         qp0_init = 0.0_wp
         qp0_init(1) = 0.0_wp                  ! h
-        qp0_init(2) = 0.0_wp                  ! hu
-        qp0_init(3) = 0.0_wp                  ! hv
+        qp0_init(2) = 0.0_wp                  ! u
+        qp0_init(3) = 0.0_wp                  ! v
         qp0_init(4) = T_collapse              ! T
         qp0_init(5:4+n_solid) = 0.0_wp        ! solid mass fractions
         qp0_init(4+n_solid+1:4+n_solid+n_add_gas) = 0.0_wp        ! gas mass fractions
         qp0_init(5+n_solid+n_add_gas:4+n_solid+n_add_gas+n_stoch_vars) = 0.0_wp
         qp0_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas+n_stoch_vars+                                    &
             n_pore_vars) =  0.0_wp
-        qp0_init(n_vars+1:n_vars+2) = 0.0_wp  ! u,v
+
 
         ! values within the collapsing volume
         qp_init = 0.0_wp
@@ -147,7 +147,6 @@ CONTAINS
         qp_init(3) = 0.0_wp
         qp_init(4) = T_collapse
 
-        qp_init(n_vars+1:n_vars+2) = 0.0_wp
 
         alphas_local = alphas_collapse(1:n_solid)
         CALL eval_mixture_properties_from_volume_fractions(T_collapse, alphag_collapse(1:n_add_gas), alphas_local,     &
@@ -170,11 +169,11 @@ CONTAINS
                     qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas                                       &
                         +n_stoch_vars+n_pore_vars) = 1.0_wp
 
-                    CALL qp_to_qc( qp_init(1:n_vars+2) , state%q(1:n_vars,j,k) )
+                    CALL qp_to_qc( qp_init(1:n_vars) , state%q(1:n_vars,j,k) )
 
                 ELSE
 
-                    CALL qp_to_qc( qp0_init(1:n_vars+2) , state%q(1:n_vars,j,k) )
+                    CALL qp_to_qc( qp0_init(1:n_vars) , state%q(1:n_vars,j,k) )
 
                 END IF
 

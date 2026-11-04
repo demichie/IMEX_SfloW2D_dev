@@ -175,7 +175,7 @@ CONTAINS
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
-        REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp_expl(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(OUT) :: divFlux_iRK(n_eqns,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: t
         INTEGER, INTENT(IN) :: solve_cells
@@ -414,7 +414,7 @@ CONTAINS
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
-        REAL(wp), INTENT(IN) :: qp_center(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp_center(n_vars,comp_cells_x,comp_cells_y)
         LOGICAL, INTENT(IN) :: use_dry_donor
         REAL(wp), INTENT(IN) :: t
         INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
@@ -688,7 +688,7 @@ CONTAINS
 
         REAL(wp), INTENT(IN) :: eta_left, eta_right, bed_face
         REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
-        REAL(wp), INTENT(IN) :: qp_adv_left(n_vars+2), qp_adv_right(n_vars+2)
+        REAL(wp), INTENT(IN) :: qp_adv_left(n_vars), qp_adv_right(n_vars)
         REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
         INTEGER, INTENT(IN) :: direction, normal_momentum_index
         INTEGER, INTENT(IN) :: face_i, face_j
@@ -698,10 +698,10 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: value_left(n_eqns), value_right(n_eqns)
 
         REAL(wp) :: q_adv_left_use(n_vars), q_adv_right_use(n_vars)
-        REAL(wp) :: qp_adv_left_use(n_vars+2), qp_adv_right_use(n_vars+2)
+        REAL(wp) :: qp_adv_left_use(n_vars), qp_adv_right_use(n_vars)
         REAL(wp) :: flux_left(n_eqns), flux_right(n_eqns)
         REAL(wp) :: path_contribution(n_eqns), interface_flux(n_eqns)
-        REAL(wp) :: qp_path_left(n_vars+2), qp_path_right(n_vars+2)
+        REAL(wp) :: qp_path_left(n_vars), qp_path_right(n_vars)
         REAL(wp) :: gamma_left, gamma_right
         REAL(wp) :: reduced_gravity_left, reduced_gravity_right
         REAL(wp) :: eta_scale, eta_roundoff
@@ -725,8 +725,7 @@ CONTAINS
             qp_adv_left_use(1:3)=0.0_wp
             qp_adv_left_use(idx_u:idx_v)=0.0_wp
         ELSE
-            qp_adv_left_use(2)=h_eta_left*qp_adv_left(idx_u)
-            qp_adv_left_use(3)=h_eta_left*qp_adv_left(idx_v)
+
 
         END IF
 
@@ -734,8 +733,7 @@ CONTAINS
             qp_adv_right_use(1:3)=0.0_wp
             qp_adv_right_use(idx_u:idx_v)=0.0_wp
         ELSE
-            qp_adv_right_use(2)=h_eta_right*qp_adv_right(idx_u)
-            qp_adv_right_use(3)=h_eta_right*qp_adv_right(idx_v)
+
 
         END IF
 
@@ -952,13 +950,13 @@ CONTAINS
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
-        REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp_expl(n_vars,comp_cells_x,comp_cells_y)
         LOGICAL, INTENT(IN) :: use_dry_donor
         INTEGER, INTENT(IN) :: solve_cells
         INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
 
         INTEGER :: j, k, l
-        REAL(wp) :: qp_path_minus(n_vars+2), qp_path_plus(n_vars+2)
+        REAL(wp) :: qp_path_minus(n_vars), qp_path_plus(n_vars)
 
         !$OMP PARALLEL DO private(l,j,k,qp_path_minus,qp_path_plus)
         DO l = 1, solve_cells
@@ -1105,7 +1103,7 @@ CONTAINS
 
         REAL(wp) :: min_r, max_r
         REAL(wp) :: h_eta_minus, h_eta_plus
-        REAL(wp) :: qp_eta_minus(n_vars+2), qp_eta_plus(n_vars+2)
+        REAL(wp) :: qp_eta_minus(n_vars), qp_eta_plus(n_vars)
 
         INTEGER :: j,k,l
 
@@ -1131,10 +1129,8 @@ CONTAINS
                     qp_eta_minus(idx_u:idx_v)=0.0_wp
                 IF (h_eta_plus .LE. dry_thickness_tolerance)                                                           &
                     qp_eta_plus(idx_u:idx_v)=0.0_wp
-                qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
-                qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
-                qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
-                qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
+
+
                 CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, grav_coeff_stag_x(j,k),idx_u,min_r,max_r)
 
                 this%a_interface_xNeg(j,k) = min_r
@@ -1166,10 +1162,8 @@ CONTAINS
                     qp_eta_minus(idx_u:idx_v)=0.0_wp
                 IF (h_eta_plus .LE. dry_thickness_tolerance)                                                           &
                     qp_eta_plus(idx_u:idx_v)=0.0_wp
-                qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
-                qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
-                qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
-                qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
+
+
                 CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, grav_coeff_stag_y(j,k),idx_v,min_r,max_r)
 
                 this%a_interface_yNeg(j,k) = min_r

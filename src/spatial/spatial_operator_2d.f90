@@ -100,7 +100,7 @@ CONTAINS
         reuse_cfl_traces )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
-        REAL(wp), INTENT(IN) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(OUT) :: spatial_term(n_eqns,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time
         CLASS(domain_type), INTENT(IN) :: domain
@@ -131,7 +131,7 @@ CONTAINS
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time
         REAL(wp), INTENT(OUT) :: dt
         CLASS(domain_type), INTENT(IN) :: domain

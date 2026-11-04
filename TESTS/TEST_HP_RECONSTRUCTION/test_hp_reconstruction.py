@@ -14,12 +14,11 @@ for s in (r, f, b):
 for old in ("reconstruct_hp_line", "evaluate_hp_cell", "commit_hp_cell",
             "hp_blended", "hp_scratch", "hp_dynamic_residual_threshold"):
     assert old not in r, old
-for expected in ("trace(2) = trace(1)*trace(idx_u)",
-                 "trace(3) = trace(1)*trace(idx_v)",
+for expected in ("discharge_bc_to_velocity", "enforce_boundary_discharge",
                  "froude_h_blend_weight", "reconstruct_kt_eta_traces"):
     assert expected in r, expected
 for expected in ("CASE ('h_x')", "CASE ('minmod')", "CASE ('froude_blend')",
-                 "qp_adv_left_use(2)=h_eta_left*qp_adv_left(idx_u)",
-                 "qp_adv_left_use(3)=h_eta_left*qp_adv_left(idx_v)"):
+                 "qp_adv_left_use(1)=h_eta_left",
+                 "CALL qp_to_qc(qp_adv_left_use"):
     assert expected in f, expected
-print("PASS: only selected-depth velocity/momentum reconstruction remains")
+print("PASS: selected-depth primitive reconstruction with discharge boundary conditions")

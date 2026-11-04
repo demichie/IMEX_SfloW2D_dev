@@ -7,7 +7,7 @@ PROGRAM test_d17_state_numeric
   USE constitutive_parameters_2d, ONLY : T_ambient
   USE state_2d, ONLY : finalize_imex_cell_state, initialize_dry_physical_cell
   IMPLICIT NONE
-  REAL(wp) :: q(4), qp(6), previous(4)
+  REAL(wp) :: q(4), qp(4), previous(4)
   n_vars=4
   n_solid=0
   n_add_gas=0
@@ -20,14 +20,13 @@ PROGRAM test_d17_state_numeric
   qp=-77.0_wp
   CALL initialize_dry_physical_cell(qp)
   CALL expect('dry initializer', ALL(qp(1:3)==0.0_wp) .AND. &
-       qp(4)==T_ambient .AND. ALL(qp(5:6)==0.0_wp))
+       qp(4)==T_ambient)
   previous=0.0_wp
   q=0.0_wp
   qp=-77.0_wp
   CALL finalize_imex_cell_state(q,qp,previous,.FALSE.)
   CALL expect('zero mass remains zero',ALL(q==0.0_wp))
-  CALL expect('zero mass has zero velocities',ALL(qp(2:3)==0.0_wp) &
-       .AND. ALL(qp(5:6)==0.0_wp))
+  CALL expect('zero mass has zero velocities',ALL(qp(2:3)==0.0_wp))
   q=[-1.0e-8_wp,3.0_wp,4.0_wp,100.0_wp]
   qp=-77.0_wp
   CALL finalize_imex_cell_state(q,qp,previous,.FALSE.)

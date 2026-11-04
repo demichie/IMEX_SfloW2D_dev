@@ -14,7 +14,7 @@ MODULE reconstruction_2d
     USE parameters_2d, ONLY : idx_h
     USE parameters_2d, ONLY : wp, n_vars, kt_trace_reconstruction, dry_thickness_tolerance
     USE parameters_2d, ONLY : lateral_source_flag, radial_source_flag
-    USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
+    USE parameters_2d, ONLY : bc, bcW, bcE, bcS, bcN
     USE parameters_2d, ONLY : idx_u, idx_v
     USE parameters_2d, ONLY : limiter, reconstr_coeff
 
@@ -96,19 +96,19 @@ CONTAINS
 
 
 
-        ALLOCATE( this%qp_adv_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+        ALLOCATE( this%qp_adv_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
         ALLOCATE( this%h_selected_interfaceL( comp_interfaces_x, comp_cells_y ) )
-        ALLOCATE( this%qp_adv_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+        ALLOCATE( this%qp_adv_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
         ALLOCATE( this%h_selected_interfaceR( comp_interfaces_x, comp_cells_y ) )
-        ALLOCATE( this%qp_adv_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+        ALLOCATE( this%qp_adv_interfaceB( n_vars, comp_cells_x, comp_interfaces_y ) )
         ALLOCATE( this%h_selected_interfaceB( comp_cells_x, comp_interfaces_y ) )
-        ALLOCATE( this%qp_adv_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+        ALLOCATE( this%qp_adv_interfaceT( n_vars, comp_cells_x, comp_interfaces_y ) )
         ALLOCATE( this%h_selected_interfaceT( comp_cells_x, comp_interfaces_y ) )
 
-        ALLOCATE( this%qp_cellW( n_vars+2, comp_cells_x, comp_cells_y ) )
-        ALLOCATE( this%qp_cellE( n_vars+2, comp_cells_x, comp_cells_y ) )
-        ALLOCATE( this%qp_cellS( n_vars+2, comp_cells_x, comp_cells_y ) )
-        ALLOCATE( this%qp_cellN( n_vars+2, comp_cells_x, comp_cells_y ) )
+        ALLOCATE( this%qp_cellW( n_vars, comp_cells_x, comp_cells_y ) )
+        ALLOCATE( this%qp_cellE( n_vars, comp_cells_x, comp_cells_y ) )
+        ALLOCATE( this%qp_cellS( n_vars, comp_cells_x, comp_cells_y ) )
+        ALLOCATE( this%qp_cellN( n_vars, comp_cells_x, comp_cells_y ) )
 
         ALLOCATE( this%eta_cellW( comp_cells_x, comp_cells_y ) )
         ALLOCATE( this%eta_cellE( comp_cells_x, comp_cells_y ) )
@@ -154,7 +154,6 @@ CONTAINS
     SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, source_boundary_enabled )
 
         ! External procedures
-    USE state_conversion_2d, ONLY : qp_to_qp2
     USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
     USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
     USE parameters_2d, ONLY : limiter
@@ -180,17 +179,16 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_kt_direct
         LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled
 
-        REAL(wp) :: qrecW(n_vars+2) !< recons var at the west edge of the cells
-        REAL(wp) :: qrecE(n_vars+2) !< recons var at the east edge of the cells
-        REAL(wp) :: qrecS(n_vars+2) !< recons var at the south edge of the cells
-        REAL(wp) :: qrecN(n_vars+2) !< recons var at the north edge of the cells
+        REAL(wp) :: qrecW(n_vars) !< recons var at the west edge of the cells
+        REAL(wp) :: qrecE(n_vars) !< recons var at the east edge of the cells
+        REAL(wp) :: qrecS(n_vars) !< recons var at the south edge of the cells
+        REAL(wp) :: qrecN(n_vars) !< recons var at the north edge of the cells
 
-        REAL(wp) :: source_bdry(n_vars+2)
-        REAL(wp) :: qrec_prime_x(n_vars+2)      !< recons variables slope
-        REAL(wp) :: qrec_prime_y(n_vars+2)      !< recons variables slope
+        REAL(wp) :: source_bdry(n_vars)
+        REAL(wp) :: qrec_prime_x(n_vars)      !< recons variables slope
+        REAL(wp) :: qrec_prime_y(n_vars)      !< recons variables slope
 
-        REAL(wp) :: qp2recW(3) , qp2recE(3)
-        REAL(wp) :: qp2recS(3) , qp2recN(3)
+        TYPE(bc) :: bcW_effective, bcE_effective, bcS_effective, bcN_effective
 
         REAL(wp) :: qrec_stencil(3) !< recons variables stencil for the limiter
         REAL(wp) :: x_stencil(3)    !< grid stencil for the limiter
@@ -213,8 +211,8 @@ CONTAINS
             CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
 
         !$OMP PARALLEL DO private(l,j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
-        !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
-        !$OMP & qp2recN,source_bdry,dq,regular_interior)
+        !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,bcW_effective,bcE_effective,bcS_effective,bcN_effective, &
+        !$OMP & source_bdry,dq,regular_interior)
 
         DO l = 1, this%hp_eta_cells
             j = this%hp_eta_j(l)
@@ -233,7 +231,7 @@ CONTAINS
             ! Default source-side ghost state. For the conservative radial source,
             ! the ring is a wall and mass/momentum are injected through eval_expl_terms.
             ! The existing lateral boundary source keeps its Dirichlet treatment.
-            source_bdry(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
+            source_bdry(1:n_vars) = qp_expl(1:n_vars,j,k)
 
             IF ( use_boundary_source .AND. lateral_source_flag .AND.                                                   &
                 ( source_cell(j,k) .EQ. 2 ) ) THEN
@@ -269,7 +267,7 @@ CONTAINS
                 y_stencil(1) = y_comp(k-1)
                 y_stencil(3) = y_comp(k+1)
 
-                fast_vars_loop:DO i=1,n_vars+2
+                fast_vars_loop:DO i=1,n_vars
 
                     qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
 
@@ -296,6 +294,30 @@ CONTAINS
             vars_loop:DO i=1,n_vars
 
                 qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
+                bcW_effective=bcW(i)
+                bcE_effective=bcE(i)
+                bcS_effective=bcS(i)
+                bcN_effective=bcN(i)
+                ! The input BCs on components 2/3 prescribe hu/hv, not velocities.
+                ! Convert their trace values to velocities for the primitive limiter.
+                IF (i==idx_u .OR. i==idx_v) THEN
+                    IF (j==1 .AND. comp_cells_x>1) CALL discharge_bc_to_velocity(                                     &
+                        bcW(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        qp_expl(1,j+1,k),qp_expl(i,j+1,k),qrecW(1),dx2,one_by_dx,-1,                                  &
+                        i==idx_u,bcW_effective)
+                    IF (j==comp_cells_x .AND. comp_cells_x>1) CALL discharge_bc_to_velocity(                          &
+                        bcE(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        qp_expl(1,j-1,k),qp_expl(i,j-1,k),qrecE(1),dx2,one_by_dx,1,                                   &
+                        i==idx_u,bcE_effective)
+                    IF (k==1 .AND. comp_cells_y>1) CALL discharge_bc_to_velocity(                                     &
+                        bcS(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        qp_expl(1,j,k+1),qp_expl(i,j,k+1),qrecS(1),dy2,one_by_dy,-1,                                  &
+                        i==idx_v,bcS_effective)
+                    IF (k==comp_cells_y .AND. comp_cells_y>1) CALL discharge_bc_to_velocity(                          &
+                        bcN(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        qp_expl(1,j,k-1),qp_expl(i,j,k-1),qrecN(1),dy2,one_by_dy,1,                                   &
+                        i==idx_v,bcN_effective)
+                END IF
 
                 ! x direction
                 check_comp_cells_x:IF ( comp_cells_x .GT. 1 ) THEN
@@ -318,8 +340,8 @@ CONTAINS
 
                             CALL boundary_reconstruction_slope(                                                        &
                                 qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j+1,k),                           &
-                                x_stag(1), x_comp(j), x_comp(j+1), bcW(i)%flag,                                        &
-                                bcW(i)%value, one_by_dx, limiter(i), .TRUE.,                                           &
+                                x_stag(1), x_comp(j), x_comp(j+1), bcW_effective%flag,                                        &
+                                bcW_effective%value, one_by_dx, limiter(i), .TRUE.,                                           &
                                 qrec_prime_x(i))
 
                         END IF
@@ -343,7 +365,7 @@ CONTAINS
                             CALL boundary_reconstruction_slope(                                                        &
                                 qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j-1,k),                           &
                                 x_stag(comp_interfaces_x), x_comp(j), x_comp(j-1),                                     &
-                                bcE(i)%flag, bcE(i)%value, one_by_dx, limiter(i), .FALSE.,                             &
+                                bcE_effective%flag, bcE_effective%value, one_by_dx, limiter(i), .FALSE.,                             &
                                 qrec_prime_x(i))
 
                         END IF
@@ -395,9 +417,9 @@ CONTAINS
                         ELSE
 
                             ! Dirichelet boundary condition at the west of the domain
-                            IF ( bcW(i)%flag .EQ. 0 ) THEN
+                            IF ( bcW_effective%flag .EQ. 0 ) THEN
 
-                                qrecW(i) = bcW(i)%value
+                                qrecW(i) = bcW_effective%value
 
                             ELSE
 
@@ -418,9 +440,9 @@ CONTAINS
                         ELSE
 
                             ! Dirichelet boundary condition at the east of the domain
-                            IF ( bcE(i)%flag .EQ. 0 ) THEN
+                            IF ( bcE_effective%flag .EQ. 0 ) THEN
 
-                                qrecE(i) = bcE(i)%value
+                                qrecE(i) = bcE_effective%value
 
                             ELSE
 
@@ -445,8 +467,8 @@ CONTAINS
 
                         CALL boundary_reconstruction_slope(                                                            &
                             qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j,k+1),                               &
-                            y_stag(1), y_comp(k), y_comp(k+1), bcS(i)%flag,                                            &
-                            bcS(i)%value,                                                                              &
+                            y_stag(1), y_comp(k), y_comp(k+1), bcS_effective%flag,                                            &
+                            bcS_effective%value,                                                                              &
                             one_by_dy, limiter(i), .TRUE., qrec_prime_y(i))
 
                         ! North boundary
@@ -458,7 +480,7 @@ CONTAINS
                             CALL boundary_reconstruction_slope(                                                        &
                             qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j,k-1),                               &
                             y_stag(comp_interfaces_y), y_comp(k), y_comp(k-1),                                         &
-                            bcN(i)%flag, bcN(i)%value, one_by_dy, limiter(i), .FALSE.,                                 &
+                            bcN_effective%flag, bcN_effective%value, one_by_dy, limiter(i), .FALSE.,                                 &
                             qrec_prime_y(i))
 
                     ELSE
@@ -507,8 +529,8 @@ CONTAINS
                         ELSE
 
                             ! Dirichlet boundary condition at the south of the domain
-                            IF ( bcS(i)%flag .EQ. 0 ) THEN
-                                qrecS(i) = bcS(i)%value
+                            IF ( bcS_effective%flag .EQ. 0 ) THEN
+                                qrecS(i) = bcS_effective%value
                             ELSE
                                 IF ( i .EQ. 3 ) qrecS(i) = MIN( qrecS(i) , 0.0_wp )
 
@@ -527,8 +549,8 @@ CONTAINS
                         ELSE
 
                             ! Dirichlet boundary condition at the north of the domain
-                            IF ( bcN(i)%flag .EQ. 0 ) THEN
-                                qrecN(i) = bcN(i)%value
+                            IF ( bcN_effective%flag .EQ. 0 ) THEN
+                                qrecN(i) = bcN_effective%value
                             ELSE
                                 IF ( i .EQ. 3 ) qrecN(i) = MAX( qrecN(i) , 0.0_wp )
 
@@ -542,175 +564,15 @@ CONTAINS
 
             ENDDO vars_loop
 
-            add_vars_loop:DO i=n_vars+1,n_vars+2
-                ! reconstruction on u and v with same limiters of hu,hv
 
-                ! x direction
-                check_comp_cells_x2:IF ( comp_cells_x .GT. 1 ) THEN
+            ! Radial inlet states are prescribed on the source-facing traces.
+            IF (radial_source_flag .AND. source_cell(j,k)==2) THEN
+                IF (sourceE(j,k)) qrecE=source_bdry
+                IF (sourceW(j,k)) qrecW=source_bdry
+                IF (sourceS(j,k)) qrecS=source_bdry
+                IF (sourceN(j,k)) qrecN=source_bdry
+            END IF
 
-                    qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
-
-                    IF ( j .EQ. 1 ) THEN
-
-                        CALL qp_to_qp2( qrecW(1:n_vars+2) , B_cent(j,k) , qp2recW )
-                        qrec_stencil(1) = qp2recW(i-n_vars+1)
-                        qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
-
-                    ELSEIF ( j .EQ. comp_cells_x ) THEN
-
-                        CALL qp_to_qp2( qrecE(1:n_vars+2) , B_cent(j,k) , qp2recE )
-                        qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
-                        qrec_stencil(3) = qp2recE(i-n_vars+1)
-
-                    ELSE
-
-                        qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
-                        qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
-
-                        ! correction for radial source inlet x-interfaces values
-                        ! used for the linear reconstruction
-                        IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                            IF ( sourceE(j,k) ) THEN
-
-                                x_stencil(3) = x_stag(j+1)
-                                qrec_stencil(3) = source_bdry(i)
-
-                            ELSEIF ( sourceW(j,k) ) THEN
-
-                                x_stencil(1) = x_stag(j)
-                                qrec_stencil(1) = source_bdry(i)
-
-                            END IF
-
-                        END IF
-
-                    END IF
-
-                    CALL limit( qrec_stencil , x_stencil , limiter(i) , qrec_prime_x(i) )
-
-                    dq = reconstr_coeff*dx2*qrec_prime_x(i)
-
-                    qrecW(i) = qrec_stencil(2) - dq
-                    qrecE(i) = qrec_stencil(2) + dq
-
-                    IF ( j .EQ. 1 ) THEN
-
-                        CALL qp_to_qp2( qrecW(1:n_vars+2) , B_cent(j,k) , qp2recW )
-                        qrecW(i) = qp2recW(i-n_vars+1)
-
-                    ELSEIF ( j .EQ. comp_cells_x ) THEN
-
-                        CALL qp_to_qp2( qrecE(1:n_vars+2) , B_cent(j,k) , qp2recE )
-                        qrecE(i) = qp2recE(i-n_vars+1)
-
-                    ELSE
-
-                        ! correction for radial source inlet x-interfaces:
-                        ! the physical variables at the x-interfaces qrecW or
-                        ! qrecE are computed from the radial inlet values
-                        IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                            IF ( sourceE(j,k) ) THEN
-
-                                qrecE(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                            ELSEIF ( sourceW(j,k) ) THEN
-
-                                qrecW(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                            END IF
-
-                        END IF
-
-                    END IF
-
-                END IF check_comp_cells_x2
-
-                ! y-direction
-                check_comp_cells_y2:IF ( comp_cells_y .GT. 1 ) THEN
-
-                    qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
-
-                    IF ( k .EQ. 1 ) THEN
-
-                        CALL qp_to_qp2( qrecS(1:n_vars+2) , B_cent(j,k) , qp2recS )
-                        qrec_stencil(1) = qp2recS(i-n_vars+1)
-                        qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
-
-                    ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                        CALL qp_to_qp2( qrecN(1:n_vars+2) , B_cent(j,k) , qp2recN )
-                        qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
-                        qrec_stencil(3) = qp2recN(i-n_vars+1)
-
-                    ELSE
-
-                        qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
-                        qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
-
-                        ! correction for radial source inlet y-interfaces
-                        ! used for the linear reconstruction
-                        IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                            IF ( sourceS(j,k) ) THEN
-
-                                y_stencil(1) = y_stag(k)
-                                qrec_stencil(1) = source_bdry(i)
-
-                            ELSEIF ( sourceN(j,k) ) THEN
-
-                                y_stencil(3) = y_stag(k+1)
-                                qrec_stencil(3) = source_bdry(i)
-
-                            END IF
-
-                        END IF
-
-                    ENDIF
-
-                    CALL limit( qrec_stencil , y_stencil , limiter(i) , qrec_prime_y(i) )
-
-                    dq = reconstr_coeff*dy2*qrec_prime_y(i)
-
-                    qrecS(i) = qrec_stencil(2) - dq
-                    qrecN(i) = qrec_stencil(2) + dq
-
-
-                    IF ( k .EQ. 1 ) THEN
-
-                        CALL qp_to_qp2( qrecS(1:n_vars+2) , B_cent(j,k) , qp2recS )
-                        qrecS(i) = qp2recS(i-n_vars+1)
-
-                    ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                        CALL qp_to_qp2( qrecN(1:n_vars+2) , B_cent(j,k) , qp2recN )
-                        qrecN(i) = qp2recN(i-n_vars+1)
-
-                    ELSE
-
-                        ! correction for radial source inlet y-interfaces:
-                        ! the physical variables at the y-interfaces qrecS or
-                        ! qrecN are computed from the radial inlet values
-                        IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
-
-                            IF ( sourceS(j,k) ) THEN
-
-                                qrecS(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                            ELSEIF ( sourceN(j,k) ) THEN
-
-                                qrecN(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                            END IF
-
-                        END IF
-
-                    END IF
-
-                ENDIF check_comp_cells_y2
-
-            ENDDO add_vars_loop
 
             END IF
 
@@ -721,10 +583,10 @@ CONTAINS
             this%qp_cellS(:,j,k) = qrecS
             this%qp_cellN(:,j,k) = qrecN
             CALL reconstruct_kt_eta_cell(this,qp_expl,j,k)
-            CALL form_direct_face_momentum(this%qp_cellW(:,j,k))
-            CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
-            CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
-            CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
+
+
+
+
             ! The transport interface arrays retain the finalized primitive traces.
             this%qp_adv_interfaceR(:,j,k) = this%qp_cellW(:,j,k)
             this%qp_adv_interfaceL(:,j+1,k) = this%qp_cellE(:,j,k)
@@ -1173,14 +1035,10 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                         this%qp_adv_interfaceL(:,j+1,k)
                     this%qp_adv_interfaceR(2,j+1,k) =                                                                  &
                         -this%qp_adv_interfaceR(2,j+1,k)
-                    this%qp_adv_interfaceR(idx_u,j+1,k) =                                                              &
-                        -this%qp_adv_interfaceR(idx_u,j+1,k)
                     this%eta_interfaceR(j+1,k) = this%eta_interfaceL(j+1,k)
                 ELSEIF ( sourceW(j,k) ) THEN
                     this%qp_adv_interfaceL(:,j,k) = this%qp_adv_interfaceR(:,j,k)
                     this%qp_adv_interfaceL(2,j,k) = -this%qp_adv_interfaceL(2,j,k)
-                    this%qp_adv_interfaceL(idx_u,j,k) =                                                                &
-                        -this%qp_adv_interfaceL(idx_u,j,k)
                     this%eta_interfaceL(j,k) = this%eta_interfaceR(j,k)
 
                 END IF
@@ -1190,14 +1048,10 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                         this%qp_adv_interfaceB(:,j,k+1)
                     this%qp_adv_interfaceT(3,j,k+1) =                                                                  &
                         -this%qp_adv_interfaceT(3,j,k+1)
-                    this%qp_adv_interfaceT(idx_v,j,k+1) =                                                              &
-                        -this%qp_adv_interfaceT(idx_v,j,k+1)
                     this%eta_interfaceT(j,k+1) = this%eta_interfaceB(j,k+1)
                 ELSEIF ( sourceS(j,k) ) THEN
                     this%qp_adv_interfaceB(:,j,k) = this%qp_adv_interfaceT(:,j,k)
                     this%qp_adv_interfaceB(3,j,k) = -this%qp_adv_interfaceB(3,j,k)
-                    this%qp_adv_interfaceB(idx_v,j,k) =                                                                &
-                        -this%qp_adv_interfaceB(idx_v,j,k)
                     this%eta_interfaceB(j,k) = this%eta_interfaceT(j,k)
 
                 END IF
@@ -1452,6 +1306,58 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         END DO
         !$OMP END PARALLEL DO
 
+        ! Apply prescribed boundary discharge to the final HP transport depths.
+        ! This is intentionally after h_selected is finalized and before ghost copies.
+        DO k=1,comp_cells_y
+            IF (comp_cells_x>1) THEN
+                IF (source_cell(1,k)/=2) THEN
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceR(:,1,k),                                   &
+                        this%h_selected_interfaceR(1,k),qp_expl(:,1,k),                                               &
+                        qp_expl(:,2,k),bcW(2),dx2,one_by_dx,-1,.TRUE.,idx_u)
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceR(:,1,k),                                   &
+                        this%h_selected_interfaceR(1,k),qp_expl(:,1,k),                                               &
+                        qp_expl(:,2,k),bcW(3),dx2,one_by_dx,-1,.FALSE.,idx_v)
+                END IF
+                IF (source_cell(comp_cells_x,k)/=2) THEN
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceL(:,comp_interfaces_x,k),                  &
+                        this%h_selected_interfaceL(comp_interfaces_x,k),qp_expl(:,comp_cells_x,k),                    &
+                        qp_expl(:,comp_cells_x-1,k),bcE(2),dx2,one_by_dx,1,.TRUE.,idx_u)
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceL(:,comp_interfaces_x,k),                  &
+                        this%h_selected_interfaceL(comp_interfaces_x,k),qp_expl(:,comp_cells_x,k),                    &
+                        qp_expl(:,comp_cells_x-1,k),bcE(3),dx2,one_by_dx,1,.FALSE.,idx_v)
+                END IF
+            END IF
+        END DO
+        DO j=1,comp_cells_x
+            IF (comp_cells_y>1) THEN
+                IF (source_cell(j,1)/=2) THEN
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceT(:,j,1),                                   &
+                        this%h_selected_interfaceT(j,1),qp_expl(:,j,1),                                               &
+                        qp_expl(:,j,2),bcS(2),dy2,one_by_dy,-1,.FALSE.,idx_u)
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceT(:,j,1),                                   &
+                        this%h_selected_interfaceT(j,1),qp_expl(:,j,1),                                               &
+                        qp_expl(:,j,2),bcS(3),dy2,one_by_dy,-1,.TRUE.,idx_v)
+                END IF
+                IF (source_cell(j,comp_cells_y)/=2) THEN
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceB(:,j,comp_interfaces_y),                  &
+                        this%h_selected_interfaceB(j,comp_interfaces_y),qp_expl(:,j,comp_cells_y),                    &
+                        qp_expl(:,j,comp_cells_y-1),bcN(2),dy2,one_by_dy,1,.FALSE.,idx_u)
+                    CALL enforce_boundary_discharge(this%qp_adv_interfaceB(:,j,comp_interfaces_y),                  &
+                        this%h_selected_interfaceB(j,comp_interfaces_y),qp_expl(:,j,comp_cells_y),                    &
+                        qp_expl(:,j,comp_cells_y-1),bcN(3),dy2,one_by_dy,1,.TRUE.,idx_v)
+                END IF
+            END IF
+        END DO
+        ! Keep both sides of an external interface identical after the correction.
+        DO k=1,comp_cells_y
+            this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
+            this%qp_adv_interfaceR(:,comp_interfaces_x,k)=this%qp_adv_interfaceL(:,comp_interfaces_x,k)
+        END DO
+        DO j=1,comp_cells_x
+            this%qp_adv_interfaceB(:,j,1)=this%qp_adv_interfaceT(:,j,1)
+            this%qp_adv_interfaceT(:,j,comp_interfaces_y)=this%qp_adv_interfaceB(:,j,comp_interfaces_y)
+        END DO
+
         ! External ghost states inherit the selected depths of their owners.
         DO k=1,comp_cells_y
             this%h_selected_interfaceL(1,k)=this%h_selected_interfaceR(1,k)
@@ -1486,20 +1392,76 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         !> @details A dry trace has zero momentum and velocity; wet traces use
         !>          the same selected depth for both momentum components.
         !> @param[in,out] trace Primitive face trace modified in place.
-    SUBROUTINE form_direct_face_momentum(trace)
-            REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
-            trace(1) = MAX(trace(1),0.0_wp)
 
-            IF (trace(1) .LE. dry_thickness_tolerance) THEN
-                trace(1:3) = 0.0_wp
-                trace(idx_u:idx_v) = 0.0_wp
+
+
+    !> Convert an imposed discharge (Dirichlet or Neumann) into a primitive
+    !> velocity boundary value, using the reconstructed first-pass depth.
+    SUBROUTINE discharge_bc_to_velocity(discharge_bc,hc,uc,hn,un,hface,half,inv_dx,side,normal,velocity_bc)
+        TYPE(bc), INTENT(IN) :: discharge_bc
+        REAL(wp), INTENT(IN) :: hc,uc,hn,un,hface,half,inv_dx
+        INTEGER, INTENT(IN) :: side
+        LOGICAL, INTENT(IN) :: normal
+        TYPE(bc), INTENT(OUT) :: velocity_bc
+        REAL(wp) :: discharge
+        CALL boundary_discharge_value(discharge_bc,hc*uc,hn*un,half,inv_dx,side,normal,discharge)
+        velocity_bc%flag=0
+        velocity_bc%value=0.0_wp
+        IF (hface>dry_thickness_tolerance) THEN
+            velocity_bc%value=discharge/hface
+        ELSEIF (ABS(discharge)>dry_thickness_tolerance) THEN
+            ERROR STOP 'Nonzero boundary discharge at dry first-pass reconstruction'
+        END IF
+    END SUBROUTINE discharge_bc_to_velocity
+
+    !> Evaluate the boundary discharge in the original physical input units.
+    SUBROUTINE boundary_discharge_value(discharge_bc,qc,qn,half,inv_dx,side,normal,discharge)
+        TYPE(bc), INTENT(IN) :: discharge_bc
+        REAL(wp), INTENT(IN) :: qc,qn,half,inv_dx
+        INTEGER, INTENT(IN) :: side
+        LOGICAL, INTENT(IN) :: normal
+        REAL(wp), INTENT(OUT) :: discharge
+        REAL(wp) :: gradient
+        SELECT CASE(discharge_bc%flag)
+        CASE(0)
+            discharge=discharge_bc%value
+        CASE(1)
+            discharge=qc+side*reconstr_coeff*half*discharge_bc%value
+        CASE(2)
+            IF (side<0) THEN
+                gradient=(qn-qc)*inv_dx
             ELSE
-                trace(2) = trace(1)*trace(idx_u)
-                trace(3) = trace(1)*trace(idx_v)
-
+                gradient=(qc-qn)*inv_dx
             END IF
-    END SUBROUTINE form_direct_face_momentum
+            discharge=qc+side*reconstr_coeff*half*gradient
+        CASE DEFAULT
+            ERROR STOP 'Invalid boundary discharge condition'
+        END SELECT
+        IF (normal .AND. discharge_bc%flag/=0) THEN
+            IF (side<0) discharge=MIN(discharge,0.0_wp)
+            IF (side>0) discharge=MAX(discharge,0.0_wp)
+        END IF
+    END SUBROUTINE boundary_discharge_value
 
+    !> Enforce prescribed hu/hv after HP depth selection, preserving the
+    !> original physical meaning of HU_BC/HV_BC (including Neumann gradients).
+    SUBROUTINE enforce_boundary_discharge(trace,hselected,qcenter,qneighbor,discharge_bc,half,inv_dx,side,normal,idx)
+        REAL(wp), INTENT(INOUT) :: trace(n_vars)
+        REAL(wp), INTENT(IN) :: hselected,qcenter(n_vars),qneighbor(n_vars),half,inv_dx
+        TYPE(bc), INTENT(IN) :: discharge_bc
+        INTEGER, INTENT(IN) :: side,idx
+        LOGICAL, INTENT(IN) :: normal
+        REAL(wp) :: discharge
+        CALL boundary_discharge_value(discharge_bc,qcenter(idx_h)*qcenter(idx),                                        &
+            qneighbor(idx_h)*qneighbor(idx),half,inv_dx,side,normal,discharge)
+        IF (hselected>dry_thickness_tolerance) THEN
+            trace(idx)=discharge/hselected
+        ELSEIF (ABS(discharge)>dry_thickness_tolerance) THEN
+            ERROR STOP 'Nonzero prescribed discharge at a dry HP boundary'
+        ELSE
+            trace(idx)=0.0_wp
+        END IF
+    END SUBROUTINE enforce_boundary_discharge
 
     !> @brief Select the admissible transport depth and finalize face fractions.
     !> @details Couples the depth choice to the component-fraction closure rather
@@ -1515,7 +1477,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[in] kt_mode Selected KT trace reconstruction mode.
     SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, source_trace,h_selected,context,kt_mode)
     USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
-        REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars)
         REAL(wp), INTENT(IN) :: eta,bed,h_minmod,h_froude
         LOGICAL, INTENT(IN) :: source_trace
         REAL(wp), INTENT(OUT) :: h_selected

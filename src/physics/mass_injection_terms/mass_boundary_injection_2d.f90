@@ -2,7 +2,7 @@
 !> @details Injection physics uses local state and geometric values; unsupported
 !>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_boundary_injection_2d
-    USE parameters_2d, ONLY : idx_T, idx_h, idx_hu, idx_hv
+    USE parameters_2d, ONLY : idx_T, idx_h
     USE parameters_2d
     USE geometry_2d, ONLY : pi_g
     USE diagnostics_2d, ONLY : fatal_error
@@ -31,7 +31,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: time
         REAL(wp), INTENT(IN) :: vect_x
         REAL(wp), INTENT(IN) :: vect_y
-        REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+        REAL(wp), INTENT(OUT) :: source_bdry(n_vars)
 
         REAL(wp) :: t_rem
         REAL(wp) :: t_coeff
@@ -78,8 +78,7 @@ CONTAINS
 
         ! The exponents of t_coeff are such that Ri does not depend on t_coeff
         source_bdry(idx_h) = t_coeff * h_source
-        source_bdry(idx_hu) = t_coeff**1.5_wp * h_source * vel_source * vect_x
-        source_bdry(idx_hv) = t_coeff**1.5_wp * h_source * vel_source * vect_y
+
         source_bdry(idx_T) = T_source
 
         source_bdry(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
@@ -101,7 +100,7 @@ CONTAINS
     !> @param[out] source_bdry Primitive injection boundary trace.
     SUBROUTINE eval_boundary_injection_semi_implicit(time, vect_x, vect_y, source_bdry)
         REAL(wp), INTENT(IN) :: time, vect_x, vect_y
-        REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+        REAL(wp), INTENT(OUT) :: source_bdry(n_vars)
         CALL fatal_error('boundary_injection: semi_implicit treatment is unsupported')
     END SUBROUTINE eval_boundary_injection_semi_implicit
 
@@ -114,7 +113,7 @@ CONTAINS
     !> @param[out] source_bdry Primitive injection boundary trace.
     SUBROUTINE eval_boundary_injection_implicit(time, vect_x, vect_y, source_bdry)
         REAL(wp), INTENT(IN) :: time, vect_x, vect_y
-        REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+        REAL(wp), INTENT(OUT) :: source_bdry(n_vars)
         CALL fatal_error('boundary_injection: implicit treatment is unsupported')
     END SUBROUTINE eval_boundary_injection_implicit
 
@@ -127,7 +126,7 @@ CONTAINS
     !> @param[out] source_bdry Primitive injection boundary trace.
     SUBROUTINE eval_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
         REAL(wp), INTENT(IN) :: time, vect_x, vect_y
-        REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+        REAL(wp), INTENT(OUT) :: source_bdry(n_vars)
         CALL fatal_error('boundary_injection: analytic treatment is unsupported')
     END SUBROUTINE eval_boundary_injection_analytic
 END MODULE mass_boundary_injection_2d

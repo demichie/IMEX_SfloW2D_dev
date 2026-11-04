@@ -70,7 +70,7 @@ CONTAINS
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: arc_perim,arc_n_x,arc_n_y,cell_area
-        REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
+        REAL(wp), INTENT(IN) :: qp_eval(n_vars),q_recipient(n_eqns),dt,t
         TYPE(source_group_type), INTENT(IN) :: group
         ! Prepartitioned immutable metadata supplied by the Lie executor.
         TYPE(source_group_type), INTENT(IN) :: non_exchange_group
@@ -457,7 +457,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: Bsecondj_yy
         REAL(wp), INTENT(IN) :: grav_coeff
 
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+        REAL(wp), INTENT(IN) :: qpj(n_vars)
         REAL(wp), INTENT(OUT) :: expl_term(n_eqns)
 
         REAL(wp), INTENT(IN) :: time
@@ -612,7 +612,7 @@ CONTAINS
     !> \param[out] topo_term Proposed bed-elevation rate.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
             erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch)
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
+        REAL(wp), INTENT(IN) :: qpj(n_vars),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
         INTEGER, INTENT(IN) :: source_mask

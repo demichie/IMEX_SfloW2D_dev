@@ -96,7 +96,7 @@ MODULE state_conversion_2d
 
     PUBLIC :: update_physical_state_kinematics
     PUBLIC :: real_physical_state_from_q, complex_state_from_real
-    PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
+    PUBLIC :: qc_to_qp, qp_to_qc
     PUBLIC :: mixt_var, mixt_var_state
     PUBLIC :: sauter_diameter, average_density_solids
     PUBLIC :: eval_mixture_heat_capacity
@@ -308,7 +308,7 @@ CONTAINS
     !> Build the shared REAL source state directly from the available primitive vector.
     !> No conservative-to-primitive conversion is performed on this path.
     SUBROUTINE physical_state_from_qp(qp, state, bx, by, bxx, bxy, byy)
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
         TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         REAL(wp) :: geometry(5)
@@ -815,7 +815,7 @@ CONTAINS
 
     SUBROUTINE enforce_primitive_mass_fraction_closure(qp, context)
 
-        REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars)
         CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
         REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
@@ -881,7 +881,7 @@ CONTAINS
 
     SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag)
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
 
         REAL(wp) :: xs(n_solid), xg(n_add_gas)
@@ -962,7 +962,7 @@ CONTAINS
     !
     !> \date 10/10/2019
     !>
-    !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
+    !> \param[in] qpj Local physical state of length n_vars with component mass fractions.
     !> \param[out] r_Ri Local dimensionless Richardson number.
     !> \param[out] r_rho_m Whole-mixture density [kg m^-3].
     !> \param[out] r_rho_c Carrier-mixture density [kg m^-3].
@@ -975,7 +975,7 @@ CONTAINS
 
     IMPLICIT none
 
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2) !< real-value physical variables
+        REAL(wp), INTENT(IN) :: qpj(n_vars) !< real-value physical variables
         REAL(wp), INTENT(OUT) :: r_Ri         !< real-value Richardson number
         REAL(wp), INTENT(OUT) :: r_rho_m      !< real-value mixture density [kg/m3]
         REAL(wp), INTENT(OUT) :: r_rho_c !< real-value carrier phase density [kg/m3]
@@ -1105,7 +1105,7 @@ CONTAINS
     IMPLICIT none
 
         REAL(wp), INTENT(IN) :: qc(n_vars)
-        REAL(wp), INTENT(OUT) :: qp(n_vars+2)
+        REAL(wp), INTENT(OUT) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: p_dyn
         CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
@@ -1147,8 +1147,6 @@ CONTAINS
 
         qp(idx_h) = r_h
 
-        qp(idx_hu) = r_h*r_u
-        qp(idx_hv) = r_h*r_v
 
         qp(idx_T) = r_T
 
@@ -1223,7 +1221,7 @@ CONTAINS
 
     IMPLICIT none
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: qc(n_vars)
         CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
 
@@ -1255,9 +1253,6 @@ CONTAINS
         r_h = qp(idx_h)
 
         IF ( r_h .GT. EPSILON(1.0_wp) ) THEN
-
-            r_hu = qp(idx_hu)
-            r_hv = qp(idx_hv)
 
             r_u = qp(idx_u)
             r_v = qp(idx_v)
@@ -1296,8 +1291,8 @@ CONTAINS
 
         qc(idx_totMassEqn) = r_rho_m * r_h
 
-        qc(idx_uEqn) = r_rho_m * r_hu
-        qc(idx_vEqn) = r_rho_m * r_hv
+        qc(idx_uEqn) = r_rho_m * r_h * r_u
+        qc(idx_vEqn) = r_rho_m * r_h * r_v
 
         ! Thermal energy per unit horizontal area. Kinetic energy is not part of
         ! the fourth conservative variable.
@@ -1324,35 +1319,9 @@ CONTAINS
     !> Mattia de' Michieli Vitturi
     !> \date 10/10/2019
     !>
-    !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
+    !> \param[in] qpj Local physical state of length n_vars with component mass fractions.
     !> \param[in] Bj Local bed elevation [m].
     !> \param[out] qp2j Three-component auxiliary vector [eta,u,v], with eta=h+B.
-    !******************************************************************************
 
-    SUBROUTINE qp_to_qp2(qpj,Bj,qp2j)
-
-    IMPLICIT none
-
-        REAL(wp), INTENT(IN) :: qpj(n_vars+2)
-        REAL(wp), INTENT(IN) :: Bj
-        REAL(wp), INTENT(OUT) :: qp2j(3)
-
-        qp2j(1) = qpj(idx_h) + Bj
-
-        IF ( qpj(idx_h) .LE. 0.0_wp ) THEN
-
-            qp2j(2) = 0.0_wp
-            qp2j(3) = 0.0_wp
-
-        ELSE
-
-            qp2j(2) = qpj(idx_hu)/qpj(idx_h)
-            qp2j(3) = qpj(idx_hv)/qpj(idx_h)
-
-        END IF
-
-        RETURN
-
-    END SUBROUTINE qp_to_qp2
 
 END MODULE state_conversion_2d

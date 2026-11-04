@@ -10,7 +10,7 @@
 
 MODULE state_2d
     USE, INTRINSIC :: iso_fortran_env, ONLY : int64
-    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T,                                                            &
+    USE parameters_2d, ONLY : idx_h, idx_T,                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
     USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity

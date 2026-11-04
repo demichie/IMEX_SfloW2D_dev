@@ -2,7 +2,7 @@
 !> @details Injection physics uses local state and geometric values; unsupported
 !>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_bottom_circular_injection_2d
-    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
@@ -35,7 +35,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
-        REAL(wp) :: qp_source(n_vars+2)
+        REAL(wp) :: qp_source(n_vars)
         REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
         INTEGER :: i_int
@@ -126,8 +126,7 @@ CONTAINS
 
             qp_source = 0.0_wp
             qp_source(idx_h) = 1.0_wp
-            qp_source(idx_hu) = 0.0_wp
-            qp_source(idx_hv) = 0.0_wp
+
             qp_source(idx_T) = t_source
 
             qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)

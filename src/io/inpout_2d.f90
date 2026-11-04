@@ -558,7 +558,7 @@ CONTAINS
         cfl = 0.24_wp
         cfl_policy = 'directional_min'
         kt_trace_reconstruction = 'eta_x'
-        limiter(1:n_vars + 2) = 1
+        limiter(1:n_vars) = 1
         theta = 1.0
         reconstr_coeff = 1.0
 
@@ -2305,8 +2305,6 @@ CONTAINS
 
         IF (verbose_level .GE. 1) WRITE (*, *) 'Limiters', limiter(1:n_vars)
 
-        limiter(n_vars + 1) = limiter(2)
-        limiter(n_vars + 2) = limiter(3)
 
         IF ((MAXVAL(limiter(1:n_vars)) .GT. 7) .OR.                                                                    &
             (MINVAL(limiter(1:n_vars)) .LT. 0)) THEN
@@ -4421,7 +4419,7 @@ CONTAINS
 
             END IF
 
-            ALLOCATE (qp_source(idx_v))
+            ALLOCATE (qp_source(n_vars))
 
             IF (lateral_source_flag .OR. radial_source_flag) THEN
 
@@ -4436,8 +4434,6 @@ CONTAINS
                 ! initial velocity
                 qp_source = 0.0_wp
                 qp_source(idx_h) = h_source
-                qp_source(idx_hu) = h_source*vel_source
-                qp_source(idx_hv) = 0.0_wp
 
                 qp_source(idx_T) = T_source
 
@@ -4486,8 +4482,6 @@ CONTAINS
                                         *SQRT(Ri_source/red_grav))**(2.0_wp/3.0_wp)
 
                         qp_source(idx_h) = h_source
-                        qp_source(idx_hu) = h_source*vel_source
-                        qp_source(idx_hv) = 0.0_wp
 
                         qp_source(idx_T) = T_source
 
@@ -4527,7 +4521,7 @@ CONTAINS
                 END IF
 
                 qp_source(idx_h) = h_source
-                qp_source(idx_hu) = h_source*vel_source
+
                 qp_source(idx_u) = vel_source
 
                 ! Check that the Richardson number is correct
@@ -6775,7 +6769,7 @@ CONTAINS
 
         REAL(wp) :: alphas_prb(n_solid)
         REAL(wp) :: alphag_prb(n_add_gas)
-        REAL(wp) :: qp_prb(n_vars+2)
+        REAL(wp) :: qp_prb(n_vars)
         REAL(wp) :: dep_probe(n_solid)
 
         INTEGER :: k
@@ -7070,7 +7064,7 @@ CONTAINS
         DO j = 1, sX
 
             DO k = 1, sY
-                CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k), alphas_local, alphag_local)
+                CALL primitive_to_volume_fractions(state%qp(1:n_vars,j,k), alphas_local, alphag_local)
                 alphas_tot(j,k) = SUM(alphas_local)
 
             END DO
@@ -7662,7 +7656,7 @@ CONTAINS
 
             IF (state%qp(idx_h, j, k) .GT. dry_thickness_tolerance) THEN
 
-                CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c,           &
+                CALL mixt_var(state%qp(1:n_vars, j, k), r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c,           &
                     r_sp_heat_mix)
 
                 denom = state%q(idx_uEqn,j,k)**2 + state%q(idx_vEqn,j,k)**2
@@ -7700,7 +7694,7 @@ END IF
             vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                                                         &
                                             + r_v*B_prime_y_geom(j, k)
 
-            CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k), r_alphas, r_alphag)
+            CALL primitive_to_volume_fractions(state%qp(1:n_vars,j,k), r_alphas, r_alphag)
             alphas2D(:,j,k) = r_alphas
             alphag2D(:,j,k) = r_alphag
 

@@ -122,7 +122,7 @@ CONTAINS
 
         this%n_layers = n_layers
         this%n_variables = n_variables
-        this%n_physical_variables = n_variables + 2
+        this%n_physical_variables = n_variables
         this%n_equations = n_equations
         this%n_solid = n_solid
         this%n_additional_gas = n_additional_gas
@@ -152,8 +152,8 @@ CONTAINS
 
         END IF
 
-        this%idx_velocity_x = n_variables + 1
-        this%idx_velocity_y = n_variables + 2
+        this%idx_velocity_x = 2
+        this%idx_velocity_y = 3
 
         IF ( next_index /= n_variables ) THEN
             ERROR STOP 'Configured variable count is inconsistent with model layout'
@@ -222,7 +222,7 @@ CONTAINS
             .AND. this%n_variables == 4 + this%n_solid                                                                 &
                     + this%n_additional_gas + this%n_stochastic                                                        &
                     + this%n_pore_pressure                                                                             &
-            .AND. this%n_physical_variables == this%n_variables + 2                                                    &
+            .AND. this%n_physical_variables == this%n_variables                                                    &
             .AND. this%n_equations == this%n_variables                                                                 &
             .AND. this%idx_mass == 1                                                                                   &
             .AND. this%idx_momentum_x == 2                                                                             &
@@ -239,8 +239,8 @@ CONTAINS
             .AND. this%idx_pore_pressure == MERGE(                                                                     &
                     5 + this%n_solid + this%n_additional_gas                                                           &
                     + this%n_stochastic, 0, this%n_pore_pressure == 1)                                                 &
-            .AND. this%idx_velocity_x == this%n_variables + 1                                                          &
-            .AND. this%idx_velocity_y == this%n_variables + 2
+            .AND. this%idx_velocity_x == 2                                                          &
+            .AND. this%idx_velocity_y == 3
 
     END FUNCTION model_layout_is_initialized
 
