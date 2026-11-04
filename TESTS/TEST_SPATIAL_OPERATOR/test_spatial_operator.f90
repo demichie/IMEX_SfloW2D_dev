@@ -278,8 +278,9 @@ CONTAINS
   END SUBROUTINE initialize_fixture
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.
-  !> \details Uses mixed-sign and near-zero component stencils, including the
-  !> same coordinate spacing as the production grid. This guards the numerical
+  !> \details Uses mixed-sign and near-zero component stencils with a
+  !> local coordinate triplet of spacing dx, independent of domain dimensions.
+  !> This guards the numerical
   !> formula independently from the spatial reference comparison.
   SUBROUTINE check_uniform_minmod_kernel
     REAL(wp) :: west(5),center(5),east(5),a(5),b(5),c(5),vector_slope(5)
@@ -288,7 +289,9 @@ CONTAINS
     west=[0.1_wp,-0.5_wp,1.0E-45_wp,3.0_wp,4.0_wp]
     center=[0.5_wp,0.2_wp,0.0_wp,3.0_wp,2.0_wp]
     east=[0.9_wp,-0.1_wp,-1.0E-45_wp,1.0_wp,3.0_wp]
-    coords=[x_comp(2),x_comp(3),x_comp(4)]
+    ! The CFL-axis tests also construct grids with nx=1 or ny=1. This
+    ! mathematical unit test must not index nonexistent mesh neighbours.
+    coords=[-dx,0.0_wp,dx]
     a=(east-center)/(coords(3)-coords(2))
     b=(center-west)/(coords(2)-coords(1))
     c=(east-west)/(coords(3)-coords(1))
