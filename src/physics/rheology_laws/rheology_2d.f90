@@ -173,7 +173,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
         process_rate=0.0_wp
-            SELECT CASE(model_id)
+        SELECT CASE(model_id)
             CASE(RHEOLOGY_ID_VOELLMY)
                 CALL eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),        &
                     process_rate(2))
@@ -219,7 +219,7 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
 
-            CALL eval_rheology_implicit_id(rheology_source_id(models(i)),state,                                          &
+            CALL eval_rheology_implicit_id(rheology_source_id(models(i)),state,                                       &
                 use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
@@ -236,7 +236,7 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate(2)
         COMPLEX(wp) :: process_rate(2)
         process_rate=CMPLX(0.0_wp,0.0_wp,wp)
-            SELECT CASE(model_id)
+        SELECT CASE(model_id)
             CASE(RHEOLOGY_ID_VOELLMY)
                 CALL eval_rheology_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),          &
                     process_rate(2))
