@@ -288,23 +288,21 @@ CONTAINS
                 x_stencil = [x_comp(j-1),x_comp(j),x_comp(j+1)]
                 y_stencil = [y_comp(k-1),y_comp(k),y_comp(k+1)]
 
-                ! Apply the original limiter separately to each component and
-                ! direction. Its formula, floating-point operation order and
-                ! reconstruction coefficient are deliberately unchanged.
-                ! The loop has no cross-component dependencies, making it a
-                ! suitable target for later SIMD-specific implementation.
-                DO i=1,n_vars
-                    qrec_stencil = [west_state(i),center_state(i),east_state(i)]
-                    CALL limit(qrec_stencil,x_stencil,limiter(i),qrec_prime_x(i))
-                    dq = reconstr_coeff*dx2*qrec_prime_x(i)
-                    qrecW(i) = center_state(i)-dq
-                    qrecE(i) = center_state(i)+dq
+                ! Each component is independent once the five stencil vectors
+                ! have been loaded. DO CONCURRENT expresses this dependency
+                ! contract to the compiler without changing the limiter formula.
+                ! Limiters are PURE and receive their own three-point stencils.
+                DO CONCURRENT (i=1:n_vars)
+                    CALL limit([west_state(i),center_state(i),east_state(i)],                                          &
+                        x_stencil,limiter(i),qrec_prime_x(i))
+                    CALL limit([south_state(i),center_state(i),north_state(i)],                                        &
+                        y_stencil,limiter(i),qrec_prime_y(i))
 
-                    qrec_stencil = [south_state(i),center_state(i),north_state(i)]
-                    CALL limit(qrec_stencil,y_stencil,limiter(i),qrec_prime_y(i))
-                    dq = reconstr_coeff*dy2*qrec_prime_y(i)
-                    qrecS(i) = center_state(i)-dq
-                    qrecN(i) = center_state(i)+dq
+                    ! Reconstruct opposite faces with symmetric limited slopes.
+                    qrecW(i) = center_state(i)-reconstr_coeff*dx2*qrec_prime_x(i)
+                    qrecE(i) = center_state(i)+reconstr_coeff*dx2*qrec_prime_x(i)
+                    qrecS(i) = center_state(i)-reconstr_coeff*dy2*qrec_prime_y(i)
+                    qrecN(i) = center_state(i)+reconstr_coeff*dy2*qrec_prime_y(i)
                 END DO
             ELSE
 

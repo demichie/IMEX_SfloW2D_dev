@@ -2087,7 +2087,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> \param[out] slope_lim Limited derivative along the stencil coordinate.
     !******************************************************************************
 
-    SUBROUTINE limit( v , z , limiter , slope_lim )
+    PURE SUBROUTINE limit( v , z , limiter , slope_lim )
 
     USE parameters_2d, ONLY : theta
 
@@ -2167,7 +2167,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> \return Same-sign minimum-magnitude slope, or zero near zero/opposite signs.
     !******************************************************************************
 
-    REAL(wp) FUNCTION minmod(a,b)
+    PURE REAL(wp) FUNCTION minmod(a,b)
 
     IMPLICIT none
 
@@ -2197,11 +2197,12 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> \param[in] b Second candidate slope.
     !> \return Same-sign maximum-magnitude slope, or zero near zero/opposite signs.
 
-    REAL(wp) function maxmod(a,b)
+    PURE REAL(wp) function maxmod(a,b)
 
     IMPLICIT none
 
-        REAL(wp) :: a , b , sa , sb
+        REAL(wp), INTENT(IN) :: a , b
+        REAL(wp) :: sa , sb
 
         IF ( ABS(a*b) .LE. 0.0e-30_wp ) THEN
 

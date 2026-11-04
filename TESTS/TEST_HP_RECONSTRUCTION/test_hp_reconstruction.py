@@ -26,11 +26,16 @@ interior = r.split("IF ( regular_interior ) THEN", 1)[1].split(
 for component in ("center_state", "west_state", "east_state",
                   "south_state", "north_state"):
     assert component in interior, component
-assert "reconstruction_cell_value" not in interior.split("DO i=1,n_vars", 1)[1], (
+assert "DO CONCURRENT (i=1:n_vars)" in interior
+assert "reconstruction_cell_value" not in interior.split("DO CONCURRENT (i=1:n_vars)", 1)[1], (
     "interior limiter still fetches scalar neighbours repeatedly"
 )
-assert "CALL limit(qrec_stencil,x_stencil" in interior
-assert "CALL limit(qrec_stencil,y_stencil" in interior
+assert "CALL limit([west_state(i),center_state(i),east_state(i)]" in interior
+assert "CALL limit([south_state(i),center_state(i),north_state(i)]" in interior
+geometry = (root / "src/geometry/geometry_2d.f90").read_text()
+for pure_declaration in ("PURE SUBROUTINE limit(", "PURE REAL(wp) FUNCTION minmod(",
+                         "PURE REAL(wp) function maxmod("):
+    assert pure_declaration in geometry, pure_declaration
 
 # Depth slopes in the hydrostatic reconstruction are required only by the
 # minmod and Froude-blended transport-depth selections.
