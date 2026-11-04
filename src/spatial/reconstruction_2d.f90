@@ -185,8 +185,12 @@ CONTAINS
         REAL(wp) :: qrecN(n_vars) !< recons var at the north edge of the cells
 
         REAL(wp) :: source_bdry(n_vars)
-        REAL(wp) :: qrec_prime_x(n_vars)      !< recons variables slope
-        REAL(wp) :: qrec_prime_y(n_vars)      !< recons variables slope
+        REAL(wp) :: qrec_prime_x(n_vars)      !< limited x-slopes for boundary cells
+        REAL(wp) :: qrec_prime_y(n_vars)      !< limited y-slopes for boundary cells
+        ! The five primitive stencil vectors are contiguous in their component index.
+        ! They are private per OpenMP worker and never modify qp_expl.
+        REAL(wp) :: center_state(n_vars), west_state(n_vars), east_state(n_vars)
+        REAL(wp) :: south_state(n_vars), north_state(n_vars)
 
         TYPE(bc) :: bcW_effective, bcE_effective, bcS_effective, bcN_effective
 
@@ -210,9 +214,9 @@ CONTAINS
         IF (.NOT. this%hp_workset_prepared)                                                                            &
             CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
 
-        !$OMP PARALLEL DO private(l,j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
+        !$OMP PARALLEL DO PRIVATE(l,j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,                         &
         !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,bcW_effective,bcE_effective,bcS_effective,bcN_effective, &
-        !$OMP & source_bdry,dq,regular_interior)
+        !$OMP & source_bdry,dq,regular_interior,center_state,west_state,east_state,south_state,north_state)
 
         DO l = 1, this%hp_eta_cells
             j = this%hp_eta_j(l)
@@ -262,33 +266,46 @@ CONTAINS
 
             IF ( regular_interior ) THEN
 
-                x_stencil(1) = x_comp(j-1)
-                x_stencil(3) = x_comp(j+1)
-                y_stencil(1) = y_comp(k-1)
-                y_stencil(3) = y_comp(k+1)
+                ! Interior fast path: fetch each neighbour's complete primitive state
+                ! once. In Fortran the component index is contiguous, so these
+                ! short vector loads avoid five indexed function calls per component.
+                ! No boundary conditions or source-wall substitutions occur here.
+                center_state = qp_expl(:,j,k)
+                west_state   = qp_expl(:,j-1,k)
+                east_state   = qp_expl(:,j+1,k)
+                south_state  = qp_expl(:,j,k-1)
+                north_state  = qp_expl(:,j,k+1)
 
-                fast_vars_loop:DO i=1,n_vars
+                ! Reproduce reconstruction_cell_value's dry-neighbour rule:
+                ! a dry cell cannot contribute an auxiliary velocity to a limiter.
+                ! Other physical variables, including h, are left unchanged.
+                IF (center_state(idx_h) <= dry_thickness_tolerance) center_state(idx_u:idx_v)=0.0_wp
+                IF (west_state(idx_h)   <= dry_thickness_tolerance) west_state(idx_u:idx_v)=0.0_wp
+                IF (east_state(idx_h)   <= dry_thickness_tolerance) east_state(idx_u:idx_v)=0.0_wp
+                IF (south_state(idx_h)  <= dry_thickness_tolerance) south_state(idx_u:idx_v)=0.0_wp
+                IF (north_state(idx_h)  <= dry_thickness_tolerance) north_state(idx_u:idx_v)=0.0_wp
 
-                    qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
+                x_stencil = [x_comp(j-1),x_comp(j),x_comp(j+1)]
+                y_stencil = [y_comp(k-1),y_comp(k),y_comp(k+1)]
 
-                    qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
-                    qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
-                    CALL limit( qrec_stencil , x_stencil , limiter(i) , qrec_prime_x(i) )
+                ! Apply the original limiter separately to each component and
+                ! direction. Its formula, floating-point operation order and
+                ! reconstruction coefficient are deliberately unchanged.
+                ! The loop has no cross-component dependencies, making it a
+                ! suitable target for later SIMD-specific implementation.
+                DO i=1,n_vars
+                    qrec_stencil = [west_state(i),center_state(i),east_state(i)]
+                    CALL limit(qrec_stencil,x_stencil,limiter(i),qrec_prime_x(i))
+                    dq = reconstr_coeff*dx2*qrec_prime_x(i)
+                    qrecW(i) = center_state(i)-dq
+                    qrecE(i) = center_state(i)+dq
 
-                    dq = reconstr_coeff * dx2 * qrec_prime_x(i)
-                    qrecW(i) = qrec_stencil(2) - dq
-                    qrecE(i) = qrec_stencil(2) + dq
-
-                    qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
-                    qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
-                    CALL limit( qrec_stencil , y_stencil , limiter(i) , qrec_prime_y(i) )
-
-                    dq = reconstr_coeff * dy2 * qrec_prime_y(i)
-                    qrecS(i) = qrec_stencil(2) - dq
-                    qrecN(i) = qrec_stencil(2) + dq
-
-                END DO fast_vars_loop
-
+                    qrec_stencil = [south_state(i),center_state(i),north_state(i)]
+                    CALL limit(qrec_stencil,y_stencil,limiter(i),qrec_prime_y(i))
+                    dq = reconstr_coeff*dy2*qrec_prime_y(i)
+                    qrecS(i) = center_state(i)-dq
+                    qrecN(i) = center_state(i)+dq
+                END DO
             ELSE
 
             vars_loop:DO i=1,n_vars
@@ -706,7 +723,10 @@ CONTAINS
                 hx=[qp_expl(1,j-1,k),qp_expl(1,j,k),qp_expl(1,j+1,k)]
                 xx=[x_comp(j-1),x_comp(j),x_comp(j+1)]
                 CALL limit(sx,xx,limiter(1),slope_x)
-                CALL limit(hx,xx,limiter(1),slope_hx)
+                ! h_x is needed only by minmod and Froude-blended transport
+                ! depths; the eta/path trace above is required by every mode.
+                IF (kt_trace_reconstruction=='minmod' .OR.                                                           &
+                    kt_trace_reconstruction=='froude_blend') CALL limit(hx,xx,limiter(1),slope_hx)
 
             END IF
 
@@ -716,7 +736,8 @@ CONTAINS
                 hy=[qp_expl(1,j,k-1),qp_expl(1,j,k),qp_expl(1,j,k+1)]
                 yy=[y_comp(k-1),y_comp(k),y_comp(k+1)]
                 CALL limit(sy,yy,limiter(1),slope_y)
-                CALL limit(hy,yy,limiter(1),slope_hy)
+                IF (kt_trace_reconstruction=='minmod' .OR.                                                           &
+                    kt_trace_reconstruction=='froude_blend') CALL limit(hy,yy,limiter(1),slope_hy)
 
             END IF
 
@@ -949,10 +970,10 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !>          unchanged; neither the input physical nor conservative state is
     !>          modified. The function is allocation-free and thread-safe.
     !> \param[in] qp_center Read-only physical centre fields, including halo.
-    !> \param[in] component Physical variable index; idx_u/idx_v are auxiliary velocities.
+    !> \param[in] component Primitive component index; idx_u/idx_v are velocities.
     !> \param[in] j X index of the centre stencil entry.
     !> \param[in] k Y index of the centre stencil entry.
-    !> \return Original centre value, or zero for a dry auxiliary velocity.
+    !> \return Original centre value, or zero for a dry velocity.
     PURE FUNCTION reconstruction_cell_value(qp_center,component,j,k) RESULT(value)
         REAL(wp), INTENT(IN) :: qp_center(:,:,:)
         INTEGER, INTENT(IN) :: component,j,k

@@ -17,6 +17,24 @@ for old in ("reconstruct_hp_line", "evaluate_hp_cell", "commit_hp_cell",
 for expected in ("discharge_bc_to_velocity", "enforce_boundary_discharge",
                  "froude_h_blend_weight", "reconstruct_kt_eta_traces"):
     assert expected in r, expected
+
+# The regular 2-D interior must use contiguous component stencils. The
+# boundary path retains the scalar, condition-aware reconstruction.
+interior = r.split("IF ( regular_interior ) THEN", 1)[1].split(
+    "vars_loop:DO i=1,n_vars", 1
+)[0]
+for component in ("center_state", "west_state", "east_state",
+                  "south_state", "north_state"):
+    assert component in interior, component
+assert "reconstruction_cell_value" not in interior.split("DO i=1,n_vars", 1)[1], (
+    "interior limiter still fetches scalar neighbours repeatedly"
+)
+assert "CALL limit(qrec_stencil,x_stencil" in interior
+assert "CALL limit(qrec_stencil,y_stencil" in interior
+
+# Depth slopes in the hydrostatic reconstruction are required only by the
+# minmod and Froude-blended transport-depth selections.
+assert r.count("kt_trace_reconstruction=='minmod' .OR.") >= 2
 for expected in ("CASE ('h_x')", "CASE ('minmod')", "CASE ('froude_blend')",
                  "qp_adv_left_use(1)=h_eta_left",
                  "CALL qp_to_qc(qp_adv_left_use"):
