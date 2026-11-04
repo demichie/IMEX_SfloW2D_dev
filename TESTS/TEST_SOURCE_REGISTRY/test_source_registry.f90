@@ -42,6 +42,7 @@ PROGRAM test_source_registry
   CALL require(ALL(groups(2)%equation_ids==[2,3,4]),'complete conservative footprint')
   CALL require(group_contains_name(groups(2),'thermal_cooling'),'cooling registered')
    CALL require(groups(2)%rheology_name=='rheology_voellmy','cached rheology identity')
+   CALL require(groups(2)%rheology_id==RHEOLOGY_ID_VOELLMY,'cached numeric rheology ID')
    CALL require(groups(2)%rheology_implicit,'cached implicit role')
    CALL require(groups(2)%thermal_active,'cached Newton thermal term')
   CALL registry%finalize()
@@ -63,6 +64,7 @@ PROGRAM test_source_registry
   groups=registry%groups()
   CALL require(groups(3)%method==SOURCE_METHOD_ANALYTIC,'analytic method preserved')
    CALL require(groups(3)%thermal_active,'analytic cooling metadata')
+   CALL require(groups(3)%rheology_id==RHEOLOGY_ID_NONE,'analytic cooling no rheology')
   CALL registry%finalize()
   ! Historical Etna lava uses a liquid carrier with the lava rheology.
   ! Cooling and bottom fissural injection must remain valid in this phase.

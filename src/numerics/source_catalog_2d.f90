@@ -9,6 +9,7 @@ MODULE source_catalog_2d
     PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
     PUBLIC :: source_newton_affected_equations
     PUBLIC :: canonical_rheology_source_name, rheology_name_has_role, canonical_rheology_catalog_unique
+    PUBLIC :: rheology_source_id
     INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_NEWTON_BLOCK=1, SOURCE_SOLVE_ANALYTIC_VELOCITY=2
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_ANALYTIC_TEMPERATURE=3, SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE=4
@@ -28,6 +29,19 @@ MODULE source_catalog_2d
     END TYPE source_term_type
     ! Default method is explicit in each Lie source catalog entry; constants
     ! SOURCE_METHOD_* remain generic method IDs also used by the solvers.
+    ! Rheology IDs correspond to the first entries of the canonical source catalog.
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_NONE=0
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_VOELLMY=1
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_PLASTIC=2
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_LAVA=3
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_LAHAR=4
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_EMPIRICAL=5
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_QUADRATIC=6
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_FROUDE=7
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_LUCAS=8
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_MUI=9
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_MUI_VOELLMY=10
+    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_NEWMODEL=11
     INTEGER, PARAMETER :: SOURCE_TERM_COUNT=23
     TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[                                           &
             source_term_type('rheology_voellmy',.TRUE.,.TRUE.,.TRUE.,                                                  &
@@ -101,6 +115,23 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.)                                     &
             ]
 CONTAINS
+    !> Resolve a canonical rheology once; -1 indicates an unknown source.
+    PURE INTEGER FUNCTION rheology_source_id(name) RESULT(id)
+        CHARACTER(*), INTENT(IN) :: name
+        INTEGER :: i
+        id=-1
+        IF (TRIM(name)=='none' .OR. LEN_TRIM(name)==0) THEN
+            id=RHEOLOGY_ID_NONE
+            RETURN
+        END IF
+        DO i=1,RHEOLOGY_ID_NEWMODEL
+            IF (TRIM(name)==TRIM(SOURCE_CATALOG(i)%name)) THEN
+                id=i
+                RETURN
+            END IF
+        END DO
+    END FUNCTION rheology_source_id
+
 
     !> @brief Resolve a rheology model name to its canonical source identity.
     !> @param[in] model_name Text identifier of the rheology constitutive law.

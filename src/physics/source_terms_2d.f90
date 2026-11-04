@@ -15,7 +15,7 @@ MODULE source_terms_2d
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
-            eval_rheology_implicit, eval_rheology_semi_implicit,                                                       &
+            eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
@@ -333,7 +333,6 @@ CONTAINS
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(physical_state_type) :: physical_state
-        CHARACTER(LEN=64) :: selected_model_name
 
         rate=0.0_wp
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
@@ -341,11 +340,10 @@ CONTAINS
         IF (.NOT.group%rheology_implicit) RETURN
         IF (q_cell(idx_totMassEqn)<=0.0_wp) RETURN
 
-        selected_model_name=group%rheology_name
-        IF (LEN_TRIM(selected_model_name)==0) RETURN
+        IF (group%rheology_id==0) RETURN
         CALL real_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                       &
             0.0_wp,0.0_wp,0.0_wp)
-        CALL eval_rheology_semi_implicit([selected_model_name],physical_state,                                         &
+        CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
             grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
 
@@ -374,7 +372,6 @@ CONTAINS
         TYPE(complex_physical_state_type) :: physical_state
 
         LOGICAL :: selected_rheology, selected_thermal
-        CHARACTER(LEN=64) :: selected_model_name
 
         IF (PRESENT(c_qj) .AND. PRESENT(c_nh_term_impl) .AND.                                                          &
             .NOT.PRESENT(r_qj) .AND. .NOT.PRESENT(r_nh_term_impl)) THEN
@@ -398,7 +395,6 @@ CONTAINS
 
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
             CALL fatal_error('eval_source_implicit requires a Newton Lie group')
-        selected_model_name=group%rheology_name
         selected_rheology=group%rheology_implicit
         selected_thermal=group%thermal_active
 
@@ -413,8 +409,8 @@ CONTAINS
 
         IF (selected_rheology) THEN
 
-            CALL eval_rheology_implicit([selected_model_name], physical_state,                                         &
-                stochastic_flag, Zij, source_term(2:3))
+            CALL eval_rheology_implicit_id(group%rheology_id,physical_state,                                           &
+                stochastic_flag,Zij,source_term(2:3))
 
         END IF
 

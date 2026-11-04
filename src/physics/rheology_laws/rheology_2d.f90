@@ -16,6 +16,10 @@ MODULE rheology_2d
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                                  &
             update_physical_state_kinematics
     USE diagnostics_2d, ONLY : fatal_error
+    USE source_catalog_2d, ONLY : rheology_source_id,RHEOLOGY_ID_NONE,                                                &
+            RHEOLOGY_ID_VOELLMY,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_LAVA,RHEOLOGY_ID_LAHAR,                               &
+            RHEOLOGY_ID_EMPIRICAL,RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_FROUDE,                                           &
+            RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI,RHEOLOGY_ID_MUI_VOELLMY,RHEOLOGY_ID_NEWMODEL
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                                    &
                 eval_rheology_voellmy_implicit,                                                                        &
                 eval_rheology_voellmy_semi_implicit,                                                                   &
@@ -60,6 +64,7 @@ MODULE rheology_2d
     PUBLIC :: curvature_acceleration
     PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
     PUBLIC :: eval_rheology_implicit, eval_rheology_analytic
+    PUBLIC :: eval_rheology_implicit_id, eval_rheology_semi_implicit_id
     PUBLIC :: limit_rheology_momentum_reversal
 
         ! Uniform treatment surface for this source family.
@@ -150,38 +155,53 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
 
-            SELECT CASE(TRIM(models(i)))
-            CASE('rheology_voellmy')
-                CALL eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),        &
-                    process_rate(2))
-            CASE('rheology_lava')
-                CALL eval_rheology_lava_semi_implicit(state, process_rate(1), process_rate(2))
-            CASE('rheology_lahar')
-                CALL eval_rheology_lahar_semi_implicit(state, process_rate(1), process_rate(2))
-            CASE('rheology_froude')
-                CALL eval_rheology_froude_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value,           &
-                    process_rate(1), process_rate(2))
-            CASE('rheology_lucas')
-                CALL eval_rheology_lucas_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value,            &
-                    process_rate(1), process_rate(2))
-            CASE('rheology_mui')
-                CALL eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),            &
-                    process_rate(2))
-            CASE('rheology_mui_voellmy')
-                CALL eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),    &
-                    process_rate(2))
-            CASE('none', 'rheology_plastic', 'rheology_empirical',                                                     &
-                    'rheology_quadratic', 'rheology_newmodel')
-                CONTINUE
-            CASE DEFAULT
-                CALL fatal_error('Invalid rheology name in semi-implicit momentum-process_rate dispatch')
-
-        END SELECT
+            CALL eval_rheology_semi_implicit_id(rheology_source_id(models(i)),state,                                  &
+                grav_coeff,use_pore_pressure,use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
 
         END DO
     END SUBROUTINE eval_rheology_semi_implicit
+
+    !> Frozen Newton semi-implicit dispatch with pre-resolved source identity.
+    SUBROUTINE eval_rheology_semi_implicit_id(model_id,state,grav_coeff,use_pore_pressure,                            &
+            use_stochastic,stochastic_value,rate)
+        INTEGER, INTENT(IN) :: model_id
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: grav_coeff,stochastic_value
+        LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
+        REAL(wp), INTENT(OUT) :: rate(2)
+        REAL(wp) :: process_rate(2)
+        process_rate=0.0_wp
+            SELECT CASE(model_id)
+            CASE(RHEOLOGY_ID_VOELLMY)
+                CALL eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),        &
+                    process_rate(2))
+            CASE(RHEOLOGY_ID_LAVA)
+                CALL eval_rheology_lava_semi_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_LAHAR)
+                CALL eval_rheology_lahar_semi_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_FROUDE)
+                CALL eval_rheology_froude_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value,           &
+                    process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_LUCAS)
+                CALL eval_rheology_lucas_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value,            &
+                    process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_MUI)
+                CALL eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),            &
+                    process_rate(2))
+            CASE(RHEOLOGY_ID_MUI_VOELLMY)
+                CALL eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),    &
+                    process_rate(2))
+            CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_EMPIRICAL, &
+                    RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_NEWMODEL)
+                CONTINUE
+            CASE DEFAULT
+                CALL fatal_error('Invalid rheology name in semi-implicit momentum-process_rate dispatch')
+
+        END SELECT
+        rate=process_rate
+    END SUBROUTINE eval_rheology_semi_implicit_id
 
 
         ! Newton/complex-step contract: read-only state and coefficients; return rates only.
@@ -199,36 +219,50 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
 
-            SELECT CASE(TRIM(models(i)))
-            CASE('rheology_voellmy')
-                CALL eval_rheology_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),          &
-                    process_rate(2))
-            CASE('rheology_mui_voellmy')
-                CALL eval_rheology_mui_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),      &
-                    process_rate(2))
-            CASE('rheology_plastic')
-                CALL eval_rheology_plastic_implicit(state, process_rate(1), process_rate(2))
-            CASE('rheology_lava')
-                CALL eval_rheology_lava_implicit(state, process_rate(1), process_rate(2))
-            CASE('rheology_lahar')
-                CALL eval_rheology_lahar_implicit(state, process_rate(1), process_rate(2))
-            CASE('rheology_empirical')
-                CALL eval_rheology_empirical_implicit(state, process_rate(1), process_rate(2))
-            CASE('rheology_newmodel')
-                CALL eval_rheology_newmodel_implicit(state,process_rate(1),process_rate(2))
-            CASE('rheology_quadratic')
-                CALL eval_rheology_quadratic_implicit(state, process_rate(1), process_rate(2))
-            CASE('none', 'rheology_froude', 'rheology_lucas', 'rheology_mui')
-                CONTINUE
-            CASE DEFAULT
-                CALL fatal_error('Invalid rheology name in implicit momentum-process_rate dispatch')
-
-        END SELECT
+            CALL eval_rheology_implicit_id(rheology_source_id(models(i)),state,                                          &
+                use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
 
         END DO
     END SUBROUTINE eval_rheology_implicit
+
+    !> Newton complex-rate dispatch with source identity resolved at initialization.
+    SUBROUTINE eval_rheology_implicit_id(model_id,state,use_stochastic,stochastic_value,rate)
+        INTEGER, INTENT(IN) :: model_id
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        LOGICAL, INTENT(IN) :: use_stochastic
+        REAL(wp), INTENT(IN) :: stochastic_value
+        COMPLEX(wp), INTENT(OUT) :: rate(2)
+        COMPLEX(wp) :: process_rate(2)
+        process_rate=CMPLX(0.0_wp,0.0_wp,wp)
+            SELECT CASE(model_id)
+            CASE(RHEOLOGY_ID_VOELLMY)
+                CALL eval_rheology_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),          &
+                    process_rate(2))
+            CASE(RHEOLOGY_ID_MUI_VOELLMY)
+                CALL eval_rheology_mui_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),      &
+                    process_rate(2))
+            CASE(RHEOLOGY_ID_PLASTIC)
+                CALL eval_rheology_plastic_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_LAVA)
+                CALL eval_rheology_lava_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_LAHAR)
+                CALL eval_rheology_lahar_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_EMPIRICAL)
+                CALL eval_rheology_empirical_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_NEWMODEL)
+                CALL eval_rheology_newmodel_implicit(state,process_rate(1),process_rate(2))
+            CASE(RHEOLOGY_ID_QUADRATIC)
+                CALL eval_rheology_quadratic_implicit(state, process_rate(1), process_rate(2))
+            CASE(RHEOLOGY_ID_NONE, RHEOLOGY_ID_FROUDE, RHEOLOGY_ID_LUCAS, RHEOLOGY_ID_MUI)
+                CONTINUE
+            CASE DEFAULT
+                CALL fatal_error('Invalid rheology name in implicit momentum-process_rate dispatch')
+
+        END SELECT
+        rate=process_rate
+    END SUBROUTINE eval_rheology_implicit_id
 
 
     SUBROUTINE eval_rheology_analytic(models, dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
