@@ -348,7 +348,7 @@ CONTAINS
     END SUBROUTINE eval_source_semi_implicit
 
     SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,                                                  &
-            c_nh_term_impl, r_qj , r_nh_term_impl, group )
+            c_nh_term_impl, r_qj , r_nh_term_impl, group, physical_scratch )
 
     USE COMPLEXIFY
 
@@ -362,6 +362,7 @@ CONTAINS
         REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
         REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
+        TYPE(complex_physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
 
 
         COMPLEX(wp) :: qj(n_vars)
@@ -369,7 +370,8 @@ CONTAINS
 
         INTEGER :: i
 
-        TYPE(complex_physical_state_type) :: physical_state
+        TYPE(complex_physical_state_type), TARGET :: physical_state_local
+        TYPE(complex_physical_state_type), POINTER :: physical_state
 
         LOGICAL :: selected_rheology, selected_thermal
 
@@ -397,6 +399,13 @@ CONTAINS
             CALL fatal_error('eval_source_implicit requires a Newton Lie group')
         selected_rheology=group%rheology_implicit
         selected_thermal=group%thermal_active
+
+        ! No cross-cell or module-shared state: use the caller's optional scratch.
+        IF (PRESENT(physical_scratch)) THEN
+            physical_state=>physical_scratch
+        ELSE
+            physical_state=>physical_state_local
+        END IF
 
         ! initialize the source terms
         source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)

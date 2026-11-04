@@ -550,12 +550,27 @@ CONTAINS
     !> Build a COMPLEX physical source state through the existing complex-step kernel.
     SUBROUTINE physical_state_from_q(q, state, bx, by, bxx, bxy, byy)
         COMPLEX(wp), INTENT(IN) :: q(n_vars)
-        TYPE(complex_physical_state_type), INTENT(OUT) :: state
+        TYPE(complex_physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         REAL(wp) :: geometry(5)
 
-        ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas),                                                       &
-            state%xs(n_solid), state%xg(n_add_gas))
+        ! Keep cell-local phase arrays allocated throughout one Newton solve.
+        IF (ALLOCATED(state%alphas)) THEN
+            IF (SIZE(state%alphas)/=n_solid) DEALLOCATE(state%alphas)
+        END IF
+        IF (ALLOCATED(state%alphag)) THEN
+            IF (SIZE(state%alphag)/=n_add_gas) DEALLOCATE(state%alphag)
+        END IF
+        IF (ALLOCATED(state%xs)) THEN
+            IF (SIZE(state%xs)/=n_solid) DEALLOCATE(state%xs)
+        END IF
+        IF (ALLOCATED(state%xg)) THEN
+            IF (SIZE(state%xg)/=n_add_gas) DEALLOCATE(state%xg)
+        END IF
+        IF (.NOT.ALLOCATED(state%alphas)) ALLOCATE(state%alphas(n_solid))
+        IF (.NOT.ALLOCATED(state%alphag)) ALLOCATE(state%alphag(n_add_gas))
+        IF (.NOT.ALLOCATED(state%xs)) ALLOCATE(state%xs(n_solid))
+        IF (.NOT.ALLOCATED(state%xg)) ALLOCATE(state%xg(n_add_gas))
         CALL c_phys_var(q, state%h, state%u, state%v, state%T, state%rho_m,                                            &
             state%alphas, state%alphag, state%inv_rhom, state%Zs,                                                      &
             state%exc_pore_pres)
