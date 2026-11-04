@@ -71,7 +71,12 @@ def check():
         r"state%qp\(:,j,k\)\s*=\s*this%qp_trial\(:,j,k\)",
         r"call\s+commit_geometry_transaction",
     ])
-    assert "CALL state%restore_substrate(substrate_before)" in time
+    # Substrate snapshots belong to the integration workspace and are restored
+    # only for steps whose configured sources can modify substrate inventories.
+    assert re.search(
+        r"if\s*\(needs_substrate_snapshot\)\s*call\s+state%restore_substrate"
+        r"\(this%substrate_before\)", time, re.I), (
+        "missing conditional workspace-owned substrate rollback")
     assert "CALL rollback_geometry_transaction" in time
     assert "state%q==q_authoritative" in time
     assert "state%qp==qp_authoritative" in time
