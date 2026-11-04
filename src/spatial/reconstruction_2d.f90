@@ -365,7 +365,7 @@ CONTAINS
                             CALL boundary_reconstruction_slope(                                                        &
                                 qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j-1,k),                           &
                                 x_stag(comp_interfaces_x), x_comp(j), x_comp(j-1),                                     &
-                                bcE_effective%flag, bcE_effective%value, one_by_dx, limiter(i), .FALSE.,                             &
+                                bcE_effective%flag, bcE_effective%value, one_by_dx, limiter(i), .FALSE.,                           &
                                 qrec_prime_x(i))
 
                         END IF
@@ -480,7 +480,7 @@ CONTAINS
                             CALL boundary_reconstruction_slope(                                                        &
                             qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j,k-1),                               &
                             y_stag(comp_interfaces_y), y_comp(k), y_comp(k-1),                                         &
-                            bcN_effective%flag, bcN_effective%value, one_by_dy, limiter(i), .FALSE.,                                 &
+                            bcN_effective%flag, bcN_effective%value, one_by_dy, limiter(i), .FALSE.,                               &
                             qrec_prime_y(i))
 
                     ELSE
