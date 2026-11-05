@@ -52,6 +52,8 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 **Migrazione F6/F7 (5 novembre 2026):** due change set F6 su `master` hanno portato la termodinamica idrostatica delle facce, il calcolo delle velocita caratteristiche, la chiusura delle tracce ricostruite e la conversione conservativa advettiva sulla nuova architettura. I kernel di assemblaggio conservativo REAL/COMPLEX/face condividono un unico `.inc`; test di equivalenza old/new estesi. Avviata F7 con pulizia in blocco di 26 dipendenze Make legacy in `physics/`. **Queste revisioni non sono ancora validate dalla Action precedente.** Il rollback Lie globale rimane un intervento separato dopo F5.
 
+**Avanzamento F6/F7 (5 novembre 2026):** `State architecture validation` verde su `f6d6d3b` (run `42045188411`). Il nuovo change set converte il calcolo dei primitivi per CFL e diagnostica al kernel `state_new` con semantica numerica esplicita, migra le condizioni iniziali all'assemblaggio conservativo numerico condiviso e amplia l'equivalenza old/new anche a pressione dinamica e temperatura near-dry. Non cambia la sequenza Lie ne il contratto del rollback globale differito. Verifiche CI del nuovo commit ancora da eseguire.
+
 ## 4. Backlog ordinato per priorità
 
 | Priorità | ID | Attività | Chiusura richiesta |

@@ -14,7 +14,7 @@ MODULE spatial_operator_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : T_ambient
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, dx, dy
-    USE state_conversion_2d, ONLY : qc_to_qp
+    USE state_new_conversions, ONLY : conservative_to_primitive
     USE domain_2d, ONLY : domain_type
     USE reconstruction_2d, ONLY : reconstruction_workspace_type
     USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -141,6 +141,7 @@ CONTAINS
         REAL(wp) :: max_a_x, max_a_y, cfl_spatial
         REAL(wp) :: dynamic_pressure, propagation_rate
         INTEGER :: tick,tock,tick_rate
+        LOGICAL :: conversion_ok,conversion_failed
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_cfl_calls=this%profile_cfl_calls+1
@@ -159,13 +160,16 @@ CONTAINS
 
         ! Refresh wet cells and the dry halo: the HP stencil reads beyond solve_cells.
         ! The end-of-loop barrier makes every cache entry available to reconstruction.
-        !$OMP PARALLEL DO PRIVATE(j,k,dynamic_pressure)
+        conversion_failed=.FALSE.
+        !$OMP PARALLEL DO PRIVATE(j,k,dynamic_pressure,conversion_ok) REDUCTION(.OR.:conversion_failed)
         DO l = 1, domain%reconstruction_cells
             j = domain%j_reconstruction(l)
             k = domain%k_reconstruction(l)
 
             IF ( q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
-                CALL qc_to_qp( q(:,j,k), qp(:,j,k), dynamic_pressure )
+                CALL conservative_to_primitive(q(:,j,k),qp(:,j,k),accepted=conversion_ok, &
+                    p_dyn=dynamic_pressure,numerical_reconstruction=.TRUE.)
+                IF (.NOT.conversion_ok) conversion_failed=.TRUE.
             ELSE
                 qp(:,j,k) = 0.0_wp
                 qp(idx_T,j,k) = T_ambient
@@ -174,6 +178,7 @@ CONTAINS
 
         END DO
         !$OMP END PARALLEL DO
+        IF (conversion_failed) CALL fatal_error('CFL reconstruction conversion rejected')
 
         ! CFL speeds must use the same selected advective traces as the spatial operator.
         CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,                                            &

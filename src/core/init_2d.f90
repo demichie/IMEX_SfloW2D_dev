@@ -45,41 +45,11 @@ CONTAINS
     !> \param[in,out] state Allocated state whose conservative vector q is initialized to zero.
 
     SUBROUTINE init_empty(state)
-
-    USE constitutive_parameters_2d, ONLY : T_ambient
-
-    USE state_conversion_2d, ONLY : qp_to_qc
-
-    USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
-
-    USE parameters_2d, ONLY : n_vars
-
-    IMPLICIT NONE
-
         CLASS(state_type), INTENT(INOUT) :: state
 
-        INTEGER :: j,k
-
-        REAL(wp) :: qp_init(n_vars)
-
         WRITE(*,*) 'Initialization with zero thickness flow'
-
-        qp_init(1:n_vars) = 0.0_wp
-        qp_init(4) = T_ambient
-
-        DO j = 1,comp_cells_x
-
-            DO k = 1,comp_cells_y
-
-                CALL qp_to_qc( qp_init(1:n_vars) , state%q(1:n_vars,j,k) )
-
-
-            END DO
-
-        END DO
-
-        RETURN
-
+        ! The conservative dry state is exactly zero; no qp conversion is needed.
+        state%q=0.0_wp
     END SUBROUTINE init_empty
 
     !******************************************************************************
@@ -99,8 +69,9 @@ CONTAINS
 
     SUBROUTINE collapsing_volume(state)
 
-    USE state_conversion_2d, ONLY : qp_to_qc,                                                                          &
-                eval_mixture_properties_from_volume_fractions
+    USE state_conversion_2d, ONLY : eval_mixture_properties_from_volume_fractions
+    USE state_new_conversions, ONLY : numerical_primitive_to_conservative
+    USE diagnostics_2d, ONLY : fatal_error
 
     USE geometry_2d, ONLY : compute_cell_fract
 
@@ -116,6 +87,7 @@ CONTAINS
         CLASS(state_type), INTENT(INOUT) :: state
 
         INTEGER :: j,k
+        LOGICAL :: converted
 
         REAL(wp) :: qp_init(n_vars) ,  qp0_init(n_vars)
         REAL(wp) :: xs_collapse(n_solid), xg_collapse(n_add_gas)
@@ -169,11 +141,13 @@ CONTAINS
                     qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas                                       &
                         +n_stoch_vars+n_pore_vars) = 1.0_wp
 
-                    CALL qp_to_qc( qp_init(1:n_vars) , state%q(1:n_vars,j,k) )
+                    CALL numerical_primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    IF (.NOT.converted) CALL fatal_error('Invalid collapsing-volume initial composition')
 
                 ELSE
 
-                    CALL qp_to_qc( qp0_init(1:n_vars) , state%q(1:n_vars,j,k) )
+                    CALL numerical_primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    IF (.NOT.converted) CALL fatal_error('Invalid dry initial composition')
 
                 END IF
 

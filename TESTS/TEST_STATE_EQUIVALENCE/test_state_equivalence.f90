@@ -7,7 +7,7 @@ PROGRAM test_state_equivalence
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
     USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
-        face_primitive_to_conservative, &
+        numerical_primitive_to_conservative, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
         state_workspace_real, state_workspace_complex, &
         initialize_state_workspace_real, initialize_state_workspace_complex
@@ -37,17 +37,23 @@ PROGRAM test_state_equivalence
     CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp, &
         -32.0_wp*EPSILON(1.0_wp),0.15_wp,0.05_wp,qp)
     CALL check_spatial_face_properties(qp,'roundoff face')
+    CALL check_numerical_decoder_limits
     WRITE(*,'(A)') 'PASS: state_new equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1
         CHARACTER(*), INTENT(IN) :: label
-        REAL(wp) :: pd_old,pd_new
+        REAL(wp) :: pd_old,pd_new,pd_numerical
+        REAL(wp) :: qp_numerical(n_vars)
         REAL(wp) :: material_qp(n_vars),old_ri,old_rho,old_carrier,old_grav
         REAL(wp) :: old_cp_c,old_cp_m,new_rho,new_inv_rho,new_cp_c,new_cp_m,new_grav
         CALL make_qp(h,T,u,v,xs1,xs2,xg1,qp)
         CALL old_qp_to_qc(qp,q_old); CALL primitive_to_conservative(qp,q)
         CALL old_qc_to_qp(q_old,qp_old,pd_old); CALL conservative_to_primitive(q,qp_new,ok,pd_new)
+        CALL conservative_to_primitive(q_old,qp_numerical,ok,pd_numerical,numerical_reconstruction=.TRUE.)
+        IF (.NOT.ok) ERROR STOP 'new numerical decoder rejected valid conservative state'
+        CALL assert_vector(label//' numerical qp',qp_numerical,qp_old,1.0E-9_wp)
+        CALL assert_scalar(label//' numerical pressure',pd_numerical,pd_old,1.0E-9_wp)
         IF (.NOT.ok) ERROR STOP 'new conversion rejected valid state'
         CALL assert_vector(label//' q',q,q_old,1.0E-10_wp)
         CALL assert_vector(label//' qp',qp_new,qp_old,1.0E-9_wp)
@@ -87,7 +93,7 @@ CONTAINS
         INTEGER :: direction,velocity_index
 
         CALL old_qp_to_qc(face,reference_q)
-        CALL face_primitive_to_conservative(face,new_q,face_ok)
+        CALL numerical_primitive_to_conservative(face,new_q,face_ok)
         IF (.NOT.face_ok) ERROR STOP 'valid reconstructed face conversion rejected'
         CALL assert_vector(label//' face conservative',new_q,reference_q,1.0E-10_wp)
         CALL old_mixture(face,old_ri,old_rho,old_rho_c,old_grav,old_cp_c,old_cp_m)
@@ -114,6 +120,32 @@ CONTAINS
             CALL assert_scalar(label//' face speed max',maximum_speed,expected_max,1.0E-10_wp)
         END DO
     END SUBROUTINE check_spatial_face_properties
+
+    SUBROUTINE check_numerical_decoder_limits
+        REAL(wp) :: legacy(n_vars),numerical(n_vars),mass,pd_old,pd_new
+        LOGICAL :: accepted
+        mass=0.1_wp*eps_sing
+        q=0.0_wp
+        q(idx_totMassEqn)=mass
+        q(idx_engyEqn)=mass*sp_heat_a*900.0_wp
+        q(idx_uEqn)=mass*20.0_wp
+        q(idx_vEqn)=-mass*5.0_wp
+        CALL old_qc_to_qp(q,legacy,pd_old)
+        CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
+        IF (.NOT.accepted) ERROR STOP 'near-dry numerical decoder rejected state'
+        CALL assert_vector('near-dry fallback',numerical,legacy,1.0E-9_wp)
+        CALL assert_scalar('near-dry pressure',pd_new,pd_old,1.0E-9_wp)
+        CALL assert_scalar('near-dry ambient temperature',numerical(idx_T),T_ambient,1.0E-12_wp)
+        q(idx_totMassEqn)=0.5_wp*EPSILON(1.0_wp)
+        CALL old_qc_to_qp(q,legacy,pd_old)
+        CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
+        IF (.NOT.accepted) ERROR STOP 'sub-epsilon numerical decoder rejected dry state'
+        CALL assert_vector('sub-epsilon dry',numerical,legacy,1.0E-12_wp)
+        q(idx_totMassEqn)=1.0_wp
+        q(idx_solid_first)=-1.0E-3_wp
+        CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
+        IF (accepted) ERROR STOP 'numerical decoder accepted materially negative solids'
+    END SUBROUTINE check_numerical_decoder_limits
 
     SUBROUTINE make_qp(h,T,u,v,xs1,xs2,xg1,out)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1

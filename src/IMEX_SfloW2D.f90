@@ -94,7 +94,8 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,                                                 &
         thickness_levels , dyn_pres_levels
 
-    USE state_conversion_2d, ONLY : qc_to_qp
+    USE state_new_conversions, ONLY : conservative_to_primitive
+    USE diagnostics_2d, ONLY : fatal_error
 
 
     USE OMP_LIB
@@ -120,6 +121,7 @@ PROGRAM IMEX_SfloW2D
 
     !> Dynamic pressure
     REAL(wp) :: p_dyn
+    LOGICAL :: conversion_ok,conversion_failed
 
     REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
 
@@ -298,10 +300,11 @@ PROGRAM IMEX_SfloW2D
     END IF
 
     IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
+    conversion_failed=.FALSE.
 
     !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
     !$OMP & thickness_exceeds,pressure_exceeds, &
-    !$OMP & mod_vel,r_u,r_v)
+    !$OMP & mod_vel,r_u,r_v,conversion_ok) REDUCTION(.OR.:conversion_failed)
 
     DO l = 1,simulation%domain%solve_cells
 
@@ -310,7 +313,10 @@ PROGRAM IMEX_SfloW2D
 
         IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars,j,k), p_dyn)
+            CALL conservative_to_primitive(simulation%state%q(1:n_vars,j,k), &
+                simulation%state%qp(1:n_vars,j,k),accepted=conversion_ok,p_dyn=p_dyn, &
+                numerical_reconstruction=.TRUE.)
+            IF (.NOT.conversion_ok) conversion_failed=.TRUE.
 
             IF ( .NOT. is_binary_restart )                                                                             &
                     simulation%state%hmax(j,k) = simulation%state%qp(idx_h,j,k)
@@ -373,6 +379,7 @@ PROGRAM IMEX_SfloW2D
     END DO
 
     !$OMP END PARALLEL DO
+    IF (conversion_failed) CALL fatal_error('Initial diagnostic state conversion rejected')
 
     IF (is_binary_restart) THEN
         CALL validate_runout_outputs(simulation%runtime, runout_exists, mass_exists)
@@ -480,9 +487,10 @@ PROGRAM IMEX_SfloW2D
             .NOT.lateral_source_flag .AND. .NOT.bottom_radial_source_flag .AND.                                      &
             .NOT.bottom_fissural_source_flag)
 
+        conversion_failed=.FALSE.
         !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
         !$OMP & thickness_exceeds,pressure_exceeds, &
-        !$OMP & mod_vel,r_u,r_v)
+        !$OMP & mod_vel,r_u,r_v,conversion_ok) REDUCTION(.OR.:conversion_failed)
 
 
         DO l = 1,simulation%domain%solve_cells
@@ -492,7 +500,10 @@ PROGRAM IMEX_SfloW2D
 
             IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-                CALL qc_to_qp(simulation%state%q(1:n_vars,j,k), simulation%state%qp(1:n_vars,j,k), p_dyn)
+                CALL conservative_to_primitive(simulation%state%q(1:n_vars,j,k), &
+                simulation%state%qp(1:n_vars,j,k),accepted=conversion_ok,p_dyn=p_dyn, &
+                numerical_reconstruction=.TRUE.)
+            IF (.NOT.conversion_ok) conversion_failed=.TRUE.
 
                 simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),                                           &
                         simulation%state%qp(idx_h,j,k))
@@ -546,6 +557,7 @@ PROGRAM IMEX_SfloW2D
         END DO
 
         !$OMP END PARALLEL DO
+        IF (conversion_failed) CALL fatal_error('Post-step diagnostic state conversion rejected')
 
         IF ( verbose_level .GE. 0 ) THEN
 

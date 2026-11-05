@@ -375,7 +375,7 @@ spatial/spatial_operator_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
                                        geometry/geometry_2d.$(OBJEXT)           \
                                        spatial/hyperbolic_2d.$(OBJEXT)          \
                                        spatial/reconstruction_2d.$(OBJEXT)      \
-                                       state/state_conversion_2d.$(OBJEXT)
+                                       state_new/state_new_conversions.$(OBJEXT)
 numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          core/constitutive_parameters_2d.$(OBJEXT) \
                                          core/diagnostics_2d.$(OBJEXT)          \
@@ -423,7 +423,8 @@ core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
                         state/state_2d.$(OBJEXT)                                \
-                        state/state_conversion_2d.$(OBJEXT)
+                        state/state_conversion_2d.$(OBJEXT) \
+                        state_new/state_new_conversions.$(OBJEXT)
 io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
                           core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
@@ -455,7 +456,7 @@ IMEX_SfloW2D.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                          io/inpout_2d.$(OBJEXT)                               \
                          numerics/time_integration_2d.$(OBJEXT)                \
                          core/simulation_2d.$(OBJEXT)                          \
-                         state/state_conversion_2d.$(OBJEXT)
+                         state_new/state_new_conversions.$(OBJEXT)
 
 IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
 IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
