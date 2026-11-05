@@ -75,12 +75,18 @@ qp contiene h, u, v, T, frazioni massiche e variabili trasportate secondo il lay
 
 I campi sono proprietà generali. Viscosità specifiche, tensione di snervamento, coefficienti di drag, velocità di settling per specie e rate dei processi non appartengono allo stato comune; appartengono ai moduli costitutivi. REAL e COMPLEX hanno parità di campi e semantica. Nessun modello specifico decide quali campi vengano inizializzati.
 
+Gli array `xs`, `xg`, `alphas` e `alphag` appartengono allo stato fisico e sono la rappresentazione persistente delle composizioni e delle frazioni volumetriche della valutazione corrente. Lo stato è proprietario della loro memoria e il costruttore dello stato li scrive direttamente; non devono esistere copie equivalenti con la stessa responsabilità nel workspace. La loro dimensione è determinata dalla configurazione del modello e viene allocata o verificata al momento dell’inizializzazione del workspace, mai durante la valutazione di una cella.
+
+Il workspace possiede uno stato REAL o COMPLEX riutilizzabile e ne garantisce il ciclo di vita. Non è una seconda rappresentazione dello stato: contiene soltanto il risultato corrente e, se necessario, scratch distinti con una responsabilità computazionale esplicita. Un eventuale scratch aggiuntivo per composizione può essere introdotto solo se evita una copia o una rivalutazione misurabile, con ownership, durata, dimensionamento e percorso di aggiornamento documentati. In assenza di tale necessità, le formule devono scrivere direttamente negli array dello stato.
+
 
 ### 3.4 Coerenza, immutabilità e invalidazione
 
 Il tipo fisico viene costruito completo a partire da un input valido. Le routine costitutive lo ricevono preferibilmente con INTENT(IN). Se una legge analitica produce uno stato successivo con u, v, T o composizione modificati, la modifica deve avvenire mediante un costruttore/operazione di aggiornamento che ricomputi tutte le dipendenze, oppure ricostruendo lo stato. Una semplice scrittura diretta a state%u lasciando Ri e mod_vel invariati è vietata.
 
 In particolare: variazione di u/v → aggiornare w, mod_vel_hor, mod_vel2, mod_vel, curvature_acceleration, Ri; variazione di T o composizione → aggiornare cp, rho, frazioni volumetriche, red_grav e Ri; variazione di h → aggiornare Ri e ogni derivata che dipende dalla profondità; variazione della topografia → aggiornare solo quantità cinematiche geometriche. La topografia non va assunta costante tra gli stage: i dati geometrici vengono passati esplicitamente alla valutazione.
+
+La proprietà degli array di composizione non cambia durante una valutazione: il workspace mantiene la stessa memoria tra chiamate e ogni nuovo stato sovrascrive tutti gli elementi pertinenti. Non sono ammesse copie implicite fra array di workspace e array dello stato, né assegnamenti di derived type che producano deep copy nel percorso caldo.
 
 
 ## 4. Kernel fondamentali e contratti
@@ -137,7 +143,7 @@ Gli array di griglia q(component,x,y) e qp(component,x,y) restano orientati alla
 
 ### 6.2 Workspace e allocazioni
 
-Allocazione delle frazioni di fase e degli scratch al setup del worker o della configurazione; nessun ciclo ripetuto ALLOCATED/SIZE/DEALLOCATE durante i loop caldi. La costruzione accetta scratch di dimensione già verificata; il controllo layout viene eseguito al confine, una sola volta per configurazione. Evitare assegnamenti di derived types con componenti allocabili quando producono deep copy non necessarie. Documentare ownership, durata e accesso dei buffer.
+Allocazione degli array di composizione appartenenti allo stato e degli eventuali scratch distinti al setup del worker o della configurazione; nessun ciclo ripetuto ALLOCATED/SIZE/DEALLOCATE durante i loop caldi. Il workspace è proprietario dello stato riutilizzabile e ne garantisce dimensione, inizializzazione e durata. La costruzione accetta workspace già dimensionati e scrive direttamente negli array dello stato; il controllo del layout viene eseguito al confine, una sola volta per configurazione. Evitare assegnamenti di derived types con componenti allocabili quando producono deep copy non necessarie. Documentare per ogni buffer ownership, durata, accesso e motivo della sua esistenza.
 
 
 ### 6.3 OpenMP / MPI / GPU
