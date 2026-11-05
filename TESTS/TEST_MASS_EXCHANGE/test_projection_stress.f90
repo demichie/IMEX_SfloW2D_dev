@@ -209,11 +209,13 @@ CONTAINS
 
   !> \brief Verify that cached real and complex physical properties are complete.
   SUBROUTINE check_complete_physical_state
-    USE state_conversion_2d, ONLY : physical_state_type,complex_physical_state_type, &
-        physical_state_from_qp,complex_state_from_real,real_part_physical_state, &
-        eval_mixture_properties_from_mass_fractions,eval_mixture_heat_capacity
-    TYPE(physical_state_type) :: wet,dry,roundtrip
-    TYPE(complex_physical_state_type) :: complex_state
+    USE state_conversion_2d, ONLY : eval_mixture_properties_from_mass_fractions, &
+        eval_mixture_heat_capacity
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+        initialize_physical_state_real, promote_physical_state
+    USE state_new_physical, ONLY : build_physical_state_from_qp
+    TYPE(physical_state_real) :: wet,dry,roundtrip
+    TYPE(physical_state_complex) :: complex_state
     REAL(wp) :: primitive(n_vars),ri,rho_m,rho_c,red_grav,cp_c,cp_m
     REAL(wp) :: expected_cp,inv_rho_m,inv_rho_c,xc
     REAL(wp) :: xs(n_solid),xg(n_add_gas),alphas(n_solid),alphag(n_add_gas)
@@ -226,7 +228,9 @@ CONTAINS
     primitive(idx_T)=320.0_wp
     primitive(idx_solid_first)=0.15_wp
     primitive(idx_solid_first+1)=0.05_wp
-    CALL physical_state_from_qp(primitive,wet)
+    CALL initialize_physical_state_real(wet)
+    CALL initialize_physical_state_real(dry)
+    CALL build_physical_state_from_qp(primitive,wet)
     xs=primitive(idx_solid_first:idx_solid_last)
     xg=primitive(idx_add_gas_first:idx_add_gas_last)
     CALL eval_mixture_properties_from_mass_fractions(primitive(idx_T),xs,xg, &
@@ -255,14 +259,18 @@ CONTAINS
     IF (ABS(wet%rho_m-rho_m)>tolerance*rho_m) &
         ERROR STOP 'physical mixture density mismatch'
 
-    CALL complex_state_from_real(wet,complex_state)
-    CALL real_part_physical_state(complex_state,roundtrip)
+    CALL promote_physical_state(wet,complex_state)
+    roundtrip%rho_c=REAL(complex_state%rho_c,wp)
+    roundtrip%inv_rho_c=REAL(complex_state%inv_rho_c,wp)
+    roundtrip%cp_c=REAL(complex_state%cp_c,wp)
+    roundtrip%cp_m=REAL(complex_state%cp_m,wp)
+    roundtrip%Ri=REAL(complex_state%Ri,wp)
     IF (roundtrip%rho_c/=wet%rho_c .OR. roundtrip%inv_rho_c/=wet%inv_rho_c .OR. &
         roundtrip%cp_c/=wet%cp_c .OR. roundtrip%cp_m/=wet%cp_m .OR. roundtrip%Ri/=wet%Ri) &
         ERROR STOP 'physical real-complex roundtrip mismatch'
 
     primitive=0.0_wp
-    CALL physical_state_from_qp(primitive,dry)
+    CALL build_physical_state_from_qp(primitive,dry)
     expected_cp=sp_heat_l
     IF (.NOT.liquid_flag) expected_cp=sp_heat_a
     IF (dry%rho_c/=rho_a_amb .OR. dry%inv_rho_c/=1.0_wp/rho_a_amb .OR. &

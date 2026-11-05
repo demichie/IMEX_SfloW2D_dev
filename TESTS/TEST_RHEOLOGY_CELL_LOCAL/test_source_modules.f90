@@ -141,11 +141,11 @@ PROGRAM test_source_modules
 
 CONTAINS
   FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)
-    USE state_conversion_2d, ONLY : complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_complex
     COMPLEX(wp), INTENT(IN) :: temperature
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
     COMPLEX(wp) :: result
-    TYPE(complex_physical_state_type) :: state
+    TYPE(physical_state_complex) :: state
     state%T=temperature
     CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,result)
   END FUNCTION test_cooling_implicit

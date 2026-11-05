@@ -1,16 +1,16 @@
 ! Quantitative D17.20 test through the production rheology dispatcher.
 PROGRAM test_d17_production_rheology
   USE parameters_2d, ONLY : wp
-  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, &
-       update_physical_state_kinematics
+  USE state_new_types, ONLY : physical_state_real, physical_state_complex
+  USE state_new_physical, ONLY : update_physical_state_kinematics
   USE rheology_2d, ONLY : eval_rheology_implicit,eval_rheology_semi_implicit
   IMPLICIT NONE
   REAL(wp), PARAMETER :: drag=0.1_wp, epsilon_cs=1.0E-24_wp
   REAL(wp) :: density_real,velocity(2),reference(2),jacobian(2,2)
   REAL(wp) :: si(2),solid(1),step
   COMPLEX(wp) :: density,vel(2),rate(2),rate_reference(2)
-  TYPE(physical_state_type) :: real_state
-  TYPE(complex_physical_state_type) :: complex_state
+  TYPE(physical_state_real) :: real_state
+  TYPE(physical_state_complex) :: complex_state
   INTEGER :: trial,j
   solid=0.0_wp
   DO trial=1,4

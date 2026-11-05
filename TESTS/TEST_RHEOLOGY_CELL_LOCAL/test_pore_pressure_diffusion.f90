@@ -8,7 +8,7 @@ PROGRAM test_pore_pressure_diffusion
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
   USE pore_pressure_darcy_2d, ONLY : eval_pore_pressure_darcy_analytic
-  USE state_conversion_2d, ONLY : physical_state_type
+  USE state_new_types, ONLY : physical_state_real
 
   IMPLICIT NONE
 
@@ -135,7 +135,7 @@ CONTAINS
   SUBROUTINE advance_pore_pressure_diffusion(p0,dt,h,temp,alpha,p_after)
     REAL(wp), INTENT(IN) :: p0,dt,h,temp,alpha(:)
     REAL(wp), INTENT(OUT) :: p_after
-    TYPE(physical_state_type) :: state
+    TYPE(physical_state_real) :: state
     REAL(wp) :: q_before(n_eqns),rate(n_eqns),mass
     LOGICAL :: ok
     p_after=p0

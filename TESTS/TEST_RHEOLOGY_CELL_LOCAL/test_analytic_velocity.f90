@@ -4,7 +4,6 @@ PROGRAM test_analytic_velocity
   USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
   USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
        Fr_0, U_w, xi, T_ref
-  USE state_conversion_2d, ONLY : physical_state_type
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &
        EXACT_FLOW_CONSTANT, EXACT_FLOW_LINEAR, EXACT_FLOW_AFFINE,              &
@@ -15,7 +14,7 @@ PROGRAM test_analytic_velocity
        eval_rheology_voellmy_implicit,                                  &
        eval_rheology_voellmy_semi_implicit,                             &
        eval_rheology_voellmy_analytic
-  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+  USE state_new_types, ONLY : physical_state_real, physical_state_complex
   USE rheology_plastic_2d, ONLY : tau, eval_rheology_plastic_implicit,  &
        eval_rheology_plastic_analytic
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
@@ -40,7 +39,7 @@ PROGRAM test_analytic_velocity
 
   IMPLICIT NONE
 
-  TYPE(physical_state_type) :: rheo_state
+  TYPE(physical_state_real) :: rheo_state
   REAL(wp), PARAMETER :: integration_step = 0.01_wp
   REAL(wp), PARAMETER :: flow_depth = 1.8_wp
   REAL(wp), PARAMETER :: mixture_density = 1800.0_wp
@@ -81,7 +80,7 @@ PROGRAM test_analytic_velocity
 
   tau = 1.0_wp
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h = flow_depth
     ps%u = velocity_before(1)
     ps%v = velocity_before(2)
@@ -95,7 +94,7 @@ PROGRAM test_analytic_velocity
        'plastic exact constant-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%u = CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v = CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m = CMPLX(mixture_density,0.0_wp,wp)
@@ -113,7 +112,7 @@ PROGRAM test_analytic_velocity
   tau0 = 100.0_wp
   T_ref = 300.0_wp
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%T=temperature
     ps%rho_m=mixture_density
@@ -133,7 +132,7 @@ PROGRAM test_analytic_velocity
        'lava exact affine-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%h=CMPLX(flow_depth,0.0_wp,wp)
     cs%T=CMPLX(temperature,0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
@@ -145,7 +144,7 @@ PROGRAM test_analytic_velocity
     CALL eval_rheology_lava_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
     ps%mod_vel=speed_after
@@ -166,7 +165,7 @@ PROGRAM test_analytic_velocity
   n_td = 0.1_wp
   n_td2 = 0.01_wp
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%T=temperature
     ps%u=velocity_before(1)
@@ -180,7 +179,7 @@ PROGRAM test_analytic_velocity
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%h=CMPLX(flow_depth,0.0_wp,wp)
     cs%T=CMPLX(temperature,0.0_wp,wp)
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
@@ -194,7 +193,7 @@ PROGRAM test_analytic_velocity
     CALL eval_rheology_lahar_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
@@ -211,7 +210,7 @@ PROGRAM test_analytic_velocity
        mixture_density*flow_depth, source, 'lahar')
 
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%T=temperature
     ps%rho_m=mixture_density
@@ -230,7 +229,7 @@ PROGRAM test_analytic_velocity
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%h=CMPLX(flow_depth,0.0_wp,wp)
     cs%T=CMPLX(temperature,0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
@@ -247,7 +246,7 @@ PROGRAM test_analytic_velocity
 
   friction_factor = 0.1_wp
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
@@ -263,7 +262,7 @@ PROGRAM test_analytic_velocity
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
@@ -279,7 +278,7 @@ PROGRAM test_analytic_velocity
   voellmy_mu = 0.3_wp
   xi = 500.0_wp
     BLOCK
-    TYPE(physical_state_type) :: rs
+    TYPE(physical_state_real) :: rs
     rs%h = flow_depth
     rs%u = velocity_before(1)
     rs%v = velocity_before(2)
@@ -294,7 +293,7 @@ PROGRAM test_analytic_velocity
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
@@ -305,7 +304,7 @@ PROGRAM test_analytic_velocity
          complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
-    TYPE(physical_state_type) :: rs
+    TYPE(physical_state_real) :: rs
     rs%h=flow_depth
     rs%u=velocity_after(1)
     rs%v=velocity_after(2)
@@ -465,7 +464,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
   mu_2 = 0.7_wp
   muI_inf = 0.8_wp
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
@@ -480,7 +479,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
        .FALSE., 0.0_wp, velocity_after, 'mu(I) dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
@@ -500,7 +499,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
        mixture_density*flow_depth, [source_x, source_y], 'mu(I)')
 
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
@@ -515,7 +514,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
        .FALSE., 0.0_wp, velocity_after, 'mu(I) pore-pressure dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
@@ -536,7 +535,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
 
   xi = 500.0_wp
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
@@ -552,7 +551,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
@@ -569,7 +568,7 @@ CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
              source_y)
   END BLOCK
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
@@ -589,7 +588,7 @@ CALL eval_rheology_mui_voellmy_implicit(cs, &
        mixture_density*flow_depth, source, 'mu(I)-Voellmy')
 
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
@@ -602,7 +601,7 @@ CALL eval_rheology_mui_voellmy_implicit(cs, &
   END BLOCK
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   BLOCK
-    TYPE(physical_state_type) :: ps
+    TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
@@ -619,7 +618,7 @@ CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
              source_y)
   END BLOCK
   BLOCK
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(physical_state_complex) :: cs
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
@@ -733,7 +732,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic, expected(2)
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp) :: actual(2)
-    TYPE(physical_state_type) :: physical_state
+    TYPE(physical_state_real) :: physical_state
     LOGICAL :: model_supported
 
     physical_state%h=flow_depth
@@ -760,7 +759,7 @@ CONTAINS
   SUBROUTINE assert_dispatch_special_cases()
 
     REAL(wp) :: actual(2)
-    TYPE(physical_state_type) :: physical_state
+    TYPE(physical_state_real) :: physical_state
     LOGICAL :: model_supported
 
     CALL assert_dispatch_matches('none', .FALSE., 0.0_wp,        &

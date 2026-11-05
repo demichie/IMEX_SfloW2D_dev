@@ -4,8 +4,10 @@ PROGRAM test_rheology_froude
   USE parameters_2d
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
-  USE state_conversion_2d, ONLY : mixt_var, physical_state_from_qp, &
-       complex_state_from_real, physical_state_type, complex_physical_state_type
+  USE state_conversion_2d, ONLY : mixt_var
+  USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+       initialize_physical_state_real, promote_physical_state
+  USE state_new_physical, ONLY : build_physical_state_from_qp
   USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit, &
        eval_rheology_froude_implicit
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -14,13 +16,14 @@ PROGRAM test_rheology_froude
 
   REAL(wp) :: qp(6), source(6), expected(6)
   COMPLEX(wp) :: complex_source(6)
-  TYPE(physical_state_type) :: local_state
-  TYPE(complex_physical_state_type) :: complex_state
+  TYPE(physical_state_real) :: local_state
+  TYPE(physical_state_complex) :: complex_state
   REAL(wp) :: Ri, rho_m, rho_c, g_reduced, cp_c, cp_mix
   REAL(wp) :: speed, Fr, friction, slope_x, slope_y, G, z
   INTEGER :: mode
 
   CALL initialize_properties
+  CALL initialize_physical_state_real(local_state)
 
   ! Set the ambient density from the same thermodynamic closure, guaranteeing
   ! exact neutral buoyancy independently of compiler rounding of ideal-gas rho.
@@ -75,7 +78,7 @@ PROGRAM test_rheology_froude
      expected = 0.0_wp
      expected(2:3) = -friction*[3.0_wp, -4.0_wp]/5.0_wp
      source=0.0_wp
-     CALL physical_state_from_qp(qp,local_state,slope_x,slope_y,0.0_wp,0.0_wp,0.0_wp)
+     CALL build_physical_state_from_qp(qp,local_state,slope_x,slope_y,0.0_wp,0.0_wp,0.0_wp)
      CALL eval_rheology_froude_semi_implicit(local_state,G,stochastic_flag,z, &
           source(2),source(3))
      CALL assert_finite(source)
@@ -149,7 +152,7 @@ CONTAINS
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp), INTENT(IN) :: bx, by
     source=0.0_wp
-    CALL physical_state_from_qp(qp,local_state,bx,by,0.0_wp,0.0_wp,0.0_wp)
+    CALL build_physical_state_from_qp(qp,local_state,bx,by,0.0_wp,0.0_wp,0.0_wp)
     CALL eval_rheology_froude_semi_implicit(local_state,1.0_wp,stochastic_flag, &
          0.2_wp,source(2),source(3))
     CALL assert_finite(source)
@@ -159,7 +162,7 @@ CONTAINS
     END IF
 
     ! Froude has no implicit contribution. Exercise its physical complex API.
-    CALL complex_state_from_real(local_state,complex_state)
+    CALL promote_physical_state(local_state,complex_state)
     complex_state%u=complex_state%u+CMPLX(0.0_wp,1.0E-20_wp,wp)
     complex_source=CMPLX(0.0_wp,0.0_wp,wp)
     CALL eval_rheology_froude_implicit(complex_state,complex_source(2),complex_source(3))

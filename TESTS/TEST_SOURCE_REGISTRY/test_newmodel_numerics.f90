@@ -5,13 +5,13 @@ PROGRAM test_newmodel_numerics
   USE source_catalog_2d, ONLY : source_term_descriptor_by_name, &
        canonical_rheology_source_name, source_term_type, rheology_name_has_role, &
        SOURCE_ROLE_IMPLICIT, SOURCE_ROLE_SEMI_IMPLICIT
-  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+  USE state_new_types, ONLY : physical_state_real, physical_state_complex
   USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, &
        eval_rheology_newmodel_semi_implicit
   IMPLICIT NONE
   TYPE(source_term_type) :: term
-  TYPE(physical_state_type) :: rs
-  TYPE(complex_physical_state_type) :: cs
+  TYPE(physical_state_real) :: rs
+  TYPE(physical_state_complex) :: cs
   REAL(wp), PARAMETER :: k=0.1_wp, eps=1.0E-24_wp
   REAL(wp) :: rho, u(2), q_before(2), q_after(2), expected(2)
   REAL(wp) :: dt, analytic_jac(2,2), cs_jac(2,2), residual(2), &
