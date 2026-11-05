@@ -244,6 +244,16 @@ Ora per massa conservativa **positiva** il dispatcher calcola `xs` e `xg` da `q_
 
 **Nota sui gate:** A01-A03 sono modifiche al codice, **non ancora chiusure verificate**. I blocchi C4/C5 e le altre opportunita A04-A12 rimangono in roadmap. Non avviare automaticamente Actions o benchmark.
 
+### D.9 Correzione ownership A02 — buoyancy esclusivamente in physics (5 novembre 2026)
+
+**Risolto il rilievo architetturale dell'utente, codice modificato e build da verificare.** Il primo intervento A02 aveva impropriamente inserito in `numerics/lie_source_executor_2d.f90` la chiusura della composizione, il calcolo `rho_mix` e il criterio di galleggiabilita. Questi elementi non appartengono alla numerica.
+
+La valutazione e stata spostata integralmente in `physics/source_terms_2d.f90`, nella routine **cell-local** `evaluate_buoyancy_removal(qp,remove_cell,red_grav,accepted)`. La routine chiude la composizione usando `close_composition`, calcola soltanto la densita con `evaluate_mixture_density`, conserva per le diagnostiche la formula `red_grav=(rho_mix-rho_a_amb)*inv_rho_mix*grav` e decide l'eliminazione tramite **`rho_mix<rho_a_amb`**, come richiesto. Se la composizione non e ammissibile `accepted=.FALSE.`. Nessun indice spaziale, campo di griglia, mutazione di stato globale o dipendenza dalla numerica e introdotto nella nuova interfaccia.
+
+L'esecutore Lie invoca soltanto il criterio fisico, interpreta `accepted` (errore 15), registra le diagnostiche, e applica/committa la rimozione del conservativo e la primitiva dry quando `remove_cell` e vero. Sono stati rimossi da Lie gli import `state_mixture`, `state_composition`, `constitutive_parameters_2d` usati per A02 e i relativi intermedi REAL e array di composizione. L'ottimizzazione A02 e preservata: **nessuno stato fisico completo ricostruito per la buoyancy**. Neutrali conservati per scelta esplicita.
+
+**Gate:** verifica manuale del compilatore, EXAMPLE_TAAL, miscela negativa/neutra/positiva rispetto all'atmosfera, casi dry e diagnostiche del D19. Nessuna Action avviata dal cambio.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.

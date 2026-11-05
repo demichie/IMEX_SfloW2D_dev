@@ -13,7 +13,7 @@ MODULE source_terms_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
     USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
-    USE state_mixture, ONLY : evaluate_mixture_heat_capacity
+    USE state_mixture, ONLY : evaluate_mixture_heat_capacity,evaluate_mixture_density
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_implicit_real, eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
@@ -22,7 +22,7 @@ MODULE source_terms_2d
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_composition, ONLY : conservative_mass_admissible
+    USE state_composition, ONLY : conservative_mass_admissible,close_composition
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
     USE source_registry_2d, ONLY : source_group_type
@@ -40,6 +40,7 @@ MODULE source_terms_2d
     PUBLIC :: eval_source_semi_implicit, eval_source_implicit, eval_source_implicit_real, eval_source_analytic
     PUBLIC :: source_cell_context_type
     PUBLIC :: eval_geometry_curvature_explicit
+    PUBLIC :: evaluate_buoyancy_removal
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
     ! Cell-local geometry and stochastic context for analytic source solves.
     TYPE :: source_cell_context_type
@@ -48,6 +49,31 @@ MODULE source_terms_2d
         REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
     END TYPE source_cell_context_type
 CONTAINS
+
+    !> Evaluate the terminal cell-local buoyancy sink, independently of Lie.
+    !> Only density is needed; neutral material is retained (strict criterion).
+    SUBROUTINE evaluate_buoyancy_removal(qp,remove_cell,red_grav,accepted)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
+        LOGICAL, INTENT(OUT) :: remove_cell,accepted
+        REAL(wp), INTENT(OUT) :: red_grav
+        REAL(wp) :: rho_mix,inv_rho_mix
+        REAL(wp) :: xs(n_solid),xg(n_add_gas)
+
+        remove_cell=.FALSE.
+        accepted=.FALSE.
+        red_grav=0.0_wp
+        xs=qp(idx_solid_first:idx_solid_last)
+        xg=qp(idx_add_gas_first:idx_add_gas_last)
+        IF (.NOT.close_composition(xs,xg)) RETURN
+
+        rho_mix=rho_a_amb
+        inv_rho_mix=1.0_wp/rho_a_amb
+        IF (qp(idx_h)>EPSILON(1.0_wp)) &
+            CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_mix,inv_rho_mix)
+        red_grav=(rho_mix-rho_a_amb)*inv_rho_mix*grav
+        remove_cell=rho_mix<rho_a_amb
+        accepted=.TRUE.
+    END SUBROUTINE evaluate_buoyancy_removal
 
     !> Apply a uniform physical factor to all coupled exchange rates.
     SUBROUTINE scale_mass_exchange_transfer(transfer,scale)

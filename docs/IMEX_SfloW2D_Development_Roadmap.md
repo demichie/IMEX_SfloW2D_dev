@@ -32,6 +32,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Interventi audit A01-A03 (5 novembre 2026, verifiche pendenti):** A01 elimina la seconda conversione completa `q->qp` dal ciclo diagnostico post-Lie, calcolando `p_dyn` da `q`/`qp` gia coerenti (possibile differenza agli ultimi bit). A02 sostituisce la costruzione fisica finale di buoyancy con sola densita, applicando il nuovo criterio stretto richiesto `rho_mix<rho_a_amb` (neutralita conservata). A03 prepara una volta per sweep il materiale delle iniezioni, distinguendo ciascuna fissura, e lo passa read-only ai kernel cell-local, evitando valutazioni termodinamiche per cella e cache globali. Rischi, differenze intenzionali e validazione nella sezione **D.8** della roadmap specialistica. Nessun test o Action avviato su questi commit.
 
+**Correzione ownership A02 (5 novembre 2026):** la valutazione fisica della buoyancy non e piu presente in `lie_source_executor_2d`: nuova interfaccia locale `physics/source_terms_2d:evaluate_buoyancy_removal` restituisce accettazione, criterio `rho_mix<rho_a_amb` e `red_grav`. Lie gestisce esclusivamente l'esito, le diagnostiche e la transazione conservativa. A01/A03 invariati; verifica manuale della build ancora pendente. Dettagli nella sezione D.9 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

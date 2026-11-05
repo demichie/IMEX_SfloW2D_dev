@@ -249,17 +249,14 @@ CONTAINS
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
             B_zone,cell_source_fractions,cell_fissure_fractions,                                              &
             cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
-        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
+        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type, &
+            evaluate_buoyancy_removal
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversions, ONLY : conservative_to_primitive
-        USE state_mixture, ONLY : evaluate_mixture_density
-        USE state_composition, ONLY : close_composition
-        USE constitutive_parameters_2d, ONLY : rho_a_amb, grav
         USE state_fields, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                               &
             physical_cell_state_finite,finite_real_value
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
-        USE parameters_2d, ONLY : idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
@@ -285,8 +282,8 @@ CONTAINS
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
-        REAL(wp) :: red_grav,rho_mix,inv_rho_mix
-        REAL(wp) :: buoyancy_xs(n_solid),buoyancy_xg(n_add_gas)
+        REAL(wp) :: red_grav
+        LOGICAL :: remove_buoyant
         ! Profiling counters are thread-owned: no atomics inside the cell loop.
         REAL(wp), ALLOCATABLE :: thread_group(:,:),thread_physics(:,:),thread_cell(:)
         INTEGER, ALLOCATABLE :: thread_evaluations(:,:)
@@ -386,7 +383,7 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_updated,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,              &
-        !$OMP& red_grav,rho_mix,inv_rho_mix,buoyancy_xs,buoyancy_xg,tid, &
+        !$OMP& red_grav,remove_buoyant,tid, &
         !$OMP& cell_tick,group_tick,                                                                                 &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
@@ -651,30 +648,16 @@ CONTAINS
             ! Restore the v2 buoyancy removal after all mass-exchange groups.
             ! This is a physical sink, not a numerical limiter on the source rates.
             IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
-                ! Only the ambient-density comparison is needed for buoyancy
-                ! removal. The full physical state (cp, phase fractions, Ri
-                ! and kinematics) would be calculated and discarded here.
-                buoyancy_xs=qp_local(idx_solid_first:idx_solid_last)
-                buoyancy_xg=qp_local(idx_add_gas_first:idx_add_gas_last)
-                conversion_ok=close_composition(buoyancy_xs,buoyancy_xg)
+                CALL evaluate_buoyancy_removal(qp_local,remove_buoyant,red_grav,conversion_ok)
                 IF (.NOT.conversion_ok) THEN
                     cell_error=15
                 ELSE
-                    rho_mix=rho_a_amb
-                    inv_rho_mix=1.0_wp/rho_a_amb
-                    IF (qp_local(idx_h)>EPSILON(1.0_wp)) &
-                        CALL evaluate_mixture_density(qp_local(idx_T),buoyancy_xs,buoyancy_xg,                           &
-                            rho_mix,inv_rho_mix)
-                    red_grav=(rho_mix-rho_a_amb)*inv_rho_mix*grav
-                END IF
-                IF (cell_error==0) THEN
                     IF (executor%diagnostics_enabled .AND. cell_arc_perim(j,k)>0.0_wp) THEN
                         executor%pre_buoyancy_mass(cell)=q_local(idx_totMassEqn)
-                        executor%pre_buoyancy_solids(cell)=SUM(q_local(idx_solidEqn_first:idx_solid_last))
+                        executor%pre_buoyancy_solids(cell)=SUM(q_local(idx_solidEqn_first:idx_solidEqn_last))
                         executor%buoyancy_reduced_gravity(cell)=red_grav
                     END IF
-                    ! Neutrally buoyant material is retained by design.
-                    IF (rho_mix<rho_a_amb) THEN
+                    IF (remove_buoyant) THEN
                         q_local=0.0_wp
                         CALL initialize_dry_physical_cell(qp_local)
                     END IF
