@@ -223,12 +223,12 @@ state/state_conversion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
 physics/rheology_laws/rheology_mui_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
                                     core/constitutive_parameters_2d.$(OBJEXT) \
                                     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)  \
-                                    state/state_conversion_2d.$(OBJEXT)        \
+                                    state_new/state_new_mixture.$(OBJEXT)        \
                                     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)      \
                                             core/constitutive_parameters_2d.$(OBJEXT) \
                                             physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-                                            state/state_conversion_2d.$(OBJEXT) \
+                                            state_new/state_new_mixture.$(OBJEXT) \
                                             physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_lava_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
                                      physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)  \
