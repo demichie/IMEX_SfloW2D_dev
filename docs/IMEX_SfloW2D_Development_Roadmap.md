@@ -14,6 +14,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Rinomina finale delle API di stato (5 novembre 2026; validazione manuale pendente):** la sola architettura di produzione passa da `src/state_new/` a `src/state/`. I moduli e i file `state_new*` sono rinominati `state*` (inclusi `state.f90`, `state_fields.f90`, `state_types.f90`, `state_composition.f90`, `state_mixture.f90`, `state_conversions.f90` e `state_physical.f90`); allineati i `USE`, le dipendenze in `src/Makefile.am` e i sorgenti dei test. Nessuna nuova struttura, wrapper legacy o modifica intenzionale alle formule numeriche. I riferimenti storici ai nomi precedenti in questa roadmap descrivono versioni passate; il nome canonico corrente e `state`. Actions esclusivamente manuali, non lanciate in questo intervento.
 
+**Stato autorevole A03, 5 novembre 2026:** completata la migrazione di produzione a `src/state/` (`d8f4f57` cutover, `c9e576d` rinomina, `c5d6eb2` pulizia workflow). L'utente ha confermato una Action Build verde dopo il cutover; la compilazione non dimostra riuso ottimale. Il **traguardo computazionale e ancora aperto**: chiuderlo con i blocchi C0-C5 nella [roadmap degli stati](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md), che e l'unica specifica dettagliata per questo workstream. Audit statico, correttezza e performance hanno gate distinti; Actions solo manuali. Le annotazioni F5/F6/F7 del registro seguente sono una cronologia, non l'attuale struttura da migrare.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni
@@ -88,7 +90,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 | Priorità | ID | Attività | Chiusura richiesta |
 | --- | --- | --- | --- |
-| P0 | A03 | Validare la migrazione F5 degli stati | Compilazione strict-debug, suite `state_new`/equivalenza, sorgenti e complex-step, Lie/rollback, confronti output su più fisiche; registrare SHA e log. Non dichiarare F5 conclusa prima dei gate. |
+| P0 | A03 | Chiudere il traguardo computazionale dello stato | Seguire C0-C5 nella roadmap specialistica: mappa per versione degli intermedi, rimozione ricalcoli cp, conversioni Lie, riuso negli evaluator e Newton, facce HP-PCCU, audit allocazioni e misure. Il backend unico `src/state/` e gia migrato; la build non dimostra l'eliminazione del lavoro ripetuto. |
 | P0 | V01 | Congelare baseline Lie verificata | Associare strict-debug e D20 al commit effettivamente testato, conservare log. |
 | P0 | V02 | Matrice di regressioni scientifiche | Confronti per idrodinamica, wet/dry, well-balancing, sorgenti, massa, energia, pressione, NEWTON, analytiche e topografia. |
 | P0 | V03 | Consolidare le prove D20 | Evidenze di Newton effettivo, fondo variato, rollback dell'intero passo dopo fallimento e confronti 1/2/4 thread, incluse le revisioni dei test. |
@@ -112,7 +114,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 ## 5. Sequenza operativa
 
-1. Per il nuovo codice F5, prima verificare build strict-debug e suite di equivalenza `state_new`/sorgenti; registrare SHA e log. In parallelo associare SHA, run ID e log della D20 verde e mantenere l'ultima baseline verificata (V01–V03); eseguire i test mirati DEM (D01) prima di considerare chiusa la validazione degli input.
+1. **Priorita architetturale-computazionale A03:** la migrazione al solo `src/state/` e completa nel codice; eseguire i blocchi C0-C5 della roadmap specialistica a partire da C0+C1, evitando nuove strutture e modifiche alla fisica. Pianificare poi le verifiche manuali strict-debug, regressioni e profiling per lo stesso SHA; mantenere in parallelo i gate V01-V03 e D01, senza attribuire risultati di commit precedenti al codice corrente.
 2. Proseguire il profiling multi-esempio (N02): analizzare `EXAMPLE_TAAL` e misurare separatamente spaziale, gruppi sorgente e I/O (N04), poi ripetere con 8 thread e passare ad altre fisiche.
 3. Usare i dati di Taal per scegliere interventi misurabili su Newton/IEEE, dispatch reologico e allocazioni (N03), evitando ottimizzazioni tarate soltanto su `EXAMPLE_CF`.
 4. Proseguire regressioni scientifiche e contratti architetturali (V02, A01–A02), quindi consolidare S01, T01, N01 e C01. Riprendere F01 solo quando prioritario.
