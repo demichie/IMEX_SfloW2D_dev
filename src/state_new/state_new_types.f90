@@ -71,7 +71,11 @@ CONTAINS
         TYPE(physical_state_complex), INTENT(INOUT) :: target
 
         IF (.NOT.source%layout_valid) ERROR STOP 'Cannot promote an uninitialized physical state'
-        IF (.NOT.target%layout_valid) ERROR STOP 'Complex physical state storage not initialized'
+        ! An explicit law may promote into a local complex state. Allocatable
+        ! arrays follow intrinsic assignment semantics, as in the old kernel.
+        ! The F5 follow-up will thread a reusable complex workspace into the
+        ! explicit dispatch so that this conversion has no per-call allocations.
+        target%layout_valid=.TRUE.
         target%h=CMPLX(source%h,0.0_wp,wp)
         target%u=CMPLX(source%u,0.0_wp,wp)
         target%v=CMPLX(source%v,0.0_wp,wp)
