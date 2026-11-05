@@ -139,7 +139,7 @@ CONTAINS
     !> A preallocated incompatible layout is rejected, never repaired in a hot loop.
     !> Allocate and clear the arrays owned by a reusable REAL state workspace.
     !> This routine belongs to setup/configuration, never to a cell-evaluation loop.
-    SUBROUTINE initialize_physical_state_real(workspace)
+    SUBROUTINE initialize_physical_state_real(state)
         TYPE(physical_state_real), INTENT(INOUT) :: state
 
         IF (.NOT.ALLOCATED(state%xs) .OR. .NOT.ALLOCATED(state%xg) .OR. &
@@ -171,7 +171,7 @@ CONTAINS
 
     !> Allocate and clear the arrays owned by a reusable COMPLEX state workspace.
     !> This routine belongs to setup/configuration, never to a cell-evaluation loop.
-    SUBROUTINE initialize_physical_state_complex(workspace)
+    SUBROUTINE initialize_physical_state_complex(state)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
 
         IF (.NOT.ALLOCATED(state%xs) .OR. .NOT.ALLOCATED(state%xg) .OR. &
