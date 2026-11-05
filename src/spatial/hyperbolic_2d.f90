@@ -678,7 +678,8 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE equation_terms_2d, ONLY : limit_component_mass_flux
-    USE state_conversion_2d, ONLY : qp_to_qc
+    USE state_new_conversions, ONLY : face_primitive_to_conservative
+    USE diagnostics_2d, ONLY : fatal_error
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
     USE pccu_2d, ONLY : eval_pccu_advective_flux
@@ -709,6 +710,7 @@ CONTAINS
         REAL(wp) :: eta_path_left, eta_path_right
         REAL(wp) :: h_eta_left,h_eta_right
         LOGICAL :: source_trace_left,source_trace_right
+        LOGICAL :: face_conversion_ok
         ! Source-side flags remain necessary for hydrostatic path endpoints.
 
         qp_adv_left_use=qp_adv_left
@@ -737,10 +739,10 @@ CONTAINS
 
         END IF
 
-        CALL qp_to_qc(qp_adv_left_use,q_adv_left_use,                                                                  &
-            'KT interface left advective trace')
-        CALL qp_to_qc(qp_adv_right_use,q_adv_right_use,                                                                &
-            'KT interface right advective trace')
+        CALL face_primitive_to_conservative(qp_adv_left_use,q_adv_left_use,face_conversion_ok)
+        IF (.NOT.face_conversion_ok) CALL fatal_error('KT interface left advective trace: invalid composition')
+        CALL face_primitive_to_conservative(qp_adv_right_use,q_adv_right_use,face_conversion_ok)
+        IF (.NOT.face_conversion_ok) CALL fatal_error('KT interface right advective trace: invalid composition')
 
         CALL eval_inertial_flux(q_adv_left_use,qp_adv_left_use,direction,flux_left)
         CALL eval_inertial_flux(q_adv_right_use,qp_adv_right_use,direction,flux_right)

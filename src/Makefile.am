@@ -90,6 +90,7 @@ EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservativ
              state_new/mixture_heat_capacity.inc state_new/mixture_from_mass.inc \
              state_new/density_from_mass.inc state_new/kinematics.inc \
              state_new/richardson.inc \
+             state_new/conservative_from_primitive.inc \
              physics/rheology_laws/rheology_voellmy_turbulent.inc \
              physics/rheology_laws/rheology_lava_viscous.inc \
              physics/rheology_laws/rheology_plastic_yield.inc \
@@ -165,7 +166,8 @@ state_new/state_new_mixture.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      state_new/density_from_mass.inc
 state_new/state_new_conversions.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
                                          state_new/state_new_mixture.$(OBJEXT) \
-                                         state_new/state_new_composition.$(OBJEXT)
+                                         state_new/state_new_composition.$(OBJEXT) \
+                                         state_new/conservative_from_primitive.inc
 state_new/state_new_physical.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
                                       state_new/state_new_mixture.$(OBJEXT) \
                                       state_new/state_new_composition.$(OBJEXT) \
@@ -386,7 +388,8 @@ spatial/hyperbolic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                  \
                                  geometry/geometry_2d.$(OBJEXT)                 \
                                  spatial/nonconservative_2d.$(OBJEXT)           \
                                  spatial/pccu_2d.$(OBJEXT)                      \
-                                 spatial/reconstruction_2d.$(OBJEXT)
+                                 spatial/reconstruction_2d.$(OBJEXT) \
+                                 state_new/state_new_conversions.$(OBJEXT)
 spatial/spatial_operator_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
                                        core/diagnostics_2d.$(OBJEXT)            \
                                        core/constitutive_parameters_2d.$(OBJEXT) \

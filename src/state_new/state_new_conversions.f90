@@ -12,13 +12,13 @@ MODULE state_new_conversions
     USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag
     USE state_new_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, evaluate_mixture_density
     USE constitutive_parameters_2d, ONLY : T_ambient
-    USE state_new_composition, ONLY : close_composition
+    USE state_new_composition, ONLY : close_composition, normalize_face_composition
 
     IMPLICIT NONE
     PRIVATE
 
     PUBLIC :: conservative_to_primitive
-    PUBLIC :: primitive_to_conservative
+    PUBLIC :: primitive_to_conservative, face_primitive_to_conservative
 
     INTERFACE conservative_to_primitive
         MODULE PROCEDURE conservative_to_primitive_real
@@ -142,18 +142,33 @@ CONTAINS
             RETURN
         END IF
         IF (.NOT.close_composition(xs,xg)) RETURN
-        CALL evaluate_mixture(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)
-        mass=rho_m*h
-        q(idx_totMassEqn)=mass
-        q(idx_uEqn)=mass*qp(idx_u)
-        q(idx_vEqn)=mass*qp(idx_v)
-        q(idx_engyEqn)=mass*cp_m*qp(idx_T)
-        q(idx_solid_first:idx_solid_last)=mass*xs
-        q(idx_add_gas_first:idx_add_gas_last)=mass*xg
-        IF (stoch_transport_flag) q(idx_stoch)=mass*qp(idx_stoch)
-        IF (pore_pressure_flag) q(idx_pore)=mass*qp(idx_pore)
+        INCLUDE 'conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_real
+
+    !> Convert a finalized reconstructed face trace to conservative form.
+    !> Unlike the strict bulk-state conversion, traces use numerical closure
+    !> with unconditional overfill normalization and are dry below epsilon.
+    SUBROUTINE face_primitive_to_conservative(qp,q,accepted)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
+        REAL(wp), INTENT(OUT) :: q(n_vars)
+        LOGICAL, INTENT(OUT) :: accepted
+        REAL(wp) :: rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c
+        REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
+        REAL(wp) :: xs(n_solid),xg(n_add_gas),mass
+
+        q=0.0_wp
+        accepted=.FALSE.
+        IF (qp(idx_h)<=EPSILON(1.0_wp)) THEN
+            accepted=.TRUE.
+            RETURN
+        END IF
+        xs=qp(idx_solid_first:idx_solid_last)
+        xg=qp(idx_add_gas_first:idx_add_gas_last)
+        IF (.NOT.normalize_face_composition(xs,xg)) RETURN
+        INCLUDE 'conservative_from_primitive.inc'
+        accepted=.TRUE.
+    END SUBROUTINE face_primitive_to_conservative
 
     SUBROUTINE primitive_to_conservative_complex(qp, q, accepted)
         COMPLEX(wp), INTENT(IN) :: qp(n_vars)
@@ -172,16 +187,7 @@ CONTAINS
             RETURN
         END IF
         IF (.NOT.close_composition(xs,xg)) RETURN
-        CALL evaluate_mixture(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)
-        mass=rho_m*qp(idx_h)
-        q(idx_totMassEqn)=mass
-        q(idx_uEqn)=mass*qp(idx_u)
-        q(idx_vEqn)=mass*qp(idx_v)
-        q(idx_engyEqn)=mass*cp_m*qp(idx_T)
-        q(idx_solid_first:idx_solid_last)=mass*xs
-        q(idx_add_gas_first:idx_add_gas_last)=mass*xg
-        IF (stoch_transport_flag) q(idx_stoch)=mass*qp(idx_stoch)
-        IF (pore_pressure_flag) q(idx_pore)=mass*qp(idx_pore)
+        INCLUDE 'conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_complex
 

@@ -7,6 +7,7 @@ PROGRAM test_state_equivalence
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
     USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
+        face_primitive_to_conservative, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
         state_workspace_real, state_workspace_complex, &
         initialize_state_workspace_real, initialize_state_workspace_complex
@@ -81,8 +82,14 @@ CONTAINS
         REAL(wp) :: old_ri,old_rho,old_rho_c,old_grav,old_cp_c,old_cp_m
         REAL(wp) :: new_grav,gamma,minimum_speed,maximum_speed
         REAL(wp) :: expected_min,expected_max,celerity,normal_speed
+        REAL(wp) :: reference_q(n_vars),new_q(n_vars)
+        LOGICAL :: face_ok
         INTEGER :: direction,velocity_index
 
+        CALL old_qp_to_qc(face,reference_q)
+        CALL face_primitive_to_conservative(face,new_q,face_ok)
+        IF (.NOT.face_ok) ERROR STOP 'valid reconstructed face conversion rejected'
+        CALL assert_vector(label//' face conservative',new_q,reference_q,1.0E-10_wp)
         CALL old_mixture(face,old_ri,old_rho,old_rho_c,old_grav,old_cp_c,old_cp_m)
         CALL eval_hydrostatic_coefficient(face,new_grav,gamma)
         CALL assert_scalar(label//' face gravity',new_grav,old_grav,1.0E-10_wp)
