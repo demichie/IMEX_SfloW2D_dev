@@ -10,7 +10,6 @@ MODULE mass_exchange_deposition_2d
 
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : mixt_var_state
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
     IMPLICIT NONE
@@ -39,12 +38,11 @@ CONTAINS
             REAL(wp), INTENT(IN) :: dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
             REAL(wp) :: alpha
-            REAL(wp) :: rho_m,rho_c,cp_c,Ri,redgrav,cpm,gas_phase_mass_fraction
+            REAL(wp) :: gas_phase_mass_fraction
 
             CALL reset_mass_exchange_rates(r)
             alpha=SUM(state%alphas)
             IF (alpha<=alphastot_min) RETURN
-            CALL mixt_var_state(state,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
             gas_phase_mass_fraction=0.0_wp
 
             IF (gas_flag) THEN
@@ -54,13 +52,13 @@ CONTAINS
             END IF
 
             ! Evaluate settling before producing the conservative species, energy and bed terms.
-            CALL eval_deposition_volume_kernel(state%h, state%T, state%alphas, alpha, rho_m, rho_c, dt,                &
+            CALL eval_deposition_volume_kernel(state%h, state%T, state%alphas, alpha, state%rho_m, state%rho_c, dt,                &
                 r%solid_deposition_rate)
             r%carrier_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
             r%solid_mass_rate=-rho_s*r%solid_deposition_rate
-            r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%carrier_deposition_rate
+            r%mixture_mass_rate=SUM(r%solid_mass_rate)-state%rho_c*r%carrier_deposition_rate
             r%energy_rate=state%T*(SUM(sp_heat_s*r%solid_mass_rate)-                                                   &
-                        rho_c*cp_c*r%carrier_deposition_rate)
+                        state%rho_c*state%cp_c*r%carrier_deposition_rate)
             IF (gas_flag .AND. n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                                       &
                         r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                                         &
                         state%xg/gas_phase_mass_fraction

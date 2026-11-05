@@ -33,6 +33,15 @@
        inv_rhom = 1.0_wp / rho_m
        rho_c = rho_a_amb
        inv_rho_c = 1.0_wp / rho_c
+       IF (PRESENT(rho_c_out)) rho_c_out=rho_c
+       IF (PRESENT(inv_rho_c_out)) inv_rho_c_out=inv_rho_c
+       IF (liquid_flag) THEN
+          IF (PRESENT(cp_c_out)) cp_c_out=sp_heat_l
+          IF (PRESENT(cp_m_out)) cp_m_out=sp_heat_l
+       ELSE
+          IF (PRESENT(cp_c_out)) cp_c_out=sp_heat_a
+          IF (PRESENT(cp_m_out)) cp_m_out=sp_heat_a
+       END IF
 
        RETURN
 
@@ -57,6 +66,8 @@
          xs, xg,                                                           &
          ! OUT
          xc, mixture_sp_heat_c, sp_heat_mix)
+    IF (PRESENT(cp_c_out)) cp_c_out=mixture_sp_heat_c
+    IF (PRESENT(cp_m_out)) cp_m_out=sp_heat_mix
 
     ! qj(idx_engyEqn)=M*cp*T contains thermal energy only, with no kinetic-energy term.
     ! The near-dry temperature fallback avoids amplification by negligible mass.
@@ -77,6 +88,8 @@
          T, xs, xg,                                                        &
          ! OUT
          rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag)
+    IF (PRESENT(rho_c_out)) rho_c_out=rho_c
+    IF (PRESENT(inv_rho_c_out)) inv_rho_c_out=inv_rho_c
 
     h = qj(idx_totMassEqn) * inv_rhom
 

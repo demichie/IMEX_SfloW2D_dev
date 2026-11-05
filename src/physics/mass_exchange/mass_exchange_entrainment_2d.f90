@@ -6,7 +6,6 @@ MODULE mass_exchange_entrainment_2d
             reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : mixt_var_state
     USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, T_ambient, sp_heat_a
     IMPLICIT NONE
     PRIVATE
@@ -27,14 +26,10 @@ CONTAINS
 
             TYPE(physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-            REAL(wp) :: speed_squared,Ri,rhom,rhoc,redgrav,cpc,cpm
-
             CALL reset_mass_exchange_rates(r)
-            speed_squared=state%mod_vel2
-            CALL mixt_var_state(state,Ri,rhom,rhoc,redgrav,cpc,cpm)
 
             ! Convert entrained ambient-air volume to mixture mass at ambient density.
-            r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(state%h,Ri,speed_squared)
+            r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(state%h,state%Ri,state%mod_vel2)
             r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
     END SUBROUTINE eval_mass_exchange_entrainment_explicit
 

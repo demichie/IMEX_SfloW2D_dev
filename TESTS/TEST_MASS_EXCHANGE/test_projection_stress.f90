@@ -38,6 +38,7 @@ PROGRAM test_projection_stress
   CALL initialize_physics
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
+  CALL check_complete_physical_state
   DO dimension=1,2
      DO level=0,2
         nx=16*2**level; ny=1
@@ -205,6 +206,52 @@ CONTAINS
     END DO
     collective_settling_flag=.FALSE.
   END SUBROUTINE check_settling_newton_roots
+
+  !> \brief Verify that cached real and complex physical properties are complete.
+  SUBROUTINE check_complete_physical_state
+    USE state_conversion_2d, ONLY : physical_state_type,complex_physical_state_type, &
+        physical_state_from_qp,complex_state_from_real,real_part_physical_state, &
+        mixt_var_state
+    TYPE(physical_state_type) :: wet,dry,roundtrip
+    TYPE(complex_physical_state_type) :: complex_state
+    REAL(wp) :: primitive(n_vars),ri,rho_m,rho_c,red_grav,cp_c,cp_m
+    REAL(wp) :: expected_cp
+
+    primitive=0.0_wp
+    primitive(idx_h)=2.0_wp
+    primitive(idx_u)=3.0_wp
+    primitive(idx_v)=4.0_wp
+    primitive(idx_T)=320.0_wp
+    primitive(idx_solid_first)=0.15_wp
+    primitive(idx_solid_first+1)=0.05_wp
+    CALL physical_state_from_qp(primitive,wet)
+    CALL mixt_var_state(wet,ri,rho_m,rho_c,red_grav,cp_c,cp_m)
+    IF (ABS(wet%rho_c-rho_c)>tolerance*MAX(1.0_wp,ABS(rho_c))) &
+        ERROR STOP 'physical carrier density mismatch'
+    IF (ABS(wet%inv_rho_c-1.0_wp/rho_c)>tolerance) &
+        ERROR STOP 'physical inverse carrier density mismatch'
+    IF (ABS(wet%cp_c-cp_c)>tolerance*cp_c .OR. &
+        ABS(wet%cp_m-cp_m)>tolerance*cp_m) &
+        ERROR STOP 'physical heat capacity mismatch'
+    IF (ABS(wet%Ri-ri)>tolerance*MAX(1.0_wp,ABS(ri))) &
+        ERROR STOP 'physical Richardson mismatch'
+    IF (ABS(wet%rho_m-rho_m)>tolerance*rho_m) &
+        ERROR STOP 'physical mixture density mismatch'
+
+    CALL complex_state_from_real(wet,complex_state)
+    CALL real_part_physical_state(complex_state,roundtrip)
+    IF (roundtrip%rho_c/=wet%rho_c .OR. roundtrip%inv_rho_c/=wet%inv_rho_c .OR. &
+        roundtrip%cp_c/=wet%cp_c .OR. roundtrip%cp_m/=wet%cp_m .OR. roundtrip%Ri/=wet%Ri) &
+        ERROR STOP 'physical real-complex roundtrip mismatch'
+
+    primitive=0.0_wp
+    CALL physical_state_from_qp(primitive,dry)
+    expected_cp=sp_heat_l
+    IF (.NOT.liquid_flag) expected_cp=sp_heat_a
+    IF (dry%rho_c/=rho_a_amb .OR. dry%inv_rho_c/=1.0_wp/rho_a_amb .OR. &
+        dry%cp_c/=expected_cp .OR. dry%cp_m/=expected_cp .OR. dry%Ri/=0.0_wp) &
+        ERROR STOP 'physical dry state properties mismatch'
+  END SUBROUTINE check_complete_physical_state
 
   !> \brief Allocate the rectangular production grid and independent oracle buffers.
   SUBROUTINE allocate_grid

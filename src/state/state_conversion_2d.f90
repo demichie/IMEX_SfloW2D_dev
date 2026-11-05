@@ -36,6 +36,7 @@ MODULE state_conversion_2d
     TYPE, PUBLIC :: physical_state_type
         REAL(wp) :: h=0.0_wp, u=0.0_wp, v=0.0_wp, T=0.0_wp
         REAL(wp) :: rho_m=0.0_wp, inv_rhom=0.0_wp, red_grav=0.0_wp
+        REAL(wp) :: rho_c=0.0_wp, inv_rho_c=0.0_wp, cp_c=0.0_wp, cp_m=0.0_wp, Ri=0.0_wp
         REAL(wp) :: Zs=0.0_wp, exc_pore_pres=0.0_wp
         REAL(wp) :: w=0.0_wp, mod_vel_hor=0.0_wp, mod_vel2=0.0_wp
         REAL(wp) :: mod_vel=0.0_wp, curvature_acceleration=0.0_wp
@@ -47,6 +48,8 @@ MODULE state_conversion_2d
         COMPLEX(wp) :: h=(0.0_wp,0.0_wp), u=(0.0_wp,0.0_wp), v=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: T=(0.0_wp,0.0_wp), rho_m=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: inv_rhom=(0.0_wp,0.0_wp), red_grav=(0.0_wp,0.0_wp)
+        COMPLEX(wp) :: rho_c=(0.0_wp,0.0_wp), inv_rho_c=(0.0_wp,0.0_wp)
+        COMPLEX(wp) :: cp_c=(0.0_wp,0.0_wp), cp_m=(0.0_wp,0.0_wp), Ri=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: Zs=(0.0_wp,0.0_wp), exc_pore_pres=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: w=(0.0_wp,0.0_wp), mod_vel_hor=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: mod_vel2=(0.0_wp,0.0_wp), mod_vel=(0.0_wp,0.0_wp)
@@ -304,6 +307,40 @@ CONTAINS
                     2.0_wp*state%u*state%v*bxy+state%v**2*byy
     END SUBROUTINE update_complex_state_kinematics
 
+    !> Evaluate Richardson from the already constructed physical properties.
+    !> The real part controls branches in the complex-step formulation.
+    !> The cap is applied before division to avoid overflowing near rest.
+    REAL(wp) FUNCTION state_richardson_real(h,u,v,red_grav) RESULT(ri)
+        REAL(wp), INTENT(IN) :: h,u,v,red_grav
+        REAL(wp) :: speed_squared,buoyancy_depth
+        ri=0.0_wp
+        speed_squared=u**2+v**2
+        buoyancy_depth=red_grav*h
+        IF (speed_squared>0.0_wp) THEN
+            IF (buoyancy_depth/1.0E15_wp>speed_squared) THEN
+                ri=1.0E15_wp
+            ELSE
+                ri=MIN(1.0E15_wp,buoyancy_depth/speed_squared)
+            END IF
+        END IF
+    END FUNCTION state_richardson_real
+
+    COMPLEX(wp) FUNCTION state_richardson_complex(h,u,v,red_grav) RESULT(ri)
+        COMPLEX(wp), INTENT(IN) :: h,u,v,red_grav
+        COMPLEX(wp) :: speed_squared,buoyancy_depth
+        ri=CMPLX(0.0_wp,0.0_wp,wp)
+        speed_squared=u**2+v**2
+        buoyancy_depth=red_grav*h
+        IF (REAL(speed_squared,wp)>0.0_wp) THEN
+            IF (REAL(buoyancy_depth/1.0E15_wp,wp)>REAL(speed_squared,wp)) THEN
+                ri=CMPLX(1.0E15_wp,0.0_wp,wp)
+            ELSE
+                ri=buoyancy_depth/speed_squared
+                IF (REAL(ri,wp)>1.0E15_wp) ri=CMPLX(1.0E15_wp,0.0_wp,wp)
+            END IF
+        END IF
+    END FUNCTION state_richardson_complex
+
 
     !> Build the shared REAL source state directly from the available primitive vector.
     !> No conservative-to-primitive conversion is performed on this path.
@@ -312,7 +349,7 @@ CONTAINS
         TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         REAL(wp) :: geometry(5)
-        REAL(wp) :: rho_c, inv_rho_c
+        REAL(wp) :: xc
         REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
         ! Retain already allocated arrays when a source workspace is reused.
@@ -349,6 +386,16 @@ CONTAINS
             state%rho_m = rho_a_amb
             state%inv_rhom = 1.0_wp / state%rho_m
             state%red_grav = 0.0_wp
+            state%rho_c = rho_a_amb
+            state%inv_rho_c = 1.0_wp / state%rho_c
+            IF (liquid_flag) THEN
+                state%cp_c=sp_heat_l
+                state%cp_m=sp_heat_l
+            ELSE
+                state%cp_c=sp_heat_a
+                state%cp_m=sp_heat_a
+            END IF
+            state%Ri=0.0_wp
             geometry=0.0_wp
             IF (PRESENT(bx)) geometry(1)=bx
             IF (PRESENT(by)) geometry(2)=by
@@ -366,9 +413,11 @@ CONTAINS
         state%xs = xs
         state%xg = xg
         CALL eval_mixture_properties_from_mass_fractions(state%T, xs, xg,                                              &
-            state%rho_m, state%inv_rhom, rho_c, inv_rho_c,                                                             &
+            state%rho_m, state%inv_rhom, state%rho_c, state%inv_rho_c,                                                 &
             state%alphas, state%alphag)
+        CALL eval_mixture_heat_capacity(xs,xg,xc,state%cp_c,state%cp_m)
         state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
+        state%Ri=state_richardson_real(state%h,state%u,state%v,state%red_grav)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx
         IF (PRESENT(by)) geometry(2)=by
@@ -487,7 +536,9 @@ CONTAINS
         IF (.NOT.ALLOCATED(state%xg)) ALLOCATE(state%xg(n_add_gas))
         CALL r_phys_var(q, state%h, state%u, state%v, state%alphas,                                                    &
             state%rho_m, state%T, state%alphag, state%red_grav,                                                        &
-            p_dyn, state%Zs, state%exc_pore_pres)
+            p_dyn, state%Zs, state%exc_pore_pres,                                                                      &
+            state%rho_c,state%inv_rho_c,state%cp_c,state%cp_m)
+        state%Ri=state_richardson_real(state%h,state%u,state%v,state%red_grav)
         state%inv_rhom = 1.0_wp / state%rho_m
         state%xs = 0.0_wp
         state%xg = 0.0_wp
@@ -534,7 +585,8 @@ CONTAINS
     !>                           variable.
     !******************************************************************************
 
-    SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag, red_grav, p_dyn, Zs, exc_pore_pres)
+    SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag, red_grav, p_dyn, Zs, exc_pore_pres,                  &
+        rho_c_out,inv_rho_c_out,cp_c_out,cp_m_out)
 
     IMPLICIT NONE
 
@@ -542,6 +594,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: h, u, v, T, rho_m
         REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
         REAL(wp), INTENT(OUT) :: red_grav, p_dyn, Zs, exc_pore_pres
+        REAL(wp), INTENT(OUT), OPTIONAL :: rho_c_out,inv_rho_c_out,cp_c_out,cp_m_out
 
         REAL(wp) :: inv_rhom, rho_c, inv_rho_c
         REAL(wp) :: xs(n_solid), xg(n_add_gas)
@@ -588,8 +641,9 @@ CONTAINS
         IF (.NOT.ALLOCATED(state%xg)) ALLOCATE(state%xg(n_add_gas))
         CALL c_phys_var(q, state%h, state%u, state%v, state%T, state%rho_m,                                            &
             state%alphas, state%alphag, state%inv_rhom, state%Zs,                                                      &
-            state%exc_pore_pres)
+            state%exc_pore_pres,state%rho_c,state%inv_rho_c,state%cp_c,state%cp_m)
         state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
+        state%Ri=state_richardson_complex(state%h,state%u,state%v,state%red_grav)
         state%xs = CMPLX(0.0_wp,0.0_wp,wp)
         state%xg = CMPLX(0.0_wp,0.0_wp,wp)
 
@@ -634,7 +688,8 @@ CONTAINS
     !>                           variable.
     !******************************************************************************
 
-    SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs, exc_pore_pres)
+    SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs, exc_pore_pres,                           &
+        rho_c_out,inv_rho_c_out,cp_c_out,cp_m_out)
 
     IMPLICIT NONE
 
@@ -642,6 +697,7 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
         COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
         COMPLEX(wp), INTENT(OUT) :: inv_rhom, Zs, exc_pore_pres
+        COMPLEX(wp), INTENT(OUT), OPTIONAL :: rho_c_out,inv_rho_c_out,cp_c_out,cp_m_out
 
         COMPLEX(wp) :: rho_c, inv_rho_c
         COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
@@ -667,6 +723,11 @@ CONTAINS
         complex_state%T = CMPLX(real_state%T,0.0_wp,wp)
         complex_state%rho_m = CMPLX(real_state%rho_m,0.0_wp,wp)
         complex_state%inv_rhom = CMPLX(real_state%inv_rhom,0.0_wp,wp)
+        complex_state%rho_c = CMPLX(real_state%rho_c,0.0_wp,wp)
+        complex_state%inv_rho_c = CMPLX(real_state%inv_rho_c,0.0_wp,wp)
+        complex_state%cp_c = CMPLX(real_state%cp_c,0.0_wp,wp)
+        complex_state%cp_m = CMPLX(real_state%cp_m,0.0_wp,wp)
+        complex_state%Ri = CMPLX(real_state%Ri,0.0_wp,wp)
         complex_state%red_grav = CMPLX(real_state%red_grav,0.0_wp,wp)
         complex_state%Zs = CMPLX(real_state%Zs,0.0_wp,wp)
         complex_state%exc_pore_pres = CMPLX(real_state%exc_pore_pres,0.0_wp,wp)
@@ -694,6 +755,11 @@ CONTAINS
         state%T = REAL(complex_state%T,wp)
         state%rho_m = REAL(complex_state%rho_m,wp)
         state%inv_rhom = REAL(complex_state%inv_rhom,wp)
+        state%rho_c = REAL(complex_state%rho_c,wp)
+        state%inv_rho_c = REAL(complex_state%inv_rho_c,wp)
+        state%cp_c = REAL(complex_state%cp_c,wp)
+        state%cp_m = REAL(complex_state%cp_m,wp)
+        state%Ri = REAL(complex_state%Ri,wp)
         state%red_grav = REAL(complex_state%red_grav,wp)
         state%Zs = REAL(complex_state%Zs,wp)
         state%exc_pore_pres = REAL(complex_state%exc_pore_pres,wp)
