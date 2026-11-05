@@ -8,6 +8,8 @@
 
 Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, con topografia, reologie configurabili, scambi conservativi, temperatura e pressione interstiziale. Gli obiettivi sono: robustezza e conservazione, HP-PCCU e well-balancing, modularità fisica, parallelismo, riproducibilità, I/O affidabile, estensioni layer-aware, HPC e chiusure subgrid/verticali anche ML.
 
+**Aggiornamento F6/F7 (5 novembre 2026):** rimosso il prerequisito Make legacy residuo in `hyperbolic_2d` e aggiunto un gate statico per impedire nuovi `USE state_conversion_2d` nei sorgenti di produzione. Il vecchio modulo rimane solo come baseline di confronto e nel target finche i test non saranno resi indipendenti dalla lista di `Makefile.am`. La validazione CI e scientifica del secondo blocco resta da eseguire manualmente; non sono state cambiate leggi fisiche o condizioni di accettazione.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

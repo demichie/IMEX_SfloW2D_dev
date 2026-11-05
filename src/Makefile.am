@@ -513,7 +513,6 @@ physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJ
 physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
-spatial/hyperbolic_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT)
 state/state_conversion_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 

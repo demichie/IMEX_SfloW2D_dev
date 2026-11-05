@@ -62,6 +62,9 @@
 
 **Attivita differita - DOPO F5 (non bloccante per F5).** Riorganizzare il controllo di ammissibilita e il rollback di Lie come una sola transazione globale a fine time-step sull'intero dominio: nessun rollback di cella/gruppo, nessuna validazione anticipata dopo lo spazio o tra gruppi. Intervenire in `time_integration_2d.f90` e `lie_source_executor_2d.f90` dopo aver completato e validato la migrazione F5; aggiornare allora i test di rollback e OpenMP. **Non modificare ora questa logica come parte di F5.**
 
+
+**F6/F7 — secondo blocco, confine backend storico (5 novembre 2026; VERIFICA CI MANUALE PENDENTE):** confermato che i sorgenti Fortran di produzione non importano piu direttamente `state_conversion_2d` (il modulo resta presente per i test differenziali vecchio/nuovo). Rimossa dal grafo Make la dipendenza obsoleta `spatial/hyperbolic_2d -> state_conversion_2d`, rimasta dopo la migrazione di `hyperbolic_2d` a `state_new_conversions`. Introdotto `TEST_STATE_NEW/check_legacy_boundary.py`, eseguito dalla workflow manuale `State architecture validation`, che blocca la reintroduzione di import legacy nella produzione e del prerequisito rimosso. **Non si elimina ancora `state_conversion_2d` dal target principale**: i test di caratterizzazione estraggono la lista sorgenti da `src/Makefile.am` e richiedono un percorso di build autonomo prima della sua rimozione. Ownership finale di `state_2d`, eliminazione del backend legacy dalla produzione, validazione dell'equivalenza scientifica e controllo del rollback restano aperti. Nessuna formula o semantica fisica modificata; nessuna Action avviata automaticamente.
+
 ## 0. Sintesi delle decisioni vincolanti
 
 - [ ] Unico stato fisico **generale, completo e coerente**, con versioni REAL e COMPLEX identiche per contenuto fisico; nessuno stato specializzato per reologia o modello ML.
