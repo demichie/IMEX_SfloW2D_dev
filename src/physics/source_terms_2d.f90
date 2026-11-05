@@ -152,6 +152,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: limiter
         LOGICAL, INTENT(OUT) :: valid
         REAL(wp) :: available_carrier,carrier_consumption
+        REAL(wp) :: subnormal_reserve,withdrawal
         REAL(wp) :: candidate(n_eqns)
         INTEGER :: solid_eq,i,gas_eq
         limiter=1.0_wp
@@ -213,6 +214,23 @@ CONTAINS
         ! This is a numerical safety margin on source rates, not clipping q.
         IF (limiter<1.0_wp .AND. limiter>0.0_wp) &
             limiter=limiter*(1.0_wp-4096.0_wp*EPSILON(1.0_wp))
+        ! For subnormal inventories, the relative margin above can round
+        ! entirely away: 4096*epsilon times ~1E-313 is below the smallest
+        ! representable positive real. Reserve a few representable quanta
+        ! of a depleted species before computing its withdrawal bound.
+        ! This adjusts only the already-existing explicit source limiter,
+        ! never the candidate state or the strict admissibility predicate.
+        DO i=1,n_eqns
+            IF (i/=idx_totMassEqn .AND.                                                              &
+                (i<idx_solidEqn_first .OR. i>idx_solidEqn_last) .AND.                                &
+                (i<idx_addGasEqn_first .OR. i>idx_addGasEqn_last)) CYCLE
+            IF (q_reference(i)<=0.0_wp .OR. q_reference(i)>=TINY(1.0_wp)) CYCLE
+            IF (rate(i)>=0.0_wp) CYCLE
+            withdrawal=-dt*rate(i)
+            IF (withdrawal<=0.0_wp) CYCLE
+            subnormal_reserve=MIN(q_reference(i),32.0_wp*SPACING(q_reference(i)))
+            limiter=MIN(limiter,MAX(0.0_wp,(q_reference(i)-subnormal_reserve)/withdrawal))
+        END DO
         ! Verify the exact floating-point update applied by the Lie executor:
         ! q_candidate=q_reference+dt*(limiter*rate). The analytical ratio can
         ! round up to 1, or leave a negative component at machine precision.
