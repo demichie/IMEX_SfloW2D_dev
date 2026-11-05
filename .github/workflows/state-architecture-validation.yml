@@ -103,3 +103,35 @@ jobs:
           name: state-equivalence-${{ github.run_id }}
           path: state-equivalence.log
           if-no-files-found: warn
+
+  strict-debug-driver:
+    name: Full driver strict-debug build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install full build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            autoconf automake gfortran make \
+            liblapack-dev libnetcdff-dev libnetcdf-dev
+
+      - name: Build complete executable with checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          FC=gfortran ./configure --with-netcdf=/usr --enable-strict-debug
+          make -j2 2>&1 | tee full-strict-debug-build.log
+          test -x src/IMEX_SfloW2D
+
+      - name: Upload full build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-strict-debug-${{ github.run_id }}
+          path: full-strict-debug-build.log
+          if-no-files-found: warn
