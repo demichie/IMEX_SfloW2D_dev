@@ -7,6 +7,7 @@ MODULE state_new_conversions
     USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE parameters_2d, ONLY : idx_h, idx_T, idx_solid_first, idx_solid_last
     USE parameters_2d, ONLY : idx_add_gas_first, idx_add_gas_last, idx_u, idx_v
+    USE parameters_2d, ONLY : idx_stoch, idx_pore
     USE parameters_2d, ONLY : eps_sing, eps_sing4
     USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag
     USE state_new_mixture, ONLY : evaluate_mixture
@@ -64,8 +65,8 @@ CONTAINS
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=xs
         qp(idx_add_gas_first:idx_add_gas_last)=xg
-        IF (stoch_transport_flag) qp(idx_u-2)=q(idx_u-2)/mass
-        IF (pore_pressure_flag) qp(idx_u-1)=q(idx_u-1)/mass
+        IF (stoch_transport_flag) qp(idx_stoch)=q(idx_stoch)/mass
+        IF (pore_pressure_flag) qp(idx_pore)=q(idx_pore)/mass
         qp(idx_u)=u
         qp(idx_v)=v
         IF (PRESENT(p_dyn)) p_dyn=0.5_wp*rho_m*qp(idx_h)*(u*u+v*v)
@@ -105,8 +106,8 @@ CONTAINS
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=xs
         qp(idx_add_gas_first:idx_add_gas_last)=xg
-        IF (stoch_transport_flag) qp(idx_u-2)=q(idx_u-2)/mass
-        IF (pore_pressure_flag) qp(idx_u-1)=q(idx_u-1)/mass
+        IF (stoch_transport_flag) qp(idx_stoch)=q(idx_stoch)/mass
+        IF (pore_pressure_flag) qp(idx_pore)=q(idx_pore)/mass
         qp(idx_u)=u
         qp(idx_v)=v
         IF (PRESENT(p_dyn)) p_dyn=0.5_wp*rho_m*qp(idx_h)*(u*u+v*v)
@@ -132,8 +133,8 @@ CONTAINS
         q(idx_engyEqn)=mass*cp_m*qp(idx_T)
         q(idx_solid_first:idx_solid_last)=mass*xs
         q(idx_add_gas_first:idx_add_gas_last)=mass*xg
-        IF (stoch_transport_flag) q(idx_u-2)=mass*qp(idx_u-2)
-        IF (pore_pressure_flag) q(idx_u-1)=mass*qp(idx_u-1)
+        IF (stoch_transport_flag) q(idx_stoch)=mass*qp(idx_stoch)
+        IF (pore_pressure_flag) q(idx_pore)=mass*qp(idx_pore)
     END SUBROUTINE primitive_to_conservative_real
 
     SUBROUTINE primitive_to_conservative_complex(qp, q)
@@ -154,8 +155,8 @@ CONTAINS
         q(idx_engyEqn)=mass*cp_m*qp(idx_T)
         q(idx_solid_first:idx_solid_last)=mass*xs
         q(idx_add_gas_first:idx_add_gas_last)=mass*xg
-        IF (stoch_transport_flag) q(idx_u-2)=mass*qp(idx_u-2)
-        IF (pore_pressure_flag) q(idx_u-1)=mass*qp(idx_u-1)
+        IF (stoch_transport_flag) q(idx_stoch)=mass*qp(idx_stoch)
+        IF (pore_pressure_flag) q(idx_pore)=mass*qp(idx_pore)
     END SUBROUTINE primitive_to_conservative_complex
 
 END MODULE state_new_conversions

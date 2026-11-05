@@ -59,7 +59,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars)
         TYPE(physical_state_real), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
-        REAL(wp) :: cp_m, cp_c, xc, geometry(5)
+        REAL(wp) :: geometry(5)
 
         CALL require_real_storage(state)
         state%h=qp(idx_h); state%u=qp(idx_u); state%v=qp(idx_v); state%T=qp(idx_T)
