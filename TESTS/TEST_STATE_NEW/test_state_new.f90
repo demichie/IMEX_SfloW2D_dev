@@ -36,6 +36,23 @@ PROGRAM test_state_new
     CALL assert_close('REAL/COMPLEX Richardson',real_workspace%state%Ri,REAL(complex_workspace%state%Ri,wp),1.0E-11_wp)
     CALL assert_close('REAL/COMPLEX kinematics',real_workspace%state%mod_vel,REAL(complex_workspace%state%mod_vel,wp),1.0E-11_wp)
 
+    ! A velocity change must refresh both kinematics and Richardson without
+    ! recomputing mixture properties, for both REAL and COMPLEX workspaces.
+    real_workspace%state%u=3.0_wp
+    real_workspace%state%v=4.0_wp
+    complex_workspace%state%u=CMPLX(3.0_wp,0.0_wp,wp)
+    complex_workspace%state%v=CMPLX(4.0_wp,0.0_wp,wp)
+    CALL update_physical_state_kinematics(real_workspace%state,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL update_physical_state_kinematics(complex_workspace%state,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL assert_close('velocity update Richardson',real_workspace%state%Ri, &
+        real_workspace%state%red_grav*real_workspace%state%h/25.0_wp,1.0E-11_wp)
+    CALL assert_close('velocity update REAL/COMPLEX Richardson',real_workspace%state%Ri, &
+        REAL(complex_workspace%state%Ri,wp),1.0E-11_wp)
+    CALL assert_close('velocity update REAL/COMPLEX speed',real_workspace%state%mod_vel, &
+        REAL(complex_workspace%state%mod_vel,wp),1.0E-11_wp)
+    CALL update_physical_state_kinematics(real_workspace%state,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
+    IF (real_workspace%state%layout_valid .EQV. .FALSE.) ERROR STOP 'workspace layout lost on velocity update'
+
     liquid_flag=.TRUE.; gas_flag=.FALSE.
     CALL build_physical_state_from_qp(qp,real_workspace%state,accepted=accepted)
     IF (.NOT.accepted) ERROR STOP 'valid liquid/solid state rejected'

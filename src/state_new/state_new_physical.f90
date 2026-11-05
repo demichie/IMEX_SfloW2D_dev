@@ -58,7 +58,6 @@ CONTAINS
         CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
             state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
         state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
-        state%Ri=richardson_real(state%h,state%u,state%v,state%red_grav)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -78,7 +77,6 @@ CONTAINS
         CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
             state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
         state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
-        state%Ri=richardson_complex(state%h,state%u,state%v,state%red_grav)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -124,12 +122,11 @@ CONTAINS
             ELSE
                 state%cp_c=sp_heat_a; state%cp_m=sp_heat_a
             END IF
-            state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp; state%Ri=0.0_wp
+            state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
-            state%Ri=richardson_real(state%h,state%u,state%v,state%red_grav)
         END IF
 
         geometry=0.0_wp
@@ -165,7 +162,7 @@ CONTAINS
                 state%cp_m=sp_heat_a; state%cp_c=sp_heat_a
             END IF
             state%xs=0.0_wp; state%xg=0.0_wp; state%alphas=0.0_wp; state%alphag=0.0_wp
-            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp; state%red_grav=0.0_wp; state%Ri=0.0_wp
+            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp; state%red_grav=0.0_wp
             geometry=0.0_wp
             IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
             IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -191,7 +188,6 @@ CONTAINS
         IF (stoch_transport_flag) state%Zs=q(idx_stoch)/mass
         IF (pore_pressure_flag) state%exc_pore_pres=q(idx_pore)/mass
         state%red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
-        state%Ri=richardson_real(state%h,state%u,state%v,state%red_grav)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -233,7 +229,6 @@ CONTAINS
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
         END IF
-        state%Ri=richardson_complex(state%h,state%u,state%v,state%red_grav)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -287,7 +282,6 @@ CONTAINS
             state%T=T_ambient
             state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp
         END IF
-        state%Ri=richardson_complex(state%h,state%u,state%v,state%red_grav)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -299,12 +293,14 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
         INCLUDE 'kinematics.inc'
+        state%Ri=richardson_real(state%h,state%u,state%v,state%red_grav)
     END SUBROUTINE update_kinematics_real
 
     SUBROUTINE update_kinematics_complex(state,bx,by,bxx,bxy,byy)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
         INCLUDE 'kinematics.inc'
+        state%Ri=richardson_complex(state%h,state%u,state%v,state%red_grav)
     END SUBROUTINE update_kinematics_complex
 
     REAL(wp) FUNCTION richardson_real(h,u,v,red_grav)

@@ -4,7 +4,7 @@
 
 > **Ambito:** progettazione clean-slate della gestione e implementazione degli stati e del loro utilizzo in numerica e fisica. Non è una riprogettazione dell’intero codice: leggi fisiche, discretizzazioni, integratori e consumatori vengono modificati solo nella misura necessaria per usare i nuovi contratti di stato. La destinazione deve essere ricavata dai flussi di dati, dai costi computazionali e dagli invarianti numerici, non dalla suddivisione attuale dei file o dalla compatibilità con organizzazioni storiche. Il codice esistente è una fonte di formule, invarianti e casi da preservare, non il vincolo architetturale di partenza. Questo documento è una roadmap tecnica specialistica subordinata alla [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md): non introduce un piano generale concorrente. Aggiornare checklist, prove e rischi qui; riportare nella roadmap generale solo stato aggregato e priorità.
 
-> **Stato:** IMPLEMENTAZIONE DEL NUCLEO P0–P2 COMPLETATA; VALIDAZIONE P3 DA ESEGUIRE. Il nucleo parallelo contiene tipi REAL/COMPLEX, workspace, valutazioni minime e complete della miscela, conversioni conservative/primitive, costruttori da `q`/`qp`, aggiornamento cinematico e refresh coerente dopo mutazioni termodinamiche o composizionali. L’integrazione con i consumatori di produzione e la validazione scientifica restano fasi successive.
+> **Stato:** NUCLEO `state_new` IMPLEMENTATO; VALIDAZIONE P3 IN CORSO; MIGRAZIONE F5 AVVIATA. Il nucleo parallelo contiene tipi REAL/COMPLEX, workspace, valutazioni minime e complete della miscela, conversioni conservative/primitive, costruttori da `q`/`qp`, aggiornamento cinematico e refresh coerente dopo mutazioni termodinamiche o composizionali. L’integrazione con i consumatori di produzione e la validazione scientifica restano fasi successive.
 
 ## 0. Sintesi delle decisioni vincolanti
 
@@ -209,7 +209,7 @@ Non mantenere pass-through o alias di compatibilità per conservare l’organizz
 - [~] **F2 — Termodinamica condivisa.** Realizzare un solo punto di definizione delle formule e kernel mirati (minimo per la numerica; completo per i sorgenti); verificare casi solidi/gas/liquidi e chiusure. Implementati `evaluate_mixture` REAL/COMPLEX e gli include condivisi; la suite isolata verifica il caso gas/solido, mentre restano casi completi e audit delle chiusure.
 - [~] **F3 — Conversioni conservative/primitive.** Riscrivere `q → qp` e `qp → q` in passaggio singolo con controllo di ammissibilità e intermedi riutilizzati; testare near-dry e conservazione. Implementate le quattro procedure tipate; la suite isolata verifica il round-trip wet, mentre restano near-dry, stati inadmissibili e confronto esteso col backend attuale.
 - [~] **F4 — Stato fisico generale REAL/COMPLEX.** Implementare costruzione completa da `q` e `qp`, conversioni e aggiornamento coerente dopo mutazioni; preparare scratch configurati una volta. Implementati i tipi, l’inizializzazione dei workspace, i costruttori `build_physical_state_from_q` e `build_physical_state_from_qp` REAL/COMPLEX e `update_physical_state_kinematics`; la suite verifica parità di densità, Richardson, cinematica e dry state, mentre restano mutazioni e audit complesso completo.
-- [ ] **F5 — Migrazione dei sorgenti.** Aggiornare reologie, mass exchange, Darcy, termica, iniezioni e dispatcher Lie/Newton all'API definitiva, senza wrapper legacy.
+- [~] **F5 — Migrazione dei sorgenti.** Aggiornare reologie, mass exchange, Darcy, termica, iniezioni e dispatcher Lie/Newton all'API definitiva, senza wrapper legacy.
 - [ ] **F6 — Proprietà delle facce HP-PCCU.** Riutilizzare proprietà della traccia finale per flussi, velocità caratteristiche, pressione idrostatica e conversioni; mantenere semantica wet/dry e well-balanced.
 - [ ] **F7 — Eliminazione delle API precedenti.** Eliminare routine non usate, calcoli duplicati, import, helper e documentazione obsoleti; ispezione finale delle dipendenze senza cicli.
 - [ ] **F8 — Gate numerici e scientifici.** Strict-debug, suite di conversione, complex-step/Newton, Lie/rollback, well-balanced, test per modelli e confronti di output.
@@ -224,7 +224,7 @@ Non mantenere pass-through o alias di compatibilità per conservare l’organizz
 | F2 | IN CORSO | `src/state_new/state_new_mixture.f90`; `mixture_heat_capacity.inc`; `mixture_from_mass.inc`; `tests/TEST_STATE_NEW`; compilazione e caratterizzazione isolate superate | Casi liquido/gas/solido, chiusure limite e confronto con il backend esistente |
 | F3 | IN CORSO | `src/state_new/state_new_conversions.f90`; round-trip wet in `tests/TEST_STATE_NEW` superato | Near-dry, ammissibilità e audit delle operazioni ripetute |
 | F4 | IN CORSO | `src/state_new/state_new_types.f90`, `src/state_new/state_new_physical.f90`, `kinematics.inc`, `richardson.inc`; test REAL/COMPLEX e dry state superati | Mutazioni coerenti, copertura COMPLEX perturbata e integrazione |
-| F5 | DA FARE | — | Migrazione dei modelli fisici da completare |
+| F5 | IN CORSO | Audit dipendenze 5 novembre 2026; preparazione dei contratti `state_new` e test cinematica/Richardson | Migrare reologie, processi mass exchange, iniezioni, termica, Darcy, dispatcher sorgenti e Lie/Newton; validare |
 | F6 | DA FARE | — | Profilazione e percorso di faccia da consolidare |
 | F7 | DA FARE | — | Rimozione API e dipendenze precedenti |
 | F8 | DA FARE | — | Prove scientifiche e Actions sul commit finale |
@@ -232,6 +232,25 @@ Non mantenere pass-through o alias di compatibilità per conservare l’organizz
 
 
 **Regola di esecuzione:** l'ordine F0–F9 è una sequenza logica di responsabilità; F2/F3/F4 possono essere sviluppate in un unico change set consistente e validato alla sua conclusione. Non introdurre wrapper per mantenere compilabili i commit intermedi.
+
+### Registro di migrazione F5 — primo change set (5 novembre 2026)
+
+**Contratti consolidati in questo change set:**
+- [x] Il setup valida le dimensioni di **tutti e quattro** gli array `xs`, `xg`, `alphas`, `alphag`, sia REAL sia COMPLEX.
+- [x] `update_physical_state_kinematics` aggiorna anche Richardson quando cambiano `u,v`; i costruttori e `refresh_physical_state` non ne duplicano il calcolo.
+- [x] `TEST_STATE_NEW` include un test dell'aggiornamento di velocita e della parita REAL/COMPLEX del Richardson.
+
+**Inventario delle dipendenze ancora da migrare (audit statico su master `1ca1fe6`):**
+- [ ] Reologie: dispatcher `rheology_2d`, Voellmy, plastic, lava, lahar, empirical, quadratic, Froude, Lucas, mu(I), mu(I)-Voellmy, newmodel. Migrare i tipi, trasferimenti REAL/COMPLEX e la copia profonda `current_state=state` nel percorso analitico.
+- [ ] Mass exchange: `mass_exchange_2d`, deposition, erosion, entrainment, vaporization, liquid loss e lava deposition. Preservare budget, rate e processi locali.
+- [ ] Darcy, termica e iniezioni: sostituire gli stati legacy; le iniezioni richiedono proprietà **del materiale sorgente**, non dello stato ricevente, e devono usare kernel mirati al posto di `mixt_var`.
+- [ ] `source_terms_2d`: unificare la costruzione dello stato per valutazione e propagare `accepted` senza introdurre wrapper storici.
+- [ ] `lie_source_executor_2d` e `nonlinear_solver_2d`: inizializzare workspace `state_new` per worker, preservare Lie, rollback, integrita dei rate, Newton e complex-step.
+- [ ] F6/F7 separati: `hyperbolic_2d`, `reconstruction_2d`, `spatial_operator_2d`, `equation_terms_2d`, `time_integration_2d`, `init_2d`, `inpout_2d` ancora importano le vecchie API.
+
+**Vincolo F6:** gli operatori in `spatial/` devono restare indipendenti dalle formule costitutive. Proprietà di faccia solo dalla traccia finale; `pccu_2d` continua a ricevere coefficienti gia valutati, senza `USE` di moduli fisici.
+
+**Validazione:** l'ultima Action verde precedente e `State architecture validation` su `3df7017`; il test di equivalenza introdotto successivamente va rieseguito e ampliato. Il nuovo change set modifica solo `state_new`, test e roadmap; la migrazione dei consumatori di produzione resta aperta.
 
 ## 11. Matrice dei test e accettazione
 

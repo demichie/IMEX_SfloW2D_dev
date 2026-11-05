@@ -95,6 +95,8 @@ CONTAINS
         IF (ALLOCATED(state%alphag)) state%alphag=0.0_wp
     END SUBROUTINE reset_physical_state_complex
 
+    !> Allocate and validate all four composition arrays once at workspace setup.
+    !> A preallocated incompatible layout is rejected, never repaired in a hot loop.
     !> Allocate and clear the arrays owned by a reusable REAL state workspace.
     !> This routine belongs to setup/configuration, never to a cell-evaluation loop.
     SUBROUTINE initialize_state_workspace_real(workspace)
@@ -109,7 +111,9 @@ CONTAINS
             ALLOCATE(workspace%state%xs(n_solid), workspace%state%xg(n_add_gas), &
                 workspace%state%alphas(n_solid), workspace%state%alphag(n_add_gas))
         ELSE IF (SIZE(workspace%state%xs) /= n_solid .OR. &
-                 SIZE(workspace%state%xg) /= n_add_gas) THEN
+                 SIZE(workspace%state%xg) /= n_add_gas .OR. &
+                 SIZE(workspace%state%alphas) /= n_solid .OR. &
+                 SIZE(workspace%state%alphag) /= n_add_gas) THEN
             ERROR STOP 'state_new REAL workspace has incompatible composition layout'
         END IF
 
@@ -134,7 +138,9 @@ CONTAINS
             ALLOCATE(workspace%state%xs(n_solid), workspace%state%xg(n_add_gas), &
                 workspace%state%alphas(n_solid), workspace%state%alphag(n_add_gas))
         ELSE IF (SIZE(workspace%state%xs) /= n_solid .OR. &
-                 SIZE(workspace%state%xg) /= n_add_gas) THEN
+                 SIZE(workspace%state%xg) /= n_add_gas .OR. &
+                 SIZE(workspace%state%alphas) /= n_solid .OR. &
+                 SIZE(workspace%state%alphag) /= n_add_gas) THEN
             ERROR STOP 'state_new COMPLEX workspace has incompatible composition layout'
         END IF
 
