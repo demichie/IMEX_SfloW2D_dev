@@ -287,6 +287,22 @@ L'esecutore Lie invoca soltanto il criterio fisico, interpreta `accepted` (error
 
 **Residui C5:** build e regression tests sul nuovo HEAD; confronto `EXAMPLE_TAAL`, caso thermal-only con Jacobiano, scenario con sorgenti ed effetti wet/dry; contatori conversione per cella e valutazioni termodinamiche REAL/COMPLEX; profiling OpenMP e diagnostiche scientifiche. Non dichiarare completato C5 in assenza di misure.
 
+### D.13 A05 — confronto CFL/spatial ed estensione selettiva alle iniezioni conservative (5 novembre 2026)
+
+**Baseline verificata dall'utente:** build, `EXAMPLE_TAAL` ed `EXAMPLE_ETNA_LAVA` sul commit `565fdf8`. **Nuova modifica in attesa di build e regressioni.**
+
+**Audit di identita del dato lungo il call graph.**
+
+1. `IMEX_SfloW2D.f90` richiama `domain%check_solve` e `spatial_operator%prepare_hp_workset` **prima** di CFL. `compute_spatial_timestep` converte tutte le celle dell'halo di ricostruzione, ricostruisce le primitive e le eta HP, valuta le velocita e i gamma di faccia. Il passo `dt` puo essere ridotto per l'output o il passo precedente, ma questo **non modifica** la ricostruzione, dipendente dal tempo di inizio passo e dalle tracce, non da `dt`.
+2. `simulation%advance_timestep` chiama `set_source_time_coefficients` tra CFL e Lie: modifica solo i coefficienti di attivazione/velocita delle **sorgenti conservative**; le leggi circolare, radiale e fissurale vengono valutate nella successiva transazione Lie, **dopo** `spatial_operator%evaluate`. I coefficienti di finestra temporale non sono consumati dalla `reconstruction_2d`. Per la sorgente radiale, la geometria `source_cell` e i vettori di bordo sono gia configurati prima della CFL, e `reconstruct` usa le stesse tracce conservative (inclusa la condizione della sorgente radiale) in entrambe le valutazioni.
+3. `stochastic%prepare_timestep` puo mutare la componente `q(idx_stoch)` e `qp(idx_stoch)` **se** `stoch_transport_flag` e attivo; anche quando modifica solo i campi OU esterni, la compatibilita non e stata testata per ogni configurazione. Si mantiene quindi prudentemente l'esclusione `stochastic_flag`.
+4. `lateral_source_flag`: `compute_spatial_timestep` riceve un override esplicito `boundary_source_enabled` ottenuto dal registry dei gruppi espliciti, mentre la ricostruzione spatial fresca, senza override, usa il fallback `lateral_source_flag`. I due valori potrebbero differire in configurazioni particolari; il riuso viene **conservativamente disabilitato** in presenza di questa sorgente. Questo non implica che le tracce siano necessariamente diverse, ma evita un cambiamento non dimostrato delle condizioni al bordo.
+5. `cfl==-1`: `compute_spatial_timestep` ritorna prima di convertire, ricostruire e generare le velocita: nulla e riusabile. Resta il percorso completo.
+
+**Modifica A05 implementata:** in `src/IMEX_SfloW2D.f90`, il gate `pre_spatial_primitives_ready` richiede ora soltanto **CFL attivo, `stochastic_flag=.FALSE.`, `lateral_source_flag=.FALSE.`**. Non esclude piu `radial_source_flag`, `bottom_radial_source_flag` e `bottom_fissural_source_flag`: questi modelli non invalidano `q/qp`, tracce di faccia o gamma tra le due visite. Il percorso opt-in continua a riusare `state%qp`, `reconstruction_workspace`, velocita e coefficienti idrostatici di faccia, **senza nuovi array, flag di versione o cache globali**. Nessuna modifica ai kernel delle sorgenti, alla fisica, alla geometria, all'integratore o all'ordine Lie. La validazione numerica sugli input con sorgenti e ancora **pendente**.
+
+**Regressioni necessarie prima di chiudere A05:** build; esempio con iniezione radiale e fissurale/circolare, almeno una sorgente attiva in celle wet e dry; confronto conservativi, tracce, CFL, termine spaziale e diagnostics con e senza cache; casi con `lateral_source_flag`, `stochastic_flag` e `cfl=-1` per verificare che i fallback restino invariati. Misurare numero di ricostruzioni, conversioni e tempi sulle configurazioni con iniezione. Questa e una **estensione selettiva implementata**, non una prova di equivalenza completa per tutte le sorgenti.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.

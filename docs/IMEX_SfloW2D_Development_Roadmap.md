@@ -40,6 +40,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Avanzamento A04–A06 (5 novembre 2026; validazione pendente):** A04 evita la riconversione post-spatial su celle wet con `q_trial==q^n` sfruttando `qp_pre` gia pronto; restano invariati i casi modificati, dry, sea sink e ammissibilita. A06 valuta il gruppo Newton `thermal-only` da T REAL/COMPLEX prodotta in `state`, con la medesima formula `.inc` dei percorsi termici esistenti; i gruppi misti conservano il full state. A05 non e stato forzato: il riuso CFL/spatial riguarda anche tracce e boundary forcing, non solo primitivi, e necessita di equivalenza dimostrata. Build e regressioni sul nuovo SHA ancora da eseguire manualmente. Dettagli in D.12 della roadmap specialistica.
 
+**A05 implementato selettivamente (5 novembre 2026, nuovo commit da validare):** completato l'audit della sequenza CFL → finestra sorgenti → spatial → Lie. Le iniezioni conservative radiale, circolare e fissurale non cambiano fra CFL e spatial né il vettore `q/qp` né la geometria/tracce necessarie alla ricostruzione; `pre_spatial_primitives_ready` puo riusare gli stessi prodotti anche quando tali sorgenti sono abilitate. Restano esclusi lo stocastico (potenziale mutazione del conservativo trasportato), l'iniezione laterale con condizioni di bordo potenzialmente differenti e `cfl=-1` (nessuna preflight CFL). Solo modifica del gate nel driver, nessuna nuova cache; build e confronto numerico dei casi con iniezione da effettuare. Evidenze e test in **D.13** della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

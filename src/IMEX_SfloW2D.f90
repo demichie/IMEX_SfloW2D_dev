@@ -480,12 +480,16 @@ PROGRAM IMEX_SfloW2D
         simulation%runtime%dt_old_old = simulation%runtime%dt_old
         simulation%runtime%dt_old = simulation%runtime%dt
 
-        ! CFL has already prepared unchanged q/qp and HP-PCCU traces.
-        ! Injection, stochastic transport and disabled CFL keep the full path.
+        ! CFL already prepared the unchanged conservative state, its numerical
+        ! primitives, HP traces and characteristic speeds. Radial, circular
+        ! and fissural sources run AFTER the spatial operator and do not
+        ! change its reconstruction inputs between these two passes.
+        ! Retain the full path for disabled CFL, stochastic updates (which
+        ! may change transported q/qp), and lateral boundary injection:
+        ! its explicit CFL boundary-source override can differ from the
+        ! fallback used by a fresh spatial reconstruction.
         CALL simulation%advance_timestep(pre_spatial_primitives_ready=                                              &
-            cfl/=-1.0_wp .AND. .NOT.stochastic_flag .AND. .NOT.radial_source_flag .AND.                              &
-            .NOT.lateral_source_flag .AND. .NOT.bottom_radial_source_flag .AND.                                      &
-            .NOT.bottom_fissural_source_flag)
+            cfl/=-1.0_wp .AND. .NOT.stochastic_flag .AND. .NOT.lateral_source_flag)
 
         ! advance_lie has already published a synchronized q/qp pair.
         ! Only the diagnostic dynamic pressure is needed; never reconvert qp.
