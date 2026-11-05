@@ -54,6 +54,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Decisione buoyancy aggiornata (5 novembre 2026, da validare):** il controllo della densita viene eseguito **prima di iniziare ogni gruppo Lie non-zero**, usando lo stato locale accettato precedente; se la miscela e neutra o galleggiante viene rimossa senza tentare ulteriori source candidate. `evaluate_density_from_qp` classifica `rho_mix <= rho_a_amb` (inclusa la convenzione near-dry che restituisce densita ambiente). Il gruppo 0 rimane libero di iniettare anche nelle celle inizialmente asciutte e il controllo finale resta presente. Nessuna conversione di candidati inammissibili. Build e regressioni da verificare. Dettagli in D.19 della roadmap specialistica.
 
+**Regressioni deterministiche confermate (5 novembre 2026):** dopo la correzione del sink di buoyancy `de873fa` l'utente conferma esecuzioni complete senza errori di `EXAMPLE_TALL`, `EXAMPLE_ETNA` e `EXAMPLE_ETNA_LAVA`; confermata in precedenza anche la risoluzione del blocco `D19` di TAAL a circa 27.36 s. `TALL` potrebbe essere il nome digitato per `TAAL`: la denominazione resta come riferita dall'utente fino a controllo. Test stocastici, lake-at-rest e performance ancora aperti. Dettagli in D.20 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

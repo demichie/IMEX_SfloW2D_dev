@@ -369,6 +369,12 @@ Il messaggio D19 deriva dal controllo dell'ammissibilita del candidato sorgente:
 
 **Verifica ancora necessaria:** compilazione sul nuovo SHA, TAAL oltre 27.36 s e fino a fine simulazione, ETNA_LAVA, casi d'iniezione in dry, depositi e topografia in transazione, confronto mass budget e D19 diagnostics. Il precedente intervento subnormal-rate nel limitatore resta presente ma distinto; non viene rivendicata l'efficacia sul caso TAAL fino al test.
 
+### D.20 Conferma utente: regressioni deterministiche complete superate (5 novembre 2026)
+
+L'utente ha eseguito fino al **tempo finale** tutti e tre i casi `EXAMPLE_TALL`, `EXAMPLE_ETNA` ed `EXAMPLE_ETNA_LAVA`, senza errori, dopo il commit `de873faf8b2cc167c43f7aed36f4fdbd7681c241` che anticipa la rimozione delle miscele neutrali/galleggianti tra gruppi Lie. In precedenza aveva confermato risolto anche il blocco `D19` a `t≈27.36` del caso denominato `EXAMPLE_TAAL`. I nomi `TALL` e `TAAL` compaiono nelle comunicazioni dell'utente: verificarne la corrispondenza nei file di test se necessaria, senza presumere che identifichino esperimenti diversi.
+
+**Stato:** regressioni deterministiche riferite dall'utente **PASS FINO A FINE RUN**; la validazione specifica con `stochastic_flag` / `stoch_transport_flag` attivi, test lake-at-rest, OpenMP riproducibilita e prestazioni restano **PENDING**. A08 resta revertito e non accettato; la conferma del run non ne dimostra l'equivalenza. Nessuna ulteriore modifica alla fisica introdotta in questo aggiornamento documentale.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
