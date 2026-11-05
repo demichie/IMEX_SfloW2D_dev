@@ -861,3 +861,8 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - `TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90` sostituisce `mixt_var` con la valutazione canonica `build_physical_state_from_qp`; i valori usati dalle asserzioni vengono letti dal physical state.
 - La suite `TEST_STATE_CONVERSION` contiene molti altri riferimenti a simboli legacy e non e ancora migrata; nel gate architetturale si usa `TEST_STATE` (API canoniche), senza introdurre moduli di compatibilita. La suite legacy rimane nel repository ma richiede migrazione o archiviazione esplicita separata, non viene dichiarata superata.
 - Restano da verificare gli esiti CI della compilazione dei test aggiornati e le relative asserzioni numeriche.
+
+### Blocco 1 - Lie mass exchange fixture dopo migrazione state
+
+- `check_lie_exchange_transaction` compila ma segnala una transazione respinta. Il test era migrato al ramo strict della conversione di stato, mentre il Lie executor usa esplicitamente `conservative_to_primitive(...,numerical_reconstruction=.TRUE.)`. Allineato il fixture a quest'ultimo per entrambe le transazioni; nessuna modifica ai kernel.
+- Il rifiuto stampa ora il `failure_message` con prefisso, per identificare la causa in caso di persistenza. La correzione e da validare in CI.

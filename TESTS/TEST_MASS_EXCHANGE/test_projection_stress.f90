@@ -521,7 +521,8 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie exchange registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure, &
+               numerical_reconstruction=.TRUE.)
           IF (.NOT.accepted) ERROR STOP 'Lie exchange initial state conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
@@ -534,7 +535,8 @@ CONTAINS
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message)
     IF (failed) THEN
-       PRINT *, TRIM(message)
+       WRITE(*,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
+       WRITE(*,'(A,I0,A,I0)') 'Lie exchange workset=',domain%solve_cells,', group=',groups(1)%id
        ERROR STOP 'Lie exchange transaction rejected'
     END IF
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
@@ -590,7 +592,8 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure, &
+               numerical_reconstruction=.TRUE.)
           IF (.NOT.accepted) ERROR STOP 'Lie rejection primitive conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
