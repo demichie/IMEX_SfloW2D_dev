@@ -2,6 +2,7 @@ PROGRAM test_state_new
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_new_types
+    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids
     USE state_new_conversions
     USE state_new_physical
     IMPLICIT NONE
@@ -13,6 +14,7 @@ PROGRAM test_state_new
     LOGICAL :: accepted
 
     CALL initialize_case
+    CALL check_particle_descriptors
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -84,6 +86,22 @@ PROGRAM test_state_new
 
 CONTAINS
 
+    !> Preserve the granular descriptors from the original mixture formulas.
+    SUBROUTINE check_particle_descriptors
+        REAL(wp) :: fractions(2),expected_d,expected_rho
+        fractions=[0.2_wp,0.3_wp]
+        expected_d=SUM(fractions)/SUM(fractions/diam_s)
+        expected_rho=SUM(fractions*rho_s)/SUM(fractions)
+        CALL assert_close('weighted Sauter diameter',sauter_diameter(fractions),expected_d,1.0E-14_wp)
+        CALL assert_close('weighted solid density',average_density_solids(fractions),expected_rho,1.0E-14_wp)
+        fractions=0.0_wp
+        CALL assert_close('zero-solid diameter',sauter_diameter(fractions),SUM(diam_s)/n_solid,1.0E-14_wp)
+        CALL assert_close('zero-solid density',average_density_solids(fractions),SUM(rho_s)/n_solid,1.0E-14_wp)
+        fractions=[0.25_wp*EPSILON(1.0_wp),0.25_wp*EPSILON(1.0_wp)]
+        CALL assert_close('near-zero solid diameter',sauter_diameter(fractions),SUM(diam_s)/n_solid,1.0E-14_wp)
+        CALL assert_close('near-zero solid density',average_density_solids(fractions),SUM(rho_s)/n_solid,1.0E-14_wp)
+    END SUBROUTINE check_particle_descriptors
+
     SUBROUTINE check_admissibility(reference_qp,reference_q)
         REAL(wp), INTENT(IN) :: reference_qp(n_vars), reference_q(n_vars)
         REAL(wp) :: bad_qp(n_vars), bad_q(n_vars), p_dyn
@@ -111,9 +129,10 @@ CONTAINS
         n_vars=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars
         n_eqns=n_vars
         CALL configure_canonical_state_indices
-        ALLOCATE(rho_s(n_solid),inv_rho_s(n_solid),sp_heat_s(n_solid))
+        ALLOCATE(rho_s(n_solid),inv_rho_s(n_solid),sp_heat_s(n_solid),diam_s(n_solid))
         ALLOCATE(sp_heat_g(n_add_gas),sp_gas_const_g(n_add_gas))
         rho_s=[2500.0_wp,1800.0_wp]; inv_rho_s=1.0_wp/rho_s; sp_heat_s=[900.0_wp,1100.0_wp]
+        diam_s=[0.0001_wp,0.001_wp]
         sp_heat_a=1005.0_wp; sp_gas_const_a=287.05_wp; sp_heat_g=[1850.0_wp]; sp_gas_const_g=[461.5_wp]
         sp_heat_l=4180.0_wp; rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l
         pres=101325.0_wp; inv_pres=1.0_wp/pres; T_ambient=300.0_wp
