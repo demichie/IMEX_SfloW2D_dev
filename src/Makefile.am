@@ -114,6 +114,41 @@ numerics/nonlinear_solver_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 # Explicit source cell kernels hold only bounded per-cell scratch, never grids.
 physics/source_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 
+# F5: physical source consumers must wait for the canonical .mod producers,
+# including under parallel make (Fortran modules are not inferred by automake).
+physics/rheology_laws/rheology_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_froude_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_lucas_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_lava_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/mass_injection_terms/mass_injection_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_2d.$(OBJEXT): state_new/state_new_physical.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): state_new/state_new_physical.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+numerics/nonlinear_solver_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+
 # F5: new general state kernels are built in module dependency order.
 state_new/state_new_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state_new/state_new_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
