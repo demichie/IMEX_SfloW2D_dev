@@ -7,11 +7,11 @@ MODULE thermal_laws_2d
     USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit,                                                      &
             eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit,                                         &
-            eval_thermal_cooling_analytic
+            eval_thermal_cooling_implicit_real, eval_thermal_cooling_analytic
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_thermal_explicit, eval_thermal_semi_implicit
-    PUBLIC :: eval_thermal_implicit, eval_thermal_analytic
+    PUBLIC :: eval_thermal_implicit, eval_thermal_implicit_real, eval_thermal_analytic
 CONTAINS
 
     !> @brief Dispatch and sum explicit thermal sources.
@@ -101,6 +101,20 @@ CONTAINS
         rate=process_rate
     END SUBROUTINE eval_thermal_implicit
 
+
+    !> REAL implicit source for Newton residual evaluation.
+    SUBROUTINE eval_thermal_implicit_real(model_id,state,radiative,convective,ambient,rate)
+        INTEGER, INTENT(IN) :: model_id
+        TYPE(physical_state_real), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        REAL(wp), INTENT(OUT) :: rate
+        SELECT CASE(model_id)
+        CASE(SOURCE_ID_THERMAL_COOLING)
+            CALL eval_thermal_cooling_implicit_real(state,radiative,convective,ambient,rate)
+        CASE DEFAULT
+            CALL fatal_error('Unknown REAL implicit thermal model ID')
+        END SELECT
+    END SUBROUTINE eval_thermal_implicit_real
 
     !> @brief Advance thermal temperature analytically over the given interval.
     !> @details The dispatcher retains each of the four numerical interfaces;

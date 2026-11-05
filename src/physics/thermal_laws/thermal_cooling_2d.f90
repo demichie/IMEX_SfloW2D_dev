@@ -7,7 +7,7 @@ MODULE thermal_cooling_2d
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
-    PUBLIC :: eval_thermal_cooling_implicit, eval_thermal_cooling_analytic
+    PUBLIC :: eval_thermal_cooling_implicit, eval_thermal_cooling_implicit_real, eval_thermal_cooling_analytic
 CONTAINS
 
     !> @brief Evaluate radiative and convective energy cooling in real arithmetic.

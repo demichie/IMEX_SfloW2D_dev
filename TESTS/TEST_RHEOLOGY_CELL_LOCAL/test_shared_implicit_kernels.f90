@@ -3,6 +3,8 @@ PROGRAM test_shared_implicit_kernels
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s, grav, inv_grav
     USE rheology_parameters_2d, ONLY : xi, I_0, mu_2, mu_s, muI_inf, T_ref
+    USE rheology_2d, ONLY : eval_rheology_implicit_real_id
+    USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, eval_rheology_newmodel_implicit_real
     USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
     USE rheology_voellmy_2d, ONLY : voellmy_mu=>mu, &
@@ -25,8 +27,9 @@ PROGRAM test_shared_implicit_kernels
     TYPE(physical_state_real) :: state,shifted
     TYPE(physical_state_complex) :: complex_state
     REAL(wp) :: explicit_rate(2),semi_rate(2),plus_exp(2),plus_semi(2)
-    REAL(wp) :: minus_exp(2),minus_semi(2),jacobian_fd(2),jacobian_cs(2)
+    REAL(wp) :: minus_exp(2),minus_semi(2),jacobian_fd(2),jacobian_cs(2),implicit_real(2)
     COMPLEX(wp) :: implicit_rate(2)
+    INTEGER, PARAMETER :: model_ids(7)=[1,10,3,2,6,5,4]
     INTEGER :: model,component
 
     n_solid=1
@@ -70,6 +73,8 @@ PROGRAM test_shared_implicit_kernels
         CALL evaluate_real(model,state,explicit_rate,semi_rate)
         CALL promote_physical_state(state,complex_state)
         CALL evaluate_complex(model,complex_state,implicit_rate)
+        CALL eval_rheology_implicit_real_id(model_ids(model),state,.FALSE.,0.0_wp,implicit_real)
+        CALL assert_rate(implicit_real,REAL(implicit_rate,wp),1.0E-12_wp,model,-3)
         CALL assert_rate(explicit_rate,semi_rate+REAL(implicit_rate,wp),1.0E-12_wp,model,0)
 
         DO component=1,2
@@ -112,6 +117,11 @@ PROGRAM test_shared_implicit_kernels
         CALL set_real_velocity(state,[3.0_wp,4.0_wp])
     END DO
 
+    ! The Newton-only linear fixture also has identical REAL/COMPLEX kernels.
+    CALL promote_physical_state(state,complex_state)
+    CALL eval_rheology_newmodel_implicit_real(state,implicit_real(1),implicit_real(2))
+    CALL eval_rheology_newmodel_implicit(complex_state,implicit_rate(1),implicit_rate(2))
+    CALL assert_rate(implicit_real,REAL(implicit_rate,wp),1.0E-12_wp,8,0)
     PRINT *, 'PASS: shared implicit rheology REAL/COMPLEX, complex-step and zero speed'
 CONTAINS
     SUBROUTINE set_real_velocity(s,v)

@@ -18,7 +18,7 @@ MODULE nonlinear_solver_2d
 
     USE source_registry_2d, ONLY : source_group_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
-    USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit
+    USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit, eval_source_implicit_real
     USE state_new_types, ONLY : physical_state_complex, physical_state_real, &
         initialize_physical_state_real, initialize_physical_state_complex
 
@@ -112,7 +112,7 @@ CONTAINS
         END IF
         CALL solve_newton_group(source_group, source_group%equation_ids, q_cell, q_si, dt, Bprime_x, Bprime_y,         &
             stochastic_value, coeff_f, tol_abs, tol_rel, iterations_used, converged, linear_info, line_search_failed,  &
-            active_workspace)
+            active_workspace,active_real_workspace)
         IF (.NOT.converged) q_cell=q_in
     END SUBROUTINE solve_backward_euler_group
 
@@ -134,7 +134,7 @@ CONTAINS
     !> \param[out] line_search_failed True if backtracking cannot accept a step.
     SUBROUTINE solve_newton_group(source_group, group_equations, qj, q_group_input, dt_step, Bprimej_x, Bprimej_y, Zij,&
         coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed,           &
-        implicit_scratch)
+        implicit_scratch, real_scratch)
 
 
     IMPLICIT NONE
@@ -158,6 +158,7 @@ CONTAINS
         REAL(wp) :: group_matrix(SIZE(group_equations),SIZE(group_equations))
         REAL(wp) :: group_rhs(SIZE(group_equations))
         TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
         INTEGER :: group_pivot(SIZE(group_equations))
         INTEGER :: nl_iter, i, j, ok
         LOGICAL :: check
@@ -173,7 +174,7 @@ CONTAINS
         DO nl_iter = 1, max_nl_iter
             iterations_used = iterations_used + 1
             CALL eval_f(qj, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,            &
-                group_equations, source_group, implicit_scratch)
+                group_equations, source_group, real_scratch)
 
             IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
             residual_tol = tol_abs_local + tol_rel_local*residual_ref
@@ -228,7 +229,7 @@ CONTAINS
                 stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
                 CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,      &
                     scal_f, right_term, stpmax, check, dt_step, Bprimej_x, Bprimej_y, Zij, group_equations,            &
-                    source_group, implicit_scratch)
+                    source_group, implicit_scratch, real_scratch)
 
                 IF (check) THEN
                     line_search_failed = .TRUE.
@@ -246,7 +247,7 @@ CONTAINS
                 END DO
 
                 CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,  &
-                    group_equations, source_group, implicit_scratch)
+                    group_equations, source_group, real_scratch)
 
             END IF
 
@@ -541,7 +542,7 @@ CONTAINS
 
     SUBROUTINE lnsrch(qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,   &
         scal_f, right_term, stpmax, check, dt_step , Bprimej_x , Bprimej_y, Zij, active_equations, source_group, &
-        implicit_scratch)
+        implicit_scratch, real_scratch)
 
     IMPLICIT NONE
 
@@ -592,6 +593,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
         REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
         INTEGER, DIMENSION(1) :: ndum
@@ -672,7 +674,7 @@ CONTAINS
             END DO
 
             CALL eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,      &
-                active_equations, source_group, implicit_scratch)
+                active_equations, source_group, real_scratch)
 
             IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
@@ -788,7 +790,7 @@ CONTAINS
         !******************************************************************************
 
     SUBROUTINE eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y , f_nl , scal_f, Zij,             &
-        active_equations, source_group, implicit_scratch)
+        active_equations, source_group, real_scratch)
 
 
     IMPLICIT NONE
@@ -807,7 +809,7 @@ CONTAINS
         REAL(wp), INTENT(IN):: Zij ! value stochastic process
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
-        TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
 
         REAL(wp) :: nh_term_impl(n_eqns)
         INTEGER :: i, equation
@@ -817,8 +819,7 @@ CONTAINS
         ! before subtracting equal large states and falsely report zero residual.
         REAL(wp), VOLATILE :: delta_q(n_vars)
 
-        CALL eval_source_implicit(Bprimej_x , Bprimej_y, Zij, r_qj = qj , r_nh_term_impl=nh_term_impl,                 &
-            group=source_group, physical_scratch=implicit_scratch)
+        CALL eval_source_implicit_real(Bprimej_x,Bprimej_y,Zij,qj,nh_term_impl,source_group,real_scratch)
 
         Rj = -nh_term_impl
 

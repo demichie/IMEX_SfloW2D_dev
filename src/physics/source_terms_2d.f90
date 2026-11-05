@@ -13,12 +13,12 @@ MODULE source_terms_2d
         initialize_physical_state_real, initialize_physical_state_complex
     USE state_new_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
-            eval_thermal_analytic
+            eval_thermal_implicit_real, eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
-            eval_rheology_explicit
+            eval_rheology_implicit_real_id, eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
@@ -34,7 +34,7 @@ MODULE source_terms_2d
     INTERFACE eval_source_explicit
         MODULE PROCEDURE eval_geometry_cell_source_explicit, eval_mass_exchange_source_explicit
     END INTERFACE
-    PUBLIC :: eval_source_semi_implicit, eval_source_implicit, eval_source_analytic
+    PUBLIC :: eval_source_semi_implicit, eval_source_implicit, eval_source_implicit_real, eval_source_analytic
     PUBLIC :: source_cell_context_type
     PUBLIC :: eval_geometry_curvature_explicit
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
@@ -349,6 +349,37 @@ CONTAINS
         CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
             grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
+
+    !> Evaluate the REAL implicit source directly for Newton residuals.
+    !> The source formulas are identical to those used by COMPLEX Jacobians.
+    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch)
+        REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,Zij,q_cell(n_vars)
+        REAL(wp), INTENT(OUT) :: rate(n_eqns)
+        TYPE(source_group_type), INTENT(IN) :: group
+        TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(physical_state_real), TARGET :: local_state
+        TYPE(physical_state_real), POINTER :: physical_state
+
+        IF (group%method/=SOURCE_METHOD_NEWTON) &
+            CALL fatal_error('eval_source_implicit_real requires a Newton Lie group')
+        rate=0.0_wp
+        IF (.NOT.group%rheology_implicit .AND. .NOT.group%thermal_active) RETURN
+        physical_state=>local_state
+        IF (PRESENT(physical_scratch)) THEN
+            physical_state=>physical_scratch
+        ELSE
+            CALL initialize_physical_state_real(local_state)
+        END IF
+        CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp)
+        IF (group%rheology_implicit) THEN
+            CALL eval_rheology_implicit_real_id(group%rheology_id,physical_state, &
+                stochastic_flag,Zij,rate(2:3))
+        END IF
+        IF (group%thermal_active) THEN
+            CALL eval_thermal_implicit_real(SOURCE_ID_THERMAL_COOLING,physical_state, &
+                radiative_term_coeff,convective_term_coeff,T_env,rate(4))
+        END IF
+    END SUBROUTINE eval_source_implicit_real
 
     SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,                                                  &
             c_nh_term_impl, r_qj , r_nh_term_impl, group, physical_scratch )
