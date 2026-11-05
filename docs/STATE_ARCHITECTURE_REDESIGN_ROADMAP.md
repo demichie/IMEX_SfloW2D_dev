@@ -213,6 +213,8 @@ Non mantenere pass-through o alias di compatibilità per conservare l’organizz
 
 **F5 test-client migration (5 novembre 2026):** test reologie cell-local, Froude, Darcy, stress mass exchange, D17 e source registry aggiornati ai tipi canonici REAL/COMPLEX. I test di costruzione esplicita inizializzano gli array una sola volta; il test mass exchange confronta la promozione numerica dei campi scalari senza dipendere dalla vecchia routine di estrazione. Esecuzione CI ancora richiesta.
 
+**F5 test shared implicit (5 novembre 2026):** aggiunto `TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_shared_implicit_kernels.f90` al runner strict/optimized: sette modelli, verifica EXPLICIT = SEMI_REAL + REAL(IMPLICIT_COMPLEX), Jacobiani complex-step contro differenze finite del contributo `EXPLICIT-SEMI` e stato a velocita zero. Test scritto e collegato al runner; esecuzione CI ancora PENDENTE.
+
 **F5 rheology analytic dispatch (5 novembre 2026):** l'esecutore analitico del singolo modello valuta ora direttamente lo stato REAL congelato tramite un dispatcher di legge unico, evitando la copia profonda di composizioni `current_state=state`. La copia resta solo nel percorso multi-modello sequenziale, che aggiorna cinematiche/Richardson dopo ogni sottopasso. Contratti e formule dei modelli non modificati; test numerici ancora necessari.
 
 **F5 Lie analytic scratch (5 novembre 2026):** l'API analitica accetta lo scratch REAL di worker gia inizializzato. L'esecutore Lie lo riusa per tutte le valutazioni analitiche locali evitando allocate/deallocate di quattro array nella fase analitica; chi usa l'API senza scratch ha un fallback esplicito. La trasformazione dell'operatore analitico in rate conservativo e invariata. Test e benchmark da eseguire.

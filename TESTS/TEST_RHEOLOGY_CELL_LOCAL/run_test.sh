@@ -48,6 +48,10 @@ for profile in strict optimized; do
     "$compiler" $common $objects test_analytic_velocity.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_analytic_velocity
     ./test_analytic_velocity
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_shared_implicit_kernels.f90"
+    "$compiler" $common $objects test_shared_implicit_kernels.o -llapack $netcdf_flibs $netcdf_clibs \
+        -o test_shared_implicit_kernels
+    ./test_shared_implicit_kernels
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_lava_cooling.f90"
     "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_cooling_2d.o \
         thermal_laws_2d.o test_lava_cooling.o -o test_lava_cooling
