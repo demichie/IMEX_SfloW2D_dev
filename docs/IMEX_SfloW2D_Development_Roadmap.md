@@ -58,6 +58,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **A08 reintrodotto su richiesta (5 novembre 2026, test pendenti):** in `src/spatial/hyperbolic_2d.f90` e ripristinata esattamente l'ottimizzazione originale `3e2b02d` del coefficiente idrostatico di faccia `Gamma` nei path interni, limitata a endpoint wet (profondita del path e profondita selezionata della faccia > EPSILON). L'anomalia D19 osservata nel precedente tentativo si riproduceva anche senza A08 ed e stata poi corretta; ora esiste una baseline con tre run deterministici completi. A08 e **DA VALIDARE** con nuova build e tre esempi completi; stocastico e lake-at-rest restano aperti. Vedi D.21 nella roadmap specialistica.
 
+**A08 verificato (5 novembre 2026):** l'utente conferma che sul commit `365cc23` la build e gli esempi precedentemente concordati risultano OK. Il riuso di `Gamma` e ora **PASS per build e regressioni degli esempi**. Restano pendenti test dedicati a lake-at-rest/well-balancing, confronto numerico e misure di performance; test stocastici rimandati. Aggiornamento dettagliato in D.22 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

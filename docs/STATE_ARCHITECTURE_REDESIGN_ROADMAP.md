@@ -385,6 +385,12 @@ L'utente ha eseguito fino al **tempo finale** tutti e tre i casi `EXAMPLE_TALL`,
 
 **Test richiesti:** ricompilazione, completamento di `EXAMPLE_TAAL/TALL`, `EXAMPLE_ETNA`, `EXAMPLE_ETNA_LAVA`, confronto quantitativo con la baseline immediatamente precedente, e test lake-at-rest, wet/dry e well-balancing. Solo a seguire stimare il beneficio di performance (numero di valutazioni termodinamiche saltate, wall-clock e scaling). Lo stocastico rimane fuori dal gate di validazione immediata, come concordato.
 
+### D.22 A08 confermato dall'utente: build e regressioni esempi OK (5 novembre 2026)
+
+L'utente ha confermato **build e EXAMPLES OK** sul commit `365cc236e9344f79420b22bb9d388a17a68c7240`, che reintroduce il riuso di `Gamma` nei path idrostatici interni HP-PCCU. Nel contesto del test richiesto gli esempi sono `EXAMPLE_TAAL/TALL`, `EXAMPLE_ETNA` e `EXAMPLE_ETNA_LAVA`; questa conferma segue i precedenti run deterministici completi sulla baseline senza A08.
+
+**Stato A08: PASS build + regressioni esempi (conferma utente)**. Restano aperte verifiche mirate lake-at-rest/well-balancing, confronto quantitativo dei campi e misure del beneficio prestazionale. Non confondere tali verifiche con il risultato positivo dei tre esempi. Validazione stocastica ancora rimandata.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
