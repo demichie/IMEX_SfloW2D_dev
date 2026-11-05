@@ -46,6 +46,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **A08 selezionato e implementato (5 novembre 2026, test pendenti):** in `hyperbolic_2d` il path idrostatico interno di ogni cella puo riusare i coefficienti `Gamma` gia valutati da `eval_speeds` sulle stesse tracce primitive. Le profondita selezionate delle facce e quelle dei path differiscono: il riuso e valido esclusivamente se entrambe superano `EPSILON(1.0_wp)`. Nei casi dry/near-dry si mantiene il calcolo precedente e la regolarizzazione wet/dry; nessun nuovo array. Sono stati lasciati intenzionalmente fuori A07, A09–A12. Build ed esempi sul nuovo commit da eseguire. Dettagli in D.15 della roadmap specialistica.
 
+**Regressione A08 e rollback mirato (5 novembre 2026):** dopo l'ottimizzazione di riuso del coefficiente idrostatico Gamma (`3e2b02d`), l'utente ha segnalato `EXAMPLE_TAAL` fallito a circa `t=27.36` con `D19: inadmissible source candidate`. Ripristinato `src/spatial/hyperbolic_2d.f90` esattamente come nel baseline `c8605e4`, mantenendo A05 e la nuova sequenza OU. A08 e ora **NON ACCETTATO / ROLLED BACK**. Necessaria conferma della build e del TAAL oltre il tempo di guasto; l'attribuzione fisica precisa non e ancora dimostrata. Dettagli in D.16 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

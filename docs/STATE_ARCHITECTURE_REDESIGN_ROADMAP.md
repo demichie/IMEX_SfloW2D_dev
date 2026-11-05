@@ -331,6 +331,16 @@ L'esecutore Lie invoca soltanto il criterio fisico, interpreta `accepted` (error
 
 **Verifica pendente:** build del nuovo HEAD, EXAMPLE_TAAL, EXAMPLE_ETNA_LAVA e test lake-at-rest/well-balanced; confronto dei `P_cell_x/P_cell_y`, `Gamma`, flux, conservativi e costi computazionali rispetto al baseline. Attenzione ai casi wet/dry dove `h_selected` e `h_path` sono su lati opposti della soglia EPSILON: il fallback deve mantenere il comportamento precedente. Nessuna Action avviata.
 
+### D.16 A08 ripristinato per regressione in EXAMPLE_TAAL (5 novembre 2026)
+
+**Segnalazione utente sul commit `3e2b02d`:** TAAL esegue fino a circa `t=27.3632` e poi termina con `FATAL ERROR: Lie timestep rolled back: D19: inadmissible source candidate`. La build precedente e i due esempi avevano avuto esito positivo sul baseline `c8605e4`. L'unico cambiamento ai kernel numerici del commit sospetto era il riuso di `Gamma` tra path interni HP-PCCU e face speeds in `src/spatial/hyperbolic_2d.f90`.
+
+**Azione correttiva immediata:** ripristinato **integralmente** `src/spatial/hyperbolic_2d.f90` dalla revisione `c8605e429fee93440be1097779a34cfe0fe8d920`, antecedente ad A08. Sono dunque ripristinate entrambe le valutazioni originarie di `eval_hydrostatic_coefficient` nei path di cella, senza valori `Gamma` cached. Gli altri file produttivi di A05 e dello splitting stocastico non sono modificati. **A08 = ROLLED BACK / NOT ACCEPTED**, da non riapplicare sulla sola ipotesi di equivalenza dei coefficienti.
+
+Il messaggio D19 deriva dal controllo dell'ammissibilita del candidato sorgente: **non dimostra da solo** quale variazione locale del percorso idrostatico abbia causato il rifiuto; il rollback A08 e una misura diagnostica e cautelativa per isolare la regressione. `IEEE_UNDERFLOW_FLAG` non e prova di causalita. Per riprendere A08 servono un confronto diretto di Gamma cached/fresh, path, flux e invarianti e una prova lake-at-rest/wet-dry.
+
+**Gate:** far rieseguire build ed EXAMPLE_TAAL sul commit di rollback fino oltre `t=27.3632`; idealmente EXAMPLE_ETNA_LAVA. Se TAAL fallisce ancora, analizzare D19 con log di gruppo, cella e candidati, senza attribuire automaticamente l'errore alla sola A08.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
