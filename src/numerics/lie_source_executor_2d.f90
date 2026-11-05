@@ -428,9 +428,11 @@ CONTAINS
 
                 SELECT CASE(executor%groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
-                    ! Evaluate source rates without committing partial transfers.
+                    ! Evaluate the source rate on qpentry (q^n only in group 0), but
+                    ! limit its transfer against q_local, the actual recipient
+                    ! after spatial evolution and all previous Lie groups.
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
-                    CALL assemble_lie_explicit_transaction(qpentry, q(1:n_eqns,j,k), time_step, source_time,           &
+                    CALL assemble_lie_explicit_transaction(qpentry, q_local(1:n_eqns), time_step, source_time,           &
                         executor%groups(group_index), erodible_local, total_rate,                                      &
                         executor%source_transfers(tid),cell_has_exchange,ok,                                          &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &

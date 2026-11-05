@@ -38,6 +38,7 @@ PROGRAM test_projection_stress
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
   CALL check_limiter_representability
+  CALL check_late_group_recipient_budget
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
   CALL check_complete_physical_state
@@ -114,6 +115,39 @@ CONTAINS
             ERROR STOP 'Deposition limiter left negative solid mass'
     END DO
   END SUBROUTINE check_limiter_representability
+
+  !> A later Lie group consumes the state left by earlier groups, not
+  !> the array held on entry to the entire source sweep.
+  SUBROUTINE check_late_group_recipient_budget
+    REAL(wp) :: stale(nq),recipient(nq),rates(nq),candidate(nq)
+    REAL(wp) :: stale_scale,current_scale
+    LOGICAL :: old_valid,current_valid
+
+    stale=0.0_wp
+    recipient=0.0_wp
+    rates=0.0_wp
+    stale(idx_totMassEqn)=1.0_wp
+    stale(idx_solidEqn_first)=0.20_wp
+    recipient(idx_totMassEqn)=0.50_wp
+    recipient(idx_solidEqn_first)=0.05_wp
+    rates(idx_totMassEqn)=-0.30_wp
+    rates(idx_solidEqn_first)=-0.15_wp
+    CALL limit_explicit_source_rates(stale,[REAL(wp)::],1.0_wp,rates, &
+         [REAL(wp)::],stale_scale,old_valid)
+    IF (.NOT.old_valid) ERROR STOP 'Late-group stale fixture failed'
+    candidate=recipient+stale_scale*rates
+    IF (conservative_mass_admissible(candidate)) &
+         ERROR STOP 'Late-group stale budget did not reproduce rejection'
+
+    CALL limit_explicit_source_rates(recipient,[REAL(wp)::],1.0_wp,rates, &
+         [REAL(wp)::],current_scale,current_valid)
+    IF (.NOT.current_valid) ERROR STOP 'Late-group recipient limiter failed'
+    candidate=recipient+current_scale*rates
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+         ERROR STOP 'Late-group recipient yielded inadmissible state'
+    IF (current_scale>=stale_scale) &
+         ERROR STOP 'Late-group limiter used a stale conservative budget'
+  END SUBROUTINE check_late_group_recipient_budget
 
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics
