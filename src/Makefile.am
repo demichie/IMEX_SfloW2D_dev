@@ -201,21 +201,17 @@ physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       
 physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)  \
                                                 core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
-                                        physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-                                        physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
-physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
-                                        physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
-physics/rheology_laws/rheology_froude_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
-                                       physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-                                       physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
-physics/rheology_laws/rheology_lucas_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
-                                      physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-                                      physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
+physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
+physics/rheology_laws/rheology_froude_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
+physics/rheology_laws/rheology_lucas_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 core/constitutive_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/runtime_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/complexify.$(OBJEXT): core/parameters_2d.$(OBJEXT)
@@ -232,69 +228,56 @@ physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OB
                                             physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
                                             state_new/state_new_mixture.$(OBJEXT) \
                                             physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
-physics/rheology_laws/rheology_lava_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
-                                     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)  \
-                                     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
-physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
-                                      core/constitutive_parameters_2d.$(OBJEXT) \
-                                      physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-                                      physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
-physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
-                                          physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+physics/rheology_laws/rheology_lava_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
+physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
+physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                                     core/diagnostics_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
-physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)        \
-                                          physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+    core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+    core/diagnostics_2d.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)               \
                                      physics/thermal_laws/thermal_cooling_2d.$(OBJEXT) \
                                       core/diagnostics_2d.$(OBJEXT)
-physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
-                                    core/constitutive_parameters_2d.$(OBJEXT) \
-                                    core/complexify.$(OBJEXT)                 \
-                                    core/diagnostics_2d.$(OBJEXT)              \
-                                    geometry/geometry_2d.$(OBJEXT)             \
-                                    state/state_conversion_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    core/complexify.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT) \
+    geometry/geometry_2d.$(OBJEXT)
 physics/pore_pressure/pore_pressure_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     physics/rheology_laws/rheology_lahar_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+    physics/rheology_laws/rheology_lahar_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_lava_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT)
-physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
-                                     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      geometry/geometry_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
@@ -304,49 +287,44 @@ physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT): core/paramete
                                      physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
-                                     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
-                                     geometry/geometry_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
+    geometry/geometry_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
-                                     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
-                                     geometry/geometry_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
+    geometry/geometry_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
-                                     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
-                                     geometry/geometry_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT)
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
+    geometry/geometry_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_injection_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT)
+    physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                      physics/mass_injection_terms/mass_injection_2d.$(OBJEXT) \
-                                      physics/mass_exchange/mass_exchange_2d.$(OBJEXT) \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT) \
-                                     geometry/geometry_2d.$(OBJEXT) \
-                                     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
-                                     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT) \
-                                     physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT) \
-                                     physics/rheology_laws/rheology_2d.$(OBJEXT) \
-                                     core/diagnostics_2d.$(OBJEXT)
+    physics/mass_injection_terms/mass_injection_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT) \
+    geometry/geometry_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_2d.$(OBJEXT) \
+    core/diagnostics_2d.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      physics/thermal_laws/thermal_laws_2d.$(OBJEXT)         \
@@ -495,10 +473,7 @@ core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT) \
                               numerics/source_input_2d.$(OBJEXT)
 
 # Additional module USE edges introduced by the Lie source architecture.
-physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
-physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
-physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     state/state_conversion_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                   numerics/source_registry_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): physics/source_terms_2d.$(OBJEXT)
@@ -517,8 +492,7 @@ physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/diagn
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
-physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT) \
-    core/constitutive_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): core/constitutive_parameters_2d.$(OBJEXT)
 physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_froude_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
