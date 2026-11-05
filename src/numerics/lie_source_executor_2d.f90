@@ -376,7 +376,7 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_updated,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,              &
-        !$OMP& ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix,tid,                                         &
+        !$OMP& red_grav,tid,                                                                                         &
         !$OMP& cell_tick,group_tick,                                                                                 &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
