@@ -4,7 +4,7 @@
 
 > **Ambito:** progettazione clean-slate della gestione e implementazione degli stati e del loro utilizzo in numerica e fisica. Non è una riprogettazione dell’intero codice: leggi fisiche, discretizzazioni, integratori e consumatori vengono modificati solo nella misura necessaria per usare i nuovi contratti di stato. La destinazione deve essere ricavata dai flussi di dati, dai costi computazionali e dagli invarianti numerici, non dalla suddivisione attuale dei file o dalla compatibilità con organizzazioni storiche. Il codice esistente è una fonte di formule, invarianti e casi da preservare, non il vincolo architetturale di partenza. Questo documento è una roadmap tecnica specialistica subordinata alla [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md): non introduce un piano generale concorrente. Aggiornare checklist, prove e rischi qui; riportare nella roadmap generale solo stato aggregato e priorità.
 
-> **Stato:** IMPLEMENTAZIONE IN CORSO. Il nucleo parallelo contiene tipi REAL/COMPLEX, workspace, valutazione della miscela, conversioni conservative/primitive e costruttori dello stato fisico da `q` e `qp` per entrambi i tipi, con aggiornamento cinematico. È presente una suite di caratterizzazione isolata per round-trip, parità REAL/COMPLEX e dry state; l’integrazione con i consumatori e la validazione scientifica completa devono ancora essere completate.
+> **Stato:** IMPLEMENTAZIONE DEL NUCLEO P0–P2 COMPLETATA; VALIDAZIONE P3 DA ESEGUIRE. Il nucleo parallelo contiene tipi REAL/COMPLEX, workspace, valutazioni minime e complete della miscela, conversioni conservative/primitive, costruttori da `q`/`qp`, aggiornamento cinematico e refresh coerente dopo mutazioni termodinamiche o composizionali. L’integrazione con i consumatori di produzione e la validazione scientifica restano fasi successive.
 
 ## 0. Sintesi delle decisioni vincolanti
 
@@ -279,6 +279,27 @@ Prima ipotesi qualitativa: il riuso sulle facce PCCU può offrire il beneficio m
 - Accettazione CI e test scientifici, inclusi path idrostatici, casi di iniezione, TAAL, Newton/complex-step e scaling.
 - Profiling prima/dopo pubblicato con misure per sottosistema e valutazione numerica documentata.
 - Documentazione aggiornata: ownership, invarianti, mappa delle dipendenze, interfacce e prescrizioni per aggiungere una reologia o un modello ML.
+
+## 15. Registro di correzione e verifica P0–P3
+
+Questo registro è parte del piano corrente di lavoro. Ogni voce deve risultare `NON INIZIATA`, `IN CORSO` o `COMPLETATA` con file e test associati; le voci non possono essere considerate concluse sulla sola base della compilazione.
+
+| Voce | Stato | Evidenza corrente | Lavoro residuo |
+| --- | --- | --- | --- |
+| P0.1 Pressione dinamica | COMPLETATA | Formula corretta in `state_new_conversions.f90`; test isolato superato | Aggiungere confronto esplicito REAL/COMPLEX nel test |
+| P0.2 Celle asciutte | CODICE COMPLETATO | Conversioni e costruttori REAL/COMPLEX trattano massa/spessore nullo come dry valido, impostano `T_ambient` e selezionano il carrier con `liquid_flag` | Validare formalmente densità/proprietà dry contro il backend canonico |
+| P0.3 Regolarizzazione near-dry | COMPLETATA | Costruttori da `q` usano `eps_sing`/`eps_sing4`; conversioni già regolarizzate | Aggiungere casi near-dry dedicati alla suite |
+| P0.4 Richardson REAL/COMPLEX | COMPLETATA | Formula REAL/COMPLEX condivisa in `richardson.inc`; velocità nulla, cap superiore e valori negativi non vengono alterati | Estendere la copertura numerica ai test dedicati del backend di riferimento |
+| P0.5 Stato COMPLEX completo | CODICE COMPLETATO | Reset espliciti REAL/COMPLEX; `Zs`, `exc_pore_pres` e `T` inizializzati e trasferiti da `q`/`qp` anche nei percorsi COMPLEX e dry | Aggiungere test di riuso con processi abilitati/disabilitati |
+| P0.6 Chiusura composizione | CODICE COMPLETATO | Chiusura condivisa per REAL/COMPLEX nei percorsi di conversione, costruzione e refresh; residui entro tolleranza normalizzati, stati inadmissibili rifiutati | Confrontare la normalizzazione con il backend canonico nella fase di test |
+| P0.7 Fallimenti riconoscibili | CODICE COMPLETATO | `accepted` opzionale nelle conversioni, nei costruttori e nel refresh; dry e inadmissibile hanno esiti distinti | Mantenere il contratto durante l’integrazione con i consumatori |
+| P1.1–P1.5 Duplicazioni e costo | CODICE COMPLETATO | Kernel minimi per calori e densità; costruttori REAL/COMPLEX da `q` diretti; conversioni riusano `inv_rho_m`; chiusura composizionale condivisa | Misurare il costo e verificare i percorsi finali |
+| P1.4 Kernel minimi | CODICE COMPLETATO | `density_from_mass.inc` separa densità/reciproco dalle proprietà complete; wrapper REAL/COMPLEX condivisi | Verificare tutte le conversioni e impedire proprietà non richieste nei percorsi minimi |
+| P1.6 Stato generale | CODICE COMPLETATO | Tipi unificati REAL/COMPLEX senza campi per reologia; `refresh_physical_state` aggiorna le dipendenze dopo mutazioni | Verificare tutti i consumatori e i campi obbligatori |
+| P2.1 Verifiche ALLOCATED/SIZE | COMPLETATA | `require_*_storage` separa i controlli di allocazione dalle chiamate a `SIZE` | Mantenere il controllo al confine di setup |
+| P2.2 Layout dei quattro array | COMPLETATA | Inizializzazione workspace verifica e prepara `xs`, `xg`, `alphas`, `alphag` | Aggiungere test di layout parzialmente allocato |
+| P2.3–P2.6 Memoria e workspace | CODICE COMPLETATO | `layout_valid` impostato al setup; i costruttori verificano un solo flag; reset espliciti impediscono valori obsoleti; nessun array duplicato nel workspace | Verificare indipendenza worker e assenza di copie profonde nei consumatori |
+| P3.1–P3.7 Test e benchmark | IN CORSO | `TEST_STATE_NEW` supera round-trip, parità, dry/near-dry, liquido/solido, pressione dinamica, perturbazione COMPLEX e rifiuto di composizioni non ammissibili | Confronto diretto col backend, benchmark e regressioni complete |
 
 ## Appendice A — API concettuale di destinazione
 

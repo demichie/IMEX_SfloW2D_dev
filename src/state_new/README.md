@@ -12,12 +12,15 @@ Il nucleo è organizzato attorno a prodotti computazionali distinti:
 - `build_physical_state_from_q`
 - `build_physical_state_from_qp`
 - `update_physical_state_kinematics`
+- `refresh_physical_state`
 
 Le formule REAL/COMPLEX comuni sono mantenute in include `.inc`; i wrapper
 tipati forniscono soltanto dichiarazioni, workspace e gestione dei branch
 necessari al complex-step. Sono ora presenti i kernel di valutazione della
 miscela e le conversioni conservative/primitive, ancora non collegati ai
-consumatori di produzione.
+consumatori di produzione. `state_new.f90` è il punto di ingresso pubblico
+unificato per i tipi, i kernel e i costruttori; la migrazione dei consumatori
+resta separata dall’implementazione del nucleo.
 
 La migrazione dei consumatori e l’inserimento nel target principale inizieranno
 solo dopo i test di caratterizzazione e il confronto con l’implementazione

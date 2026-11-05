@@ -14,13 +14,53 @@ MODULE state_new_mixture
     PRIVATE
 
     PUBLIC :: evaluate_mixture
+    PUBLIC :: evaluate_mixture_heat_capacity
+    PUBLIC :: evaluate_mixture_density
 
     INTERFACE evaluate_mixture
         MODULE PROCEDURE evaluate_mixture_real
         MODULE PROCEDURE evaluate_mixture_complex
     END INTERFACE evaluate_mixture
 
+    INTERFACE evaluate_mixture_heat_capacity
+        MODULE PROCEDURE evaluate_mixture_heat_capacity_real
+        MODULE PROCEDURE evaluate_mixture_heat_capacity_complex
+    END INTERFACE evaluate_mixture_heat_capacity
+
+    INTERFACE evaluate_mixture_density
+        MODULE PROCEDURE evaluate_mixture_density_real
+        MODULE PROCEDURE evaluate_mixture_density_complex
+    END INTERFACE evaluate_mixture_density
+
 CONTAINS
+
+    SUBROUTINE evaluate_mixture_density_real(T,xs,xg,rho_m,inv_rho_m)
+        REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
+        REAL(wp), INTENT(OUT) :: rho_m, inv_rho_m
+        REAL(wp) :: xc, gas_const_c, inv_rho_c
+        INCLUDE 'density_from_mass.inc'
+    END SUBROUTINE evaluate_mixture_density_real
+
+    SUBROUTINE evaluate_mixture_density_complex(T,xs,xg,rho_m,inv_rho_m)
+        COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
+        COMPLEX(wp), INTENT(OUT) :: rho_m, inv_rho_m
+        COMPLEX(wp) :: xc, gas_const_c, inv_rho_c
+        INCLUDE 'density_from_mass.inc'
+    END SUBROUTINE evaluate_mixture_density_complex
+
+    SUBROUTINE evaluate_mixture_heat_capacity_real(xs,xg,cp_m,cp_c)
+        REAL(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
+        REAL(wp), INTENT(OUT) :: cp_m, cp_c
+        REAL(wp) :: xc, carrier_sp_heat_mass
+        INCLUDE 'mixture_heat_capacity.inc'
+    END SUBROUTINE evaluate_mixture_heat_capacity_real
+
+    SUBROUTINE evaluate_mixture_heat_capacity_complex(xs,xg,cp_m,cp_c)
+        COMPLEX(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
+        COMPLEX(wp), INTENT(OUT) :: cp_m, cp_c
+        COMPLEX(wp) :: xc, carrier_sp_heat_mass
+        INCLUDE 'mixture_heat_capacity.inc'
+    END SUBROUTINE evaluate_mixture_heat_capacity_complex
 
     SUBROUTINE evaluate_mixture_real(T, xs, xg, rho_m, inv_rho_m, rho_c, inv_rho_c, &
             cp_m, cp_c, alphas, alphag)
