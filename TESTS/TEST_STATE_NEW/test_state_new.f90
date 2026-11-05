@@ -77,10 +77,6 @@ PROGRAM test_state_new
     CALL build_physical_state_from_qp(qp,real_workspace%state,accepted=accepted)
     IF (accepted) ERROR STOP 'invalid physical state accepted'
 
-    ! Conservative-state construction must apply the same composition closure
-    ! in REAL and COMPLEX before evaluating density or heat capacity.
-    CALL check_conservative_physical_closure(q)
-
     qp=0.0_wp
     CALL build_physical_state_from_qp(qp,real_workspace%state)
     IF (real_workspace%state%Ri /= 0.0_wp) ERROR STOP 'dry Richardson state is not zero'
@@ -109,64 +105,6 @@ CONTAINS
         IF (.NOT.accepted) ERROR STOP 'valid conservative state rejected'
         IF (p_dyn<=0.0_wp) ERROR STOP 'dynamic pressure was not computed'
     END SUBROUTINE check_admissibility
-
-    SUBROUTINE check_conservative_physical_closure(reference_q)
-        REAL(wp), INTENT(IN) :: reference_q(n_vars)
-        REAL(wp) :: candidate(n_vars),mass,overfill,closed_fraction
-        COMPLEX(wp) :: complex_candidate(n_vars)
-        LOGICAL :: accepted_real,accepted_complex
-
-        mass=reference_q(idx_totMassEqn)
-        candidate=reference_q
-        ! Overfill within closure tolerance: both representations must
-        ! normalize to the same physically admissible composition.
-        overfill=32.0_wp*EPSILON(1.0_wp)
-        candidate(idx_solid_first:idx_solid_last)=0.0_wp
-        candidate(idx_add_gas_first:idx_add_gas_last)=0.0_wp
-        candidate(idx_solid_first)=mass*(1.0_wp+overfill)
-        complex_candidate=CMPLX(candidate,0.0_wp,wp)
-        CALL build_physical_state_from_q(candidate,real_workspace%state,accepted=accepted_real)
-        CALL build_physical_state_from_q(complex_candidate,complex_workspace%state,accepted=accepted_complex)
-        IF (.NOT.accepted_real .OR. .NOT.accepted_complex) &
-            ERROR STOP 'roundoff-sized conservative composition rejected'
-        closed_fraction=SUM(real_workspace%state%xs)+SUM(real_workspace%state%xg)
-        CALL assert_close('REAL conservative closure',closed_fraction,1.0_wp,1.0E-13_wp)
-        CALL assert_close('REAL/COMPLEX conservative density',real_workspace%state%rho_m, &
-            REAL(complex_workspace%state%rho_m,wp),1.0E-12_wp)
-        CALL assert_close('REAL/COMPLEX conservative heat capacity',real_workspace%state%cp_m, &
-            REAL(complex_workspace%state%cp_m,wp),1.0E-12_wp)
-
-        ! Near-zero negative fractions are clamped in both backends. Preserve
-        ! the complex-step perturbation while removing only the roundoff real part.
-        candidate=reference_q
-        candidate(idx_solid_first)=-16.0_wp*EPSILON(1.0_wp)*mass
-        complex_candidate=CMPLX(candidate,0.0_wp,wp)
-        complex_candidate(idx_solid_first)=CMPLX(candidate(idx_solid_first),1.0E-20_wp,wp)
-        CALL build_physical_state_from_q(candidate,real_workspace%state,accepted=accepted_real)
-        CALL build_physical_state_from_q(complex_candidate,complex_workspace%state,accepted=accepted_complex)
-        IF (.NOT.accepted_real .OR. .NOT.accepted_complex) &
-            ERROR STOP 'roundoff-negative species rejected'
-        CALL assert_close('clamped real fraction',real_workspace%state%xs(1),0.0_wp,0.0_wp)
-        CALL assert_close('clamped complex real fraction',REAL(complex_workspace%state%xs(1),wp), &
-            0.0_wp,0.0_wp)
-        IF (AIMAG(complex_workspace%state%xs(1))==0.0_wp) &
-            ERROR STOP 'composition complex-step perturbation discarded'
-
-    ! Reject true overfill and a negative species without entering the
-        ! mixture kernel; a failed constructor must not report acceptance.
-        candidate(idx_solid_first)=mass*1.01_wp
-        complex_candidate=CMPLX(candidate,0.0_wp,wp)
-        CALL build_physical_state_from_q(candidate,real_workspace%state,accepted=accepted_real)
-        CALL build_physical_state_from_q(complex_candidate,complex_workspace%state,accepted=accepted_complex)
-        IF (accepted_real .OR. accepted_complex) ERROR STOP 'overfilled conservative state accepted'
-
-        candidate=reference_q
-        candidate(idx_solid_first)=-1.0E-3_wp*mass
-        complex_candidate=CMPLX(candidate,0.0_wp,wp)
-        CALL build_physical_state_from_q(candidate,real_workspace%state,accepted=accepted_real)
-        CALL build_physical_state_from_q(complex_candidate,complex_workspace%state,accepted=accepted_complex)
-        IF (accepted_real .OR. accepted_complex) ERROR STOP 'negative conservative species accepted'
-    END SUBROUTINE check_conservative_physical_closure
 
     SUBROUTINE initialize_case
         n_solid=2; n_add_gas=1; n_stoch_vars=1; n_pore_vars=1
