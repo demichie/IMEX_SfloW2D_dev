@@ -277,9 +277,9 @@ CONTAINS
             ! which disables the exact-rest scalar-flux guard at the next stage.
             IF ( exactly_resting_stencil(recon,qp_expl(:,j,k),j,k) ) THEN
                 IF ( comp_cells_x .GT. 1 ) CALL cancel_resting_roundoff(                                               &
-                    recon,j,k,1,divFlux_iRK(2,j,k) )
+                    this,recon,j,k,1,divFlux_iRK(2,j,k) )
                 IF ( comp_cells_y .GT. 1 ) CALL cancel_resting_roundoff(                                               &
-                    recon,j,k,2,divFlux_iRK(3,j,k) )
+                    this,recon,j,k,2,divFlux_iRK(3,j,k) )
 
             END IF
 
@@ -333,33 +333,48 @@ CONTAINS
     !> \param[in] k Cell y index.
     !> \param[in] axis One for x momentum, two for y momentum.
     !> \param[in,out] residual Assembled normal-momentum spatial term.
-    SUBROUTINE cancel_resting_roundoff(recon,j,k,axis,residual)
+    SUBROUTINE cancel_resting_roundoff(this,recon,j,k,axis,residual)
+        CLASS(hyperbolic_workspace_type), INTENT(IN) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
         INTEGER, INTENT(IN) :: j,k,axis
         REAL(wp), INTENT(INOUT) :: residual
-        REAL(wp) :: scale, inverse_spacing
+        REAL(wp) :: scale,inverse_spacing
+
+        ! An already vanishing momentum residual requires no thermodynamics.
+        IF (residual==0.0_wp) THEN
+            residual=0.0_wp
+            RETURN
+        END IF
 
         IF (axis .EQ. 1) THEN
             scale = MAX(                                                                                               &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j,k),                                           &
-                recon%eta_interfaceL(j,k),grav_coeff_stag_x(j,k)),                                                     &
+                recon%eta_interfaceL(j,k),grav_coeff_stag_x(j,k),                                                     &
+                this%gamma_interface_xL(j,k),recon%h_selected_interfaceL(j,k)),                                       &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j,k),                                           &
-                recon%eta_interfaceR(j,k),grav_coeff_stag_x(j,k)),                                                     &
+                recon%eta_interfaceR(j,k),grav_coeff_stag_x(j,k),                                                     &
+                this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k)),                                       &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j+1,k),                                         &
-                recon%eta_interfaceL(j+1,k),grav_coeff_stag_x(j+1,k)),                                                 &
+                recon%eta_interfaceL(j+1,k),grav_coeff_stag_x(j+1,k),                                                 &
+                this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k)),                                   &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j+1,k),                                         &
-                recon%eta_interfaceR(j+1,k),grav_coeff_stag_x(j+1,k)) )
+                recon%eta_interfaceR(j+1,k),grav_coeff_stag_x(j+1,k),                                                 &
+                this%gamma_interface_xR(j+1,k),recon%h_selected_interfaceR(j+1,k)) )
             inverse_spacing = one_by_dx
         ELSE
             scale = MAX(                                                                                               &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k),                                           &
-                recon%eta_interfaceB(j,k),grav_coeff_stag_y(j,k)),                                                     &
+                recon%eta_interfaceB(j,k),grav_coeff_stag_y(j,k),                                                     &
+                this%gamma_interface_yB(j,k),recon%h_selected_interfaceB(j,k)),                                       &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k),                                           &
-                recon%eta_interfaceT(j,k),grav_coeff_stag_y(j,k)),                                                     &
+                recon%eta_interfaceT(j,k),grav_coeff_stag_y(j,k),                                                     &
+                this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k)),                                       &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k+1),                                         &
-                recon%eta_interfaceB(j,k+1),grav_coeff_stag_y(j,k+1)),                                                 &
+                recon%eta_interfaceB(j,k+1),grav_coeff_stag_y(j,k+1),                                                 &
+                this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1)),                                   &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k+1),                                         &
-                recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1)) )
+                recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1),                                                 &
+                this%gamma_interface_yT(j,k+1),recon%h_selected_interfaceT(j,k+1)) )
             inverse_spacing = one_by_dy
 
         END IF
@@ -368,20 +383,25 @@ CONTAINS
             residual = 0.0_wp
     END SUBROUTINE cancel_resting_roundoff
 
-    !> \brief Estimate the pressure scale underlying one hydrostatic endpoint calculation.
-    !> \param[in] qp_face Reconstructed physical state, with depth in entry one.
-    !> \param[in] eta Face free surface [m], included for subtraction roundoff.
-    !> \param[in] gravity_factor Dimensionless large-slope factor at the face.
-    !> \return Absolute path arithmetic scale [kg s^-2]; zero for a dry endpoint.
-    FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor) RESULT(scale)
+    !> Estimate the hydrostatic arithmetic scale for one unmodified face trace.
+    !> The cached coefficient comes from the selected-depth CFL trace and uses
+    !> identical temperature and mass fractions. Only the depth can differ.
+    !> If it changes the wet/dry branch, retain the original evaluation.
+    FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h) RESULT(scale)
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
-        REAL(wp), INTENT(IN) :: qp_face(:),eta,gravity_factor
+        REAL(wp), INTENT(IN) :: qp_face(:),eta,gravity_factor,cached_gamma,selected_h
         REAL(wp) :: scale,gamma,reduced_gravity,h
 
         h = MAX(0.0_wp,qp_face(1))
         scale = 0.0_wp
         IF (h .EQ. 0.0_wp) RETURN
-        CALL eval_hydrostatic_coefficient(qp_face,reduced_gravity,gamma)
+        IF (h<=EPSILON(1.0_wp)) THEN
+            gamma=0.0_wp
+        ELSEIF (selected_h>EPSILON(1.0_wp)) THEN
+            gamma=cached_gamma
+        ELSE
+            CALL eval_hydrostatic_coefficient(qp_face,reduced_gravity,gamma)
+        END IF
         scale = ABS(gravity_factor*gamma)*h*MAX(h,ABS(eta))
     END FUNCTION hydrostatic_arithmetic_scale
 

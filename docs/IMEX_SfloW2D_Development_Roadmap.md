@@ -26,6 +26,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Avanzamento C4 (5 novembre 2026):** `hyperbolic_2d` riusa sui path di interfaccia i coefficienti idrostatici `gamma=rho_m*g'` calcolati insieme alle velocita caratteristiche sulle stesse tracce finali. Memorizzati nel workspace HP-PCCU, invalidati con il ricalcolo delle velocita e azzerati dove il dry-donor modifica la profondita; nessuna nuova cache globale o modifica delle formule. Evitate due ulteriori valutazioni termodinamiche per faccia, a costo di quattro matrici scalari aggiuntive da misurare. **C4 in corso: compilazione, risultati e profiling sul nuovo commit pendenti.** Dettagli nella roadmap specialistica; Actions solo manuali.
 
+**Avanzamento C4/C5 (5 novembre 2026):** `hyperbolic_2d:cancel_resting_roundoff` riutilizza i gamma delle facce gia calcolati durante `eval_speeds` per la stima del residuo well-balanced; mantiene il vecchio kernel quando la selezione di profondita attraversa la soglia wet/dry e salta tutte le valutazioni quando il residuo e gia esattamente nullo. Nessun nuovo array. **C4 e C5 IN CORSO**, compilazione, regressioni scientifiche e profiling del nuovo commit pendenti; tutti i test rimangono manuali.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni
