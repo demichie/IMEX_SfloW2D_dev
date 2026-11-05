@@ -12,8 +12,10 @@ gfortran $common -c "$repo_dir/src/core/parameters_2d.f90"
 gfortran $common -c "$repo_dir/src/core/constitutive_parameters_2d.f90"
 gfortran $common -J. -c "$repo_dir/src/state_new/state_new_types.f90"
 gfortran $common -J. -c "$repo_dir/src/state_new/state_new_mixture.f90"
+gfortran $common -J. -c "$repo_dir/src/state_new/state_new_composition.f90"
 gfortran $common -J. -c "$repo_dir/src/state_new/state_new_conversions.f90"
 gfortran $common -J. -c "$repo_dir/src/state_new/state_new_physical.f90"
+gfortran $common -J. -c "$repo_dir/src/state_new/state_new.f90"
 gfortran $common -J. -c "$test_dir/test_state_new.f90"
 gfortran $common ./*.o -o test_state_new
 ./test_state_new
