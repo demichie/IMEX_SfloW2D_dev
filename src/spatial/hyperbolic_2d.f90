@@ -1022,7 +1022,9 @@ CONTAINS
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),           &
                     qp_path_plus,recon%eta_cellE(j,k),                                                                 &
-                    grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
+                    grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k),                                      &
+                    this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k),                                   &
+                    this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k) )
 
             END IF
 
@@ -1035,7 +1037,9 @@ CONTAINS
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),           &
                     qp_path_plus,recon%eta_cellN(j,k),                                                                 &
-                    grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
+                    grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k),                                      &
+                    this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k),                                   &
+                    this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1) )
 
             END IF
 
@@ -1057,7 +1061,8 @@ CONTAINS
     !> \param[in] grav_plus Large-slope gravity factor at the positive endpoint.
     !> \param[in] direction Cartesian path orientation.
     !> \param[out] path Hydrostatic path contribution across the cell.
-    SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path)
+    SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path, &
+        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus)
 
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE pccu_2d, ONLY : eval_hydrostatic_path
@@ -1066,14 +1071,28 @@ CONTAINS
 
         REAL(wp), INTENT(IN) :: qp_minus(:),eta_minus,grav_minus
         REAL(wp), INTENT(IN) :: qp_plus(:),eta_plus,grav_plus
+        REAL(wp), INTENT(IN) :: cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(OUT) :: path(:)
 
         REAL(wp) :: gamma_minus,gamma_plus
         REAL(wp) :: reduced_gravity_minus,reduced_gravity_plus
 
-        CALL eval_hydrostatic_coefficient(qp_minus,reduced_gravity_minus, gamma_minus)
-        CALL eval_hydrostatic_coefficient(qp_plus,reduced_gravity_plus,gamma_plus)
+        ! Face speed coefficients were evaluated on the same thermodynamic
+        ! primitive traces. Their selected depths may differ from the path
+        ! depths, so reuse only when both endpoints are genuinely wet.
+        ! Otherwise retain the original density evaluation and shoreline
+        ! regularization. No tolerance-based comparison of compositions.
+        IF (qp_minus(1)>EPSILON(1.0_wp) .AND. selected_h_minus>EPSILON(1.0_wp)) THEN
+            gamma_minus=cached_gamma_minus
+        ELSE
+            CALL eval_hydrostatic_coefficient(qp_minus,reduced_gravity_minus,gamma_minus)
+        END IF
+        IF (qp_plus(1)>EPSILON(1.0_wp) .AND. selected_h_plus>EPSILON(1.0_wp)) THEN
+            gamma_plus=cached_gamma_plus
+        ELSE
+            CALL eval_hydrostatic_coefficient(qp_plus,reduced_gravity_plus,gamma_plus)
+        END IF
         CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1), gamma_plus)
         CALL eval_hydrostatic_path(direction,qp_minus(1),gamma_minus,eta_minus,                                        &
             grav_minus,qp_plus(1),gamma_plus,eta_plus,grav_plus,path)

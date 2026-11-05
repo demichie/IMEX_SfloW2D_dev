@@ -44,6 +44,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Splitting stocastico aggiornato su richiesta (5 novembre 2026, codice da compilare):** la sequenza operativa ora e `CFL → spatial(q_Z) → OU(post-spatial trial) → Lie sources(effective_Z) → commit`. Lo stage OU e coordinato in `time_integration_2d` ma calcolato esclusivamente da `stochastic_module`, senza aggiornare lo stato pubblicato prima del commit; `Z` ed `effective_Z` sono ripristinati sul rifiuto della transazione. Questo cambia intenzionalmente l'ordine dello splitting e la dipendenza della rumorosita dalle velocita, e richiede test con stocastico attivo. A05 ora consente di riusare CFL/HP-PCCU con stocastico attivo poiche OU non modifica piu `q/qp` prima dello spatial; le esclusioni conservate sono `cfl==-1` e iniezione laterale di bordo. Dettagli e controlli in D.14 della roadmap specialistica.
 
+**A08 selezionato e implementato (5 novembre 2026, test pendenti):** in `hyperbolic_2d` il path idrostatico interno di ogni cella puo riusare i coefficienti `Gamma` gia valutati da `eval_speeds` sulle stesse tracce primitive. Le profondita selezionate delle facce e quelle dei path differiscono: il riuso e valido esclusivamente se entrambe superano `EPSILON(1.0_wp)`. Nei casi dry/near-dry si mantiene il calcolo precedente e la regolarizzazione wet/dry; nessun nuovo array. Sono stati lasciati intenzionalmente fuori A07, A09–A12. Build ed esempi sul nuovo commit da eseguire. Dettagli in D.15 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni
