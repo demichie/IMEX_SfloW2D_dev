@@ -93,6 +93,8 @@ EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservativ
              physics/rheology_laws/rheology_lava_viscous.inc \
              physics/rheology_laws/rheology_plastic_yield.inc \
              physics/rheology_laws/rheology_quadratic_drag.inc \
+             physics/rheology_laws/rheology_empirical_drag.inc \
+             physics/rheology_laws/rheology_lahar_drag.inc \
              python_diagnostics/kt_ritter_1d.f90
 
 state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
@@ -497,3 +499,7 @@ physics/rheology_laws/rheology_lava_2d.$(OBJEXT): physics/rheology_laws/rheology
 physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): physics/rheology_laws/rheology_plastic_yield.inc
 
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): physics/rheology_laws/rheology_quadratic_drag.inc
+
+physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): physics/rheology_laws/rheology_empirical_drag.inc
+
+physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc
