@@ -48,6 +48,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Regressione A08 e rollback mirato (5 novembre 2026):** dopo l'ottimizzazione di riuso del coefficiente idrostatico Gamma (`3e2b02d`), l'utente ha segnalato `EXAMPLE_TAAL` fallito a circa `t=27.36` con `D19: inadmissible source candidate`. Ripristinato `src/spatial/hyperbolic_2d.f90` esattamente come nel baseline `c8605e4`, mantenendo A05 e la nuova sequenza OU. A08 e ora **NON ACCETTATO / ROLLED BACK**. Necessaria conferma della build e del TAAL oltre il tempo di guasto; l'attribuzione fisica precisa non e ancora dimostrata. Dettagli in D.16 della roadmap specialistica.
 
+**Rettifica TAAL D19 (5 novembre 2026):** l'utente segnala che `EXAMPLE_TAAL` fallisce circa a t=27.36 anche dopo il rollback di A08 (`b373f6a`); i run precedenti probabilmente non erano stati prolungati abbastanza. Non e dimostrato che A08 sia responsabile, ne che esista una baseline precedente che superi il tempo critico. Il rifiuto e in `lie_source_executor_2d`, ramo esplicito `cell_error=6`: candidato `q_local+dt*total_rate` non ammissibile. Prossimo passo: eseguire `IMEX_LIE_DIAGNOSTICS=1 ./IMEX_SfloW2D` e raccogliere `D19_BUDGET` (gruppo, cella, recipient, rate, candidato), senza modificare la fisica. Vedi D.17 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

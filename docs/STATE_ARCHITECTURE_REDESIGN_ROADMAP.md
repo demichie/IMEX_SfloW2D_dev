@@ -341,6 +341,14 @@ Il messaggio D19 deriva dal controllo dell'ammissibilita del candidato sorgente:
 
 **Gate:** far rieseguire build ed EXAMPLE_TAAL sul commit di rollback fino oltre `t=27.3632`; idealmente EXAMPLE_ETNA_LAVA. Se TAAL fallisce ancora, analizzare D19 con log di gruppo, cella e candidati, senza attribuire automaticamente l'errore alla sola A08.
 
+### D.17 Rettifica diagnostica TAAL t circa 27.36 — errore D19 preesistente al rollback A08 (5 novembre 2026)
+
+**Nuova evidenza dall'utente:** `EXAMPLE_TAAL` si arresta nello stesso punto anche su `b373f6a`, dove `hyperbolic_2d.f90` e stato ripristinato alla versione precedente ad A08. L'utente precisa che i run precedenti, ritenuti riusciti, potrebbero essere stati interrotti prima del tempo critico. **Non esiste ancora una baseline verificata oltre t circa 27.36.** E pertanto scorretto classificare il difetto come regressione dimostrata di A08. A08 rimane revertito per prudenza, non giudicato come causa.
+
+**Punto di fallimento nel codice:** `lie_source_executor_2d.f90`, `cell_error=6`, `conservative_mass_admissible(q_candidate(1:n_eqns))` falso durante un gruppo esplicito; `q_candidate=q_local+dt*total_rate`. I controlli e i limiter dei rate non vanno alterati prima di identificare la causa. I dati essenziali sono gia stampati con `IMEX_LIE_DIAGNOSTICS=1`: `D19_BUDGET cell/group/dt/recipient/scaled_rate/candidate/reconstruction_match`, oltre alla spiegazione del fallimento. Non serve una nuova patch strumentale.
+
+**Piano diagnostico:** rieseguire `EXAMPLE_TAAL` oltre 27 s con `IMEX_LIE_DIAGNOSTICS=1`, acquisire tutti i record `D19_BUDGET` e la riga `FATAL ERROR`, individuare la sorgente `group`, la componente negativa/non fisica e il bilancio del rate. Solo dopo risalire al termine sorgente di quella componente. Distinguere bug del modello da instabilita condizionale da timestep; nessuna correzione numerica o rollback generalizzato senza evidenza.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
