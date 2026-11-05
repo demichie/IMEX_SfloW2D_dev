@@ -7,15 +7,15 @@ permissions:
   contents: read
 
 jobs:
-  state-new:
-    name: New state architecture
+  state:
+    name: State architecture
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify stateNEW production boundary
+      - name: Verify state module production boundary
         shell: bash
         run: python3 TESTS/TEST_STATE/check_legacy_boundary.py
 
@@ -27,14 +27,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sh TESTS/TEST_STATE/run_test.sh 2>&1 | tee state-new-test.log
+          sh TESTS/TEST_STATE/run_test.sh 2>&1 | tee state-test.log
 
       - name: Upload state architecture log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: state-new-test-${{ github.run_id }}
-          path: state-new-test.log
+          name: state-test-${{ github.run_id }}
+          path: state-test.log
           if-no-files-found: warn
 
   existing-state-regressions:
