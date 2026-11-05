@@ -21,7 +21,7 @@
 MODULE rheology_mui_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_solid
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
     USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
@@ -46,7 +46,7 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate Two-component conservative momentum source.
     SUBROUTINE eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
 
         LOGICAL, INTENT(IN) :: use_pore_pressure
@@ -71,7 +71,7 @@ CONTAINS
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: use_pore_pressure
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
@@ -152,7 +152,7 @@ CONTAINS
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_mui_implicit(state, rate_x, rate_y)
 
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
@@ -175,7 +175,7 @@ CONTAINS
     SUBROUTINE eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,                  &
         use_pore_pressure, velocity_after)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration
         LOGICAL, INTENT(IN) :: use_pore_pressure
         REAL(wp), INTENT(OUT) :: velocity_after(2)

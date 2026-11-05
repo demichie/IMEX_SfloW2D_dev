@@ -242,6 +242,8 @@ Non mantenere pass-through o alias di compatibilità per conservare l’organizz
 - [x] `update_physical_state_kinematics` aggiorna anche Richardson quando cambiano `u,v`; i costruttori e `refresh_physical_state` non ne duplicano il calcolo.
 - [x] `TEST_STATE_NEW` include un test dell'aggiornamento di velocita e della parita REAL/COMPLEX del Richardson.
 
+**F5 — cambio contratti delle reologie (5 novembre 2026):** tutti i 12 moduli reologici (dispatcher e leggi) ora dichiarano direttamente `physical_state_real`/`physical_state_complex` da `state_new_types`. La promozione REAL → COMPLEX usata dalle valutazioni esplicite composte è un'operazione numerica esplicita in `state_new_types`, con buffer COMPLEX preinizializzato: non è un forwarding wrapper. Il vecchio costruttore del `state_conversion_2d` non viene più usato dalle reologie. La nuova promozione richiede aggiornamento dei chiamanti e della gestione degli scratch; compilazione e test restano NON VERIFICATI fino alla migrazione coordinata di `source_terms_2d` e dell'esecutore Lie/Newton. Non marcare F5 completata.
+
 **Inventario delle dipendenze ancora da migrare (audit statico su master `1ca1fe6`):**
 - [ ] Reologie: dispatcher `rheology_2d`, Voellmy, plastic, lava, lahar, empirical, quadratic, Froude, Lucas, mu(I), mu(I)-Voellmy, newmodel. Migrare i tipi, trasferimenti REAL/COMPLEX e la copia profonda `current_state=state` nel percorso analitico.
 - [ ] Mass exchange: `mass_exchange_2d`, deposition, erosion, entrainment, vaporization, liquid loss e lava deposition. Preservare budget, rate e processi locali.

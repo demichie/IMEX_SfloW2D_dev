@@ -20,7 +20,7 @@
 MODULE rheology_lucas_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
@@ -45,7 +45,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate Conservative horizontal momentum source vector.
     SUBROUTINE eval_rheology_lucas_explicit(state, grav_coeff, use_stochastic, stochastic_value, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_stochastic
@@ -72,7 +72,7 @@ CONTAINS
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_lucas_semi_implicit(state, grav_coeff, stochastic, stochastic_value, rate_x, rate_y)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -126,7 +126,7 @@ CONTAINS
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_lucas_implicit(state, rate_x, rate_y)
 
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
@@ -151,7 +151,7 @@ CONTAINS
     SUBROUTINE eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,            &
         stochastic_value, velocity_after)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_term
         LOGICAL, INTENT(IN) :: stochastic
         REAL(wp), INTENT(IN) :: stochastic_value

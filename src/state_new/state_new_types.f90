@@ -20,6 +20,7 @@ MODULE state_new_types
     PUBLIC :: initialize_state_workspace_complex
     PUBLIC :: reset_physical_state_real
     PUBLIC :: reset_physical_state_complex
+    PUBLIC :: promote_physical_state
 
     !> Complete cell-local physical state for real-valued evaluation.
     TYPE, PUBLIC :: physical_state_real
@@ -62,6 +63,40 @@ MODULE state_new_types
     END TYPE state_workspace_complex
 
 CONTAINS
+
+    !> Promote a frozen real physical state for shared REAL/COMPLEX constitutive evaluation.
+    !> This is a genuine precision-domain conversion, not a legacy API forwarding wrapper.
+    SUBROUTINE promote_physical_state(source,target)
+        TYPE(physical_state_real), INTENT(IN) :: source
+        TYPE(physical_state_complex), INTENT(INOUT) :: target
+
+        IF (.NOT.source%layout_valid) ERROR STOP 'Cannot promote an uninitialized physical state'
+        IF (.NOT.target%layout_valid) ERROR STOP 'Complex physical state storage not initialized'
+        target%h=CMPLX(source%h,0.0_wp,wp)
+        target%u=CMPLX(source%u,0.0_wp,wp)
+        target%v=CMPLX(source%v,0.0_wp,wp)
+        target%T=CMPLX(source%T,0.0_wp,wp)
+        target%rho_m=CMPLX(source%rho_m,0.0_wp,wp)
+        target%inv_rhom=CMPLX(source%inv_rhom,0.0_wp,wp)
+        target%rho_c=CMPLX(source%rho_c,0.0_wp,wp)
+        target%inv_rho_c=CMPLX(source%inv_rho_c,0.0_wp,wp)
+        target%cp_m=CMPLX(source%cp_m,0.0_wp,wp)
+        target%cp_c=CMPLX(source%cp_c,0.0_wp,wp)
+        target%red_grav=CMPLX(source%red_grav,0.0_wp,wp)
+        target%Ri=CMPLX(source%Ri,0.0_wp,wp)
+        target%Zs=CMPLX(source%Zs,0.0_wp,wp)
+        target%exc_pore_pres=CMPLX(source%exc_pore_pres,0.0_wp,wp)
+        target%w=CMPLX(source%w,0.0_wp,wp)
+        target%mod_vel_hor=CMPLX(source%mod_vel_hor,0.0_wp,wp)
+        target%mod_vel2=CMPLX(source%mod_vel2,0.0_wp,wp)
+        target%mod_vel=CMPLX(source%mod_vel,0.0_wp,wp)
+        target%curvature_acceleration=CMPLX(source%curvature_acceleration,0.0_wp,wp)
+        target%xs=CMPLX(source%xs,0.0_wp,wp)
+        target%xg=CMPLX(source%xg,0.0_wp,wp)
+        target%alphas=CMPLX(source%alphas,0.0_wp,wp)
+        target%alphag=CMPLX(source%alphag,0.0_wp,wp)
+    END SUBROUTINE promote_physical_state
+
 
     SUBROUTINE reset_physical_state_real(state)
         TYPE(physical_state_real), INTENT(INOUT) :: state

@@ -13,8 +13,8 @@
 MODULE rheology_2d
 
     USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                                  &
-            update_physical_state_kinematics
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_new_physical, ONLY : update_physical_state_kinematics
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : rheology_source_id,RHEOLOGY_ID_NONE,                                                &
             RHEOLOGY_ID_VOELLMY,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_LAVA,RHEOLOGY_ID_LAHAR,                               &
@@ -92,7 +92,7 @@ CONTAINS
     SUBROUTINE eval_rheology_explicit(model_id, state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value,  &
         rate)
         INTEGER, INTENT(IN) :: model_id
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
@@ -136,7 +136,7 @@ CONTAINS
     SUBROUTINE eval_rheology_semi_implicit(models, state, grav_coeff, use_pore_pressure, use_stochastic,               &
         stochastic_value, rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
@@ -160,7 +160,7 @@ CONTAINS
     SUBROUTINE eval_rheology_semi_implicit_id(model_id,state,grav_coeff,use_pore_pressure,                            &
             use_stochastic,stochastic_value,rate)
         INTEGER, INTENT(IN) :: model_id
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff,stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
@@ -201,7 +201,7 @@ CONTAINS
         ! Never advance shared inventories or geometry while evaluating this dispatch.
     SUBROUTINE eval_rheology_implicit(models, state, use_stochastic, stochastic_value, rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
@@ -223,7 +223,7 @@ CONTAINS
     !> Newton complex-rate dispatch with source identity resolved at initialization.
     SUBROUTINE eval_rheology_implicit_id(model_id,state,use_stochastic,stochastic_value,rate)
         INTEGER, INTENT(IN) :: model_id
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
@@ -262,11 +262,11 @@ CONTAINS
         use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported, bx, by, bxx, bxy, byy)
         CHARACTER(*), INTENT(IN) :: models(:)
         REAL(wp), INTENT(IN) :: dt,speed_ratio,grav_coeff,curvature_acceleration,stochastic_value
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         LOGICAL, INTENT(OUT) :: model_supported
-        TYPE(physical_state_type) :: current_state
+        TYPE(physical_state_real) :: current_state
         REAL(wp) :: velocity_before(2)
         REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
         INTEGER :: i

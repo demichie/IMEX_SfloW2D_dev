@@ -25,7 +25,7 @@
 MODULE rheology_mui_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_solid
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex, promote_physical_state
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, xi
     USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
@@ -54,18 +54,18 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
     SUBROUTINE eval_rheology_mui_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
-        TYPE(complex_physical_state_type) :: cs
+        TYPE(physical_state_complex) :: cs
 
         curvature_accel=state%curvature_acceleration
         CALL eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, sx, sy)
-        CALL complex_state_from_real(state, cs)
+        CALL promote_physical_state(state, cs)
         CALL eval_rheology_mui_voellmy_implicit(cs, use_stochastic, stochastic_value, ix, iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_mui_voellmy_explicit
@@ -85,7 +85,7 @@ CONTAINS
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: use_pore_pressure
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
@@ -171,7 +171,7 @@ CONTAINS
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_mui_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
 
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
 
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -223,7 +223,7 @@ CONTAINS
     SUBROUTINE eval_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,          &
         use_pore_pressure, use_stochastic_xi, stochastic_xi_value, velocity_after)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration
         LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_xi_value

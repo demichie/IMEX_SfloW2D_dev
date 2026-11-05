@@ -20,7 +20,7 @@
 MODULE rheology_lava_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex, promote_physical_state
     USE rheology_parameters_2d, ONLY : T_ref
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
@@ -38,15 +38,15 @@ MODULE rheology_lava_2d
 CONTAINS
 
     SUBROUTINE eval_rheology_lava_explicit(state, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
 
 
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
-        TYPE(complex_physical_state_type) :: cs
+        TYPE(physical_state_complex) :: cs
         CALL eval_rheology_lava_semi_implicit(state, sx, sy)
-        CALL complex_state_from_real(state, cs)
+        CALL promote_physical_state(state, cs)
         CALL eval_rheology_lava_implicit(cs, ix, iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lava_explicit
@@ -54,7 +54,7 @@ CONTAINS
 
     SUBROUTINE eval_rheology_lava_semi_implicit(state, rate_x, rate_y)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
 
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
@@ -68,7 +68,7 @@ CONTAINS
 
     SUBROUTINE eval_rheology_lava_implicit(state, rate_x, rate_y)
 
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
 
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: gamma
@@ -96,7 +96,7 @@ CONTAINS
 
     SUBROUTINE eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
         REAL(wp) :: velocity_before(2)
         REAL(wp), INTENT(OUT) :: velocity_after(2)

@@ -4,7 +4,7 @@
 MODULE rheology_newmodel_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_rheology_newmodel_explicit
@@ -19,7 +19,7 @@ CONTAINS
         !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
         !> \param[out] rate Two-component conservative momentum source.
     SUBROUTINE eval_rheology_newmodel_explicit(state, rate)
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(OUT) :: rate(2)
             ! Keep the common four-treatment interface, but this fixture is Newton-only.
             rate=0.0_wp
@@ -36,7 +36,7 @@ CONTAINS
         !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_newmodel_semi_implicit(state,rate_x,rate_y)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(OUT) :: rate_x,rate_y
 
             rate_x=0.0_wp
@@ -52,7 +52,7 @@ CONTAINS
         !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_newmodel_implicit(state,rate_x,rate_y)
 
-            TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_complex), INTENT(IN) :: state
             COMPLEX(wp), INTENT(OUT) :: rate_x,rate_y
             REAL(wp), PARAMETER :: drag_coefficient=0.1_wp
 
@@ -69,7 +69,7 @@ CONTAINS
         !> retained in the returned velocity vector.
     SUBROUTINE eval_rheology_newmodel_analytic(state)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             CALL fatal_error('rheology_newmodel: analytic treatment unsupported')
     END SUBROUTINE eval_rheology_newmodel_analytic
 
