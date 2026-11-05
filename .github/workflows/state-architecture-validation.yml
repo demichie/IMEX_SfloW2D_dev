@@ -2,15 +2,6 @@ name: State architecture validation
 
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - 'src/physics/source_terms_2d.f90'
-      - 'src/numerics/lie_source_executor_2d.f90'
-      - 'src/state_new/**'
-      - 'TESTS/TEST_MASS_EXCHANGE/**'
-      - '.github/workflows/state-architecture-validation.yml'
-      - '.github/scripts/install-ubuntu-deps.sh'
 
 permissions:
   contents: read
@@ -114,8 +105,6 @@ jobs:
     name: Full driver strict-debug build
     runs-on: ubuntu-24.04
     timeout-minutes: 35
-    outputs:
-      first_error: ${{ steps.compiler_error.outputs.first_error }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -135,16 +124,14 @@ jobs:
           make -j2 2>&1 | tee full-strict-debug-build.log
           test -x src/IMEX_SfloW2D
 
-      - name: Surface compiler error in job metadata
-        if: always()
-        id: compiler_error
+      - name: Report compiler error in build log
+        if: failure()
         shell: bash
         run: |
           if [ -f full-strict-debug-build.log ]; then
             first=$(grep -m1 -E 'Error:|Fatal Error:|error:' full-strict-debug-build.log || true)
-            first="${first:0:180}"
             if [ -n "$first" ]; then
-              printf 'first_error=%s\n' "$first" >> "$GITHUB_OUTPUT"
+              echo "::error title=Fortran compiler failure::$first"
             fi
           fi
 
@@ -198,12 +185,3 @@ jobs:
           path: full-strict-debug-build.log
           if-no-files-found: warn
 
-  compiler-error-summary:
-    name: "Compiler failure: ${{ needs.strict-debug-driver.outputs.first_error }}"
-    needs: strict-debug-driver
-    if: ${{ always() && needs.strict-debug-driver.outputs.first_error != '' }}
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Report the first compiler error
-        run: |
-          echo "First compiler failure: ${{ needs.strict-debug-driver.outputs.first_error }}"

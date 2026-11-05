@@ -2,9 +2,6 @@ name: Settling regression pre-post stateNEW
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/settling-regression-bisect.yml'
 
 permissions:
   contents: read
