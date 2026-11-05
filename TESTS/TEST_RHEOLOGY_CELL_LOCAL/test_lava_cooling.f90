@@ -2,7 +2,9 @@ PROGRAM test_lava_cooling
 
   USE parameters_2d, ONLY : wp
   USE thermal_cooling_2d, ONLY : eval_thermal_cooling_analytic, &
-       eval_thermal_cooling_implicit
+       eval_thermal_cooling_implicit, eval_thermal_cooling_explicit, &
+       eval_thermal_cooling_semi_implicit
+  USE state_new_types, ONLY : physical_state_real, physical_state_complex
 
   IMPLICIT NONE
 
@@ -13,6 +15,30 @@ PROGRAM test_lava_cooling
   REAL(wp), PARAMETER :: convective_coefficient = 9.0_wp
   REAL(wp) :: after_first, after_second, after_full, after_short
   REAL(wp) :: expected_derivative, measured_derivative, expected_temperature
+  REAL(wp) :: explicit_rate,semi_rate,complex_step_derivative
+  TYPE(physical_state_real) :: real_state
+  TYPE(physical_state_complex) :: complex_state
+  COMPLEX(wp) :: complex_rate
+  REAL(wp), PARAMETER :: step_cs=1.0E-20_wp
+
+  ! Explicit = semi-implicit REAL + shared implicit REAL; complex-step derivative.
+  real_state%T=initial_temperature
+  complex_state%T=CMPLX(initial_temperature,0.0_wp,wp)
+  CALL eval_thermal_cooling_explicit(real_state,radiative_coefficient, &
+       convective_coefficient,ambient,explicit_rate)
+  CALL eval_thermal_cooling_semi_implicit(real_state,semi_rate)
+  CALL eval_thermal_cooling_implicit(complex_state,radiative_coefficient, &
+       convective_coefficient,ambient,complex_rate)
+  CALL assert_close(explicit_rate,semi_rate+REAL(complex_rate,wp),1.0E-14_wp, &
+       'thermal REAL/COMPLEX rate mismatch')
+  complex_state%T=CMPLX(initial_temperature,step_cs,wp)
+  CALL eval_thermal_cooling_implicit(complex_state,radiative_coefficient, &
+       convective_coefficient,ambient,complex_rate)
+  complex_step_derivative=AIMAG(complex_rate)/step_cs
+  expected_derivative=-4.0_wp*radiative_coefficient*initial_temperature**3 &
+       -convective_coefficient
+  CALL assert_close(complex_step_derivative,expected_derivative,1.0E-13_wp, &
+       'thermal complex-step derivative mismatch')
 
   CALL test_cooling_analytic(initial_temperature, 0.0_wp,        &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,   &

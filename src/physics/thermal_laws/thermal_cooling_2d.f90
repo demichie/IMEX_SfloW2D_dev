@@ -20,7 +20,10 @@ CONTAINS
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: rate
-        rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
+        REAL(wp) :: semi_rate,implicit_rate
+        CALL eval_thermal_cooling_semi_implicit(state,semi_rate)
+        CALL eval_thermal_cooling_implicit_real(state,radiative,convective,ambient,implicit_rate)
+        rate=semi_rate+implicit_rate
     END SUBROUTINE eval_thermal_cooling_explicit
 
 
@@ -44,8 +47,16 @@ CONTAINS
         TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         COMPLEX(wp), INTENT(OUT) :: rate
-        rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
+        INCLUDE 'thermal_cooling_rate.inc'
     END SUBROUTINE eval_thermal_cooling_implicit
+
+    !> Evaluate exactly the same implicit contribution in REAL for explicit assembly.
+    SUBROUTINE eval_thermal_cooling_implicit_real(state,radiative,convective,ambient,rate)
+        TYPE(physical_state_real), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        REAL(wp), INTENT(OUT) :: rate
+        INCLUDE 'thermal_cooling_rate.inc'
+    END SUBROUTINE eval_thermal_cooling_implicit_real
 
 
     !> @brief Advance temperature under frozen-coefficient exact cooling.

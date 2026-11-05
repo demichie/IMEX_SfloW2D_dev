@@ -95,6 +95,7 @@ EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservativ
              physics/rheology_laws/rheology_quadratic_drag.inc \
              physics/rheology_laws/rheology_empirical_drag.inc \
              physics/rheology_laws/rheology_lahar_drag.inc \
+             physics/thermal_laws/thermal_cooling_rate.inc \
              python_diagnostics/kt_ritter_1d.f90
 
 state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
