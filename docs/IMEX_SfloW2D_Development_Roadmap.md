@@ -64,6 +64,8 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 **GitHub Actions — runner Ubuntu e mirror Azure (5 novembre 2026):** i job paralleli ripetevano `apt-get update` anche quando le dipendenze erano gia installate; alcuni restavano bloccati sul mirror Azure. Introdotto `.github/scripts/install-ubuntu-deps.sh`, utilizzato da tutti i 10 workflow che installano pacchetti APT: verifica con `dpkg-query` ogni dipendenza e salta completamente APT quando tutti i pacchetti sono presenti. Quando necessario, esegue APT con retry e timeout di connessione a 15 secondi, limite di 150 secondi sull'update e 240 sull'installazione, senza installare pacchetti raccomandati. Le dipendenze dichiarate e tutti i gate scientifici restano invariati. **Verifica CI ancora necessaria**; i workflow gia avviati non sono aggiornati retroattivamente.
 
+**TAAL smoke CI: falso positivo eliminato (5 novembre 2026):** il log `taal-settling-smoke.log` della Action verde precedente mostra solo masse totale e solida nulle fino a `t=0.05`, a differenza dell'esecuzione dell'utente in cui la massa e gia positiva a `t=0.011`. Quindi il test non aveva esercitato la deposizione. Il gate e stato esteso a `T_END=0.2` e ora fallisce esplicitamente se nessuna riga di output dimostra **massa totale positiva e massa solida positiva**. Il rollback D19 rimane aperto e la causa del mancato ingresso del flusso nella precedente CI va indagata se la nuova Action produce ancora massa zero. Non modificato il kernel fisico.
+
 ## 4. Backlog ordinato per priorità
 
 | Priorità | ID | Attività | Chiusura richiesta |
