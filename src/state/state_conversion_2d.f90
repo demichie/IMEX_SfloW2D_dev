@@ -101,7 +101,6 @@ MODULE state_conversion_2d
     PUBLIC :: real_physical_state_from_q, complex_state_from_real
     PUBLIC :: qc_to_qp, qp_to_qc
     PUBLIC :: mixt_var
-    PUBLIC :: sauter_diameter, average_density_solids
     PUBLIC :: eval_mixture_heat_capacity
     PUBLIC :: eval_mixture_properties_from_mass_fractions
     PUBLIC :: eval_mixture_properties_from_volume_fractions
@@ -874,44 +873,7 @@ CONTAINS
     !> \param[in] alpha_solids Depth-averaged solid volume fractions used as mixture weights.
     !> \return Sauter diameter [m]; an unweighted mean diameter when solid volume is negligible.
 
-    FUNCTION sauter_diameter(alpha_solids)
-        !> Sauter diameter
-        REAL(wp) :: sauter_diameter
 
-        !> depth-averaged volumetric fractions of solid phases
-        REAL(wp), INTENT(IN) :: alpha_solids(n_solid)
-
-        IF ( SUM( alpha_solids ) .LT. EPSILON(1.0_wp) ) THEN
-            sauter_diameter = SUM( diam_s ) / n_solid
-        ELSE
-            sauter_diameter = SUM( alpha_solids ) / SUM( alpha_solids /  diam_s )
-
-        END IF
-
-    END FUNCTION sauter_diameter
-
-    !> \brief Compute the volume-weighted mean density of the solid phases.
-    !>
-    !> Function that calculates the average density of solid phases
-    !>
-    !> \param[in] alpha_solids Depth-averaged solid volume fractions used as mixture weights.
-    !> \return Solid mixture density [kg m^-3]; an unweighted mean when solid volume is negligible.
-
-    FUNCTION average_density_solids(alpha_solids)
-        !> Average density
-        REAL(wp) :: average_density_solids
-
-        !> depth-averaged volumetric fractions of solid phases
-        REAL(wp), INTENT(IN) :: alpha_solids(n_solid)
-
-        IF ( SUM( alpha_solids ) .LT. EPSILON(1.0_wp) ) THEN
-            average_density_solids = SUM( rho_s ) / n_solid
-        ELSE
-            average_density_solids = SUM( alpha_solids * rho_s ) / SUM( alpha_solids )
-
-        END IF
-
-    END FUNCTION average_density_solids
 
 
     !******************************************************************************

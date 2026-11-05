@@ -129,8 +129,10 @@ physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): state_new/state_new_types.$(O
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
 physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
-physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
-physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
+physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
+    state_new/state_new_mixture.$(OBJEXT)
+physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
+    state_new/state_new_mixture.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
 physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
@@ -155,6 +157,7 @@ numerics/lie_source_executor_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
 # F5: new general state kernels are built in module dependency order.
 state_new/state_new_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state_new/state_new_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+# F5: physical particle descriptors belong to mixture physics.
 state_new/state_new_mixture.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state_new/mixture_heat_capacity.inc \
@@ -441,7 +444,8 @@ core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         state/state_conversion_2d.$(OBJEXT)
 io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
                           core/diagnostics_2d.$(OBJEXT)
-io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
+io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    state_new/state_new_mixture.$(OBJEXT)                           \
                         physics/rheology_laws/rheology_2d.$(OBJEXT)                        \
                         physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)             \
                         physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT)                \

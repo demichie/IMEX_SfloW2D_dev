@@ -121,7 +121,7 @@ MODULE inpout_2d
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     USE rheology_quadratic_2d, ONLY: friction_factor
     ! -- Functions used in the rheology calculations
-    USE state_conversion_2d, ONLY: sauter_diameter, average_density_solids
+    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids
     USE constitutive_parameters_2d, ONLY: precompute_pascal_coefficient
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
