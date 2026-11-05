@@ -324,7 +324,8 @@ physics/source_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT) \
     physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_2d.$(OBJEXT) \
-    core/diagnostics_2d.$(OBJEXT)
+    core/diagnostics_2d.$(OBJEXT) \
+    state_new/state_new_composition.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      physics/thermal_laws/thermal_laws_2d.$(OBJEXT)         \
@@ -347,6 +348,7 @@ state/state_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                           core/constitutive_parameters_2d.$(OBJEXT)            \
                           geometry/geometry_2d.$(OBJEXT)                       \
                           core/model_layout_2d.$(OBJEXT)                       \
+                          state_new/state_new_composition.$(OBJEXT) \
                           state/state_conversion_2d.$(OBJEXT)                 \
                           core/diagnostics_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
@@ -524,3 +526,4 @@ physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): physics/rheology_laws/rhe
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): physics/rheology_laws/rheology_empirical_drag.inc
 
 physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc
+

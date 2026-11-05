@@ -3,13 +3,14 @@ PROGRAM test_projection_stress
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
-  USE state_2d, ONLY : state_type,substrate_snapshot_type
+  USE state_2d, ONLY : state_type,substrate_snapshot_type,conservative_mass_admissible
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
   USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
        finalize_lie_source_executor,lie_source_executor_type
   USE state_conversion_2d, ONLY : qc_to_qp
+  USE source_terms_2d, ONLY : limit_explicit_source_rates
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite,ieee_value,ieee_quiet_nan
@@ -36,6 +37,7 @@ PROGRAM test_projection_stress
   OPEN(NEWUNIT=unit,FILE='projection_snapshot.bin',ACCESS='STREAM', &
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
+  CALL check_limiter_representability
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
   CALL check_complete_physical_state
@@ -85,6 +87,33 @@ PROGRAM test_projection_stress
   CLOSE(unit)
   WRITE(*,*) 'PASS: Lie-compatible prescribed projection refinement and geometry checks'
 CONTAINS
+
+  !> The limiter must preserve strict positivity after the exact floating-point
+  !> multiplication order used by the Lie executor (including rounded ratios).
+  SUBROUTINE check_limiter_representability
+    REAL(wp) :: reference(nq),rates(nq),candidate(nq),scale
+    REAL(wp) :: qsolid,dt
+    LOGICAL :: valid
+    INTEGER :: sample
+    dt=0.01_wp
+    DO sample=1,1000
+       reference=0.0_wp
+       rates=0.0_wp
+       reference(idx_totMassEqn)=1.4739E-4_wp
+       qsolid=5.0E-5_wp*(1.0_wp+REAL(sample,wp)*EPSILON(1.0_wp))
+       reference(idx_solidEqn_first)=qsolid
+       rates(idx_solidEqn_first)=-NEAREST(qsolid/dt,1.0_wp)
+       rates(idx_totMassEqn)=rates(idx_solidEqn_first)
+       CALL limit_explicit_source_rates(reference,[REAL(wp)::],dt,rates, &
+            [REAL(wp)::],scale,valid)
+       IF (.NOT.valid) ERROR STOP 'Representable deposition limiter rejected valid state'
+       candidate=reference+dt*(scale*rates)
+       IF (.NOT.conservative_mass_admissible(candidate)) &
+            ERROR STOP 'Deposition limiter returned an inadmissible candidate'
+       IF (ANY(candidate(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) &
+            ERROR STOP 'Deposition limiter left negative solid mass'
+    END DO
+  END SUBROUTINE check_limiter_representability
 
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics

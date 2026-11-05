@@ -54,6 +54,8 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 **Avanzamento F6/F7 (5 novembre 2026):** `State architecture validation` verde su `f6d6d3b` (run `42045188411`). Il nuovo change set converte il calcolo dei primitivi per CFL e diagnostica al kernel `state_new` con semantica numerica esplicita, migra le condizioni iniziali all'assemblaggio conservativo numerico condiviso e amplia l'equivalenza old/new anche a pressione dinamica e temperatura near-dry. Non cambia la sequenza Lie ne il contratto del rollback globale differito. Verifiche CI del nuovo commit ancora da eseguire.
 
+**Regressione D19 all'avvio degli esempi CF/TAAL (5 novembre 2026):** `EXAMPLE_CF` fallisce al gruppo esplicito 4 (deposizione), cella (228,101), con massa solida `-3.4660E-20` e massa totale positiva `1.4739E-04`. Inserita una salvaguardia conservativa nel solo fattore dei rate espliciti che verifica il candidato calcolato con l'ordine floating-point reale, riducendo il limiter di ULP quando serve. Il controllo resta rigoroso; nessun clipping, nessuna modifica a Lie/rollback. Aggiunta regressione di esaurimento delle specie e accentrata la funzione di ammissibilita in `state_new_composition`. **Non dichiarare risolta finche non superano Action e i due esempi completi.**
+
 ## 4. Backlog ordinato per priorità
 
 | Priorità | ID | Attività | Chiusura richiesta |

@@ -17,6 +17,7 @@ MODULE state_2d
 
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE model_layout_2d, ONLY : model_layout_type
+    USE state_new_composition, ONLY : conservative_mass_admissible
 
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
@@ -202,17 +203,7 @@ CONTAINS
     !>          does not clip or otherwise modify a candidate conservative state.
     !> @param[in] q_cell One conservative cell vector of n_eqns entries.
     !> @return True if the candidate satisfies all mass admissibility guards.
-    PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
-        REAL(wp), INTENT(IN) :: q_cell(n_eqns)
-        valid=.FALSE.
-        IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
-        IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
-        IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
-        ! All transported component masses share the same total-mixture budget.
-        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) +                                                        &
-            SUM(q_cell(idx_add_gas_first:idx_add_gas_last)) > q_cell(idx_totMassEqn)) RETURN
-        valid=.TRUE.
-    END FUNCTION conservative_mass_admissible
+
 
     !> @brief Snapshot all owned substrate inventories and their aggregates.
     !> @param[in] this Authoritative state before the Lie source sweep.

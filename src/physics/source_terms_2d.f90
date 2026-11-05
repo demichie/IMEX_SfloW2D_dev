@@ -20,6 +20,7 @@ MODULE source_terms_2d
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
+    USE state_new_composition, ONLY : conservative_mass_admissible
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
     USE source_registry_2d, ONLY : source_group_type
@@ -143,7 +144,8 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: limiter
         LOGICAL, INTENT(OUT) :: valid
         REAL(wp) :: available_carrier,carrier_consumption
-        INTEGER :: solid_eq,i
+        REAL(wp) :: candidate(n_eqns)
+        INTEGER :: solid_eq,i,gas_eq
         limiter=1.0_wp
         valid=.FALSE.
         IF (dt<=0.0_wp) RETURN
@@ -158,6 +160,12 @@ CONTAINS
 
         END DO
 
+        ! Gas species also have separate nonnegative conservative budgets.
+        DO gas_eq=idx_addGasEqn_first,idx_addGasEqn_last
+            IF (rate(gas_eq)<0.0_wp) limiter=MIN(limiter, &
+                MAX(0.0_wp,q_reference(gas_eq)/(-dt*rate(gas_eq))))
+        END DO
+
         DO i=1,SIZE(inventory)
             IF (solid_erosion_rate(i)>0.0_wp) limiter=MIN(limiter,                                                     &
                 MAX(0.0_wp,inventory(i)/(dt*solid_erosion_rate(i))))
@@ -169,21 +177,22 @@ CONTAINS
         carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
         IF (carrier_consumption>0.0_wp) limiter=MIN(limiter,                                                           &
             MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
-        ! The limiting ratio places a depleted component exactly at zero in
-        ! real arithmetic. Two rounded products (dt*rate and limiter*rate)
-        ! can otherwise leave a tiny negative mass (~1e-24) at a dry front.
-        ! Stay a few representable steps inside the admissible interval,
-        ! only when an actual physical transfer is limited.
-        IF (limiter>0.0_wp .AND. limiter<1.0_wp) THEN
-
-            DO i=1,8
+        ! Verify the exact floating-point update applied by the Lie executor:
+        ! q_candidate=q_reference+dt*(limiter*rate). The analytical ratio can
+        ! round up to 1, or leave a negative component at machine precision.
+        ! Move the physical rate limiter toward zero by representable steps,
+        ! never modifying the conservative candidate or its admissibility test.
+        IF (limiter>=0.0_wp .AND. limiter<=1.0_wp) THEN
+            DO i=1,256
+                candidate=q_reference+dt*(limiter*rate)
+                IF (conservative_mass_admissible(candidate)) EXIT
+                IF (limiter<=0.0_wp) EXIT
                 limiter=NEAREST(limiter,-1.0_wp)
-
             END DO
-
+            candidate=q_reference+dt*(limiter*rate)
         END IF
-
         valid=limiter>=0.0_wp .AND. limiter<=1.0_wp
+        IF (valid) valid=conservative_mass_admissible(candidate)
     END SUBROUTINE limit_explicit_source_rates
 
     !> Return the conservative equivalent rate of the exact source substep.

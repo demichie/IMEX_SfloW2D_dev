@@ -1,13 +1,28 @@
 MODULE state_new_composition
-    USE parameters_2d, ONLY : wp, n_solid, n_add_gas
+    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_eqns
+    USE parameters_2d, ONLY : idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last, &
+        idx_add_gas_first,idx_add_gas_last
     IMPLICIT NONE
     PRIVATE
     REAL(wp), PARAMETER :: tol=4096.0_wp*EPSILON(1.0_wp)
-    PUBLIC :: close_composition, normalize_face_composition
+    PUBLIC :: close_composition, normalize_face_composition, conservative_mass_admissible
     INTERFACE close_composition
         MODULE PROCEDURE close_composition_real, close_composition_complex
     END INTERFACE
 CONTAINS
+    !> Strict conservative mass budget shared by the solver and source limiter.
+    !> Never silently clip a negative component or accept a tolerance violation.
+    PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
+        REAL(wp), INTENT(IN) :: q_cell(n_eqns)
+        valid=.FALSE.
+        IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
+        IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
+        IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
+        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))+ &
+            SUM(q_cell(idx_add_gas_first:idx_add_gas_last))>q_cell(idx_totMassEqn)) RETURN
+        valid=.TRUE.
+    END FUNCTION conservative_mass_admissible
+
     !> Closure of reconstructed face traces (distinct from strict state conversion).
     !> Retains legacy HP-PCCU semantics: clip roundoff-negative species and
     !> normalize any positive overfill, while rejecting materially negative input.
