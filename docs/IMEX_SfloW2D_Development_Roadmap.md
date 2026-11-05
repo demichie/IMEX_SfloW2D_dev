@@ -58,6 +58,8 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 **Regressione D19 all'avvio degli esempi CF/TAAL (5 novembre 2026):** `EXAMPLE_CF` fallisce al gruppo esplicito 4 (deposizione), cella (228,101), con massa solida `-3.4660E-20` e massa totale positiva `1.4739E-04`. Inserita una salvaguardia conservativa nel solo fattore dei rate espliciti che verifica il candidato calcolato con l'ordine floating-point reale, riducendo il limiter di ULP quando serve. Il controllo resta rigoroso; nessun clipping, nessuna modifica a Lie/rollback. Aggiunta regressione di esaurimento delle specie e accentrata la funzione di ammissibilita in `state_new_composition`. **Non dichiarare risolta finche non superano Action e i due esempi completi.**
 
+**F5 — regressione delle componenti quasi esaurite (5 novembre 2026):** confrontato `state_conversion_2d` pre-F5 (`cbcdc174ad`) con `stateNEW`: il vecchio costruttore fisico mantiene le frazioni positive inferiori alla tolleranza di roundoff, il nuovo `close_composition_real` le azzerava. Questo cambia le frazioni volumetriche e il settling in celle debolmente cariche. Ripristinata la sola **semantica fisica** nel modulo canonico `state_new_composition`, senza tornare alla vecchia architettura. Aggiunti test differenziali vecchio/nuovo sulle tracce near-depleted (REAL/COMPLEX e rate di settling); nuove CI ed esempi scientifici ancora da validare. La correzione del destinatario `q_local` in Lie resta separata e non prova da sola l'equivalenza pre/post-F5.
+
 ## 4. Backlog ordinato per priorità
 
 | Priorità | ID | Attività | Chiusura richiesta |

@@ -46,10 +46,11 @@ CONTAINS
         REAL(wp) :: total
         close_composition_real=.FALSE.
         IF (ANY(xs < -tol) .OR. ANY(xg < -tol)) RETURN
-        WHERE (ABS(xs)<=tol) xs=0.0_wp
-        WHERE (ABS(xg)<=tol) xg=0.0_wp
-        WHERE (xs<0.0_wp) xs=0.0_wp
-        WHERE (xg<0.0_wp) xg=0.0_wp
+        ! Retain every positive species fraction, including sub-roundoff values.
+        ! The historical source-state closure only clipped negative roundoff;
+        ! zeroing positive solids would suppress near-depleted settling rates.
+        xs=MAX(xs,0.0_wp)
+        xg=MAX(xg,0.0_wp)
         total=SUM(xs)+SUM(xg)
         IF (total>1.0_wp+tol) RETURN
         IF (total>1.0_wp) THEN

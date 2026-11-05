@@ -38,6 +38,7 @@ PROGRAM test_state_equivalence
         -32.0_wp*EPSILON(1.0_wp),0.15_wp,0.05_wp,qp)
     CALL check_spatial_face_properties(qp,'roundoff face')
     CALL check_numerical_decoder_limits
+    CALL check_settling_trace_equivalence
     WRITE(*,'(A)') 'PASS: state_new equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
@@ -120,6 +121,57 @@ CONTAINS
             CALL assert_scalar(label//' face speed max',maximum_speed,expected_max,1.0E-10_wp)
         END DO
     END SUBROUTINE check_spatial_face_properties
+
+    !> Regression: F5 source-state closure must retain tiny positive solids.
+    !> The historical constructor never zeroed a positive mass fraction,
+    !> even when its magnitude was within the negative-roundoff tolerance.
+    SUBROUTINE check_settling_trace_equivalence
+        REAL(wp), PARAMETER :: tiny_fraction=0.25_wp*4096.0_wp*EPSILON(1.0_wp)
+        REAL(wp), PARAMETER :: velocity=0.01_wp,dt=1.0_wp
+        REAL(wp) :: old_rate,new_rate
+        COMPLEX(wp) :: ctrace(n_vars)
+        INTEGER :: mode
+        LOGICAL :: accepted
+
+        DO mode=1,3
+            SELECT CASE(mode)
+            CASE(1)
+                CALL make_qp(2.0_wp,300.0_wp,0.0_wp,0.0_wp, &
+                    tiny_fraction,0.0_wp,0.0_wp,qp)
+            CASE(2)
+                CALL make_qp(2.0_wp,300.0_wp,0.0_wp,0.0_wp, &
+                    0.0_wp,tiny_fraction,0.0_wp,qp)
+            CASE(3)
+                CALL make_qp(2.0_wp,300.0_wp,0.0_wp,0.0_wp, &
+                    tiny_fraction,0.0_wp,tiny_fraction,qp)
+            END SELECT
+            CALL old_state_qp(qp,old_real)
+            CALL new_state_qp(qp,new_real%state,accepted=accepted)
+            IF (.NOT.accepted) ERROR STOP 'tiny-positive source state rejected'
+            IF (ANY(new_real%state%xs/=old_real%xs)) &
+                ERROR STOP 'F5 tiny-positive solid fraction differs from legacy'
+            IF (ANY(new_real%state%xg/=old_real%xg)) &
+                ERROR STOP 'F5 tiny-positive gas fraction differs from legacy'
+            IF (ANY(new_real%state%alphas/=old_real%alphas)) &
+                ERROR STOP 'F5 settling volume fraction differs from legacy'
+            IF (ANY(qp(idx_solid_first:idx_solid_last)>0.0_wp) .AND. &
+                .NOT.ANY(new_real%state%alphas>0.0_wp)) &
+                ERROR STOP 'F5 source closure removed positive solid volume'
+            old_rate=MIN(old_real%alphas(1)*velocity, &
+                old_real%h*old_real%alphas(1)/dt)
+            new_rate=MIN(new_real%state%alphas(1)*velocity, &
+                new_real%state%h*new_real%state%alphas(1)/dt)
+            IF (new_rate/=old_rate) &
+                ERROR STOP 'F5 near-depleted settling input rate differs'
+            ctrace=CMPLX(qp,0.0_wp,wp)
+            ctrace(idx_solid_first)=ctrace(idx_solid_first)+ &
+                CMPLX(0.0_wp,1.0E-20_wp,wp)
+            CALL new_state_qp(ctrace,new_complex%state,accepted=accepted)
+            IF (.NOT.accepted) ERROR STOP 'tiny-positive complex source rejected'
+            IF (AIMAG(new_complex%state%xs(1))/=1.0E-20_wp) &
+                ERROR STOP 'tiny-positive complex-step perturbation lost'
+        END DO
+    END SUBROUTINE check_settling_trace_equivalence
 
     SUBROUTINE check_numerical_decoder_limits
         REAL(wp) :: legacy(n_vars),numerical(n_vars),mass,pd_old,pd_new
