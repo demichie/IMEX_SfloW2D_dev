@@ -50,6 +50,7 @@ MODULE lie_source_executor_2d
         INTEGER :: bed_group_id=-1,reject_group=-1
         INTEGER, ALLOCATABLE :: failure_code(:),failure_group(:),failure_detail(:),failure_iterations(:)
         REAL(wp), ALLOCATABLE :: failure_mass(:),failure_components(:)
+        REAL(wp), ALLOCATABLE :: failure_reference(:,:),failure_rate(:,:),failure_candidate(:,:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
     END TYPE lie_source_executor_type
@@ -149,6 +150,8 @@ CONTAINS
             ALLOCATE(executor%failure_group(ncells),executor%failure_detail(ncells))
             ALLOCATE(executor%failure_iterations(ncells))
             ALLOCATE(executor%failure_mass(ncells),executor%failure_components(ncells))
+            ALLOCATE(executor%failure_reference(n_eqns,ncells),executor%failure_rate(n_eqns,ncells))
+            ALLOCATE(executor%failure_candidate(n_eqns,ncells))
         END IF
         IF (executor%newton_witness                                                                                    &
             .AND. executor%has_newton_group) ALLOCATE(executor%newton_iterations(ncells,SIZE(executor%groups)))
@@ -191,6 +194,9 @@ CONTAINS
         IF (ALLOCATED(executor%failure_iterations)) DEALLOCATE(executor%failure_iterations)
         IF (ALLOCATED(executor%failure_mass)) DEALLOCATE(executor%failure_mass)
         IF (ALLOCATED(executor%failure_components)) DEALLOCATE(executor%failure_components)
+        IF (ALLOCATED(executor%failure_reference)) DEALLOCATE(executor%failure_reference)
+        IF (ALLOCATED(executor%failure_rate)) DEALLOCATE(executor%failure_rate)
+        IF (ALLOCATED(executor%failure_candidate)) DEALLOCATE(executor%failure_candidate)
         IF (ALLOCATED(executor%newton_iterations)) DEALLOCATE(executor%newton_iterations)
         IF (ALLOCATED(executor%bed_rate_cell)) DEALLOCATE(executor%bed_rate_cell)
         IF (ALLOCATED(executor%bed_rate_vertex)) DEALLOCATE(executor%bed_rate_vertex)
@@ -465,6 +471,9 @@ CONTAINS
                             cell_group=executor%groups(group_index)%id
                             cell_mass=q_candidate(idx_totMassEqn)
                             cell_components=SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
+                            executor%failure_reference(:,cell)=q_local(1:n_eqns)
+                            executor%failure_rate(:,cell)=total_rate
+                            executor%failure_candidate(:,cell)=q_candidate(1:n_eqns)
                         END IF
                         EXIT group_loop
                     END IF
@@ -710,6 +719,19 @@ CONTAINS
                         'D19: inadmissible source candidate group=',executor%failure_group(first_failure),           &
                         ' cell=',j,',',k,' mass=',executor%failure_mass(first_failure),                                &
                         ' components=',executor%failure_components(first_failure)
+                    WRITE(*,'(A,2(I0,1X),A,I0)') 'D19_BUDGET cell=',j,k, &
+                        'group=',executor%failure_group(first_failure)
+                    WRITE(*,'(A,ES24.16)') 'D19_BUDGET dt=',time_step
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_BUDGET recipient=', &
+                        executor%failure_reference(:,first_failure)
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_BUDGET scaled_rate=', &
+                        executor%failure_rate(:,first_failure)
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_BUDGET candidate=', &
+                        executor%failure_candidate(:,first_failure)
+                    WRITE(*,'(A,L1)') 'D19_BUDGET reconstruction_match=', &
+                        ALL(executor%failure_candidate(:,first_failure)== &
+                        executor%failure_reference(:,first_failure)+ &
+                        time_step*executor%failure_rate(:,first_failure))
                 ELSE
                     failure_reason='D19: inadmissible source candidate'
                 END IF

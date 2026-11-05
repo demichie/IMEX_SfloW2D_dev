@@ -60,6 +60,8 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 **F5 — regressione delle componenti quasi esaurite (5 novembre 2026):** confrontato `state_conversion_2d` pre-F5 (`cbcdc174ad`) con `stateNEW`: il vecchio costruttore fisico mantiene le frazioni positive inferiori alla tolleranza di roundoff, il nuovo `close_composition_real` le azzerava. Questo cambia le frazioni volumetriche e il settling in celle debolmente cariche. Ripristinata la sola **semantica fisica** nel modulo canonico `state_new_composition`, senza tornare alla vecchia architettura. Aggiunti test differenziali vecchio/nuovo sulle tracce near-depleted (REAL/COMPLEX e rate di settling); nuove CI ed esempi scientifici ancora da validare. La correzione del destinatario `q_local` in Lie resta separata e non prova da sola l'equivalenza pre/post-F5.
 
+**Gate TAAL con settling (5 novembre 2026):** la correzione differenziale della chiusura `stateNEW` non ha eliminato D19 a `t=0.0226`. La CI `strict-debug-driver` esegue ora `EXAMPLE_TAAL` con DEM originale e `SETTLING_FLAG=T` fino a `T_END=0.05`, oltre alla compilazione full strict-debug. In caso di fallimento D19 produce un witness conservativo per la prima cella: `q_local`, `total_rate`, `q_candidate`, gruppo, cella e controllo della ricostruzione floating-point. Nessuna modifica di rate o limiter in questo commit diagnostico; il gate e da eseguire e analizzare.
+
 ## 4. Backlog ordinato per priorità
 
 | Priorità | ID | Attività | Chiusura richiesta |
