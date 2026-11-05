@@ -18,6 +18,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Avanzamento C0/C1 (5 novembre 2026):** audit statico iniziale degli intermedi in `time_integration_2d`, `lie_source_executor_2d`, `source_terms_2d`, `state_physical` e facce. Introdotto `evaluate_mixture_phase_properties` REAL/COMPLEX con formula condivisa; rimossa la seconda valutazione di cp dai costruttori fisici da `q` e quella non richiesta da `primitive_to_volume_fractions`. **C0/C1 IN CORSO, validazione e misure pendenti**. Dettagli e prossimi interventi nel registro C0/C1 della roadmap specialistica. Nessuna Action avviata.
 
+**Avanzamento C2 (5 novembre 2026):** `lie_source_executor_2d` riusa `qp_local` quando il candidato conservativo di un gruppo EXPLICIT, ANALYTIC o NEWTON e esattamente uguale a `q_local`; mantiene comunque controllo di ammissibilita, aggiornamenti di substrato e conversione dei candidati modificati. C2 ancora in corso: controlli completi dei percorsi, build del change set e misure da raccogliere. Dettagli nella roadmap specialistica. Actions solo manuali.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

@@ -512,20 +512,23 @@ CONTAINS
                         END IF
                     END IF
 
-                    IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                        CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                    &
-                            p_dyn=pressure,numerical_reconstruction=.TRUE.)
-
-                        IF (.NOT.conversion_ok) THEN
-                            cell_error=8
-                            EXIT group_loop
+                    ! No-op conservative groups leave the synchronized primitive
+                    ! representation valid. Exchange inventories may still change.
+                    IF (ANY(q_candidate/=q_local)) THEN
+                        IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
+                            CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,             &
+                                p_dyn=pressure,numerical_reconstruction=.TRUE.)
+                            IF (.NOT.conversion_ok) THEN
+                                cell_error=8
+                                EXIT group_loop
+                            END IF
+                        ELSE
+                            CALL initialize_dry_physical_cell(qp_candidate)
                         END IF
-                    ELSE
-                        CALL initialize_dry_physical_cell(qp_candidate)
+                        qp_local=qp_candidate
                     END IF
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
-                    qp_local=qp_candidate
                     IF (executor%diagnostics_enabled .AND. executor%groups(group_index)%id==0) THEN
                         IF (cell_arc_perim(j,k)>0.0_wp) THEN
                             executor%injection_mass(cell)=q_local(idx_totMassEqn)
@@ -610,20 +613,23 @@ CONTAINS
                     EXIT group_loop
                 END IF
 
-                IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                    CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                    &
-                        p_dyn=pressure,numerical_reconstruction=.TRUE.)
-
-                    IF (.NOT.conversion_ok) THEN
-                        cell_error=14
-                        EXIT group_loop
+                ! Analytic and Newton candidates only invalidate primitive values
+                ! when the conservative vector actually changes.
+                IF (ANY(q_candidate/=q_local)) THEN
+                    IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
+                        CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                &
+                            p_dyn=pressure,numerical_reconstruction=.TRUE.)
+                        IF (.NOT.conversion_ok) THEN
+                            cell_error=14
+                            EXIT group_loop
+                        END IF
+                    ELSE
+                        CALL initialize_dry_physical_cell(qp_candidate)
                     END IF
-                ELSE
-                    CALL initialize_dry_physical_cell(qp_candidate)
+                    qp_local=qp_candidate
                 END IF
 
                 q_local=q_candidate
-                qp_local=qp_candidate
                 IF (profiling_enabled) THEN
                     CALL SYSTEM_CLOCK(profile_tock)
                     thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &
