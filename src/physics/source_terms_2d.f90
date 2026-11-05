@@ -212,7 +212,7 @@ CONTAINS
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
 
-    RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
+    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -240,11 +240,17 @@ CONTAINS
             CALL initialize_physical_state_real(local_state)
         END IF
 
-        IF (INDEX(selected_model_name,'rheology_')==1) THEN
+        ! Build only for treatments that actually consume physical properties.
+        ! Darcy on zero mass stays a no-op; no new intermediate admissibility check.
+        IF (INDEX(selected_model_name,'rheology_')==1 .OR.                                                             &
+            selected_model_name=='thermal_cooling' .OR.                                                                 &
+            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp)) THEN
+            CALL build_physical_state_from_q(q_before,physical_state,                                                   &
+                context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                                  &
+                context%Bsecond_xy,context%Bsecond_yy)
+        END IF
 
-            CALL build_physical_state_from_q(q_before, physical_state,                                                 &
-                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
-                    context%Bsecond_xy,context%Bsecond_yy)
+        IF (INDEX(selected_model_name,'rheology_')==1) THEN
             horizontal_speed=physical_state%mod_vel_hor
             speed_ratio=1.0_wp
             IF (horizontal_speed>0.0_wp)                                                                               &
@@ -274,10 +280,6 @@ CONTAINS
             status=0
 
         ELSE IF (selected_model_name=='thermal_cooling') THEN
-            CALL build_physical_state_from_q(q_before, physical_state,                                                 &
-                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
-                    context%Bsecond_xy,context%Bsecond_yy)
-
             IF (physical_state%T<=0.0_wp) THEN
                 status=-3
                 RETURN
@@ -293,10 +295,6 @@ CONTAINS
 
         ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
             IF (q_before(1)>0.0_wp) THEN
-
-                CALL build_physical_state_from_q(q_before, physical_state,                                             &
-                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
-                    context%Bsecond_xy,context%Bsecond_yy)
                 CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],                                              &
                         physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
 
