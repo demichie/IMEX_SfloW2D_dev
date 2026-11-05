@@ -841,3 +841,10 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - La prima matrice di regression CI ha segnalato fallimenti in piu suite, pur con build parallelo e audit statico superati. Il confronto con il Makefile ha rilevato che cinque script di test compilavano i sorgenti senza gli include path delle reologie e del cooling; allineate le opzioni `-I` a quelle del Makefile.
 - `TEST_SOURCE_MASS` richiede l'eseguibile, non lo compila autonomamente: la workflow ora costruisce il programma prima di eseguire quella suite.
 - I risultati precedenti delle regressioni non sono considerati verifiche di fisica; attendere l'esito dei nuovi job prima di attribuire eventuali errori ai kernel.
+
+### Blocco 1 - gate finale delle regressioni (Action 42116271701)
+
+- Sul commit `03502fe3a811`, i job **Fortran static audit** e **parallel build** sono `PASS`.
+- I job `TEST_STATE_CONVERSION`, `TEST_SOURCE_MASS`, `TEST_SOURCE_REGISTRY`, `TEST_MASS_EXCHANGE` e `TEST_RHEOLOGY_CELL_LOCAL` risultano `FAIL` al passo `Run regression`, anche dopo la correzione dei percorsi di include e la compilazione dell'eseguibile per il test integrato. Il job Froude non aveva ancora un esito definitivo al momento della rilevazione.
+- La cause di questi fallimenti non sono state accertate: lo stato dei job non contiene i messaggi del compilatore o le asserzioni che permetterebbero di distinguere problemi del runner da regressioni del codice. Non modificare la fisica sulla base dei soli exit code.
+- La PR #5 e il **Blocco 1 restano aperti**. Prima del merge occorre ispezionare i log/artifact della Action, distinguere cause infrastrutturali da difetti reali, correggere i problemi riproducibili e riottenere un gate di regressione verde.
