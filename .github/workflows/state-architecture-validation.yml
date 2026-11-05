@@ -131,7 +131,7 @@ jobs:
           mkdir -p smoke-taal
           cp EXAMPLES/EXAMPLE_TAAL/IMEX_SfloW2D.inp smoke-taal/IMEX_SfloW2D.inp
           ln -s "$GITHUB_WORKSPACE/EXAMPLES/EXAMPLE_TAAL/topography_dem.asc" smoke-taal/topography_dem.asc
-          sed -i -E 's/^ T_END=.*/ T_END= 0.2000000000,/' smoke-taal/IMEX_SfloW2D.inp
+          sed -i -E 's/^ T_END=.*/ T_END= 0.3500000000,/' smoke-taal/IMEX_SfloW2D.inp
           grep -E 'SETTLING_FLAG *= *T' smoke-taal/IMEX_SfloW2D.inp
           (
             cd smoke-taal

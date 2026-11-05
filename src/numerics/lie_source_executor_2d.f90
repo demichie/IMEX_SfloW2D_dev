@@ -51,6 +51,8 @@ MODULE lie_source_executor_2d
         INTEGER, ALLOCATABLE :: failure_code(:),failure_group(:),failure_detail(:),failure_iterations(:)
         REAL(wp), ALLOCATABLE :: failure_mass(:),failure_components(:)
         REAL(wp), ALLOCATABLE :: failure_reference(:,:),failure_rate(:,:),failure_candidate(:,:)
+        REAL(wp), ALLOCATABLE :: injection_mass(:),injection_solids(:),pre_buoyancy_mass(:)
+        REAL(wp), ALLOCATABLE :: pre_buoyancy_solids(:),buoyancy_reduced_gravity(:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
     END TYPE lie_source_executor_type
@@ -152,6 +154,9 @@ CONTAINS
             ALLOCATE(executor%failure_mass(ncells),executor%failure_components(ncells))
             ALLOCATE(executor%failure_reference(n_eqns,ncells),executor%failure_rate(n_eqns,ncells))
             ALLOCATE(executor%failure_candidate(n_eqns,ncells))
+            ALLOCATE(executor%injection_mass(ncells),executor%injection_solids(ncells))
+            ALLOCATE(executor%pre_buoyancy_mass(ncells),executor%pre_buoyancy_solids(ncells))
+            ALLOCATE(executor%buoyancy_reduced_gravity(ncells))
         END IF
         IF (executor%newton_witness                                                                                    &
             .AND. executor%has_newton_group) ALLOCATE(executor%newton_iterations(ncells,SIZE(executor%groups)))
@@ -197,6 +202,11 @@ CONTAINS
         IF (ALLOCATED(executor%failure_reference)) DEALLOCATE(executor%failure_reference)
         IF (ALLOCATED(executor%failure_rate)) DEALLOCATE(executor%failure_rate)
         IF (ALLOCATED(executor%failure_candidate)) DEALLOCATE(executor%failure_candidate)
+        IF (ALLOCATED(executor%injection_mass)) DEALLOCATE(executor%injection_mass)
+        IF (ALLOCATED(executor%injection_solids)) DEALLOCATE(executor%injection_solids)
+        IF (ALLOCATED(executor%pre_buoyancy_mass)) DEALLOCATE(executor%pre_buoyancy_mass)
+        IF (ALLOCATED(executor%pre_buoyancy_solids)) DEALLOCATE(executor%pre_buoyancy_solids)
+        IF (ALLOCATED(executor%buoyancy_reduced_gravity)) DEALLOCATE(executor%buoyancy_reduced_gravity)
         IF (ALLOCATED(executor%newton_iterations)) DEALLOCATE(executor%newton_iterations)
         IF (ALLOCATED(executor%bed_rate_cell)) DEALLOCATE(executor%bed_rate_cell)
         IF (ALLOCATED(executor%bed_rate_vertex)) DEALLOCATE(executor%bed_rate_vertex)
@@ -296,6 +306,13 @@ CONTAINS
             END DO
         END IF
         IF (executor%has_bed_group) executor%bed_rate_cell=0.0_wp
+        IF (executor%diagnostics_enabled) THEN
+            executor%injection_mass(1:domain%solve_cells)=0.0_wp
+            executor%injection_solids(1:domain%solve_cells)=0.0_wp
+            executor%pre_buoyancy_mass(1:domain%solve_cells)=0.0_wp
+            executor%pre_buoyancy_solids(1:domain%solve_cells)=0.0_wp
+            executor%buoyancy_reduced_gravity(1:domain%solve_cells)=0.0_wp
+        END IF
         IF (ALLOCATED(executor%newton_iterations)) executor%newton_iterations(1:domain%solve_cells,:)=0
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
@@ -505,6 +522,12 @@ CONTAINS
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
                     qp_local=qp_candidate
+                    IF (executor%diagnostics_enabled .AND. executor%groups(group_index)%id==0) THEN
+                        IF (cell_arc_perim(j,k)>0.0_wp) THEN
+                            executor%injection_mass(cell)=q_local(idx_totMassEqn)
+                            executor%injection_solids(cell)=SUM(q_local(idx_solidEqn_first:idx_solidEqn_last))
+                        END IF
+                    END IF
 
                     IF (executor%exchange_group(group_index)) THEN
                         deposit_local=deposit_candidate
@@ -608,6 +631,11 @@ CONTAINS
             ! This is a physical sink, not a numerical limiter on the source rates.
             IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
                 CALL mixt_var(qp_local,ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix)
+                IF (executor%diagnostics_enabled .AND. cell_arc_perim(j,k)>0.0_wp) THEN
+                    executor%pre_buoyancy_mass(cell)=q_local(idx_totMassEqn)
+                    executor%pre_buoyancy_solids(cell)=SUM(q_local(idx_solidEqn_first:idx_solidEqn_last))
+                    executor%buoyancy_reduced_gravity(cell)=red_grav
+                END IF
                 IF (red_grav<=0.0_wp) THEN
                     q_local=0.0_wp
                     CALL initialize_dry_physical_cell(qp_local)
@@ -684,6 +712,21 @@ CONTAINS
             ! not an individual group evaluation. Report it separately.
             profile_cell_sweep=profile_cell_sweep+REAL(tock-tick,wp)/REAL(clock_rate,wp)
             tick=tock
+        END IF
+        ! One witness per timestep, gathered after the OpenMP cell sweep.
+        ! Compare injection, deposition and final buoyancy deletion.
+        IF (executor%diagnostics_enabled) THEN
+            WRITE(*,'(A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6)') &
+                'D19_SOURCE_AUDIT t=',source_time, &
+                ' injection_mass=',SUM(executor%injection_mass(1:domain%solve_cells)), &
+                ' injection_solids=',SUM(executor%injection_solids(1:domain%solve_cells)), &
+                ' after_exchange_mass=',SUM(executor%pre_buoyancy_mass(1:domain%solve_cells))
+            WRITE(*,'(A,ES14.6,A,I0,A,I0)') &
+                'D19_SOURCE_AUDIT after_exchange_solids=', &
+                SUM(executor%pre_buoyancy_solids(1:domain%solve_cells)), &
+                ' injection_cells=',COUNT(executor%injection_mass(1:domain%solve_cells)>0.0_wp), &
+                ' buoyancy_removed_cells=',COUNT(executor%pre_buoyancy_mass(1:domain%solve_cells)>0.0_wp .AND. &
+                executor%buoyancy_reduced_gravity(1:domain%solve_cells)<=0.0_wp)
         END IF
         ! Build a human-readable failure message only when a cell was rejected.
         IF (first_failure/=HUGE(0)) THEN
