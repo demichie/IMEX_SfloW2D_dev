@@ -172,6 +172,9 @@ CONTAINS
         END IF
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
+        ! Match the COMPLEX constructor before evaluating any material property.
+        ! Reject inadmissible fractions and close roundoff-sized overfill.
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         state%T=q(4)/(mass*cp_m)
         CALL evaluate_mixture(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,state%alphas,state%alphag)
