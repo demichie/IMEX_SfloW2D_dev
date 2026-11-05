@@ -8,7 +8,7 @@
 !> and numerical scratch storage belong to other modules.
 !********************************************************************************
 
-MODULE state_2d
+MODULE state_new_fields
     USE, INTRINSIC :: iso_fortran_env, ONLY : int64
     USE parameters_2d, ONLY : idx_h, idx_T,                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
@@ -260,4 +260,4 @@ CONTAINS
     END SUBROUTINE refresh_substrate_totals
 
     !******************************************************************************
-END MODULE state_2d
+END MODULE state_new_fields

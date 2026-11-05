@@ -23,9 +23,9 @@ IMEX_SfloW2D_SOURCES = \
                 core/runtime_2d.f90 \
                 core/complexify.f90 \
                 geometry/geometry_2d.f90 \
-                state/state_conversion_2d.f90 \
                 state_new/state_new_types.f90 \
                 state_new/state_new_composition.f90 \
+                state_new/state_new_fields.f90 \
                 state_new/state_new_mixture.f90 \
                 state_new/state_new_conversions.f90 \
                 state_new/state_new_physical.f90 \
@@ -66,7 +66,6 @@ IMEX_SfloW2D_SOURCES = \
                 spatial/nonconservative_2d.f90 \
                 spatial/pccu_2d.f90 \
                 geometry/domain_2d.f90 \
-                state/state_2d.f90 \
                 numerics/nonlinear_solver_2d.f90 \
                 spatial/reconstruction_2d.f90 \
                 spatial/hyperbolic_2d.f90 \
@@ -82,12 +81,10 @@ IMEX_SfloW2D_SOURCES = \
                 io/inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
-AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state -I$(srcdir)/state_new \
+AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state_new \
              -I$(srcdir)/physics/rheology_laws -I$(srcdir)/physics/thermal_laws
 CLEANFILES = *.mod
-EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservative.inc \
-             state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
-             state_new/mixture_heat_capacity.inc state_new/mixture_from_mass.inc \
+EXTRA_DIST = state_new/mixture_heat_capacity.inc state_new/mixture_from_mass.inc \
              state_new/density_from_mass.inc state_new/kinematics.inc \
              state_new/richardson.inc \
              state_new/conservative_from_primitive.inc \
@@ -101,17 +98,7 @@ EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservativ
              physics/thermal_laws/thermal_cooling_rate.inc \
              python_diagnostics/kt_ritter_1d.f90
 
-state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
-                                     state/velocity_from_conservative.inc     \
-                                     state/mixture_heat_capacity.inc          \
-                                     state/mixture_from_mass.inc
-
-# Keep runtime-sized, cell-local phase scratch on each OpenMP thread's stack.
-# In this hot state-conversion unit, automatic arrays otherwise trigger frequent
-# malloc/free calls for n_solid and n_add_gas scratch inside PCCU and speed bounds.
-# Scope this GNU Fortran optimization to this object: global -fstack-arrays would
-# risk moving unrelated large grid temporaries onto thread stacks.
-state/state_conversion_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Keep spatial cell scratch on each OpenMP thread's stack.
 spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 # Newton's small runtime-sized cell work arrays remain thread-private on stack.
 numerics/nonlinear_solver_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
@@ -174,6 +161,7 @@ state_new/state_new_physical.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
                                       state_new/state_new_composition.$(OBJEXT) \
                                       state_new/kinematics.inc state_new/richardson.inc
 state_new/state_new.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
+                             state_new/state_new_fields.$(OBJEXT) \
                              state_new/state_new_composition.$(OBJEXT) \
                              state_new/state_new_mixture.$(OBJEXT) \
                              state_new/state_new_conversions.$(OBJEXT) \
@@ -217,8 +205,6 @@ core/constitutive_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/runtime_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/complexify.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 geometry/geometry_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-state/state_conversion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
-                                     core/constitutive_parameters_2d.$(OBJEXT)
 physics/rheology_laws/rheology_mui_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
                                     core/constitutive_parameters_2d.$(OBJEXT) \
                                     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)  \
@@ -345,12 +331,11 @@ spatial/pccu_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                        \
                            spatial/nonconservative_2d.$(OBJEXT)
 geometry/domain_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               geometry/geometry_2d.$(OBJEXT)
-state/state_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
+state_new/state_new_fields.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                           core/constitutive_parameters_2d.$(OBJEXT)            \
                           geometry/geometry_2d.$(OBJEXT)                       \
                           core/model_layout_2d.$(OBJEXT)                       \
                           state_new/state_new_composition.$(OBJEXT) \
-                          state/state_conversion_2d.$(OBJEXT)                 \
                           core/diagnostics_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
                                         core/diagnostics_2d.$(OBJEXT)           \
@@ -389,7 +374,7 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          numerics/nonlinear_solver_2d.$(OBJEXT)  \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
                                          state_new/state_new_conversions.$(OBJEXT) \
-                                         state/state_2d.$(OBJEXT) \
+                                         state_new/state_new_fields.$(OBJEXT) \
                                          numerics/lie_source_executor_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           core/constitutive_parameters_2d.$(OBJEXT) \
@@ -400,7 +385,7 @@ numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           physics/source_terms_2d.$(OBJEXT) \
                                           physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT) \
                                           numerics/nonlinear_solver_2d.$(OBJEXT) \
-                                          state/state_2d.$(OBJEXT) \
+                                          state_new/state_new_fields.$(OBJEXT) \
                                           geometry/geometry_2d.$(OBJEXT)     \
                                           state_new/state_new_conversions.$(OBJEXT) \
                                           state_new/state_new_physical.$(OBJEXT)
@@ -408,7 +393,7 @@ stochastic/stochastic_random_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 stochastic/stochastic_module.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                         geometry/domain_2d.$(OBJEXT)             \
                                         geometry/geometry_2d.$(OBJEXT)          \
-                                        state/state_2d.$(OBJEXT)                 \
+                                        state_new/state_new_fields.$(OBJEXT)                 \
                                         stochastic/stochastic_random_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               geometry/geometry_2d.$(OBJEXT)                    \
@@ -418,7 +403,7 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               numerics/nonlinear_solver_2d.$(OBJEXT)            \
                               core/runtime_2d.$(OBJEXT)                         \
                               spatial/spatial_operator_2d.$(OBJEXT)             \
-                              state/state_2d.$(OBJEXT)                          \
+                              state_new/state_new_fields.$(OBJEXT)                          \
                               stochastic/stochastic_module.$(OBJEXT)            \
                               numerics/time_integration_2d.$(OBJEXT)            \
                               numerics/lie_source_executor_2d.$(OBJEXT) \
@@ -426,7 +411,7 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
-                        state/state_2d.$(OBJEXT)                                \
+                        state_new/state_new_fields.$(OBJEXT)                                \
                         state_new/state_new_mixture.$(OBJEXT) \
                         state_new/state_new_conversions.$(OBJEXT)
 io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
@@ -447,7 +432,7 @@ io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                         geometry/geometry_2d.$(OBJEXT)                         \
                         core/init_2d.$(OBJEXT)                                 \
                         core/runtime_2d.$(OBJEXT)                              \
-                        state/state_2d.$(OBJEXT)                               \
+                        state_new/state_new_fields.$(OBJEXT)                               \
                         state_new/state_new_physical.$(OBJEXT) \
                         state_new/state_new_types.$(OBJEXT) \
                         state_new/state_new_composition.$(OBJEXT) \
@@ -514,7 +499,6 @@ physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEX
 physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT)
-state/state_conversion_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 
 physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): physics/rheology_laws/rheology_voellmy_turbulent.inc
 

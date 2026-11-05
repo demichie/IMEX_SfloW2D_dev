@@ -10,6 +10,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Aggiornamento F6/F7 (5 novembre 2026):** rimosso il prerequisito Make legacy residuo in `hyperbolic_2d` e aggiunto un gate statico per impedire nuovi `USE state_conversion_2d` nei sorgenti di produzione. Il vecchio modulo rimane solo come baseline di confronto e nel target finche i test non saranno resi indipendenti dalla lista di `Makefile.am`. La validazione CI e scientifica del secondo blocco resta da eseguire manualmente; non sono state cambiate leggi fisiche o condizioni di accettazione.
 
+**F6/F7 — cutover strutturale del 5 novembre 2026 (IMPLEMENTATO NEL SORGENTE, DA VALIDARE):** unica architettura di produzione sotto `src/state_new/`. Il modulo proprietario di `q`, `qp`, inventari di deposito/erosione/lava, diagnostiche e snapshot globali del substrato e stato trasferito da `src/state/state_2d.f90` a `src/state_new/state_new_fields.f90` con modulo `state_new_fields` e import dei chiamanti aggiornati. `state_new.f90` re-esporta il nuovo modulo. Rimossi dal tree `src/state/`, `state_conversion_2d` e i relativi include obsoleti; eliminate le dipendenze legacy dal target in `src/Makefile.am`. Nessuna nuova struttura alternativa, nessuna modifica intenzionale alle formule o alla transazione Lie. **Per richiesta dell'utente, test, regressioni, benchmark e Actions NON eseguiti in questo passaggio**; gli harness storici che importavano `state_2d`/`state_conversion_2d` richiedono successiva migrazione, aggiornamento o rimozione, e non costituiscono ora criteri di blocco. Prima di certificare il cutover occorre almeno una build completa manuale.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

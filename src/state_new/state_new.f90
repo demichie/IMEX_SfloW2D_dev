@@ -3,6 +3,7 @@
 !*******************************************************************************
 MODULE state_new
     USE state_new_types
+    USE state_new_fields
     USE state_new_mixture
     USE state_new_conversions
     USE state_new_physical

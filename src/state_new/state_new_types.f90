@@ -1,9 +1,8 @@
 !*******************************************************************************
 !> Types for the clean-slate state architecture.
 !
-!> This module is intentionally parallel to state_conversion_2d.  It contains
-!> only state data ownership and workspace lifetime; numerical consumers are
-!> not migrated by this first step.
+!> Canonical REAL/COMPLEX cell-local physical states and reusable workspaces.
+!> Grid-sized authoritative fields are owned by state_new_fields.
 !*******************************************************************************
 MODULE state_new_types
 

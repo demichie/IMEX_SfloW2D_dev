@@ -14,7 +14,7 @@ MODULE lie_source_executor_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
         SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
-    USE state_2d, ONLY : state_type
+    USE state_new_fields, ONLY : state_type
     USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, initialize_physical_state_complex
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
@@ -252,7 +252,7 @@ CONTAINS
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_new_conversions, ONLY : conservative_to_primitive
         USE state_new_physical, ONLY : build_physical_state_from_qp
-        USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                               &
+        USE state_new_fields, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                               &
             physical_cell_state_finite,finite_real_value
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num

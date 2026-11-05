@@ -20,7 +20,7 @@ MODULE inpout_2d
     USE parameters_2d, ONLY: wp, dry_thickness_tolerance,                                                              &
             configure_canonical_state_indices
     USE runtime_2d, ONLY: runtime_state_type
-    USE state_2d, ONLY: state_type
+    USE state_new_fields, ONLY: state_type
     USE domain_2d, ONLY: domain_type
     USE stochastic_module, ONLY: stochastic_workspace_type
     USE output_paths, ONLY: initialize_output_paths, output_file_path,                                                 &

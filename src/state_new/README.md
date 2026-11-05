@@ -1,27 +1,19 @@
-# Nuova architettura degli stati
+# state_new — canonical solver state
 
-Questa directory contiene l’implementazione parallela della gestione degli
-stati. Non viene ancora usata dai consumatori di produzione e non deve
-dipendere da `state_conversion_2d`.
+This directory contains the sole production state implementation.
 
-Il nucleo è organizzato attorno a prodotti computazionali distinti:
+- `state_new_fields.f90` owns grid fields (`q`, `qp`), substrate inventories,
+  accumulated diagnostics and substrate transaction snapshots.
+- `state_new_types.f90` owns the REAL/COMPLEX cell-local physical state types
+  and reusable per-worker workspaces.
+- `state_new_composition.f90`, `state_new_mixture.f90`,
+  `state_new_conversions.f90` and `state_new_physical.f90`
+  implement canonical cell-local transformations and evaluations.
+- `state_new.f90` exports these modules as one public facade.
 
-- `conservative_to_primitive`
-- `primitive_to_conservative`
-- `evaluate_mixture`
-- `build_physical_state_from_q`
-- `build_physical_state_from_qp`
-- `update_physical_state_kinematics`
-- `refresh_physical_state`
+Production code must not import or link `state_2d` or
+`state_conversion_2d`; the historical `src/state/` implementation was
+removed. The REAL/COMPLEX shared `.inc` kernels remain in this directory.
 
-Le formule REAL/COMPLEX comuni sono mantenute in include `.inc`; i wrapper
-tipati forniscono soltanto dichiarazioni, workspace e gestione dei branch
-necessari al complex-step. Sono ora presenti i kernel di valutazione della
-miscela e le conversioni conservative/primitive, ancora non collegati ai
-consumatori di produzione. `state_new.f90` è il punto di ingresso pubblico
-unificato per i tipi, i kernel e i costruttori; la migrazione dei consumatori
-resta separata dall’implementazione del nucleo.
-
-La migrazione dei consumatori e l’inserimento nel target principale inizieranno
-solo dopo i test di caratterizzazione e il confronto con l’implementazione
-attuale.
+This change intentionally does not alter the Lie splitting, settling,
+source rates or global time-step rollback rules.

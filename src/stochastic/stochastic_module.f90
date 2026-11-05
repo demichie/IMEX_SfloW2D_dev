@@ -17,7 +17,7 @@ MODULE stochastic_module
     USE parameters_2d, ONLY : idx_totMassEqn, wp, rheology_model, idx_stoch, idx_u, idx_v
 
     USE domain_2d, ONLY: domain_type
-    USE state_2d, ONLY: state_type
+    USE state_new_fields, ONLY: state_type
     USE parameters_2d, ONLY : length_spatial_corr,                                                                     &
             stochastic_flag, stoch_transport_flag
     USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y

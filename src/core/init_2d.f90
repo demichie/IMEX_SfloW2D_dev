@@ -14,7 +14,7 @@ MODULE init_2d
     USE parameters_2d, ONLY : verbose_level
     USE parameters_2d, ONLY : n_solid , n_add_gas
     USE parameters_2d, ONLY : n_stoch_vars , n_pore_vars
-    USE state_2d, ONLY : state_type
+    USE state_new_fields, ONLY : state_type
 
     IMPLICIT none
 

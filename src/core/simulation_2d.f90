@@ -24,7 +24,7 @@ MODULE simulation_2d
 
 
     USE runtime_2d, ONLY : runtime_state_type
-    USE state_2d, ONLY : state_type
+    USE state_new_fields, ONLY : state_type
     USE domain_2d, ONLY : domain_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE time_integration_2d, ONLY : time_integration_workspace_type
