@@ -10,6 +10,7 @@ on:
       - 'src/state_new/**'
       - 'TESTS/TEST_MASS_EXCHANGE/**'
       - '.github/workflows/state-architecture-validation.yml'
+      - '.github/scripts/install-ubuntu-deps.sh'
 
 permissions:
   contents: read
