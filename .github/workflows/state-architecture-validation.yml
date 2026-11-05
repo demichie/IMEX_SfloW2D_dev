@@ -2,12 +2,6 @@ name: State architecture validation
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'src/state_new/**'
-      - 'TESTS/TEST_STATE_NEW/**'
-      - 'docs/STATE_ARCHITECTURE_REDESIGN_ROADMAP.md'
-      - '.github/workflows/state-architecture-validation.yml'
 
 permissions:
   contents: read

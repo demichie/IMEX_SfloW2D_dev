@@ -299,7 +299,7 @@ Questo registro è parte del piano corrente di lavoro. Ogni voce deve risultare 
 | P2.1 Verifiche ALLOCATED/SIZE | COMPLETATA | `require_*_storage` separa i controlli di allocazione dalle chiamate a `SIZE` | Mantenere il controllo al confine di setup |
 | P2.2 Layout dei quattro array | COMPLETATA | Inizializzazione workspace verifica e prepara `xs`, `xg`, `alphas`, `alphag` | Aggiungere test di layout parzialmente allocato |
 | P2.3–P2.6 Memoria e workspace | CODICE COMPLETATO | `layout_valid` impostato al setup; i costruttori verificano un solo flag; reset espliciti impediscono valori obsoleti; nessun array duplicato nel workspace | Verificare indipendenza worker e assenza di copie profonde nei consumatori |
-| P3.1–P3.7 Test e benchmark | IN CORSO | Workflow corretta sui percorsi reali `TESTS/`; codice P0–P2 consolidato e compilazione isolata superata | Eseguire la Action sul repository, confrontare col backend, aggiungere benchmark e completare le regressioni |
+| P3.1–P3.7 Test e benchmark | IN CORSO | Workflow manuale `state-architecture-validation.yml` sui percorsi reali `TESTS/`; codice P0–P2 consolidato e compilazione isolata superata | Avviare manualmente la Action sul repository, confrontare col backend, aggiungere benchmark e completare le regressioni |
 
 ## Appendice A — API concettuale di destinazione
 
