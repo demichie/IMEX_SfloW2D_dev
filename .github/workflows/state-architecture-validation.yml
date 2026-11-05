@@ -46,6 +46,9 @@ jobs:
           - TEST_MASS_EXCHANGE
           - TEST_SPATIAL_OPERATOR
           - TEST_WORKSPACE_LIFECYCLE
+          - TEST_RHEOLOGY_CELL_LOCAL
+          - TEST_RHEOLOGY_FROUDE
+          - TEST_SOURCE_REGISTRY
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
