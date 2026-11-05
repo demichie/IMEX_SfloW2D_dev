@@ -5,7 +5,7 @@ MODULE mass_exchange_entrainment_2d
     USE parameters_2d, ONLY : wp, mass_exchange_rates_type,                                                            &
             reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, T_ambient, sp_heat_a
     IMPLICIT NONE
     PRIVATE

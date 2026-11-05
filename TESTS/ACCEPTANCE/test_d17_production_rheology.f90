@@ -1,8 +1,8 @@
 ! Quantitative D17.20 test through the production rheology dispatcher.
 PROGRAM test_d17_production_rheology
   USE parameters_2d, ONLY : wp
-  USE state_new_types, ONLY : physical_state_real, physical_state_complex
-  USE state_new_physical, ONLY : update_physical_state_kinematics
+  USE state_types, ONLY : physical_state_real, physical_state_complex
+  USE state_physical, ONLY : update_physical_state_kinematics
   USE rheology_2d, ONLY : eval_rheology_implicit,eval_rheology_semi_implicit
   IMPLICIT NONE
   REAL(wp), PARAMETER :: drag=0.1_wp, epsilon_cs=1.0E-24_wp

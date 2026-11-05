@@ -187,7 +187,7 @@ CONTAINS
   !> An initially dry cell receives solids in group 0. With the stale
   !> pre-group reference, group 4 is artificially disabled; the actual
   !> recipient budget permits settling. Characterize this behavioral change
-  !> independently of the state_new physical-state migration.
+  !> independently of the state physical-state migration.
   SUBROUTINE check_injection_before_settling_budget
     REAL(wp) :: dry(nq),injected(nq),settling_rate(nq),candidate(nq)
     REAL(wp) :: stale_scale,recipient_scale
@@ -375,9 +375,9 @@ CONTAINS
   SUBROUTINE check_complete_physical_state
     USE state_conversion_2d, ONLY : eval_mixture_properties_from_mass_fractions, &
         eval_mixture_heat_capacity
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+    USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
-    USE state_new_physical, ONLY : build_physical_state_from_qp
+    USE state_physical, ONLY : build_physical_state_from_qp
     TYPE(physical_state_real) :: wet,dry,roundtrip
     TYPE(physical_state_complex) :: complex_state
     REAL(wp) :: primitive(n_vars),ri,rho_m,rho_c,red_grav,cp_c,cp_m

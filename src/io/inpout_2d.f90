@@ -20,7 +20,7 @@ MODULE inpout_2d
     USE parameters_2d, ONLY: wp, dry_thickness_tolerance,                                                              &
             configure_canonical_state_indices
     USE runtime_2d, ONLY: runtime_state_type
-    USE state_new_fields, ONLY: state_type
+    USE state_fields, ONLY: state_type
     USE domain_2d, ONLY: domain_type
     USE stochastic_module, ONLY: stochastic_workspace_type
     USE output_paths, ONLY: initialize_output_paths, output_file_path,                                                 &
@@ -121,11 +121,11 @@ MODULE inpout_2d
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     USE rheology_quadratic_2d, ONLY: friction_factor
     ! -- Functions used in the rheology calculations
-    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids, &
+    USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
         evaluate_mixture, evaluate_mixture_from_volume, primitive_to_volume_fractions
-    USE state_new_composition, ONLY : normalize_face_composition
-    USE state_new_types, ONLY : physical_state_real, initialize_physical_state_real
-    USE state_new_physical, ONLY : build_physical_state_from_qp
+    USE state_composition, ONLY : normalize_face_composition
+    USE state_types, ONLY : physical_state_real, initialize_physical_state_real
+    USE state_physical, ONLY : build_physical_state_from_qp
     USE constitutive_parameters_2d, ONLY: precompute_pascal_coefficient
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS

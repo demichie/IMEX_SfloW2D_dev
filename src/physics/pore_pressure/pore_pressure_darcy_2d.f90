@@ -15,7 +15,7 @@ MODULE pore_pressure_darcy_2d
             sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,                                         &
             dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
     USE geometry_2d, ONLY : pi_g
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
     IMPLICIT NONE

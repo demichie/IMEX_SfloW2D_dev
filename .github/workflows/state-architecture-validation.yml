@@ -17,17 +17,17 @@ jobs:
 
       - name: Verify stateNEW production boundary
         shell: bash
-        run: python3 TESTS/TEST_STATE_NEW/check_legacy_boundary.py
+        run: python3 TESTS/TEST_STATE/check_legacy_boundary.py
 
       - name: Install Fortran test dependencies
         run: |
           bash .github/scripts/install-ubuntu-deps.sh gfortran
 
-      - name: Compile and run TEST_STATE_NEW
+      - name: Compile and run TEST_STATE
         shell: bash
         run: |
           set -euo pipefail
-          sh TESTS/TEST_STATE_NEW/run_test.sh 2>&1 | tee state-new-test.log
+          sh TESTS/TEST_STATE/run_test.sh 2>&1 | tee state-new-test.log
 
       - name: Upload state architecture log
         if: always()
@@ -92,7 +92,7 @@ jobs:
       - name: Install equivalence-test dependencies
         run: |
           bash .github/scripts/install-ubuntu-deps.sh gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config
-      - name: Compare legacy and state_new backends
+      - name: Compare legacy and state backends
         shell: bash
         run: |
           set -euo pipefail

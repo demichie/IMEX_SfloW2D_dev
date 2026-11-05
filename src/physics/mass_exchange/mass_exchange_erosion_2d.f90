@@ -5,7 +5,7 @@ MODULE mass_exchange_erosion_2d
     USE parameters_2d, ONLY : wp, n_solid, erodible_deposit_flag,                                                      &
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract,                           &
             alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
     IMPLICIT NONE

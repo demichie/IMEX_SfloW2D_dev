@@ -2,7 +2,7 @@
 """Enforce the production boundary of the retired state conversion module.
 
 This is a static architectural check, not a numerical equivalence test:
-the legacy module remains built for the old/new characterization tests.
+the former state backends have been removed from production.
 """
 from pathlib import Path
 import re
@@ -21,11 +21,12 @@ for source in sorted(SRC.rglob("*.f90")):
 for lineno, line in enumerate((SRC / "Makefile.am").read_text(encoding="utf-8").splitlines(), 1):
     if MAKE_LEGACY.match(line):
         errors.append(f"src/Makefile.am:{lineno}: stale legacy prerequisite")
-if (SRC / "state").exists():
-    errors.append("src/state/: legacy implementation directory still present")
+for obsolete in ("state_2d.f90", "state_conversion_2d.f90"):
+    if (SRC / "state" / obsolete).exists():
+        errors.append(f"src/state/{obsolete}: retired module remains")
 if errors:
-    print("STATE_NEW_BOUNDARY_FAIL")
+    print("state_BOUNDARY_FAIL")
     for error in errors:
         print(error)
     sys.exit(1)
-print("STATE_NEW_BOUNDARY_PASS: no legacy imports in production; obsolete Make edge absent")
+print("state_BOUNDARY_PASS: no legacy imports in production; obsolete Make edge absent")

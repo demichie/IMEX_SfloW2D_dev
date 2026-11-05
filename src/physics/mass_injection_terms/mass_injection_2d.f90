@@ -1,7 +1,7 @@
 !> @brief Assemble complete conservative rates from volumetric injection processes.
 MODULE mass_injection_2d
     USE parameters_2d, ONLY : wp, n_eqns
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE mass_bottom_circular_injection_2d, ONLY : eval_bottom_circular_injection_explicit,                             &
             eval_bottom_circular_injection_semi_implicit, eval_bottom_circular_injection_implicit,                     &
             eval_bottom_circular_injection_analytic

@@ -3,7 +3,7 @@
 !> to be added without changing any caller. Darcy is the only model today.
 MODULE pore_pressure_2d
     USE parameters_2d, ONLY : wp, n_solid, n_eqns, pore_pressure_flag
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE diagnostics_2d, ONLY : fatal_error
     USE pore_pressure_darcy_2d, ONLY :                                                                                 &
             darcy_explicit => eval_pore_pressure_darcy_explicit,                                                       &

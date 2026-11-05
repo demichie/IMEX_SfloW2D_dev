@@ -94,7 +94,7 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,                                                 &
         thickness_levels , dyn_pres_levels
 
-    USE state_new_conversions, ONLY : conservative_to_primitive
+    USE state_conversions, ONLY : conservative_to_primitive
     USE diagnostics_2d, ONLY : fatal_error
 
 

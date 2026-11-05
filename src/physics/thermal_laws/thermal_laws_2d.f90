@@ -4,7 +4,7 @@ MODULE thermal_laws_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_ID_THERMAL_COOLING
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit,                                                      &
             eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit,                                         &
             eval_thermal_cooling_implicit_real, eval_thermal_cooling_analytic

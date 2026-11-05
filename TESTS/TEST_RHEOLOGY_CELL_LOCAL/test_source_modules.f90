@@ -141,7 +141,7 @@ PROGRAM test_source_modules
 
 CONTAINS
   FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)
-    USE state_new_types, ONLY : physical_state_complex
+    USE state_types, ONLY : physical_state_complex
     COMPLEX(wp), INTENT(IN) :: temperature
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
     COMPLEX(wp) :: result

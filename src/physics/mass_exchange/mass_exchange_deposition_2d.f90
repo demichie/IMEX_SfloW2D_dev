@@ -9,7 +9,7 @@ MODULE mass_exchange_deposition_2d
             collective_settling_flag, A_drag, B_drag, diam_s
 
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
     IMPLICIT NONE

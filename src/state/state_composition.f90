@@ -1,4 +1,4 @@
-MODULE state_new_composition
+MODULE state_composition
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_eqns
     USE parameters_2d, ONLY : idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last, &
         idx_add_gas_first,idx_add_gas_last
@@ -70,4 +70,4 @@ CONTAINS
         END IF
         close_composition_complex=.TRUE.
     END FUNCTION close_composition_complex
-END MODULE state_new_composition
+END MODULE state_composition

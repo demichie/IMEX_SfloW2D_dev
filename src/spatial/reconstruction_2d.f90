@@ -1534,7 +1534,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[in] context Context string used in physical closure diagnostics.
     !> @param[in] kt_mode Selected KT trace reconstruction mode.
     SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, source_trace,h_selected,context,kt_mode)
-        USE state_new_composition, ONLY : normalize_face_composition
+        USE state_composition, ONLY : normalize_face_composition
         USE diagnostics_2d, ONLY : fatal_error
         USE parameters_2d, ONLY : n_solid,n_add_gas,idx_solid_first,idx_solid_last, &
             idx_add_gas_first,idx_add_gas_last

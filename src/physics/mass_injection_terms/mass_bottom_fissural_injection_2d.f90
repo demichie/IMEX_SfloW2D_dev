@@ -5,9 +5,9 @@ MODULE mass_bottom_fissural_injection_2d
     USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
-    USE state_new_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
-    USE state_new_composition, ONLY : close_composition
+    USE state_types, ONLY : physical_state_real, physical_state_complex
+    USE state_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
+    USE state_composition, ONLY : close_composition
 
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d

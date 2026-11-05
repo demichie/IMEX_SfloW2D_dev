@@ -4,7 +4,7 @@ PROGRAM test_lava_cooling
   USE thermal_cooling_2d, ONLY : eval_thermal_cooling_analytic, &
        eval_thermal_cooling_implicit, eval_thermal_cooling_explicit, &
        eval_thermal_cooling_semi_implicit
-  USE state_new_types, ONLY : physical_state_real, physical_state_complex
+  USE state_types, ONLY : physical_state_real, physical_state_complex
 
   IMPLICIT NONE
 
@@ -126,7 +126,7 @@ CONTAINS
     CALL eval_thermal_cooling_analytic(temperature,step,capacity,radiative,convective,ambient,result)
   END SUBROUTINE test_cooling_analytic
   FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)
-    USE state_new_types, ONLY : physical_state_complex
+    USE state_types, ONLY : physical_state_complex
     COMPLEX(wp), INTENT(IN) :: temperature
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
     COMPLEX(wp) :: result

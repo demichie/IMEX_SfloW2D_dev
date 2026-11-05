@@ -14,7 +14,7 @@ PROGRAM test_analytic_velocity
        eval_rheology_voellmy_implicit,                                  &
        eval_rheology_voellmy_semi_implicit,                             &
        eval_rheology_voellmy_analytic
-  USE state_new_types, ONLY : physical_state_real, physical_state_complex
+  USE state_types, ONLY : physical_state_real, physical_state_complex
   USE rheology_plastic_2d, ONLY : tau, eval_rheology_plastic_implicit,  &
        eval_rheology_plastic_analytic
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &

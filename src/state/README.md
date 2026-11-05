@@ -1,15 +1,15 @@
-# state_new — canonical solver state
+# state — canonical solver state
 
 This directory contains the sole production state implementation.
 
-- `state_new_fields.f90` owns grid fields (`q`, `qp`), substrate inventories,
+- `state_fields.f90` owns grid fields (`q`, `qp`), substrate inventories,
   accumulated diagnostics and substrate transaction snapshots.
-- `state_new_types.f90` owns the REAL/COMPLEX cell-local physical state types
+- `state_types.f90` owns the REAL/COMPLEX cell-local physical state types
   and reusable per-worker workspaces.
-- `state_new_composition.f90`, `state_new_mixture.f90`,
-  `state_new_conversions.f90` and `state_new_physical.f90`
+- `state_composition.f90`, `state_mixture.f90`,
+  `state_conversions.f90` and `state_physical.f90`
   implement canonical cell-local transformations and evaluations.
-- `state_new.f90` exports these modules as one public facade.
+- `state.f90` exports these modules as one public facade.
 
 Production code must not import or link `state_2d` or
 `state_conversion_2d`; the historical `src/state/` implementation was

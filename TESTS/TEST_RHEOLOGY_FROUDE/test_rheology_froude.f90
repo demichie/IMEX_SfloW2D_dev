@@ -5,9 +5,9 @@ PROGRAM test_rheology_froude
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
   USE state_conversion_2d, ONLY : mixt_var
-  USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+  USE state_types, ONLY : physical_state_real, physical_state_complex, &
        initialize_physical_state_real, promote_physical_state
-  USE state_new_physical, ONLY : build_physical_state_from_qp
+  USE state_physical, ONLY : build_physical_state_from_qp
   USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit, &
        eval_rheology_froude_implicit
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite

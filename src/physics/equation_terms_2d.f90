@@ -13,8 +13,8 @@ MODULE equation_terms_2d
     USE parameters_2d, ONLY : idx_addGasEqn_first,idx_addGasEqn_last
     USE constitutive_parameters_2d, ONLY : grav,rho_a_amb
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_mixture, ONLY : evaluate_mixture_density
-    USE state_new_composition, ONLY : normalize_face_composition
+    USE state_mixture, ONLY : evaluate_mixture_density
+    USE state_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
 

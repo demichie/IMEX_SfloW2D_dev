@@ -1,7 +1,7 @@
 !*******************************************************************************
 !> Shared REAL/COMPLEX mixture kernels for the new state architecture.
 !*******************************************************************************
-MODULE state_new_mixture
+MODULE state_mixture
 
     USE parameters_2d, ONLY : wp, gas_flag
     USE parameters_2d, ONLY : n_solid, n_add_gas, n_vars, idx_h, idx_T, &
@@ -10,7 +10,7 @@ MODULE state_new_mixture
     USE constitutive_parameters_2d, ONLY : sp_gas_const_a, sp_gas_const_g
     USE constitutive_parameters_2d, ONLY : inv_pres, pres, rho_l, inv_rho_l
     USE constitutive_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s
-    USE state_new_composition, ONLY : normalize_face_composition
+    USE state_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
     PRIVATE
@@ -196,4 +196,4 @@ CONTAINS
 
     END FUNCTION average_density_solids
 
-END MODULE state_new_mixture
+END MODULE state_mixture

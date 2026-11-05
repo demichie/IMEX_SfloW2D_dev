@@ -1,7 +1,7 @@
 !*******************************************************************************
 !> Conservative/primitive conversions for the new state architecture.
 !*******************************************************************************
-MODULE state_new_conversions
+MODULE state_conversions
 
     USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas
     USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
@@ -10,9 +10,9 @@ MODULE state_new_conversions
     USE parameters_2d, ONLY : idx_stoch, idx_pore
     USE parameters_2d, ONLY : eps_sing, eps_sing4
     USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag
-    USE state_new_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, evaluate_mixture_density
+    USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, evaluate_mixture_density
     USE constitutive_parameters_2d, ONLY : T_ambient
-    USE state_new_composition, ONLY : close_composition, normalize_face_composition
+    USE state_composition, ONLY : close_composition, normalize_face_composition
 
     IMPLICIT NONE
     PRIVATE
@@ -228,4 +228,4 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_complex
 
-END MODULE state_new_conversions
+END MODULE state_conversions

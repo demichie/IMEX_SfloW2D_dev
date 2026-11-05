@@ -1,10 +1,10 @@
-PROGRAM test_state_new
+PROGRAM test_state
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_new_types
-    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids
-    USE state_new_conversions
-    USE state_new_physical
+    USE state_types
+    USE state_mixture, ONLY : sauter_diameter, average_density_solids
+    USE state_conversions
+    USE state_physical
     IMPLICIT NONE
 
     REAL(wp), ALLOCATABLE :: qp(:), qp_roundtrip(:), q(:)
@@ -82,7 +82,7 @@ PROGRAM test_state_new
     qp=0.0_wp
     CALL build_physical_state_from_qp(qp,real_workspace%state)
     IF (real_workspace%state%Ri /= 0.0_wp) ERROR STOP 'dry Richardson state is not zero'
-    WRITE(*,'(A)') 'PASS: state_new kernels verified'
+    WRITE(*,'(A)') 'PASS: state kernels verified'
 
 CONTAINS
 
@@ -146,4 +146,4 @@ CONTAINS
         REAL(wp), INTENT(IN) :: a,b,tol
         IF (ABS(a-b)>tol*MAX(1.0_wp,ABS(a),ABS(b))) ERROR STOP label
     END SUBROUTINE assert_close
-END PROGRAM test_state_new
+END PROGRAM test_state

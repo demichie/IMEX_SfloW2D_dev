@@ -19,7 +19,7 @@ MODULE nonlinear_solver_2d
     USE source_registry_2d, ONLY : source_group_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit, eval_source_implicit_real
-    USE state_new_types, ONLY : physical_state_complex, physical_state_real, &
+    USE state_types, ONLY : physical_state_complex, physical_state_real, &
         initialize_physical_state_real, initialize_physical_state_complex
 
     IMPLICIT NONE

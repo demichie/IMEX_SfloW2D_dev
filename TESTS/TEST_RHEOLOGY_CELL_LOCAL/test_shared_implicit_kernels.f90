@@ -5,7 +5,7 @@ PROGRAM test_shared_implicit_kernels
     USE rheology_parameters_2d, ONLY : xi, I_0, mu_2, mu_s, muI_inf, T_ref
     USE rheology_2d, ONLY : eval_rheology_implicit_real_id
     USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, eval_rheology_newmodel_implicit_real
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+    USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
     USE rheology_voellmy_2d, ONLY : voellmy_mu=>mu, &
         eval_rheology_voellmy_explicit, eval_rheology_voellmy_semi_implicit, eval_rheology_voellmy_implicit

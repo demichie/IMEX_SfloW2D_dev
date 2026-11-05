@@ -12,7 +12,7 @@
 MODULE rheology_empirical_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 solve_exact_velocity_flow, EXACT_FLOW_LINEAR
     IMPLICIT NONE

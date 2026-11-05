@@ -21,10 +21,10 @@
 MODULE rheology_mui_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_solid
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
-    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids
+    USE state_mixture, ONLY : sauter_diameter, average_density_solids
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_MUI

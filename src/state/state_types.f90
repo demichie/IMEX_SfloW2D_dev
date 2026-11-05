@@ -2,9 +2,9 @@
 !> Types for the clean-slate state architecture.
 !
 !> Canonical REAL/COMPLEX cell-local physical states and reusable workspaces.
-!> Grid-sized authoritative fields are owned by state_new_fields.
+!> Grid-sized authoritative fields are owned by state_fields.
 !*******************************************************************************
-MODULE state_new_types
+MODULE state_types
 
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas
 
@@ -153,7 +153,7 @@ CONTAINS
                  SIZE(state%xg) /= n_add_gas .OR. &
                  SIZE(state%alphas) /= n_solid .OR. &
                  SIZE(state%alphag) /= n_add_gas) THEN
-            ERROR STOP 'state_new REAL workspace has incompatible composition layout'
+            ERROR STOP 'state REAL workspace has incompatible composition layout'
         END IF
 
         state%xs=0.0_wp
@@ -185,7 +185,7 @@ CONTAINS
                  SIZE(state%xg) /= n_add_gas .OR. &
                  SIZE(state%alphas) /= n_solid .OR. &
                  SIZE(state%alphag) /= n_add_gas) THEN
-            ERROR STOP 'state_new COMPLEX workspace has incompatible composition layout'
+            ERROR STOP 'state COMPLEX workspace has incompatible composition layout'
         END IF
 
         state%xs=(0.0_wp,0.0_wp)
@@ -200,4 +200,4 @@ CONTAINS
         CALL initialize_physical_state_complex(workspace%state)
     END SUBROUTINE initialize_state_workspace_complex
 
-END MODULE state_new_types
+END MODULE state_types

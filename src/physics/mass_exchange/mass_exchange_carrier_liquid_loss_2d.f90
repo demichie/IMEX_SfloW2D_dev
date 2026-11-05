@@ -6,7 +6,7 @@ MODULE mass_exchange_carrier_liquid_loss_2d
             reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : loss_rate
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
 
     IMPLICIT NONE
     PRIVATE

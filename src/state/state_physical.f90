@@ -1,7 +1,7 @@
 !*******************************************************************************
 !> Complete physical-state construction for the new state architecture.
 !*******************************************************************************
-MODULE state_new_physical
+MODULE state_physical
 
     USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas
     USE parameters_2d, ONLY : idx_h, idx_T, idx_solid_first, idx_solid_last
@@ -11,10 +11,10 @@ MODULE state_new_physical
     USE parameters_2d, ONLY : slope_correction_flag, curvature_term_flag
     USE parameters_2d, ONLY : eps_sing, eps_sing4
     USE constitutive_parameters_2d, ONLY : rho_a_amb, sp_heat_a, sp_heat_l, grav, T_ambient
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
-    USE state_new_types, ONLY : reset_physical_state_real, reset_physical_state_complex
-    USE state_new_composition, ONLY : close_composition
-    USE state_new_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity
+    USE state_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : reset_physical_state_real, reset_physical_state_complex
+    USE state_composition, ONLY : close_composition
+    USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity
 
     IMPLICIT NONE
     PRIVATE
@@ -86,12 +86,12 @@ CONTAINS
 
     SUBROUTINE require_real_storage(state)
         TYPE(physical_state_real), INTENT(IN) :: state
-        IF (.NOT.state%layout_valid) ERROR STOP 'state_new REAL workspace was not validated at setup'
+        IF (.NOT.state%layout_valid) ERROR STOP 'state REAL workspace was not validated at setup'
     END SUBROUTINE require_real_storage
 
     SUBROUTINE require_complex_storage(state)
         TYPE(physical_state_complex), INTENT(IN) :: state
-        IF (.NOT.state%layout_valid) ERROR STOP 'state_new COMPLEX workspace was not validated at setup'
+        IF (.NOT.state%layout_valid) ERROR STOP 'state COMPLEX workspace was not validated at setup'
     END SUBROUTINE require_complex_storage
 
     SUBROUTINE build_physical_state_from_qp_real(qp, state, bx, by, bxx, bxy, byy, accepted)
@@ -317,4 +317,4 @@ CONTAINS
         richardson_complex=ri
     END FUNCTION richardson_complex
 
-END MODULE state_new_physical
+END MODULE state_physical

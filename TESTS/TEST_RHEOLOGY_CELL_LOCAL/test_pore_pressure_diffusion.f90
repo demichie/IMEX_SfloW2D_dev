@@ -8,7 +8,7 @@ PROGRAM test_pore_pressure_diffusion
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
   USE pore_pressure_darcy_2d, ONLY : eval_pore_pressure_darcy_analytic
-  USE state_new_types, ONLY : physical_state_real
+  USE state_types, ONLY : physical_state_real
 
   IMPLICIT NONE
 

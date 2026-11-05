@@ -14,7 +14,7 @@ MODULE mass_exchange_2d
         SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                      &
         SOURCE_ID_EXCHANGE_VAPORIZATION, SOURCE_ID_EXCHANGE_LAVA_DEPOSITION
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit

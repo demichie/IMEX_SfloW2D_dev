@@ -7,7 +7,7 @@ PROGRAM test_state_equivalence
         old_from_volume=>eval_mixture_properties_from_volume_fractions, &
         old_primitive_volume=>primitive_to_volume_fractions
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
-    USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
+    USE state, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
         numerical_primitive_to_conservative, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
@@ -43,7 +43,7 @@ PROGRAM test_state_equivalence
     CALL check_numerical_decoder_limits
     CALL check_settling_trace_equivalence
     CALL check_volume_conversion_equivalence
-    WRITE(*,'(A)') 'PASS: state_new equivalence cases verified'
+    WRITE(*,'(A)') 'PASS: state equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1

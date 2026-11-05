@@ -13,8 +13,8 @@
 MODULE rheology_2d
 
     USE parameters_2d, ONLY : wp
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
-    USE state_new_physical, ONLY : update_physical_state_kinematics
+    USE state_types, ONLY : physical_state_real, physical_state_complex
+    USE state_physical, ONLY : update_physical_state_kinematics
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : rheology_source_id,RHEOLOGY_ID_NONE,                                                 &
             RHEOLOGY_ID_VOELLMY,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_LAVA,RHEOLOGY_ID_LAHAR,                                &

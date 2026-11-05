@@ -4,7 +4,7 @@
 MODULE rheology_newmodel_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex
+    USE state_types, ONLY : physical_state_real, physical_state_complex
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_rheology_newmodel_explicit

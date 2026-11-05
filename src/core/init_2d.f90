@@ -14,7 +14,7 @@ MODULE init_2d
     USE parameters_2d, ONLY : verbose_level
     USE parameters_2d, ONLY : n_solid , n_add_gas
     USE parameters_2d, ONLY : n_stoch_vars , n_pore_vars
-    USE state_new_fields, ONLY : state_type
+    USE state_fields, ONLY : state_type
 
     IMPLICIT none
 
@@ -69,8 +69,8 @@ CONTAINS
 
     SUBROUTINE collapsing_volume(state)
 
-    USE state_new_mixture, ONLY : evaluate_mixture_from_volume
-    USE state_new_conversions, ONLY : numerical_primitive_to_conservative
+    USE state_mixture, ONLY : evaluate_mixture_from_volume
+    USE state_conversions, ONLY : numerical_primitive_to_conservative
     USE diagnostics_2d, ONLY : fatal_error
 
     USE geometry_2d, ONLY : compute_cell_fract

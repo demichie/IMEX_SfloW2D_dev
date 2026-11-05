@@ -678,7 +678,7 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE equation_terms_2d, ONLY : limit_component_mass_flux
-    USE state_new_conversions, ONLY : numerical_primitive_to_conservative
+    USE state_conversions, ONLY : numerical_primitive_to_conservative
     USE diagnostics_2d, ONLY : fatal_error
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_oriented_pccu_pair

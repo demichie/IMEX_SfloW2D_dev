@@ -5,7 +5,7 @@ PROGRAM test_newmodel_numerics
   USE source_catalog_2d, ONLY : source_term_descriptor_by_name, &
        canonical_rheology_source_name, source_term_type, rheology_name_has_role, &
        SOURCE_ROLE_IMPLICIT, SOURCE_ROLE_SEMI_IMPLICIT
-  USE state_new_types, ONLY : physical_state_real, physical_state_complex
+  USE state_types, ONLY : physical_state_real, physical_state_complex
   USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, &
        eval_rheology_newmodel_semi_implicit
   IMPLICIT NONE

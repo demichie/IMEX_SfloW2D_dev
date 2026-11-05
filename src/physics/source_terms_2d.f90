@@ -9,9 +9,9 @@ MODULE source_terms_2d
     USE mass_injection_coefficients_2d
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex,                                           &
+    USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
-    USE state_new_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
+    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_implicit_real, eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
@@ -20,7 +20,7 @@ MODULE source_terms_2d
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_new_composition, ONLY : conservative_mass_admissible
+    USE state_composition, ONLY : conservative_mass_admissible
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
     USE source_registry_2d, ONLY : source_group_type

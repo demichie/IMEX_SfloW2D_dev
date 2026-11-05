@@ -14,7 +14,7 @@ MODULE spatial_operator_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : T_ambient
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, dx, dy
-    USE state_new_conversions, ONLY : conservative_to_primitive
+    USE state_conversions, ONLY : conservative_to_primitive
     USE domain_2d, ONLY : domain_type
     USE reconstruction_2d, ONLY : reconstruction_workspace_type
     USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
