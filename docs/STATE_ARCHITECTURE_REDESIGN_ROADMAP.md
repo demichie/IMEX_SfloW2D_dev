@@ -825,3 +825,13 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 
 - La Action `Fortran architecture dependency audit`, run [42115367142](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42115367142), ha restituito **success** sul commit `a51f4fc6c04a` (verifica statica automatica, non compilazione).
 - Aggiunto un secondo job per una build `gfortran` parallela (`make -j4`), per confermare il comportamento delle dipendenze Fortran su ambiente CI. La build resta da osservare dopo il commit.
+
+### Blocco 1 - verifica build e contratti delle sorgenti
+
+- La build completa `gfortran` con `make -j4` e il controllo statico sono **PASS** nella [Action 42115531813](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42115531813). La dipendenza incrociata fra moduli e Makefile e quindi verificata anche da un compilatore in parallelo.
+- Audit dei modelli reologici: gli 11 modelli hanno le quattro interfacce; nei modelli con contributi reali/complessi comuni, i file `.inc` eliminano la duplicazione dei kernel senza introdurre conversioni improprie. Gli `explicit` che assemblano il semi-implicito e l'implicito reale costituiscono composizione prevista, non wrapper di compatibilita eliminabili.
+- `rheology_froude`, `rheology_lucas`, `rheology_mui`: la routine implicita restituisce zero, ma i tre termini sono catalogati come `has_newton=.FALSE.` e `default_method=EXPLICIT`; il test `TEST_RHEOLOGY_FROUDE` controlla anche il valore zero della sua interfaccia complessa. Non modificare il comportamento senza riprogettare esplicitamente il contratto di partizione semi-implicito/implicito.
+- `rheology_newmodel`: `explicit` e `analytic` falliscono esplicitamente e sono marcati non disponibili nel catalogo; il `semi_implicit` restituisce zero mentre il contributo fisico e nell'`implicit`. Questo non e un metodo pubblicizzato come implementato per i gruppi non consentiti.
+- Le varianti di dispatch per nome della reologia sono ancora chiamate dai test di accettazione; la loro rimozione non rientra in una pulizia dimostrabilmente sicura. `eval_source_analytic_state` e un helper chiamato da `eval_source_analytic` per la mappa di stato esatta, non un wrapper di compatibilita inattivo.
+- Aggiunta una matrice CI con sei suite (`SOURCE_REGISTRY`, `SOURCE_MASS`, `MASS_EXCHANGE`, `RHEOLOGY_CELL_LOCAL`, `RHEOLOGY_FROUDE`, `STATE_CONVERSION`) per verificare il comportamento dopo l'audit. **Da osservare gli esiti sul nuovo commit.**
+- Resta una verifica esaustiva degli entry point pubblici contro tutti i consumatori prima di poter attestare l'assenza assoluta di wrapper inutilizzati; la sola ricerca testuale non costituisce prova sufficiente.
