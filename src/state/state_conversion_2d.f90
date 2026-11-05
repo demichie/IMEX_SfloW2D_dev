@@ -107,10 +107,8 @@ MODULE state_conversion_2d
     PUBLIC :: eval_mixture_properties_from_volume_fractions
     PUBLIC :: enforce_mass_fraction_closure
     PUBLIC :: enforce_primitive_mass_fraction_closure
-    PUBLIC :: clip_roundoff_negative_component_masses
     PUBLIC :: primitive_to_volume_fractions
     PUBLIC :: velocity_from_conservative
-    PUBLIC :: project_dry_cell_momenta
 
 CONTAINS
 
@@ -772,21 +770,6 @@ CONTAINS
         state%curvature_acceleration = REAL(complex_state%curvature_acceleration,wp)
     END SUBROUTINE real_part_physical_state
 
-    !> \brief Remove unresolved cell momenta without discarding conservative mass.
-    !> \param[in,out] qc Conservative cell state; only entries 2 and 3 may change.
-    !> \param[in] h Depth recovered with the current mixture thermodynamic closure.
-    !> \details At h <= the existing shared dry-depth threshold, reset both
-    !>          momenta to zero. Mass, thermal energy and transported components
-    !>          are bitwise unchanged. Wet momenta are also unchanged.
-    !> \note Apply after observing/checking the raw final IMEX assembly, not inside
-    !>       the differentiable real/complex closure or the implicit Newton solve.
-    PURE SUBROUTINE project_dry_cell_momenta(qc, h)
-        REAL(wp), INTENT(INOUT) :: qc(:)
-        REAL(wp), INTENT(IN) :: h
-
-        IF (h <= dry_thickness_tolerance) qc(idx_uEqn:idx_vEqn) = 0.0_wp
-    END SUBROUTINE project_dry_cell_momenta
-
     !> \brief Recover real velocities from mixture mass and momenta with dry-state regularization.
     !>
     !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and
@@ -850,41 +833,6 @@ CONTAINS
         qp(idx_add_gas_first:idx_add_gas_last) = xg
 
     END SUBROUTINE enforce_primitive_mass_fraction_closure
-
-    !> \brief Clip only roundoff-sized negative conservative component masses.
-    !> Material negatives are deliberately left unchanged for the existing
-    !> admissibility checks to report as errors.
-    !> \param[in,out] qc Local conservative state; only roundoff-sized negative
-    !>                   solid, gas or liquid masses may be changed.
-    SUBROUTINE clip_roundoff_negative_component_masses(qc)
-
-        REAL(wp), INTENT(INOUT) :: qc(n_vars)
-        REAL(wp) :: tolerance
-
-        IF (qc(idx_totMassEqn) .LE. 0.0_wp) RETURN
-        tolerance = mass_fraction_roundoff_tolerance *                                                                 &
-            MAX(ABS(qc(idx_totMassEqn)),TINY(1.0_wp))
-
-        IF (n_solid .GT. 0) THEN
-            WHERE ((qc(idx_solid_first:idx_solid_last) .LT. 0.0_wp) .AND.                                              &
-                (qc(idx_solid_first:idx_solid_last) .GE. -tolerance))
-                qc(idx_solid_first:idx_solid_last) = 0.0_wp
-
-            END WHERE
-
-        END IF
-
-        IF (n_add_gas .GT. 0) THEN
-            WHERE ((qc(idx_add_gas_first:idx_add_gas_last) .LT. 0.0_wp) .AND.                                          &
-                (qc(idx_add_gas_first:idx_add_gas_last) .GE. -tolerance))
-                qc(idx_add_gas_first:idx_add_gas_last) = 0.0_wp
-
-            END WHERE
-
-        END IF
-
-    END SUBROUTINE clip_roundoff_negative_component_masses
-
 
     !> \brief Derive constitutive volume fractions from canonical physical mass fractions.
     !>
@@ -1328,17 +1276,4 @@ CONTAINS
     END SUBROUTINE qp_to_qc
 
     !******************************************************************************
-    !> \brief Convert a physical state to the auxiliary free-surface reconstruction representation.
-    !
-    !> This subroutine evaluates from the physical local variables qpj, the three
-    !> additional local variables qp2j = (h+B,u,v).
-    !> @author
-    !> Mattia de' Michieli Vitturi
-    !> \date 10/10/2019
-    !>
-    !> \param[in] qpj Local physical state of length n_vars with component mass fractions.
-    !> \param[in] Bj Local bed elevation [m].
-    !> \param[out] qp2j Three-component auxiliary vector [eta,u,v], with eta=h+B.
-
-
 END MODULE state_conversion_2d
