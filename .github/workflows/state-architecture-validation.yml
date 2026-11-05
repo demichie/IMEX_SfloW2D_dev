@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - 'src/state_new/**'
-      - 'tests/TEST_STATE_NEW/**'
+      - 'TESTS/TEST_STATE_NEW/**'
       - 'docs/STATE_ARCHITECTURE_REDESIGN_ROADMAP.md'
       - '.github/workflows/state-architecture-validation.yml'
 
@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tests/TEST_STATE_NEW/run_test.sh 2>&1 | tee state-new-test.log
+          TESTS/TEST_STATE_NEW/run_test.sh 2>&1 | tee state-new-test.log
 
       - name: Upload state architecture log
         if: always()

@@ -287,7 +287,7 @@ Questo registro è parte del piano corrente di lavoro. Ogni voce deve risultare 
 | Voce | Stato | Evidenza corrente | Lavoro residuo |
 | --- | --- | --- | --- |
 | P0.1 Pressione dinamica | COMPLETATA | Formula corretta in `state_new_conversions.f90`; test isolato superato | Aggiungere confronto esplicito REAL/COMPLEX nel test |
-| P0.2 Celle asciutte | CODICE COMPLETATO | Conversioni e costruttori REAL/COMPLEX trattano massa/spessore nullo come dry valido, impostano `T_ambient` e selezionano il carrier con `liquid_flag` | Validare formalmente densità/proprietà dry contro il backend canonico |
+| P0.2 Celle asciutte | CODICE COMPLETATO | Costruttori REAL/COMPLEX da `q` ora seguono lo stesso ramo per ogni massa positiva; la regolarizzazione near-dry è applicata solo alle velocità, mentre massa nulla resta dry | Validare formalmente densità/proprietà dry contro il backend canonico |
 | P0.3 Regolarizzazione near-dry | COMPLETATA | Costruttori da `q` usano `eps_sing`/`eps_sing4`; conversioni già regolarizzate | Aggiungere casi near-dry dedicati alla suite |
 | P0.4 Richardson REAL/COMPLEX | CODICE COMPLETATO | Formula REAL/COMPLEX condivisa in `richardson.inc`; cap verificato prima della divisione per evitare overflow; velocità nulla e valori negativi preservati | Estendere la copertura numerica ai test dedicati del backend di riferimento |
 | P0.5 Stato COMPLEX completo | CODICE COMPLETATO | Reset espliciti REAL/COMPLEX; `Zs`, `exc_pore_pres` e `T` inizializzati e trasferiti da `q`/`qp` anche nei percorsi COMPLEX e dry | Aggiungere test di riuso con processi abilitati/disabilitati |
@@ -299,7 +299,7 @@ Questo registro è parte del piano corrente di lavoro. Ogni voce deve risultare 
 | P2.1 Verifiche ALLOCATED/SIZE | COMPLETATA | `require_*_storage` separa i controlli di allocazione dalle chiamate a `SIZE` | Mantenere il controllo al confine di setup |
 | P2.2 Layout dei quattro array | COMPLETATA | Inizializzazione workspace verifica e prepara `xs`, `xg`, `alphas`, `alphag` | Aggiungere test di layout parzialmente allocato |
 | P2.3–P2.6 Memoria e workspace | CODICE COMPLETATO | `layout_valid` impostato al setup; i costruttori verificano un solo flag; reset espliciti impediscono valori obsoleti; nessun array duplicato nel workspace | Verificare indipendenza worker e assenza di copie profonde nei consumatori |
-| P3.1–P3.7 Test e benchmark | IN CORSO | Aggiunta `.github/workflows/state-architecture-validation.yml`; codice P0–P2 consolidato e compilazione isolata superata | Eseguire la Action sul repository, confrontare col backend, aggiungere benchmark e completare le regressioni |
+| P3.1–P3.7 Test e benchmark | IN CORSO | Workflow corretta sui percorsi reali `TESTS/`; codice P0–P2 consolidato e compilazione isolata superata | Eseguire la Action sul repository, confrontare col backend, aggiungere benchmark e completare le regressioni |
 
 ## Appendice A — API concettuale di destinazione
 
