@@ -354,7 +354,7 @@ CONTAINS
     END SUBROUTINE eval_source_semi_implicit
 
     SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,                                                  &
-            c_nh_term_impl, r_qj , r_nh_term_impl, group, physical_scratch )
+            c_nh_term_impl, r_qj , r_nh_term_impl, group, physical_scratch, accepted )
 
     USE COMPLEXIFY
 
@@ -369,7 +369,7 @@ CONTAINS
         REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
         TYPE(physical_state_complex), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
-
+        LOGICAL, OPTIONAL, INTENT(OUT) :: accepted
 
         COMPLEX(wp) :: qj(n_vars)
         COMPLEX(wp) :: source_term(n_eqns)
@@ -381,6 +381,7 @@ CONTAINS
 
         LOGICAL :: selected_rheology, selected_thermal, physical_accepted
 
+        IF (PRESENT(accepted)) accepted=.FALSE.
         IF (PRESENT(c_qj) .AND. PRESENT(c_nh_term_impl) .AND.                                                          &
             .NOT.PRESENT(r_qj) .AND. .NOT.PRESENT(r_nh_term_impl)) THEN
 
@@ -420,9 +421,14 @@ CONTAINS
         IF (selected_rheology .OR. selected_thermal) THEN
             CALL build_physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y,                                 &
                 0.0_wp, 0.0_wp, 0.0_wp, accepted=physical_accepted)
-            IF (.NOT.physical_accepted) CALL fatal_error('Invalid Newton implicit physical state')
+            IF (.NOT.physical_accepted) THEN
+                IF (PRESENT(c_nh_term_impl)) c_nh_term_impl=CMPLX(0.0_wp,0.0_wp,wp)
+                IF (PRESENT(r_nh_term_impl)) r_nh_term_impl=0.0_wp
+                RETURN
+            END IF
 
         END IF
+        IF (PRESENT(accepted)) accepted=.TRUE.
 
         IF (selected_rheology) THEN
 
