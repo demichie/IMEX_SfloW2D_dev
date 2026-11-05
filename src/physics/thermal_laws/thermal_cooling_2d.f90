@@ -56,7 +56,7 @@ CONTAINS
     !> @param[in] convective Nonnegative convective cooling coefficient.
     !> @param[in] ambient Positive ambient temperature [K].
     !> @param[out] temperature_after Temperature following cooling interval [K].
-    SUBROUTINE eval_thermal_cooling_analytic(initial_temperature,interval,heat_capacity,                                             &
+    SUBROUTINE eval_thermal_cooling_analytic(initial_temperature,interval,heat_capacity, &
             radiative,convective,ambient,temperature_after)
         REAL(wp), INTENT(IN) :: initial_temperature
         REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
