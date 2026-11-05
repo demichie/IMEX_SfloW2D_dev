@@ -1,0 +1,103 @@
+name: Settling regression pre-post stateNEW
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/settling-regression-bisect.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compare-taal:
+    name: TAAL settling / ${{ matrix.label }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: pre-drag-pre-F5
+            ref: cbcdc174ad
+          - label: post-drag-pre-F5
+            ref: ef160e8bfa7a
+          - label: first-F5-stateNEW
+            ref: 55b6be687a97
+          - label: current-master
+            ref: master
+    steps:
+      - name: Checkout current test harness and input
+        uses: actions/checkout@v4
+
+      - name: Install exact common toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/install-ubuntu-deps.sh \
+            autoconf automake gfortran make \
+            liblapack-dev libblas-dev libnetcdff-dev libnetcdf-dev
+
+      - name: Checkout historical implementation
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+          path: candidate
+
+      - name: Build historical implementation without changing physics
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          autoreconf -fi
+          FC=gfortran ./configure --with-netcdf=/usr --enable-strict-debug
+          make -j2
+          test -x src/IMEX_SfloW2D
+
+      - name: Run identical TAAL case with settling
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p comparison
+          cp EXAMPLES/EXAMPLE_TAAL/IMEX_SfloW2D.inp comparison/IMEX_SfloW2D.inp
+          ln -s "$GITHUB_WORKSPACE/EXAMPLES/EXAMPLE_TAAL/topography_dem.asc" comparison/topography_dem.asc
+          sed -i -E 's/^ T_END=.*/ T_END= 0.3500000000,/' comparison/IMEX_SfloW2D.inp
+          grep -E 'SETTLING_FLAG *= *T' comparison/IMEX_SfloW2D.inp
+          set +e
+          (cd comparison && OMP_NUM_THREADS=2 OMP_DYNAMIC=FALSE IMEX_LIE_DIAGNOSTICS=1 \
+            timeout 240s "$GITHUB_WORKSPACE/candidate/src/IMEX_SfloW2D") \
+            2>&1 | tee "comparison-${{ matrix.label }}.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "process_exit=$status" | tee "summary-${{ matrix.label }}.txt"
+          awk '
+            /^[[:space:]]*t =/ {
+              for (i=1; i<=NF; i++) {
+                if ($i=="mass" && $(i+1)=="=") {
+                  m=$(i+2)+0
+                  if (m>0 && !seen) {
+                    print "first_positive_mass: " $0
+                    seen=1
+                  }
+                  break
+                }
+              }
+            }
+            END {
+              if (!seen) print "first_positive_mass: NONE"
+            }
+          ' "comparison-${{ matrix.label }}.log" | tee -a "summary-${{ matrix.label }}.txt"
+          grep -E 'D19_BUDGET|D19_SOURCE_AUDIT|FATAL ERROR' \
+            "comparison-${{ matrix.label }}.log" | tail -n 25 \
+            >> "summary-${{ matrix.label }}.txt" || true
+          cat "summary-${{ matrix.label }}.txt"
+
+      - name: Preserve comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: settling-compare-${{ matrix.label }}-${{ github.run_id }}
+          path: |
+            comparison-${{ matrix.label }}.log
+            summary-${{ matrix.label }}.txt
+          if-no-files-found: warn
