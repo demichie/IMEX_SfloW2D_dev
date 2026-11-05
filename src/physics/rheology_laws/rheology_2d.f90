@@ -16,9 +16,9 @@ MODULE rheology_2d
     USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE state_new_physical, ONLY : update_physical_state_kinematics
     USE diagnostics_2d, ONLY : fatal_error
-    USE source_catalog_2d, ONLY : rheology_source_id,RHEOLOGY_ID_NONE,                                                &
-            RHEOLOGY_ID_VOELLMY,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_LAVA,RHEOLOGY_ID_LAHAR,                               &
-            RHEOLOGY_ID_EMPIRICAL,RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_FROUDE,                                           &
+    USE source_catalog_2d, ONLY : rheology_source_id,RHEOLOGY_ID_NONE,                                                 &
+            RHEOLOGY_ID_VOELLMY,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_LAVA,RHEOLOGY_ID_LAHAR,                                &
+            RHEOLOGY_ID_EMPIRICAL,RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_FROUDE,                                            &
             RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI,RHEOLOGY_ID_MUI_VOELLMY,RHEOLOGY_ID_NEWMODEL
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                                    &
                 eval_rheology_voellmy_implicit,                                                                        &
@@ -148,7 +148,7 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
 
-            CALL eval_rheology_semi_implicit_id(rheology_source_id(models(i)),state,                                  &
+            CALL eval_rheology_semi_implicit_id(rheology_source_id(models(i)),state,                                   &
                 grav_coeff,use_pore_pressure,use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
@@ -157,7 +157,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
     !> Frozen Newton semi-implicit dispatch with pre-resolved source identity.
-    SUBROUTINE eval_rheology_semi_implicit_id(model_id,state,grav_coeff,use_pore_pressure,                            &
+    SUBROUTINE eval_rheology_semi_implicit_id(model_id,state,grav_coeff,use_pore_pressure,                             &
             use_stochastic,stochastic_value,rate)
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -186,7 +186,7 @@ CONTAINS
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
                 CALL eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),    &
                     process_rate(2))
-            CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_EMPIRICAL, &
+            CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_EMPIRICAL,                                           &
                     RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_NEWMODEL)
                 CONTINUE
             CASE DEFAULT
@@ -212,7 +212,7 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
 
-            CALL eval_rheology_implicit_id(rheology_source_id(models(i)),state,                                       &
+            CALL eval_rheology_implicit_id(rheology_source_id(models(i)),state,                                        &
                 use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
@@ -277,7 +277,7 @@ CONTAINS
 
         IF (SIZE(models)==1) THEN
             CALL dispatch_analytic_rheology(models(1),dt,state,speed_ratio,grav_coeff,                                 &
-                curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                             &
+                curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                              &
                 velocity_after,model_supported)
             RETURN
         END IF
@@ -286,8 +286,8 @@ CONTAINS
         ! Only this uncommon multi-law path copies the physical composition.
         current_state=state
         DO i=1,SIZE(models)
-            CALL dispatch_analytic_rheology(models(i),dt,current_state,speed_ratio,grav_coeff,                        &
-                curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                             &
+            CALL dispatch_analytic_rheology(models(i),dt,current_state,speed_ratio,grav_coeff,                         &
+                curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                              &
                 velocity_after,model_supported)
             IF (.NOT.model_supported) RETURN
             current_state%u=velocity_after(1)
@@ -308,36 +308,36 @@ CONTAINS
 
         velocity_after=[state%u,state%v]
         model_supported=.TRUE.
-            SELECT CASE(TRIM(model))
-            CASE ('none')
-                CONTINUE
-            CASE ('rheology_voellmy')
-                CALL eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,&
-                    use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
-            CASE ('rheology_plastic')
-                CALL eval_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
-            CASE ('rheology_lava')
-                CALL eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
-            CASE ('rheology_lahar')
-                CALL eval_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
-            CASE ('rheology_empirical')
-                CALL eval_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
-            CASE ('rheology_quadratic')
-                CALL eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
-            CASE ('rheology_froude')
-                CALL eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
-                    use_stochastic, stochastic_value, velocity_after)
-            CASE ('rheology_lucas')
-                CALL eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,  &
-                    use_stochastic, stochastic_value, velocity_after)
-            CASE ('rheology_mui')
-                CALL eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,    &
-                    use_pore_pressure, velocity_after)
-            CASE ('rheology_mui_voellmy')
-                CALL eval_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff,                    &
-                    curvature_acceleration, use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
-            CASE DEFAULT
-                model_supported = .FALSE.
+        SELECT CASE(TRIM(model))
+        CASE ('none')
+            CONTINUE
+        CASE ('rheology_voellmy')
+            CALL eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,&
+                use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
+        CASE ('rheology_plastic')
+            CALL eval_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
+        CASE ('rheology_lava')
+            CALL eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
+        CASE ('rheology_lahar')
+            CALL eval_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
+        CASE ('rheology_empirical')
+            CALL eval_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
+        CASE ('rheology_quadratic')
+            CALL eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
+        CASE ('rheology_froude')
+            CALL eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,             &
+                use_stochastic, stochastic_value, velocity_after)
+        CASE ('rheology_lucas')
+            CALL eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
+                use_stochastic, stochastic_value, velocity_after)
+        CASE ('rheology_mui')
+            CALL eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,                &
+                use_pore_pressure, velocity_after)
+        CASE ('rheology_mui_voellmy')
+            CALL eval_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff,                                &
+                curvature_acceleration, use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
+        CASE DEFAULT
+            model_supported = .FALSE.
 
         END SELECT
     END SUBROUTINE dispatch_analytic_rheology
@@ -407,7 +407,7 @@ CONTAINS
         !> \param[in] u x velocity [m s^-1].
         !> \param[in] v y velocity [m s^-1].
         !> \return Computed acceleration for the requested model and inputs.
-    PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,                                       &
+    PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,                                           &
                 u, v) RESULT(acceleration)
 
             REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy

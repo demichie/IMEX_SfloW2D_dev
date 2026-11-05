@@ -1,6 +1,6 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
-**Roadmap operativa unica** · aggiornata al 3 novembre 2026 · Repository `demichie/IMEX_SfloW2D_dev` · Branch `master`.
+**Roadmap operativa unica** · aggiornata al 5 novembre 2026 · Repository `demichie/IMEX_SfloW2D_dev` · Branch `master`.
 
 > Questo è il solo documento operativo da aggiornare con priorità, risultati, lavori aperti e criteri di accettazione. I precedenti tracker D17–D20 e la roadmap storica sono conservati integralmente in `docs/archive/roadmaps/`, ma non sono piani concorrenti. Gli schemi IMEX-RK, le cadenze STAGE/STEP e i percorsi di compatibilità precedenti sono superati dal Lie splitting.
 
@@ -22,13 +22,13 @@ L'integratore temporale globale è esclusivamente il **Lie splitting del primo o
 - `state/`: `q`, `qp`, deposito, erosione, lava, inventari e aggregati; validità e conversioni di stato.
 - `geometry/`: `B_vertex`, topografia e grandezze geometriche derivate, aggiornabili anche con fondo evolutivo.
 
-Ogni sorgente conserva **quattro interfacce** ordinate EXPLICIT, SEMI_IMPLICIT, IMPLICIT, ANALYTIC; le operazioni non disponibili falliscono esplicitamente. Esplicito, semi-implicito e analitico ricevono stato reale; implicito stato complesso. Negli espliciti reologici è lecito convertire localmente lo stato per comporre semi-implicito e implicito senza duplicare la fisica. Evitare wrapper di mero inoltro. Le sorgenti specifiche calcolano anche gli effetti sulle altre equazioni conservative; limitatori condivisi carrier/packing preservano la coerenza dei trasferimenti. L'iniezione di bordo resta distinta dall'iniezione volumetrica.
+Ogni sorgente conserva **quattro interfacce** ordinate EXPLICIT, SEMI_IMPLICIT, IMPLICIT, ANALYTIC; le operazioni non disponibili falliscono esplicitamente. Esplicito, semi-implicito e analitico ricevono stato reale; implicito stato complesso. Negli espliciti reologici il rate e la somma del contributo semi-implicito REAL e del contributo implicito valutato in REAL; quest'ultimo condivide la stessa implementazione `.inc` con il contributo COMPLEX di Newton. Non convertire uno stato REAL in COMPLEX per assemblare l'esplicito quando esiste il kernel REAL condiviso. Evitare wrapper di mero inoltro. Evitare wrapper di mero inoltro. Le sorgenti specifiche calcolano anche gli effetti sulle altre equazioni conservative; limitatori condivisi carrier/packing preservano la coerenza dei trasferimenti. L'iniezione di bordo resta distinta dall'iniezione volumetrica.
 
 ### Parallelismo
 
 L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono parallelizzabili con OpenMP. I temporanei devono essere locali e thread-safe, con input immutabile durante la valutazione e commit/rollback coerenti. Il percorso futuro a MPI+OpenMP richiede domini locali, halo e tile di celle attive.
 
-## 3. Stato verificabile al 3 novembre 2026
+## 3. Stato verificabile al 5 novembre 2026
 
 **Legenda:** *IMPLEMENTATO* = codice e struttura presenti; *VERIFICATO* = gate comunicato o documentato; *PARZIALE* = restano verifiche o interventi; *FUTURO* = lavoro pianificato. Non equiparare compilazione, regressione e accettazione scientifica.
 
@@ -37,6 +37,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 | Migrazione a Lie, gruppi sorgente e confini architetturali | IMPLEMENTATO | Audit statico D19 del 1 novembre; non equivale a validazione scientifica totale. |
 | Ownership di stato/inventari e topografia | IMPLEMENTATO | Riordino di stato e geometria, transazioni e rollback nei percorsi Lie. |
 | `physics/` cell-local | VERIFICATO staticamente | Audit dei 34 moduli fisici: nessun indice spaziale `j,k` in ingresso. Residuo da esaminare: scalari globali `pi_g` e `bottom_source_area_ratio` nelle injection. |
+| **F5 — nuova architettura degli stati** | **MIGRAZIONE CODICE IN CORSO, NON VALIDATA** | Tipi e costruttori `state_new` collegati a fisica, assemblaggio sorgenti, Lie e Newton; per-worker scratch inizializzato; sette reologie con kernel impliciti REAL/COMPLEX condivisi; dispatcher analitico singolo senza deep copy. Ultimo change set `534d6c5`. Non esiste ancora un gate CI/strict-debug/equivalenza scientifica su questa revisione: baseline precedente non trasferibile. Dettagli nella [roadmap specialistica](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md). |
 | Reologia, scambio di massa, injection, termica, Darcy | IMPLEMENTATO / PARZIALE | Moduli e trattamenti riorganizzati; non estendere alle future revisioni la validità di test precedenti. |
 | Compilazione `strict-debug` | VERIFICATO dall'utente | Verde dopo la correzione di `source_registry_2d.f90` comunicata il 2 novembre. |
 | **Lie OpenMP validation (D20)** | VERIFICATO dall'utente | Action riconfermata verde il 3 novembre dopo `142c859`; annotare SHA esatto del run e URL/log prima di usarla come gate formale. Non prova scaling ottimale. |
@@ -52,6 +53,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 | Priorità | ID | Attività | Chiusura richiesta |
 | --- | --- | --- | --- |
+| P0 | A03 | Validare la migrazione F5 degli stati | Compilazione strict-debug, suite `state_new`/equivalenza, sorgenti e complex-step, Lie/rollback, confronti output su più fisiche; registrare SHA e log. Non dichiarare F5 conclusa prima dei gate. |
 | P0 | V01 | Congelare baseline Lie verificata | Associare strict-debug e D20 al commit effettivamente testato, conservare log. |
 | P0 | V02 | Matrice di regressioni scientifiche | Confronti per idrodinamica, wet/dry, well-balancing, sorgenti, massa, energia, pressione, NEWTON, analytiche e topografia. |
 | P0 | V03 | Consolidare le prove D20 | Evidenze di Newton effettivo, fondo variato, rollback dell'intero passo dopo fallimento e confronti 1/2/4 thread, incluse le revisioni dei test. |
@@ -75,7 +77,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 ## 5. Sequenza operativa
 
-1. Associare SHA, run ID e log della D20 verde e mantenere l'ultima baseline verificata (V01–V03); eseguire i test mirati DEM (D01) prima di considerare chiusa la validazione degli input.
+1. Per il nuovo codice F5, prima verificare build strict-debug e suite di equivalenza `state_new`/sorgenti; registrare SHA e log. In parallelo associare SHA, run ID e log della D20 verde e mantenere l'ultima baseline verificata (V01–V03); eseguire i test mirati DEM (D01) prima di considerare chiusa la validazione degli input.
 2. Proseguire il profiling multi-esempio (N02): analizzare `EXAMPLE_TAAL` e misurare separatamente spaziale, gruppi sorgente e I/O (N04), poi ripetere con 8 thread e passare ad altre fisiche.
 3. Usare i dati di Taal per scegliere interventi misurabili su Newton/IEEE, dispatch reologico e allocazioni (N03), evitando ottimizzazioni tarate soltanto su `EXAMPLE_CF`.
 4. Proseguire regressioni scientifiche e contratti architetturali (V02, A01–A02), quindi consolidare S01, T01, N01 e C01. Riprendere F01 solo quando prioritario.
