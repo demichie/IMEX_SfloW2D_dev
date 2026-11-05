@@ -94,7 +94,7 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,                                                 &
         thickness_levels , dyn_pres_levels
 
-    USE state_conversions, ONLY : conservative_to_primitive
+    USE state_conversions, ONLY : conservative_to_primitive, dynamic_pressure_from_synchronized_state
     USE diagnostics_2d, ONLY : fatal_error
 
 
@@ -487,10 +487,10 @@ PROGRAM IMEX_SfloW2D
             .NOT.lateral_source_flag .AND. .NOT.bottom_radial_source_flag .AND.                                      &
             .NOT.bottom_fissural_source_flag)
 
-        conversion_failed=.FALSE.
+        ! advance_lie has already published a synchronized q/qp pair.
+        ! Only the diagnostic dynamic pressure is needed; never reconvert qp.
         !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
-        !$OMP & thickness_exceeds,pressure_exceeds, &
-        !$OMP & mod_vel,r_u,r_v,conversion_ok) REDUCTION(.OR.:conversion_failed)
+        !$OMP & thickness_exceeds,pressure_exceeds,mod_vel,r_u,r_v)
 
 
         DO l = 1,simulation%domain%solve_cells
@@ -500,10 +500,8 @@ PROGRAM IMEX_SfloW2D
 
             IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
-                CALL conservative_to_primitive(simulation%state%q(1:n_vars,j,k), &
-                simulation%state%qp(1:n_vars,j,k),accepted=conversion_ok,p_dyn=p_dyn, &
-                numerical_reconstruction=.TRUE.)
-            IF (.NOT.conversion_ok) conversion_failed=.TRUE.
+                p_dyn=dynamic_pressure_from_synchronized_state(                                                     &
+                    simulation%state%q(idx_totMassEqn,j,k),simulation%state%qp(:,j,k))
 
                 simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),                                           &
                         simulation%state%qp(idx_h,j,k))
@@ -557,7 +555,7 @@ PROGRAM IMEX_SfloW2D
         END DO
 
         !$OMP END PARALLEL DO
-        IF (conversion_failed) CALL fatal_error('Post-step diagnostic state conversion rejected')
+        ! Conversion acceptance was already checked during the Lie transaction.
 
         IF ( verbose_level .GE. 0 ) THEN
 

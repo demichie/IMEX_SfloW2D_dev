@@ -19,6 +19,7 @@ MODULE state_conversions
 
     PUBLIC :: conservative_to_primitive
     PUBLIC :: primitive_to_conservative, numerical_primitive_to_conservative
+    PUBLIC :: dynamic_pressure_from_synchronized_state
 
     INTERFACE conservative_to_primitive
         MODULE PROCEDURE conservative_to_primitive_real
@@ -31,6 +32,20 @@ MODULE state_conversions
     END INTERFACE primitive_to_conservative
 
 CONTAINS
+
+    !> Diagnostic dynamic pressure from already synchronized q and qp.
+    !> The numerical q->qp conversion computed h=mass/rho_m and the final
+    !> primitive velocities. Reconstruct rho_m from that identity instead of
+    !> repeating heat capacity, density, composition and the whole conversion.
+    !> The reconstructed density can differ in last-bit rounding from rho_m.
+    PURE REAL(wp) FUNCTION dynamic_pressure_from_synchronized_state(q_mass,qp) RESULT(p_dyn)
+        REAL(wp), INTENT(IN) :: q_mass,qp(n_vars)
+
+        p_dyn=0.0_wp
+        IF (q_mass<=EPSILON(1.0_wp) .OR. qp(idx_h)<=0.0_wp) RETURN
+        p_dyn=0.5_wp*(q_mass/qp(idx_h))*(qp(idx_u)*qp(idx_u)+qp(idx_v)*qp(idx_v))
+    END FUNCTION dynamic_pressure_from_synchronized_state
+
 
     !> REAL state conversion, optionally retaining numerical reconstruction
     !> semantics (dry <= epsilon, ambient near-dry T, trace normalization).
