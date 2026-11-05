@@ -27,6 +27,7 @@ MODULE state_new_physical
 
     INTERFACE build_physical_state_from_qp
         MODULE PROCEDURE build_physical_state_from_qp_real
+        MODULE PROCEDURE build_physical_state_from_qp_complex
     END INTERFACE build_physical_state_from_qp
 
     INTERFACE update_physical_state_kinematics
@@ -122,6 +123,37 @@ CONTAINS
         CALL build_physical_state_from_qp_real(qp,state,bx,by,bxx,bxy,byy)
     END SUBROUTINE build_physical_state_from_q_real
 
+    SUBROUTINE build_physical_state_from_qp_complex(qp, state, bx, by, bxx, bxy, byy)
+        COMPLEX(wp), INTENT(IN) :: qp(n_vars)
+        TYPE(physical_state_complex), INTENT(INOUT) :: state
+        REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
+        REAL(wp) :: geometry(5)
+
+        CALL require_complex_storage(state)
+        state%h=qp(idx_h); state%u=qp(idx_u); state%v=qp(idx_v); state%T=qp(idx_T)
+        state%xs=qp(idx_solid_first:idx_solid_last)
+        state%xg=qp(idx_add_gas_first:idx_add_gas_last)
+        state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
+        IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
+        IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
+
+        IF (REAL(state%h,wp) <= EPSILON(1.0_wp)) THEN
+            state%rho_m=rho_a_amb; state%inv_rhom=1.0_wp/rho_a_amb
+            state%rho_c=rho_a_amb; state%inv_rho_c=1.0_wp/rho_a_amb
+            state%cp_m=sp_heat_a; state%cp_c=sp_heat_a
+            state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp
+        ELSE
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
+        END IF
+        state%Ri=richardson_complex(state%h,state%u,state%v,state%red_grav)
+        geometry=0.0_wp
+        IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
+        IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
+        CALL update_kinematics_complex(state,geometry(1),geometry(2),geometry(3),geometry(4),geometry(5))
+    END SUBROUTINE build_physical_state_from_qp_complex
+
     SUBROUTINE build_physical_state_from_q_complex(q, state, bx, by, bxx, bxy, byy)
         COMPLEX(wp), INTENT(IN) :: q(n_vars)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
@@ -175,10 +207,9 @@ CONTAINS
 
     COMPLEX(wp) FUNCTION richardson_complex(h,u,v,red_grav)
         COMPLEX(wp), INTENT(IN) :: h,u,v,red_grav
-        COMPLEX(wp) :: speed2
-        speed2=u**2+v**2; richardson_complex=0.0_wp
-        IF (REAL(speed2,wp)>0.0_wp) richardson_complex=red_grav*h/speed2
-        IF (REAL(richardson_complex,wp)>1.0E15_wp) richardson_complex=CMPLX(1.0E15_wp,0.0_wp,wp)
+        COMPLEX(wp) :: speed2, ri
+        INCLUDE 'richardson.inc'
+        richardson_complex=ri
     END FUNCTION richardson_complex
 
 END MODULE state_new_physical
