@@ -29,6 +29,10 @@ CONTAINS
         REAL(wp) :: total
         close_composition_complex=.FALSE.
         IF (ANY(REAL(xs,wp)<-tol) .OR. ANY(REAL(xg,wp)<-tol)) RETURN
+        ! Match REAL composition closure without destroying imaginary
+        ! complex-step perturbations of a nearly zero species.
+        WHERE (ABS(REAL(xs,wp))<=tol) xs=CMPLX(0.0_wp,AIMAG(xs),wp)
+        WHERE (ABS(REAL(xg,wp))<=tol) xg=CMPLX(0.0_wp,AIMAG(xg),wp)
         total=SUM(REAL(xs,wp))+SUM(REAL(xg,wp))
         IF (total>1.0_wp+tol) RETURN
         IF (total>1.0_wp) THEN

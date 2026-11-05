@@ -136,7 +136,23 @@ CONTAINS
         CALL assert_close('REAL/COMPLEX conservative heat capacity',real_workspace%state%cp_m, &
             REAL(complex_workspace%state%cp_m,wp),1.0E-12_wp)
 
-        ! Reject true overfill and a negative species without entering the
+        ! Near-zero negative fractions are clamped in both backends. Preserve
+        ! the complex-step perturbation while removing only the roundoff real part.
+        candidate=reference_q
+        candidate(idx_solid_first)=-16.0_wp*EPSILON(1.0_wp)*mass
+        complex_candidate=CMPLX(candidate,0.0_wp,wp)
+        complex_candidate(idx_solid_first)=CMPLX(candidate(idx_solid_first),1.0E-20_wp,wp)
+        CALL build_physical_state_from_q(candidate,real_workspace%state,accepted=accepted_real)
+        CALL build_physical_state_from_q(complex_candidate,complex_workspace%state,accepted=accepted_complex)
+        IF (.NOT.accepted_real .OR. .NOT.accepted_complex) &
+            ERROR STOP 'roundoff-negative species rejected'
+        CALL assert_close('clamped real fraction',real_workspace%state%xs(1),0.0_wp,0.0_wp)
+        CALL assert_close('clamped complex real fraction',REAL(complex_workspace%state%xs(1),wp), &
+            0.0_wp,0.0_wp)
+        IF (AIMAG(complex_workspace%state%xs(1))==0.0_wp) &
+            ERROR STOP 'composition complex-step perturbation discarded'
+
+    ! Reject true overfill and a negative species without entering the
         ! mixture kernel; a failed constructor must not report acceptance.
         candidate(idx_solid_first)=mass*1.01_wp
         complex_candidate=CMPLX(candidate,0.0_wp,wp)
