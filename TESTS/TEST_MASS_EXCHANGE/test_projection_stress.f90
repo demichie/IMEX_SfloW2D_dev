@@ -41,6 +41,7 @@ PROGRAM test_projection_stress
   CALL check_taal_saturated_species_budget
   CALL check_late_group_recipient_budget
   CALL check_injection_before_settling_budget
+  CALL check_preexisting_settling_budget
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
   CALL check_complete_physical_state
@@ -213,6 +214,41 @@ CONTAINS
     IF (.NOT.conservative_mass_admissible(candidate)) &
         ERROR STOP 'Post-injection settling candidate inadmissible'
   END SUBROUTINE check_injection_before_settling_budget
+
+  !> Preserve legacy Lie source splitting without an unsafe stale recipient:
+  !> newly injected solids are not available for same-step settling; on a
+  !> previously wet cell the existing and current budgets must BOTH apply.
+  SUBROUTINE check_preexisting_settling_budget
+    REAL(wp) :: before(nq),recipient(nq),rates(nq),candidate(nq),scale
+    LOGICAL :: valid
+
+    before=0.0_wp
+    recipient=0.0_wp
+    rates=0.0_wp
+    recipient(idx_totMassEqn)=1.0_wp
+    recipient(idx_solidEqn_first)=0.25_wp
+    rates(idx_totMassEqn)=-0.20_wp
+    rates(idx_solidEqn_first)=-0.15_wp
+    CALL limit_explicit_source_rates(recipient,[REAL(wp)::],1.0_wp,rates, &
+        [REAL(wp)::],scale,valid,before)
+    IF (.NOT.valid .OR. scale/=0.0_wp) &
+        ERROR STOP 'Preexisting dry state permitted instant injection settling'
+    candidate=recipient+scale*rates
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+        ERROR STOP 'Dry preexisting budget yielded invalid recipient'
+
+    before(idx_totMassEqn)=1.0_wp
+    before(idx_solidEqn_first)=0.20_wp
+    recipient(idx_totMassEqn)=0.6_wp
+    recipient(idx_solidEqn_first)=0.05_wp
+    CALL limit_explicit_source_rates(recipient,[REAL(wp)::],1.0_wp,rates, &
+        [REAL(wp)::],scale,valid,before)
+    IF (.NOT.valid .OR. scale<=0.0_wp .OR. scale>=1.0_wp) &
+        ERROR STOP 'Preexisting/current two-budget limiter failed'
+    candidate=recipient+scale*rates
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+        ERROR STOP 'Two-budget limiter accepted negative solid mass'
+  END SUBROUTINE check_preexisting_settling_budget
 
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics

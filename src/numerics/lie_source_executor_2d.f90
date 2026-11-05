@@ -451,9 +451,10 @@ CONTAINS
 
                 SELECT CASE(executor%groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
-                    ! Evaluate the source rate on qpentry (q^n only in group 0), but
-                    ! limit its transfer against q_local, the actual recipient
-                    ! after spatial evolution and all previous Lie groups.
+                    ! The current recipient provides strict conservation bounds.
+                    ! The pre-spatial inventory separately caps withdrawals by
+                    ! mass present before any source group (legacy Lie semantics).
+                    ! Newly injected solids cannot settle within the same step.
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL assemble_lie_explicit_transaction(qpentry, q_local(1:n_eqns), time_step, source_time,           &
                         executor%groups(group_index), erodible_local, total_rate,                                      &
@@ -462,7 +463,8 @@ CONTAINS
                         cell_fissure_fractions(j,k,:),cell_arc_perim(j,k),cell_arc_n_x(j,k),                         &
                         cell_arc_n_y(j,k),dx*dy,                                                                     &
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
-                        executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid))
+                        executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
+                        q_original(1:n_eqns,j,k))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

@@ -68,7 +68,7 @@ CONTAINS
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
-            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch)
+            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -80,6 +80,9 @@ CONTAINS
         LOGICAL, INTENT(IN) :: exchange_selected
         TYPE(physical_state_real), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
+        ! Inventory at the beginning of the timestep: exchange cannot consume
+        ! source mass introduced by preceding groups during this same step.
+        REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
         REAL(wp), INTENT(IN) :: inventory(n_solid)
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -122,7 +125,7 @@ CONTAINS
 
         IF (has_exchange) THEN
             CALL limit_explicit_source_rates(q_recipient,inventory,dt,rate,                                            &
-                transfer%solid_erosion_rate,scale,valid)
+                transfer%solid_erosion_rate,scale,valid,q_preexisting)
         ELSE
             CALL limit_explicit_source_rates(q_recipient,[REAL(wp)::],dt,rate,                                         &
                 [REAL(wp)::],scale,valid)
@@ -138,9 +141,10 @@ CONTAINS
     !> assembling all explicit source rates. Reference inventories belong to
     !> the post-spatial Lie state; group zero rate evaluation stays at q^n.
     SUBROUTINE limit_explicit_source_rates(q_reference,inventory,dt,rate,                                              &
-            solid_erosion_rate,limiter,valid)
+            solid_erosion_rate,limiter,valid,q_preexisting)
         REAL(wp), INTENT(IN) :: q_reference(n_eqns),inventory(:),dt
         REAL(wp), INTENT(IN) :: rate(n_eqns),solid_erosion_rate(:)
+        REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
         REAL(wp), INTENT(OUT) :: limiter
         LOGICAL, INTENT(OUT) :: valid
         REAL(wp) :: available_carrier,carrier_consumption
@@ -177,6 +181,26 @@ CONTAINS
         carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
         IF (carrier_consumption>0.0_wp) limiter=MIN(limiter,                                                           &
             MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
+        ! Preserve the historical source-splitting withdrawal inventory,
+        ! but verify the resulting rate against the actual updated recipient.
+        ! This prevents settling from consuming newly injected solids within
+        ! the same step while avoiding the old stale-recipient D19 failure.
+        IF (PRESENT(q_preexisting)) THEN
+            IF (rate(idx_totMassEqn)<0.0_wp) limiter=MIN(limiter, &
+                MAX(0.0_wp,q_preexisting(idx_totMassEqn)/(-dt*rate(idx_totMassEqn))))
+            DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
+                IF (rate(solid_eq)<0.0_wp) limiter=MIN(limiter, &
+                    MAX(0.0_wp,q_preexisting(solid_eq)/(-dt*rate(solid_eq))))
+            END DO
+            DO gas_eq=idx_addGasEqn_first,idx_addGasEqn_last
+                IF (rate(gas_eq)<0.0_wp) limiter=MIN(limiter, &
+                    MAX(0.0_wp,q_preexisting(gas_eq)/(-dt*rate(gas_eq))))
+            END DO
+            available_carrier=q_preexisting(idx_totMassEqn)- &
+                SUM(q_preexisting(idx_solidEqn_first:idx_solidEqn_last))
+            IF (carrier_consumption>0.0_wp) limiter=MIN(limiter, &
+                MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
+        END IF
         ! When one or more species balances are saturated, reserve a small
         ! relative buffer before the floating-point candidate check. A bound
         ! with zero remaining species is susceptible to reassociation/FMA
