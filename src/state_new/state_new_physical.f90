@@ -13,6 +13,7 @@ MODULE state_new_physical
     USE constitutive_parameters_2d, ONLY : rho_a_amb, sp_heat_a, sp_heat_l, grav, T_ambient
     USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE state_new_types, ONLY : reset_physical_state_real, reset_physical_state_complex
+    USE state_new_composition, ONLY : close_composition
     USE state_new_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity
 
     IMPLICIT NONE
@@ -52,7 +53,7 @@ CONTAINS
         REAL(wp) :: geometry(5)
         CALL require_real_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
-        IF (.NOT.close_real_composition(state%xs,state%xg)) RETURN
+        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         IF (state%h<0.0_wp .OR. state%T<0.0_wp) RETURN
         CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
             state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
@@ -72,7 +73,7 @@ CONTAINS
         REAL(wp) :: geometry(5)
         CALL require_complex_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
-        IF (.NOT.close_complex_composition(state%xs,state%xg)) RETURN
+        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         IF (REAL(state%h,wp)<0.0_wp .OR. REAL(state%T,wp)<0.0_wp) RETURN
         CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
             state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
@@ -84,38 +85,6 @@ CONTAINS
         CALL update_kinematics_complex(state,geometry(1),geometry(2),geometry(3),geometry(4),geometry(5))
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE refresh_physical_state_complex
-
-    LOGICAL FUNCTION close_real_composition(xs,xg)
-        REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
-        REAL(wp), PARAMETER :: tol=4096.0_wp*EPSILON(1.0_wp)
-        REAL(wp) :: total
-        close_real_composition=.FALSE.
-        IF (ANY(xs < -tol) .OR. ANY(xg < -tol)) RETURN
-        WHERE (ABS(xs)<=tol) xs=0.0_wp
-        WHERE (ABS(xg)<=tol) xg=0.0_wp
-        WHERE (xs<0.0_wp) xs=0.0_wp
-        WHERE (xg<0.0_wp) xg=0.0_wp
-        total=SUM(xs)+SUM(xg)
-        IF (total>1.0_wp+tol) RETURN
-        IF (total>1.0_wp) THEN
-            xs=xs/total; xg=xg/total
-        END IF
-        close_real_composition=.TRUE.
-    END FUNCTION close_real_composition
-
-    LOGICAL FUNCTION close_complex_composition(xs,xg)
-        COMPLEX(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
-        REAL(wp), PARAMETER :: tol=4096.0_wp*EPSILON(1.0_wp)
-        REAL(wp) :: total
-        close_complex_composition=.FALSE.
-        IF (ANY(REAL(xs,wp)<-tol) .OR. ANY(REAL(xg,wp)<-tol)) RETURN
-        total=SUM(REAL(xs,wp))+SUM(REAL(xg,wp))
-        IF (total>1.0_wp+tol) RETURN
-        IF (total>1.0_wp) THEN
-            xs=xs/total; xg=xg/total
-        END IF
-        close_complex_composition=.TRUE.
-    END FUNCTION close_complex_composition
 
     SUBROUTINE require_real_storage(state)
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -141,7 +110,7 @@ CONTAINS
         state%xs=qp(idx_solid_first:idx_solid_last)
         state%xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (state%h < 0.0_wp) RETURN
-        IF (.NOT.close_real_composition(state%xs,state%xg)) RETURN
+        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
@@ -244,7 +213,7 @@ CONTAINS
         state%xs=qp(idx_solid_first:idx_solid_last)
         state%xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (REAL(state%h,wp) < 0.0_wp) RETURN
-        IF (.NOT.close_complex_composition(state%xs,state%xg)) RETURN
+        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
@@ -291,7 +260,7 @@ CONTAINS
         IF (pore_pressure_flag .AND. REAL(mass,wp)>0.0_wp) state%exc_pore_pres=q(idx_pore)/mass
         IF (REAL(mass,wp)>eps_sing) THEN
             xs=q(idx_solid_first:idx_solid_last)/mass; xg=q(idx_add_gas_first:idx_add_gas_last)/mass
-            IF (.NOT.close_complex_composition(xs,xg)) RETURN
+            IF (.NOT.close_composition(xs,xg)) RETURN
             CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
             T=q(4)/(mass*cp_m)
             CALL evaluate_mixture(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)

@@ -1,0 +1,84 @@
+name: State architecture validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/state_new/**'
+      - 'tests/TEST_STATE_NEW/**'
+      - 'docs/STATE_ARCHITECTURE_REDESIGN_ROADMAP.md'
+      - '.github/workflows/state-architecture-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  state-new:
+    name: New state architecture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Fortran test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gfortran
+
+      - name: Compile and run TEST_STATE_NEW
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests/TEST_STATE_NEW/run_test.sh 2>&1 | tee state-new-test.log
+
+      - name: Upload state architecture log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-new-test-${{ github.run_id }}
+          path: state-new-test.log
+          if-no-files-found: warn
+
+  existing-state-regressions:
+    name: Existing state regression / ${{ matrix.suite }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - TEST_STATE_CONVERSION
+          - TEST_MASS_EXCHANGE
+          - TEST_SPATIAL_OPERATOR
+          - TEST_WORKSPACE_LIFECYCLE
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install regression dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            gfortran libnetcdff-dev libnetcdf-dev \
+            liblapack-dev libblas-dev pkg-config python3-numpy
+
+      - name: Run existing regression suite
+        shell: bash
+        env:
+          OMP_NUM_THREADS: '1'
+          OMP_DYNAMIC: 'FALSE'
+          PYTHON: /usr/bin/python3
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          printf 'commit=%s\nsuite=%s\n' "$GITHUB_SHA" "${{ matrix.suite }}" > evidence/context.txt
+          sh "TESTS/${{ matrix.suite }}/run_test.sh" 2>&1 | tee evidence/run.log
+
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-regression-${{ matrix.suite }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: warn

@@ -12,11 +12,10 @@ MODULE state_new_conversions
     USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag
     USE state_new_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, evaluate_mixture_density
     USE constitutive_parameters_2d, ONLY : T_ambient
+    USE state_new_composition, ONLY : close_composition
 
     IMPLICIT NONE
     PRIVATE
-
-    REAL(wp), PARAMETER :: closure_tolerance = 4096.0_wp*EPSILON(1.0_wp)
 
     PUBLIC :: conservative_to_primitive
     PUBLIC :: primitive_to_conservative
@@ -32,37 +31,6 @@ MODULE state_new_conversions
     END INTERFACE primitive_to_conservative
 
 CONTAINS
-
-    LOGICAL FUNCTION admissible_real_fractions(xs,xg)
-        REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
-        REAL(wp) :: total
-        admissible_real_fractions=.FALSE.
-        IF (ANY(xs < -closure_tolerance) .OR. ANY(xg < -closure_tolerance)) RETURN
-        WHERE (ABS(xs)<=closure_tolerance) xs=0.0_wp
-        WHERE (ABS(xg)<=closure_tolerance) xg=0.0_wp
-        WHERE (xs<0.0_wp) xs=0.0_wp
-        WHERE (xg<0.0_wp) xg=0.0_wp
-        total=SUM(xs)+SUM(xg)
-        IF (total>1.0_wp+closure_tolerance) RETURN
-        IF (total>1.0_wp) THEN
-            IF (total<=0.0_wp) RETURN
-            xs=xs/total; xg=xg/total
-        END IF
-        admissible_real_fractions=.TRUE.
-    END FUNCTION admissible_real_fractions
-
-    LOGICAL FUNCTION admissible_complex_fractions(xs,xg)
-        COMPLEX(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
-        REAL(wp) :: total
-        admissible_complex_fractions=.FALSE.
-        IF (ANY(REAL(xs,wp)<-closure_tolerance) .OR. ANY(REAL(xg,wp)<-closure_tolerance)) RETURN
-        total=SUM(REAL(xs,wp))+SUM(REAL(xg,wp))
-        IF (total>1.0_wp+closure_tolerance) RETURN
-        IF (total>1.0_wp) THEN
-            xs=xs/total; xg=xg/total
-        END IF
-        admissible_complex_fractions=.TRUE.
-    END FUNCTION admissible_complex_fractions
 
     SUBROUTINE conservative_to_primitive_real(q, qp, accepted, p_dyn)
         REAL(wp), INTENT(IN) :: q(n_vars)
@@ -86,7 +54,7 @@ CONTAINS
 
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
-        IF (.NOT.admissible_real_fractions(xs,xg)) RETURN
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (cp_m <= 0.0_wp) RETURN
         T=q(idx_engyEqn)/(mass*cp_m)
@@ -133,7 +101,7 @@ CONTAINS
 
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
-        IF (.NOT.admissible_complex_fractions(xs,xg)) RETURN
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         T=q(idx_engyEqn)/(mass*cp_m)
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
@@ -173,7 +141,7 @@ CONTAINS
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
-        IF (.NOT.admissible_real_fractions(xs,xg)) RETURN
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)
         mass=rho_m*h
         q(idx_totMassEqn)=mass
@@ -203,7 +171,7 @@ CONTAINS
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
-        IF (.NOT.admissible_complex_fractions(xs,xg)) RETURN
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)
         mass=rho_m*qp(idx_h)
         q(idx_totMassEqn)=mass
