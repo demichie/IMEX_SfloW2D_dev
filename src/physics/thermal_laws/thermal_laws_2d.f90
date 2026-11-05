@@ -7,12 +7,47 @@ MODULE thermal_laws_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit,                                                      &
             eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit,                                         &
-            eval_thermal_cooling_implicit_real, eval_thermal_cooling_analytic
+            eval_thermal_cooling_implicit_real, eval_thermal_cooling_analytic,                                        &
+            eval_thermal_cooling_from_temperature_real,eval_thermal_cooling_from_temperature_complex
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_thermal_explicit, eval_thermal_semi_implicit
     PUBLIC :: eval_thermal_implicit, eval_thermal_implicit_real, eval_thermal_analytic
+    PUBLIC :: eval_thermal_implicit_temperature
+    INTERFACE eval_thermal_implicit_temperature
+        MODULE PROCEDURE eval_thermal_implicit_temperature_real
+        MODULE PROCEDURE eval_thermal_implicit_temperature_complex
+    END INTERFACE eval_thermal_implicit_temperature
 CONTAINS
+
+    !> Thermal-only Newton groups use the same cooling formula without a
+    !> heavyweight physical state. Full-state interfaces remain supported.
+    SUBROUTINE eval_thermal_implicit_temperature_real(model_id,T,radiative,convective,ambient,rate)
+        INTEGER, INTENT(IN) :: model_id
+        REAL(wp), INTENT(IN) :: T,radiative,convective,ambient
+        REAL(wp), INTENT(OUT) :: rate
+        SELECT CASE(model_id)
+        CASE(SOURCE_ID_THERMAL_COOLING)
+            CALL eval_thermal_cooling_from_temperature_real(T,radiative,convective,ambient,rate)
+        CASE DEFAULT
+            CALL fatal_error('Unknown REAL thermal model ID')
+        END SELECT
+    END SUBROUTINE eval_thermal_implicit_temperature_real
+
+    SUBROUTINE eval_thermal_implicit_temperature_complex(model_id,T,radiative,convective,ambient,rate)
+        INTEGER, INTENT(IN) :: model_id
+        COMPLEX(wp), INTENT(IN) :: T
+        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        COMPLEX(wp), INTENT(OUT) :: rate
+        SELECT CASE(model_id)
+        CASE(SOURCE_ID_THERMAL_COOLING)
+            CALL eval_thermal_cooling_from_temperature_complex(T,radiative,convective,ambient,rate)
+        CASE DEFAULT
+            CALL fatal_error('Unknown COMPLEX thermal model ID')
+        END SELECT
+    END SUBROUTINE eval_thermal_implicit_temperature_complex
+
+
 
     !> @brief Dispatch and sum explicit thermal sources.
     !> @details The dispatcher retains each of the four numerical interfaces;

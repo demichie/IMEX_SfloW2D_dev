@@ -12,10 +12,10 @@ MODULE source_terms_2d
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
-    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
+    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp, evaluate_temperature_from_q
     USE state_mixture, ONLY : evaluate_mixture_heat_capacity
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
-            eval_thermal_implicit_real, eval_thermal_analytic
+            eval_thermal_implicit_real, eval_thermal_analytic, eval_thermal_implicit_temperature
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
@@ -418,11 +418,18 @@ CONTAINS
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
+        REAL(wp) :: temperature
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
             CALL fatal_error('eval_source_implicit_real requires a Newton Lie group')
         rate=0.0_wp
         IF (.NOT.group%rheology_implicit .AND. .NOT.group%thermal_active) RETURN
+        IF (group%thermal_active .AND. .NOT.group%rheology_implicit) THEN
+            CALL evaluate_temperature_from_q(q_cell,temperature)
+            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
+                radiative_term_coeff,convective_term_coeff,T_env,rate(4))
+            RETURN
+        END IF
         physical_state=>local_state
         IF (PRESENT(physical_scratch)) THEN
             physical_state=>physical_scratch
@@ -450,11 +457,18 @@ CONTAINS
         TYPE(physical_state_complex), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         TYPE(physical_state_complex), TARGET :: local_state
         TYPE(physical_state_complex), POINTER :: physical_state
+        COMPLEX(wp) :: temperature
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
             CALL fatal_error('eval_source_implicit requires a Newton Lie group')
         c_nh_term_impl=CMPLX(0.0_wp,0.0_wp,wp)
         IF (.NOT.group%rheology_implicit .AND. .NOT.group%thermal_active) RETURN
+        IF (group%thermal_active .AND. .NOT.group%rheology_implicit) THEN
+            CALL evaluate_temperature_from_q(c_qj,temperature)
+            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
+                radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
+            RETURN
+        END IF
 
         physical_state=>local_state
         IF (PRESENT(physical_scratch)) THEN

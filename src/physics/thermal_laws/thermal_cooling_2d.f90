@@ -8,6 +8,7 @@ MODULE thermal_cooling_2d
     PRIVATE
     PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
     PUBLIC :: eval_thermal_cooling_implicit, eval_thermal_cooling_implicit_real, eval_thermal_cooling_analytic
+    PUBLIC :: eval_thermal_cooling_from_temperature_real, eval_thermal_cooling_from_temperature_complex
 CONTAINS
 
     !> @brief Evaluate radiative and convective energy cooling in real arithmetic.
@@ -47,6 +48,8 @@ CONTAINS
         TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         COMPLEX(wp), INTENT(OUT) :: rate
+        COMPLEX(wp) :: temperature
+        temperature=state%T
         INCLUDE 'thermal_cooling_rate.inc'
     END SUBROUTINE eval_thermal_cooling_implicit
 
@@ -55,8 +58,26 @@ CONTAINS
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: rate
+        REAL(wp) :: temperature
+        temperature=state%T
         INCLUDE 'thermal_cooling_rate.inc'
     END SUBROUTINE eval_thermal_cooling_implicit_real
+
+
+    !> Evaluate the identical cooling law from temperature alone, so thermal-
+    !> only Newton groups do not construct a full REAL or COMPLEX physical state.
+    SUBROUTINE eval_thermal_cooling_from_temperature_real(temperature,radiative,convective,ambient,rate)
+        REAL(wp), INTENT(IN) :: temperature,radiative,convective,ambient
+        REAL(wp), INTENT(OUT) :: rate
+        INCLUDE 'thermal_cooling_rate.inc'
+    END SUBROUTINE eval_thermal_cooling_from_temperature_real
+
+    SUBROUTINE eval_thermal_cooling_from_temperature_complex(temperature,radiative,convective,ambient,rate)
+        COMPLEX(wp), INTENT(IN) :: temperature
+        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        COMPLEX(wp), INTENT(OUT) :: rate
+        INCLUDE 'thermal_cooling_rate.inc'
+    END SUBROUTINE eval_thermal_cooling_from_temperature_complex
 
 
     !> @brief Advance temperature under frozen-coefficient exact cooling.

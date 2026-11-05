@@ -1,1 +1,1 @@
-        rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
+        rate=-radiative*(temperature**4-ambient**4)-convective*(temperature-ambient)

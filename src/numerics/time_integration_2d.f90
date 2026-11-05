@@ -182,9 +182,16 @@ CONTAINS
             END IF
 
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL conservative_to_primitive(this%q_trial(:,j,k),this%qp_trial(:,j,k),                            &
-                    accepted=conversion_ok,numerical_reconstruction=.TRUE.)
-                IF (.NOT.conversion_ok) this%cell_status(l)=2
+                ! The numerical primitive of an unchanged conservative state
+                ! was already prepared for the spatial operator (CFL or
+                ! explicit halo preflight). Reuse the same state version.
+                IF (ALL(this%q_trial(:,j,k)==state%q(:,j,k))) THEN
+                    this%qp_trial(:,j,k)=qp_pre(:,j,k)
+                ELSE
+                    CALL conservative_to_primitive(this%q_trial(:,j,k),this%qp_trial(:,j,k),                        &
+                        accepted=conversion_ok,numerical_reconstruction=.TRUE.)
+                    IF (.NOT.conversion_ok) this%cell_status(l)=2
+                END IF
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
 

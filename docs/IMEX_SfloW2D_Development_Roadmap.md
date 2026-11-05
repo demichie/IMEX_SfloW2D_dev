@@ -38,6 +38,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Ownership A02 definitivo (5 novembre 2026):** il predicato `rho_mix<rho_a_amb` e una classificazione di stato e viene prodotto da `state_physical:evaluate_density_from_qp` con output opzionale `below_ambient`, insieme a densita e `red_grav`. Rimosso il wrapper `physics:evaluate_buoyancy_removal` che eseguiva soltanto il confronto. Lie consuma il predicato e applica la transazione. Dettagli in D.11 della roadmap specialistica; nuovo SHA non ancora validato con build.
 
+**Avanzamento A04–A06 (5 novembre 2026; validazione pendente):** A04 evita la riconversione post-spatial su celle wet con `q_trial==q^n` sfruttando `qp_pre` gia pronto; restano invariati i casi modificati, dry, sea sink e ammissibilita. A06 valuta il gruppo Newton `thermal-only` da T REAL/COMPLEX prodotta in `state`, con la medesima formula `.inc` dei percorsi termici esistenti; i gruppi misti conservano il full state. A05 non e stato forzato: il riuso CFL/spatial riguarda anche tracce e boundary forcing, non solo primitivi, e necessita di equivalenza dimostrata. Build e regressioni sul nuovo SHA ancora da eseguire manualmente. Dettagli in D.12 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

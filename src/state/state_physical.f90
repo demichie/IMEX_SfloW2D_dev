@@ -25,6 +25,12 @@ MODULE state_physical
     PUBLIC :: update_physical_state_kinematics
     PUBLIC :: refresh_physical_state
     PUBLIC :: evaluate_density_from_qp
+    PUBLIC :: evaluate_temperature_from_q
+
+    INTERFACE evaluate_temperature_from_q
+        MODULE PROCEDURE evaluate_temperature_from_q_real
+        MODULE PROCEDURE evaluate_temperature_from_q_complex
+    END INTERFACE evaluate_temperature_from_q
 
     INTERFACE build_physical_state_from_q
         MODULE PROCEDURE build_physical_state_from_q_real
@@ -76,6 +82,50 @@ CONTAINS
         accepted=.TRUE.
     END SUBROUTINE evaluate_density_from_qp
 
+
+    !> Temperature-only primitive from a conservative REAL candidate.
+    !> Mirrors the thermodynamic part of build_physical_state_from_q_real
+    !> without computing density, phase volumes or kinematics.
+    SUBROUTINE evaluate_temperature_from_q_real(q,T)
+        REAL(wp), INTENT(IN) :: q(n_vars)
+        REAL(wp), INTENT(OUT) :: T
+        REAL(wp) :: mass,cp_m,cp_c
+        REAL(wp) :: xs(n_solid),xg(n_add_gas)
+
+        T=0.0_wp
+        mass=q(1)
+        IF (mass<0.0_wp) RETURN
+        IF (mass==0.0_wp) THEN
+            T=T_ambient
+            RETURN
+        END IF
+        xs=q(idx_solid_first:idx_solid_last)/mass
+        xg=q(idx_add_gas_first:idx_add_gas_last)/mass
+        CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+        T=q(4)/(mass*cp_m)
+    END SUBROUTINE evaluate_temperature_from_q_real
+
+    !> Complex-step temperature-only primitive. Preserve the same composition
+    !> closure as build_physical_state_from_q_complex, including early rejection.
+    SUBROUTINE evaluate_temperature_from_q_complex(q,T)
+        COMPLEX(wp), INTENT(IN) :: q(n_vars)
+        COMPLEX(wp), INTENT(OUT) :: T
+        COMPLEX(wp) :: mass,cp_m,cp_c
+        COMPLEX(wp) :: xs(n_solid),xg(n_add_gas)
+
+        T=(0.0_wp,0.0_wp)
+        mass=q(1)
+        IF (REAL(mass,wp)<0.0_wp) RETURN
+        IF (REAL(mass,wp)==0.0_wp) THEN
+            T=CMPLX(T_ambient,0.0_wp,wp)
+            RETURN
+        END IF
+        xs=q(idx_solid_first:idx_solid_last)/mass
+        xg=q(idx_add_gas_first:idx_add_gas_last)/mass
+        IF (.NOT.close_composition(xs,xg)) RETURN
+        CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+        T=q(4)/(mass*cp_m)
+    END SUBROUTINE evaluate_temperature_from_q_complex
 
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)
         TYPE(physical_state_real), INTENT(INOUT) :: state
