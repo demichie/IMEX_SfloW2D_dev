@@ -4,7 +4,8 @@
 MODULE mass_radial_injection_2d
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
 
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d
@@ -31,8 +32,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: t_rem, t_coeff, h_dot
-        REAL(wp) :: qp_source(n_vars)
-        REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+        REAL(wp) :: r_rho_m, r_inv_rho_m, r_red_grav
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
 
         rate=0.0_wp
@@ -81,20 +81,13 @@ CONTAINS
 
             IF ( t_coeff .GT. 0.0_wp ) THEN
 
-                qp_source(:) = 0.0_wp
-                qp_source(idx_h) = 1.0_wp
-                qp_source(idx_T) = T_source
-
-                qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
-                qp_source(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
-
-                IF ( stoch_transport_flag ) qp_source(idx_stoch) = 0.0_wp
-                IF ( pore_pressure_flag )   qp_source(idx_poreEqn) = 0.0_wp
-
-                qp_source(idx_u) = 0.0_wp
-                qp_source(idx_v) = 0.0_wp
-
-                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
+                ! Only source-material density, heat capacity and buoyancy are needed.
+                ! Do not construct a synthetic primitive state or compute Richardson.
+                CALL evaluate_mixture_density(T_source, &
+                    xs_source(1:n_solid), xg_source(1:n_add_gas), r_rho_m, r_inv_rho_m)
+                CALL evaluate_mixture_heat_capacity(xs_source(1:n_solid), &
+                    xg_source(1:n_add_gas), r_sp_heat_mix, r_sp_heat_c)
+                r_red_grav=(r_rho_m-rho_a_amb)*r_inv_rho_m*grav
 
                 ! Per-cell injection rate (m/s) - integrates to MFR over all cells.
                 h_dot = h_source * vel_source * lat_arc_perim_jk / cell_area_jk

@@ -3,9 +3,10 @@ PROGRAM test_state_equivalence
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, &
         old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, &
-        physical_state_type, complex_physical_state_type
+        physical_state_type, complex_physical_state_type, old_mixture=>mixt_var
     USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
+        evaluate_mixture_density, evaluate_mixture_heat_capacity, &
         state_workspace_real, state_workspace_complex, &
         initialize_state_workspace_real, initialize_state_workspace_complex
     IMPLICIT NONE
@@ -33,6 +34,8 @@ CONTAINS
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1
         CHARACTER(*), INTENT(IN) :: label
         REAL(wp) :: pd_old,pd_new
+        REAL(wp) :: material_qp(n_vars),old_ri,old_rho,old_carrier,old_grav
+        REAL(wp) :: old_cp_c,old_cp_m,new_rho,new_inv_rho,new_cp_c,new_cp_m,new_grav
         CALL make_qp(h,T,u,v,xs1,xs2,xg1,qp)
         CALL old_qp_to_qc(qp,q_old); CALL primitive_to_conservative(qp,q)
         CALL old_qc_to_qp(q_old,qp_old,pd_old); CALL conservative_to_primitive(q,qp_new,ok,pd_new)
@@ -47,6 +50,21 @@ CONTAINS
         cq=CMPLX(q_old,0.0_wp,wp); CALL old_state_cq(cq,old_complex); CALL new_state_q(cq,new_complex%state,accepted=ok)
         IF (.NOT.ok) ERROR STOP 'new COMPLEX state rejected valid state'
         CALL assert_scalar(label//' complex density',REAL(new_complex%state%rho_m,wp),REAL(old_complex%rho_m,wp),1.0E-9_wp)
+        ! The source material has its own composition, independently of the recipient cell.
+        material_qp=qp
+        material_qp(idx_h)=1.0_wp
+        material_qp(idx_u)=0.0_wp; material_qp(idx_v)=0.0_wp
+        CALL old_mixture(material_qp,old_ri,old_rho,old_carrier,old_grav,old_cp_c,old_cp_m)
+        CALL evaluate_mixture_density(material_qp(idx_T), &
+            material_qp(idx_solid_first:idx_solid_last), &
+            material_qp(idx_add_gas_first:idx_add_gas_last),new_rho,new_inv_rho)
+        CALL evaluate_mixture_heat_capacity(material_qp(idx_solid_first:idx_solid_last), &
+            material_qp(idx_add_gas_first:idx_add_gas_last),new_cp_m,new_cp_c)
+        new_grav=(new_rho-rho_a_amb)*new_inv_rho*grav
+        CALL assert_scalar(label//' injection rho',new_rho,old_rho,1.0E-9_wp)
+        CALL assert_scalar(label//' injection cp',new_cp_m,old_cp_m,1.0E-9_wp)
+        CALL assert_scalar(label//' injection red grav',new_grav,old_grav,1.0E-9_wp)
+
     END SUBROUTINE compare_case
     SUBROUTINE make_qp(h,T,u,v,xs1,xs2,xg1,out)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1

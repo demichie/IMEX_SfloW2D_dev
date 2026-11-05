@@ -243,12 +243,14 @@ Non mantenere pass-through o alias di compatibilità per conservare l’organizz
 **Inventario delle dipendenze ancora da migrare (audit statico su master `1ca1fe6`):**
 - [ ] Reologie: dispatcher `rheology_2d`, Voellmy, plastic, lava, lahar, empirical, quadratic, Froude, Lucas, mu(I), mu(I)-Voellmy, newmodel. Migrare i tipi, trasferimenti REAL/COMPLEX e la copia profonda `current_state=state` nel percorso analitico.
 - [ ] Mass exchange: `mass_exchange_2d`, deposition, erosion, entrainment, vaporization, liquid loss e lava deposition. Preservare budget, rate e processi locali.
-- [ ] Darcy, termica e iniezioni: sostituire gli stati legacy; le iniezioni richiedono proprietà **del materiale sorgente**, non dello stato ricevente, e devono usare kernel mirati al posto di `mixt_var`.
+- [~] Darcy, termica e iniezioni: tre iniezioni volumetriche (circolare, fissurale, radiale) migrano ai kernel mirati `evaluate_mixture_density`/`evaluate_mixture_heat_capacity` senza costruire `qp_source`; resta migrare i tipi di stato, Darcy, termica e altri consumatori.
 - [ ] `source_terms_2d`: unificare la costruzione dello stato per valutazione e propagare `accepted` senza introdurre wrapper storici.
 - [ ] `lie_source_executor_2d` e `nonlinear_solver_2d`: inizializzare workspace `state_new` per worker, preservare Lie, rollback, integrita dei rate, Newton e complex-step.
 - [ ] F6/F7 separati: `hyperbolic_2d`, `reconstruction_2d`, `spatial_operator_2d`, `equation_terms_2d`, `time_integration_2d`, `init_2d`, `inpout_2d` ancora importano le vecchie API.
 
 **Vincolo F6:** gli operatori in `spatial/` devono restare indipendenti dalle formule costitutive. Proprietà di faccia solo dalla traccia finale; `pccu_2d` continua a ricevere coefficienti gia valutati, senza `USE` di moduli fisici.
+
+**Secondo change set F5 (iniezioni e build):** sostituita `mixt_var` nelle tre sorgenti volumetriche con due kernel della nuova miscela (densità/calore) e gravità ridotta locale; rimossi i `qp_source` artificiali. `src/Makefile.am` elenca i sei moduli `state_new`, gli include e le dipendenze; `TEST_STATE_EQUIVALENCE` confronta ora proprietà del materiale iniettato con il backend storico per gas/solido, liquido/solido e casi limite. Le quattro interfacce e i rate restano invariati. **Non ancora migrati** i tipi fisici in `physics/`, `source_terms_2d`, Lie e Newton; validare build e test prima del prossimo blocco.
 
 **Validazione:** l'ultima Action verde precedente e `State architecture validation` su `3df7017`; il test di equivalenza introdotto successivamente va rieseguito e ampliato. Il nuovo change set modifica solo `state_new`, test e roadmap; la migrazione dei consumatori di produzione resta aperta.
 

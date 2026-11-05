@@ -5,7 +5,8 @@ MODULE mass_bottom_fissural_injection_2d
     USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
 
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d
@@ -35,8 +36,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: t_rem, t_coeff, h_dot
-        REAL(wp) :: qp_source(n_vars)
-        REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+        REAL(wp) :: r_rho_m, r_inv_rho_m, r_red_grav
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
         INTEGER :: i_fissure
 
@@ -81,19 +81,13 @@ CONTAINS
                 IF (t_coeff .LE. 0.0_wp) CYCLE
 
                 h_dot = cell_fissure_fract(i_fissure) * linear_vel_fissures(i_fissure)
-                qp_source = 0.0_wp
-                qp_source(idx_h) = 1.0_wp
-                qp_source(idx_T) = T_fissures(i_fissure)
-                qp_source(idx_solid_first:idx_solid_last) =                                                            &
-                    xs_fissures(1:n_solid,i_fissure)
-                qp_source(idx_add_gas_first:idx_add_gas_last) =                                                        &
-                    xg_fissures(1:n_add_gas,i_fissure)
-                IF (stoch_transport_flag) qp_source(idx_stoch) = 0.0_wp
-                IF (pore_pressure_flag) qp_source(idx_poreEqn) = 0.0_wp
-                qp_source(idx_u) = 0.0_wp
-                qp_source(idx_v) = 0.0_wp
-
-                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
+                ! Only source-material density, heat capacity and buoyancy are needed.
+                ! Do not construct a synthetic primitive state or compute Richardson.
+                CALL evaluate_mixture_density(T_fissures(i_fissure), &
+                    xs_fissures(1:n_solid,i_fissure), xg_fissures(1:n_add_gas,i_fissure), r_rho_m, r_inv_rho_m)
+                CALL evaluate_mixture_heat_capacity(xs_fissures(1:n_solid,i_fissure), &
+                    xg_fissures(1:n_add_gas,i_fissure), r_sp_heat_mix, r_sp_heat_c)
+                r_red_grav=(r_rho_m-rho_a_amb)*r_inv_rho_m*grav
 
                 rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
                 rate(4) = rate(4) + (t_coeff *                                                                         &

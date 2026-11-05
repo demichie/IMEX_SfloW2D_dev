@@ -24,6 +24,12 @@ IMEX_SfloW2D_SOURCES = \
                 core/complexify.f90 \
                 geometry/geometry_2d.f90 \
                 state/state_conversion_2d.f90 \
+                state_new/state_new_types.f90 \
+                state_new/state_new_composition.f90 \
+                state_new/state_new_mixture.f90 \
+                state_new/state_new_conversions.f90 \
+                state_new/state_new_physical.f90 \
+                state_new/state_new.f90 \
                 physics/rheology_laws/rheology_voellmy_2d.f90 \
                 physics/rheology_laws/rheology_plastic_2d.f90 \
                 physics/rheology_laws/rheology_froude_2d.f90 \
@@ -76,10 +82,13 @@ IMEX_SfloW2D_SOURCES = \
                 io/inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
-AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state
+AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state -I$(srcdir)/state_new
 CLEANFILES = *.mod
 EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservative.inc \
              state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
+             state_new/mixture_heat_capacity.inc state_new/mixture_from_mass.inc \
+             state_new/density_from_mass.inc state_new/kinematics.inc \
+             state_new/richardson.inc \
              python_diagnostics/kt_ritter_1d.f90
 
 state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
@@ -98,6 +107,30 @@ spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 numerics/nonlinear_solver_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 # Explicit source cell kernels hold only bounded per-cell scratch, never grids.
 physics/source_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+
+# F5: new general state kernels are built in module dependency order.
+state_new/state_new_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+state_new/state_new_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+state_new/state_new_mixture.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                     core/constitutive_parameters_2d.$(OBJEXT) \
+                                     state_new/mixture_heat_capacity.inc \
+                                     state_new/mixture_from_mass.inc \
+                                     state_new/density_from_mass.inc
+state_new/state_new_conversions.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
+                                         state_new/state_new_mixture.$(OBJEXT) \
+                                         state_new/state_new_composition.$(OBJEXT)
+state_new/state_new_physical.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
+                                      state_new/state_new_mixture.$(OBJEXT) \
+                                      state_new/state_new_composition.$(OBJEXT) \
+                                      state_new/kinematics.inc state_new/richardson.inc
+state_new/state_new.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
+                             state_new/state_new_composition.$(OBJEXT) \
+                             state_new/state_new_mixture.$(OBJEXT) \
+                             state_new/state_new_conversions.$(OBJEXT) \
+                             state_new/state_new_physical.$(OBJEXT)
+physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT)
+physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT)
+physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT)
 
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                 \
