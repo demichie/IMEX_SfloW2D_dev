@@ -128,9 +128,12 @@ state_new/state_new.$(OBJEXT): state_new/state_new_types.$(OBJEXT) \
                              state_new/state_new_mixture.$(OBJEXT) \
                              state_new/state_new_conversions.$(OBJEXT) \
                              state_new/state_new_physical.$(OBJEXT)
-physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT)
-physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT)
-physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT)
+physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT) \
+    state_new/state_new_composition.$(OBJEXT)
+physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT) \
+    state_new/state_new_composition.$(OBJEXT)
+physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state_new/state_new_mixture.$(OBJEXT) \
+    state_new/state_new_composition.$(OBJEXT)
 
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                 \

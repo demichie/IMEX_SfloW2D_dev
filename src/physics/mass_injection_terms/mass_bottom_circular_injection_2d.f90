@@ -7,6 +7,7 @@ MODULE mass_bottom_circular_injection_2d
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_new_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
+    USE state_new_composition, ONLY : close_composition
 
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d
@@ -37,6 +38,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
         REAL(wp) :: r_rho_m, r_inv_rho_m, r_red_grav
+        REAL(wp) :: source_xs(n_solid), source_xg(n_add_gas)
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
         INTEGER :: i_int
 
@@ -124,12 +126,15 @@ CONTAINS
 
             END IF
 
-            ! Only source-material density, heat capacity and buoyancy are needed.
-            ! Do not construct a synthetic primitive state or compute Richardson.
+            ! Source material is independent of the recipient cell.
+            ! Close fractions before evaluating only the necessary properties.
+            source_xs=xs_source(1:n_solid)
+            source_xg=xg_source(1:n_add_gas)
+            IF (.NOT.close_composition(source_xs,source_xg)) &
+                CALL fatal_error('Invalid injection material composition')
             CALL evaluate_mixture_density(T_source, &
-                xs_source(1:n_solid), xg_source(1:n_add_gas), r_rho_m, r_inv_rho_m)
-            CALL evaluate_mixture_heat_capacity(xs_source(1:n_solid), &
-                xg_source(1:n_add_gas), r_sp_heat_mix, r_sp_heat_c)
+                source_xs,source_xg,r_rho_m,r_inv_rho_m)
+            CALL evaluate_mixture_heat_capacity(source_xs,source_xg,r_sp_heat_mix,r_sp_heat_c)
             r_red_grav=(r_rho_m-rho_a_amb)*r_inv_rho_m*grav
 
             rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
