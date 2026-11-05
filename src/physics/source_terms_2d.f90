@@ -9,7 +9,9 @@ MODULE source_terms_2d
     USE mass_injection_coefficients_2d
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_conversion_2d
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+        initialize_physical_state_real, initialize_physical_state_complex
+    USE state_new_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
@@ -75,7 +77,7 @@ CONTAINS
         ! Prepartitioned immutable metadata supplied by the Lie executor.
         TYPE(source_group_type), INTENT(IN) :: non_exchange_group
         LOGICAL, INTENT(IN) :: exchange_selected
-        TYPE(physical_state_type), INTENT(INOUT), OPTIONAL :: physical_scratch
+        TYPE(physical_state_real), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         REAL(wp), INTENT(IN) :: inventory(n_solid)
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -215,7 +217,7 @@ CONTAINS
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: q_after(n_vars)
         INTEGER, INTENT(OUT) :: status
-        TYPE(physical_state_type) :: physical_state
+        TYPE(physical_state_real) :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
         REAL(wp) :: heat_capacity,temperature_after
         REAL(wp) :: pore_rate(n_eqns)
@@ -228,10 +230,11 @@ CONTAINS
         IF (.NOT.ALLOCATED(group%source_names)) RETURN
         IF (SIZE(group%source_names)/=1) RETURN
         selected_model_name=TRIM(group%source_names(1))
+        CALL initialize_physical_state_real(physical_state)
 
         IF (INDEX(selected_model_name,'rheology_')==1) THEN
 
-            CALL real_physical_state_from_q(q_before, physical_state,                                                  &
+            CALL build_physical_state_from_q(q_before, physical_state,                                                  &
                     context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
                     context%Bsecond_xy,context%Bsecond_yy)
             horizontal_speed=physical_state%mod_vel_hor
@@ -263,7 +266,7 @@ CONTAINS
             status=0
 
         ELSE IF (selected_model_name=='thermal_cooling') THEN
-            CALL real_physical_state_from_q(q_before, physical_state,                                                  &
+            CALL build_physical_state_from_q(q_before, physical_state,                                                  &
                     context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
                     context%Bsecond_xy,context%Bsecond_yy)
 
@@ -283,7 +286,7 @@ CONTAINS
         ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
             IF (q_before(1)>0.0_wp) THEN
 
-                CALL real_physical_state_from_q(q_before, physical_state,                                              &
+                CALL build_physical_state_from_q(q_before, physical_state,                                              &
                     context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
                     context%Bsecond_xy,context%Bsecond_yy)
                 CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],                                              &
@@ -315,9 +318,9 @@ CONTAINS
         REAL(wp), INTENT(IN) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
-        TYPE(physical_state_type), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
-        TYPE(physical_state_type), TARGET :: local_state
-        TYPE(physical_state_type), POINTER :: physical_state
+        TYPE(physical_state_real), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
+        TYPE(physical_state_real), TARGET :: local_state
+        TYPE(physical_state_real), POINTER :: physical_state
 
         rate=0.0_wp
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
@@ -327,8 +330,12 @@ CONTAINS
 
         IF (group%rheology_id==0) RETURN
         physical_state=>local_state
-        IF (PRESENT(physical_scratch)) physical_state=>physical_scratch
-        CALL real_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                       &
+        IF (PRESENT(physical_scratch)) THEN
+            physical_state=>physical_scratch
+        ELSE
+            CALL initialize_physical_state_real(local_state)
+        END IF
+        CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                       &
             0.0_wp,0.0_wp,0.0_wp)
         CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
             grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
@@ -349,7 +356,7 @@ CONTAINS
         REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
         REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
-        TYPE(complex_physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(physical_state_complex), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
 
 
         COMPLEX(wp) :: qj(n_vars)
@@ -357,8 +364,8 @@ CONTAINS
 
         INTEGER :: i
 
-        TYPE(complex_physical_state_type), TARGET :: physical_state_local
-        TYPE(complex_physical_state_type), POINTER :: physical_state
+        TYPE(physical_state_complex), TARGET :: physical_state_local
+        TYPE(physical_state_complex), POINTER :: physical_state
 
         LOGICAL :: selected_rheology, selected_thermal
 
@@ -392,13 +399,14 @@ CONTAINS
             physical_state=>physical_scratch
         ELSE
             physical_state=>physical_state_local
+            CALL initialize_physical_state_complex(physical_state_local)
         END IF
 
         ! initialize the source terms
         source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
 
         IF (selected_rheology .OR. selected_thermal) THEN
-            CALL physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y,                                       &
+            CALL build_physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y,                                       &
                 0.0_wp, 0.0_wp, 0.0_wp)
 
         END IF
@@ -472,7 +480,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: cell_area_jk
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: stochastic_value
-        TYPE(physical_state_type), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
+        TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -481,8 +489,8 @@ CONTAINS
 
 
 
-        TYPE(physical_state_type), TARGET :: local_state
-        TYPE(physical_state_type), POINTER :: physical_state
+        TYPE(physical_state_real), TARGET :: local_state
+        TYPE(physical_state_real), POINTER :: physical_state
 
 
         REAL(wp) :: q1
@@ -502,8 +510,12 @@ CONTAINS
 
         ! Injection into a dry cell still needs density and pore-pressure state.
         physical_state=>local_state
-        IF (PRESENT(physical_scratch)) physical_state=>physical_scratch
-        CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y,                                         &
+        IF (PRESENT(physical_scratch)) THEN
+            physical_state=>physical_scratch
+        ELSE
+            CALL initialize_physical_state_real(local_state)
+        END IF
+        CALL build_physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y,                                         &
             Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
 
         ! Gravity terms - only meaningful when the cell has mass.
@@ -618,14 +630,18 @@ CONTAINS
         INTEGER, INTENT(IN) :: source_mask
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        TYPE(physical_state_type), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
+        TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
-        TYPE(physical_state_type), TARGET :: local_state
-        TYPE(physical_state_type), POINTER :: exchange_state
+        TYPE(physical_state_real), TARGET :: local_state
+        TYPE(physical_state_real), POINTER :: exchange_state
 
         exchange_state=>local_state
-        IF (PRESENT(physical_scratch)) exchange_state=>physical_scratch
-        CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
+        IF (PRESENT(physical_scratch)) THEN
+            exchange_state=>physical_scratch
+        ELSE
+            CALL initialize_physical_state_real(local_state)
+        END IF
+        CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
         CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
             erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit

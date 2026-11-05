@@ -18,6 +18,7 @@ MODULE state_new_types
     PUBLIC :: state_workspace_complex
     PUBLIC :: initialize_state_workspace_real
     PUBLIC :: initialize_state_workspace_complex
+    PUBLIC :: initialize_physical_state_real, initialize_physical_state_complex
     PUBLIC :: reset_physical_state_real
     PUBLIC :: reset_physical_state_complex
     PUBLIC :: promote_physical_state
@@ -138,56 +139,66 @@ CONTAINS
     !> A preallocated incompatible layout is rejected, never repaired in a hot loop.
     !> Allocate and clear the arrays owned by a reusable REAL state workspace.
     !> This routine belongs to setup/configuration, never to a cell-evaluation loop.
-    SUBROUTINE initialize_state_workspace_real(workspace)
-        TYPE(state_workspace_real), INTENT(INOUT) :: workspace
+    SUBROUTINE initialize_physical_state_real(workspace)
+        TYPE(physical_state_real), INTENT(INOUT) :: state
 
-        IF (.NOT.ALLOCATED(workspace%state%xs) .OR. .NOT.ALLOCATED(workspace%state%xg) .OR. &
-            .NOT.ALLOCATED(workspace%state%alphas) .OR. .NOT.ALLOCATED(workspace%state%alphag)) THEN
-            IF (ALLOCATED(workspace%state%xs)) DEALLOCATE(workspace%state%xs)
-            IF (ALLOCATED(workspace%state%xg)) DEALLOCATE(workspace%state%xg)
-            IF (ALLOCATED(workspace%state%alphas)) DEALLOCATE(workspace%state%alphas)
-            IF (ALLOCATED(workspace%state%alphag)) DEALLOCATE(workspace%state%alphag)
-            ALLOCATE(workspace%state%xs(n_solid), workspace%state%xg(n_add_gas), &
-                workspace%state%alphas(n_solid), workspace%state%alphag(n_add_gas))
-        ELSE IF (SIZE(workspace%state%xs) /= n_solid .OR. &
-                 SIZE(workspace%state%xg) /= n_add_gas .OR. &
-                 SIZE(workspace%state%alphas) /= n_solid .OR. &
-                 SIZE(workspace%state%alphag) /= n_add_gas) THEN
+        IF (.NOT.ALLOCATED(state%xs) .OR. .NOT.ALLOCATED(state%xg) .OR. &
+            .NOT.ALLOCATED(state%alphas) .OR. .NOT.ALLOCATED(state%alphag)) THEN
+            IF (ALLOCATED(state%xs)) DEALLOCATE(state%xs)
+            IF (ALLOCATED(state%xg)) DEALLOCATE(state%xg)
+            IF (ALLOCATED(state%alphas)) DEALLOCATE(state%alphas)
+            IF (ALLOCATED(state%alphag)) DEALLOCATE(state%alphag)
+            ALLOCATE(state%xs(n_solid), state%xg(n_add_gas), &
+                state%alphas(n_solid), state%alphag(n_add_gas))
+        ELSE IF (SIZE(state%xs) /= n_solid .OR. &
+                 SIZE(state%xg) /= n_add_gas .OR. &
+                 SIZE(state%alphas) /= n_solid .OR. &
+                 SIZE(state%alphag) /= n_add_gas) THEN
             ERROR STOP 'state_new REAL workspace has incompatible composition layout'
         END IF
 
-        workspace%state%xs=0.0_wp
-        workspace%state%xg=0.0_wp
-        workspace%state%alphas=0.0_wp
-        workspace%state%alphag=0.0_wp
-        workspace%state%layout_valid=.TRUE.
+        state%xs=0.0_wp
+        state%xg=0.0_wp
+        state%alphas=0.0_wp
+        state%alphag=0.0_wp
+        state%layout_valid=.TRUE.
+    END SUBROUTINE initialize_physical_state_real
+
+    SUBROUTINE initialize_state_workspace_real(workspace)
+        TYPE(state_workspace_real), INTENT(INOUT) :: workspace
+        CALL initialize_physical_state_real(workspace%state)
     END SUBROUTINE initialize_state_workspace_real
 
     !> Allocate and clear the arrays owned by a reusable COMPLEX state workspace.
     !> This routine belongs to setup/configuration, never to a cell-evaluation loop.
-    SUBROUTINE initialize_state_workspace_complex(workspace)
-        TYPE(state_workspace_complex), INTENT(INOUT) :: workspace
+    SUBROUTINE initialize_physical_state_complex(workspace)
+        TYPE(physical_state_complex), INTENT(INOUT) :: state
 
-        IF (.NOT.ALLOCATED(workspace%state%xs) .OR. .NOT.ALLOCATED(workspace%state%xg) .OR. &
-            .NOT.ALLOCATED(workspace%state%alphas) .OR. .NOT.ALLOCATED(workspace%state%alphag)) THEN
-            IF (ALLOCATED(workspace%state%xs)) DEALLOCATE(workspace%state%xs)
-            IF (ALLOCATED(workspace%state%xg)) DEALLOCATE(workspace%state%xg)
-            IF (ALLOCATED(workspace%state%alphas)) DEALLOCATE(workspace%state%alphas)
-            IF (ALLOCATED(workspace%state%alphag)) DEALLOCATE(workspace%state%alphag)
-            ALLOCATE(workspace%state%xs(n_solid), workspace%state%xg(n_add_gas), &
-                workspace%state%alphas(n_solid), workspace%state%alphag(n_add_gas))
-        ELSE IF (SIZE(workspace%state%xs) /= n_solid .OR. &
-                 SIZE(workspace%state%xg) /= n_add_gas .OR. &
-                 SIZE(workspace%state%alphas) /= n_solid .OR. &
-                 SIZE(workspace%state%alphag) /= n_add_gas) THEN
+        IF (.NOT.ALLOCATED(state%xs) .OR. .NOT.ALLOCATED(state%xg) .OR. &
+            .NOT.ALLOCATED(state%alphas) .OR. .NOT.ALLOCATED(state%alphag)) THEN
+            IF (ALLOCATED(state%xs)) DEALLOCATE(state%xs)
+            IF (ALLOCATED(state%xg)) DEALLOCATE(state%xg)
+            IF (ALLOCATED(state%alphas)) DEALLOCATE(state%alphas)
+            IF (ALLOCATED(state%alphag)) DEALLOCATE(state%alphag)
+            ALLOCATE(state%xs(n_solid), state%xg(n_add_gas), &
+                state%alphas(n_solid), state%alphag(n_add_gas))
+        ELSE IF (SIZE(state%xs) /= n_solid .OR. &
+                 SIZE(state%xg) /= n_add_gas .OR. &
+                 SIZE(state%alphas) /= n_solid .OR. &
+                 SIZE(state%alphag) /= n_add_gas) THEN
             ERROR STOP 'state_new COMPLEX workspace has incompatible composition layout'
         END IF
 
-        workspace%state%xs=(0.0_wp,0.0_wp)
-        workspace%state%xg=(0.0_wp,0.0_wp)
-        workspace%state%alphas=(0.0_wp,0.0_wp)
-        workspace%state%alphag=(0.0_wp,0.0_wp)
-        workspace%state%layout_valid=.TRUE.
+        state%xs=(0.0_wp,0.0_wp)
+        state%xg=(0.0_wp,0.0_wp)
+        state%alphas=(0.0_wp,0.0_wp)
+        state%alphag=(0.0_wp,0.0_wp)
+        state%layout_valid=.TRUE.
+    END SUBROUTINE initialize_physical_state_complex
+
+    SUBROUTINE initialize_state_workspace_complex(workspace)
+        TYPE(state_workspace_complex), INTENT(INOUT) :: workspace
+        CALL initialize_physical_state_complex(workspace%state)
     END SUBROUTINE initialize_state_workspace_complex
 
 END MODULE state_new_types

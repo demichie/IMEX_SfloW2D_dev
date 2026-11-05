@@ -19,7 +19,8 @@ MODULE nonlinear_solver_2d
     USE source_registry_2d, ONLY : source_group_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit
-    USE state_conversion_2d, ONLY : complex_physical_state_type, physical_state_type
+    USE state_new_types, ONLY : physical_state_complex, physical_state_real, &
+        initialize_physical_state_real, initialize_physical_state_complex
 
     IMPLICIT NONE
 
@@ -42,12 +43,12 @@ CONTAINS
         INTEGER, INTENT(OUT) :: iterations_used,linear_info
         LOGICAL, INTENT(OUT) :: converged,line_search_failed
         ! Optional reusable per-worker workspace; the fallback stays cell-local.
-        TYPE(complex_physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: complex_workspace
-        TYPE(complex_physical_state_type), TARGET :: local_complex_workspace
-        TYPE(complex_physical_state_type), POINTER :: active_workspace
-        TYPE(physical_state_type), OPTIONAL, TARGET, INTENT(INOUT) :: real_workspace
-        TYPE(physical_state_type), TARGET :: local_real_workspace
-        TYPE(physical_state_type), POINTER :: active_real_workspace
+        TYPE(physical_state_complex), OPTIONAL, TARGET, INTENT(INOUT) :: complex_workspace
+        TYPE(physical_state_complex), TARGET :: local_complex_workspace
+        TYPE(physical_state_complex), POINTER :: active_workspace
+        TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: real_workspace
+        TYPE(physical_state_real), TARGET :: local_real_workspace
+        TYPE(physical_state_real), POINTER :: active_real_workspace
         REAL(wp) :: q_in(n_vars),q_si(n_vars),semi_rate(n_eqns),coeff_f(n_eqns)
         REAL(wp) :: semi_scale,delta_momentum
         INTEGER :: n_active,i
@@ -71,7 +72,11 @@ CONTAINS
         ! nonnegative factor, so neither momentum component crosses zero.
         ! Components initially at rest must not acquire a sign from friction.
         active_real_workspace=>local_real_workspace
-        IF (PRESENT(real_workspace)) active_real_workspace=>real_workspace
+        IF (PRESENT(real_workspace)) THEN
+            active_real_workspace=>real_workspace
+        ELSE
+            CALL initialize_physical_state_real(local_real_workspace)
+        END IF
         CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y,grav_correction,stochastic_value,            &
             semi_rate,active_real_workspace)
         semi_scale=1.0_wp
@@ -103,6 +108,7 @@ CONTAINS
             active_workspace => complex_workspace
         ELSE
             active_workspace => local_complex_workspace
+            CALL initialize_physical_state_complex(local_complex_workspace)
         END IF
         CALL solve_newton_group(source_group, source_group%equation_ids, q_cell, q_si, dt, Bprime_x, Bprime_y,         &
             stochastic_value, coeff_f, tol_abs, tol_rel, iterations_used, converged, linear_info, line_search_failed,  &
@@ -151,7 +157,7 @@ CONTAINS
         REAL(wp) :: stpmax
         REAL(wp) :: group_matrix(SIZE(group_equations),SIZE(group_equations))
         REAL(wp) :: group_rhs(SIZE(group_equations))
-        TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
         INTEGER :: group_pivot(SIZE(group_equations))
         INTEGER :: nl_iter, i, j, ok
         LOGICAL :: check
@@ -585,7 +591,7 @@ CONTAINS
         REAL(wp), INTENT(IN):: Zij ! value stochastic process
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
-        TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
         REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
         INTEGER, DIMENSION(1) :: ndum
@@ -801,7 +807,7 @@ CONTAINS
         REAL(wp), INTENT(IN):: Zij ! value stochastic process
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
-        TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
 
         REAL(wp) :: nh_term_impl(n_eqns)
         INTEGER :: i, equation
@@ -876,7 +882,7 @@ CONTAINS
         REAL(wp), INTENT(IN):: Zij ! value stochastic process
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
-        TYPE(complex_physical_state_type), INTENT(INOUT) :: implicit_scratch
+        TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
 
         REAL(wp) :: complex_step_perturbation,inverse_complex_step_perturbation
         COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)

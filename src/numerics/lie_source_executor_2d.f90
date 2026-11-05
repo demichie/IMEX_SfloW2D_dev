@@ -15,7 +15,8 @@ MODULE lie_source_executor_2d
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
         SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
     USE state_2d, ONLY : state_type
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex, &
+        initialize_physical_state_real, initialize_physical_state_complex
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
 
     IMPLICIT NONE
@@ -37,9 +38,9 @@ MODULE lie_source_executor_2d
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
         TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
-        TYPE(physical_state_type), ALLOCATABLE :: source_physical_scratch(:)
+        TYPE(physical_state_real), ALLOCATABLE :: source_physical_scratch(:)
         ! Per-worker complex-step workspace persists across cells and timesteps.
-        TYPE(complex_physical_state_type), ALLOCATABLE :: source_complex_scratch(:)
+        TYPE(physical_state_complex), ALLOCATABLE :: source_complex_scratch(:)
         TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
         TYPE(mass_exchange_rates_type), ALLOCATABLE :: source_transfers(:)
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
@@ -313,6 +314,15 @@ CONTAINS
             IF (.NOT.ALLOCATED(executor%source_complex_scratch))                                                       &
                 ALLOCATE(executor%source_complex_scratch(nthreads))
         END IF
+        ! Set up composition storage once per OpenMP worker, outside the hot loops.
+        DO tid=1,nthreads
+            IF (.NOT.executor%source_physical_scratch(tid)%layout_valid) &
+                CALL initialize_physical_state_real(executor%source_physical_scratch(tid))
+            IF (executor%has_newton_group) THEN
+                IF (.NOT.executor%source_complex_scratch(tid)%layout_valid) &
+                    CALL initialize_physical_state_complex(executor%source_complex_scratch(tid))
+            END IF
+        END DO
         IF (ALLOCATED(executor%source_exchange_scratch)) THEN
             IF (SIZE(executor%source_exchange_scratch)<nthreads) DEALLOCATE(executor%source_exchange_scratch)
         END IF
