@@ -28,6 +28,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Avanzamento C4/C5 (5 novembre 2026):** `hyperbolic_2d:cancel_resting_roundoff` riutilizza i gamma delle facce gia calcolati durante `eval_speeds` per la stima del residuo well-balanced; mantiene il vecchio kernel quando la selezione di profondita attraversa la soglia wet/dry e salta tutte le valutazioni quando il residuo e gia esattamente nullo. Nessun nuovo array. **C4 e C5 IN CORSO**, compilazione, regressioni scientifiche e profiling del nuovo commit pendenti; tutti i test rimangono manuali.
 
+**Audit complessivo di riuso degli stati — 5 novembre 2026, baseline `a7a3ff8`:** inventario statico C0 dei call graph di produzione completato, senza modifiche al codice e senza Actions. **Tre ricalcoli ad alta priorita**: conversione `q->qp` ripetuta dal driver dopo il publish Lie (A01), stato fisico completo ricostruito per usare soltanto `red_grav` nel sink finale (A02), proprieta del materiale di iniezione rivalutate per cella nonostante input comuni (A03). Altre opportunita: post-spatial invariato, controllo della validita del flag CFL/spatial, Newton thermal-only, path interni, setup delle sorgenti. Dettagli, gravita, condizioni di invalidazione e ordine delle correzioni nella sezione **D.7** della [roadmap degli stati](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md). C0 statico completato ma **C5 dinamico e traguardo computazionale aperti**. L'utente conferma build ed esempi funzionanti sul codice precedente all'audit; non attribuire speedup senza profiling.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni
@@ -102,7 +104,7 @@ L'ordine dei gruppi Lie è seriale; le celle indipendenti al loro interno sono p
 
 | Priorità | ID | Attività | Chiusura richiesta |
 | --- | --- | --- | --- |
-| P0 | A03 | Chiudere il traguardo computazionale dello stato | Seguire C0-C5 nella roadmap specialistica: mappa per versione degli intermedi, rimozione ricalcoli cp, conversioni Lie, riuso negli evaluator e Newton, facce HP-PCCU, audit allocazioni e misure. Il backend unico `src/state/` e gia migrato; la build non dimostra l'eliminazione del lavoro ripetuto. |
+| P0 | A03 | Chiudere il traguardo computazionale dello stato (audit statico C0 concluso; criticita A01-A03 della roadmap specialistica) | Seguire C0-C5 nella roadmap specialistica: mappa per versione degli intermedi, rimozione ricalcoli cp, conversioni Lie, riuso negli evaluator e Newton, facce HP-PCCU, audit allocazioni e misure. Il backend unico `src/state/` e gia migrato; la build non dimostra l'eliminazione del lavoro ripetuto. |
 | P0 | V01 | Congelare baseline Lie verificata | Associare strict-debug e D20 al commit effettivamente testato, conservare log. |
 | P0 | V02 | Matrice di regressioni scientifiche | Confronti per idrodinamica, wet/dry, well-balancing, sorgenti, massa, energia, pressione, NEWTON, analytiche e topografia. |
 | P0 | V03 | Consolidare le prove D20 | Evidenze di Newton effettivo, fondo variato, rollback dell'intero passo dopo fallimento e confronti 1/2/4 thread, incluse le revisioni dei test. |
