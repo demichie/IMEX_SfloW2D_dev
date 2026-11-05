@@ -39,6 +39,7 @@ PROGRAM test_projection_stress
   CALL initialize_physics
   CALL check_limiter_representability
   CALL check_late_group_recipient_budget
+  CALL check_injection_before_settling_budget
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
   CALL check_complete_physical_state
@@ -148,6 +149,37 @@ CONTAINS
     IF (current_scale>=stale_scale) &
          ERROR STOP 'Late-group limiter used a stale conservative budget'
   END SUBROUTINE check_late_group_recipient_budget
+
+  !> An initially dry cell receives solids in group 0. With the stale
+  !> pre-group reference, group 4 is artificially disabled; the actual
+  !> recipient budget permits settling. Characterize this behavioral change
+  !> independently of the state_new physical-state migration.
+  SUBROUTINE check_injection_before_settling_budget
+    REAL(wp) :: dry(nq),injected(nq),settling_rate(nq),candidate(nq)
+    REAL(wp) :: stale_scale,recipient_scale
+    LOGICAL :: stale_valid,recipient_valid
+
+    dry=0.0_wp
+    injected=0.0_wp
+    settling_rate=0.0_wp
+    injected(idx_totMassEqn)=1.0_wp
+    injected(idx_solidEqn_first)=0.25_wp
+    settling_rate(idx_totMassEqn)=-0.20_wp
+    settling_rate(idx_solidEqn_first)=-0.15_wp
+
+    CALL limit_explicit_source_rates(dry,[REAL(wp)::],1.0_wp,settling_rate, &
+        [REAL(wp)::],stale_scale,stale_valid)
+    IF (.NOT.stale_valid .OR. stale_scale/=0.0_wp) &
+        ERROR STOP 'Dry pre-injection budget must suppress settling'
+
+    CALL limit_explicit_source_rates(injected,[REAL(wp)::],1.0_wp,settling_rate, &
+        [REAL(wp)::],recipient_scale,recipient_valid)
+    IF (.NOT.recipient_valid .OR. recipient_scale<=0.0_wp) &
+        ERROR STOP 'Current post-injection budget must allow settling'
+    candidate=injected+recipient_scale*settling_rate
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+        ERROR STOP 'Post-injection settling candidate inadmissible'
+  END SUBROUTINE check_injection_before_settling_budget
 
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics
