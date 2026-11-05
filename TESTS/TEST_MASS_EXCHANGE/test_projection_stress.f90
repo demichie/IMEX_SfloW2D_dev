@@ -211,11 +211,13 @@ CONTAINS
   SUBROUTINE check_complete_physical_state
     USE state_conversion_2d, ONLY : physical_state_type,complex_physical_state_type, &
         physical_state_from_qp,complex_state_from_real,real_part_physical_state, &
-        mixt_var_state
+        eval_mixture_properties_from_mass_fractions,eval_mixture_heat_capacity
     TYPE(physical_state_type) :: wet,dry,roundtrip
     TYPE(complex_physical_state_type) :: complex_state
     REAL(wp) :: primitive(n_vars),ri,rho_m,rho_c,red_grav,cp_c,cp_m
-    REAL(wp) :: expected_cp
+    REAL(wp) :: expected_cp,inv_rho_m,inv_rho_c,xc
+    REAL(wp) :: xs(n_solid),xg(n_add_gas),alphas(n_solid),alphag(n_add_gas)
+    REAL(wp) :: speed_squared,buoyancy_depth
 
     primitive=0.0_wp
     primitive(idx_h)=2.0_wp
@@ -225,7 +227,22 @@ CONTAINS
     primitive(idx_solid_first)=0.15_wp
     primitive(idx_solid_first+1)=0.05_wp
     CALL physical_state_from_qp(primitive,wet)
-    CALL mixt_var_state(wet,ri,rho_m,rho_c,red_grav,cp_c,cp_m)
+    xs=primitive(idx_solid_first:idx_solid_last)
+    xg=primitive(idx_add_gas_first:idx_add_gas_last)
+    CALL eval_mixture_properties_from_mass_fractions(primitive(idx_T),xs,xg, &
+        rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
+    CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
+    red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
+    speed_squared=primitive(idx_u)**2+primitive(idx_v)**2
+    buoyancy_depth=red_grav*primitive(idx_h)
+    ri=0.0_wp
+    IF (speed_squared>0.0_wp) THEN
+        IF (buoyancy_depth/1.0E15_wp>speed_squared) THEN
+            ri=1.0E15_wp
+        ELSE
+            ri=MIN(1.0E15_wp,buoyancy_depth/speed_squared)
+        END IF
+    END IF
     IF (ABS(wet%rho_c-rho_c)>tolerance*MAX(1.0_wp,ABS(rho_c))) &
         ERROR STOP 'physical carrier density mismatch'
     IF (ABS(wet%inv_rho_c-1.0_wp/rho_c)>tolerance) &

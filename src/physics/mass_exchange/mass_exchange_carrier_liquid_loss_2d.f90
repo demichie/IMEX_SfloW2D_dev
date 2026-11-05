@@ -7,7 +7,6 @@ MODULE mass_exchange_carrier_liquid_loss_2d
     USE constitutive_parameters_2d, ONLY : loss_rate
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : mixt_var_state
 
     IMPLICIT NONE
     PRIVATE
@@ -26,17 +25,15 @@ CONTAINS
 
             TYPE(physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-            REAL(wp) :: rho_c,cp_c,Ri,rhom,redgrav,cpm
 
             CALL reset_mass_exchange_rates(r)
 
             IF (liquid_flag .AND. ALLOCATED(loss_rate)) THEN
-                CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
                 r%carrier_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
                 ! The liquid is the only carrier in this configuration.
-                r%mixture_mass_rate=-rho_c*r%carrier_withdrawal_volume_rate
-                r%energy_rate=state%T*cp_c*r%mixture_mass_rate
+                r%mixture_mass_rate=-state%rho_c*r%carrier_withdrawal_volume_rate
+                r%energy_rate=state%T*state%cp_c*r%mixture_mass_rate
 
             END IF
 

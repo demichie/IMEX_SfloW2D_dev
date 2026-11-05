@@ -15,8 +15,7 @@ MODULE pore_pressure_darcy_2d
             sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,                                         &
             dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
     USE geometry_2d, ONLY : pi_g
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type,                                  &
-            mixt_var_state
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
     IMPLICIT NONE
@@ -75,7 +74,6 @@ CONTAINS
         LOGICAL :: do_gas_loss
         COMPLEX(wp) :: diffusion, inhibition
         REAL(wp) :: lambda, A, loss, mass_after, pressure_after, pressure_q
-        REAL(wp) :: rho_c, cp_c, Ri, rhom, redgrav, cpm
         REAL(wp) :: gas_inventory, gas_fraction
         REAL(wp) :: exponential_factor, pressure_integral, coefficient
         LOGICAL :: active
@@ -113,7 +111,6 @@ CONTAINS
         IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
         IF (do_gas_loss .AND.                                                                                          &
             SUM(state%alphas)<maximum_solid_packing) THEN
-        CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
 
         IF (state%exc_pore_pres>0.0_wp) THEN
             ! This velocity is linear in p_e with the frozen closures.
@@ -121,9 +118,9 @@ CONTAINS
             BLOCK
                 COMPLEX(wp) :: gas_loss_coefficient
                 CALL pore_gas_loss_complex(CMPLX(state%h,0.0_wp,wp), CMPLX(state%T,0.0_wp,wp),                         &
-                    CMPLX(state%alphas,0.0_wp,wp), CMPLX(SUM(state%alphas),0.0_wp,wp), CMPLX(rho_c,0.0_wp,wp),         &
+                    CMPLX(state%alphas,0.0_wp,wp), CMPLX(SUM(state%alphas),0.0_wp,wp), CMPLX(state%rho_c,0.0_wp,wp),         &
                     CMPLX(1.0_wp,0.0_wp,wp), gas_loss_coefficient)
-                A=rho_c*REAL(gas_loss_coefficient,wp)
+                A=state%rho_c*REAL(gas_loss_coefficient,wp)
 
             END BLOCK
 
@@ -219,7 +216,7 @@ CONTAINS
         IF (loss>0.0_wp) THEN
         ! No gas is removed from solid-class conservative masses.
         q_after(idx_engyEqn)=q_before(idx_engyEqn)-                                                                    &
-                state%T*cp_c*loss
+                state%T*state%cp_c*loss
 
         IF (n_add_gas>0) THEN
             gas_fraction=loss/gas_inventory

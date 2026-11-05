@@ -100,7 +100,7 @@ MODULE state_conversion_2d
     PUBLIC :: update_physical_state_kinematics
     PUBLIC :: real_physical_state_from_q, complex_state_from_real
     PUBLIC :: qc_to_qp, qp_to_qc
-    PUBLIC :: mixt_var, mixt_var_state
+    PUBLIC :: mixt_var
     PUBLIC :: sauter_diameter, average_density_solids
     PUBLIC :: eval_mixture_heat_capacity
     PUBLIC :: eval_mixture_properties_from_mass_fractions
@@ -771,55 +771,6 @@ CONTAINS
         state%mod_vel = REAL(complex_state%mod_vel,wp)
         state%curvature_acceleration = REAL(complex_state%curvature_acceleration,wp)
     END SUBROUTINE real_part_physical_state
-
-    !> Mixture properties from named state components, without rebuilding qp.
-    SUBROUTINE mixt_var_state(state,ri,rho_m,rho_c,red_grav,cp_c,cp_m)
-        TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(OUT) :: ri,rho_m,rho_c,red_grav,cp_c,cp_m
-        REAL(wp) :: inv_rho_m,inv_rho_c,xc,speed_squared,buoyancy_depth
-        REAL(wp) :: xs(n_solid),xg(n_add_gas)
-        REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
-
-        IF (state%h <= EPSILON(1.0_wp)) THEN
-            ri=0.0_wp
-            red_grav=0.0_wp
-            rho_m=rho_a_amb
-            rho_c=rho_a_amb
-
-            IF (liquid_flag) THEN
-                cp_c=sp_heat_l
-                cp_m=sp_heat_l
-            ELSE
-                cp_c=sp_heat_a
-                cp_m=sp_heat_a
-
-            END IF
-
-            RETURN
-
-        END IF
-
-        xs=state%xs
-        xg=state%xg
-        CALL enforce_mass_fraction_closure(xs,xg)
-        CALL eval_mixture_properties_from_mass_fractions(state%T,xs,xg, rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
-        CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
-        red_grav=(rho_m-rho_a_amb)/rho_m*grav
-        speed_squared=state%u**2+state%v**2
-        buoyancy_depth=red_grav*state%h
-        ri=0.0_wp
-
-        IF (speed_squared > 0.0_wp) THEN
-
-            IF (buoyancy_depth/1.E15_wp > speed_squared) THEN
-                ri=1.E15_wp
-            ELSE
-                ri=MIN(1.E15_wp,buoyancy_depth/speed_squared)
-
-            END IF
-
-        END IF
-    END SUBROUTINE mixt_var_state
 
     !> \brief Remove unresolved cell momenta without discarding conservative mass.
     !> \param[in,out] qc Conservative cell state; only entries 2 and 3 may change.
