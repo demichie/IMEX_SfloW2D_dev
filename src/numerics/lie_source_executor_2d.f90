@@ -511,7 +511,7 @@ CONTAINS
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
-                        time_step, analytic_rate, status)
+                        time_step, analytic_rate, status, executor%source_physical_scratch(tid))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

@@ -185,12 +185,13 @@ CONTAINS
 
     !> Return the conservative equivalent rate of the exact source substep.
     !> The interval is supplied by the selected Lie group operator.
-    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status)
+    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER, INTENT(OUT) :: status
+        TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
 
@@ -206,18 +207,20 @@ CONTAINS
 
         END IF
 
-        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status)
+        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
 
-    RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status)
+    RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: q_after(n_vars)
         INTEGER, INTENT(OUT) :: status
-        TYPE(physical_state_real) :: physical_state
+        TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(physical_state_real), TARGET :: local_state
+        TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
         REAL(wp) :: heat_capacity,temperature_after
         REAL(wp) :: pore_rate(n_eqns)
@@ -230,7 +233,12 @@ CONTAINS
         IF (.NOT.ALLOCATED(group%source_names)) RETURN
         IF (SIZE(group%source_names)/=1) RETURN
         selected_model_name=TRIM(group%source_names(1))
-        CALL initialize_physical_state_real(physical_state)
+        physical_state=>local_state
+        IF (PRESENT(physical_scratch)) THEN
+            physical_state=>physical_scratch
+        ELSE
+            CALL initialize_physical_state_real(local_state)
+        END IF
 
         IF (INDEX(selected_model_name,'rheology_')==1) THEN
 
