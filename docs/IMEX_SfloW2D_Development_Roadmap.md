@@ -34,6 +34,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Correzione ownership A02 (5 novembre 2026):** la valutazione fisica della buoyancy non e piu presente in `lie_source_executor_2d`: nuova interfaccia locale `physics/source_terms_2d:evaluate_buoyancy_removal` restituisce accettazione, criterio `rho_mix<rho_a_amb` e `red_grav`. Lie gestisce esclusivamente l'esito, le diagnostiche e la transazione conservativa. A01/A03 invariati; verifica manuale della build ancora pendente. Dettagli nella sezione D.9 della roadmap specialistica.
 
+**Correzione ownership A02, secondo passaggio (5 novembre 2026):** in accordo con il vincolo utente, chiusura composizionale, densita della miscela e `red_grav` sono ora valutati in `state_physical:evaluate_density_from_qp` con kernel di `state_mixture`. `physics/source_terms_2d:evaluate_buoyancy_removal` applica solamente il criterio `rho_mix<rho_a_amb`; `numerics/lie_source_executor_2d` gestisce la transazione e le diagnostiche. D.9 e storico, D.10 e lo stato architetturale corrente. Build e regressioni sul nuovo SHA pendenti.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

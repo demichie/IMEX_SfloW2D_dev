@@ -12,8 +12,9 @@ MODULE source_terms_2d
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
-    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
-    USE state_mixture, ONLY : evaluate_mixture_heat_capacity,evaluate_mixture_density
+    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp, &
+        evaluate_density_from_qp
+    USE state_mixture, ONLY : evaluate_mixture_heat_capacity
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_implicit_real, eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
@@ -22,7 +23,7 @@ MODULE source_terms_2d
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_composition, ONLY : conservative_mass_admissible,close_composition
+    USE state_composition, ONLY : conservative_mass_admissible
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
     USE source_registry_2d, ONLY : source_group_type
@@ -56,23 +57,14 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars)
         LOGICAL, INTENT(OUT) :: remove_cell,accepted
         REAL(wp), INTENT(OUT) :: red_grav
-        REAL(wp) :: rho_mix,inv_rho_mix
-        REAL(wp) :: xs(n_solid),xg(n_add_gas)
+        REAL(wp) :: rho_mix
 
+        ! Mixture density and reduced gravity are state properties, not
+        ! source physics. Only the removal decision belongs here.
+        CALL evaluate_density_from_qp(qp,rho_mix,red_grav,accepted)
         remove_cell=.FALSE.
-        accepted=.FALSE.
-        red_grav=0.0_wp
-        xs=qp(idx_solid_first:idx_solid_last)
-        xg=qp(idx_add_gas_first:idx_add_gas_last)
-        IF (.NOT.close_composition(xs,xg)) RETURN
-
-        rho_mix=rho_a_amb
-        inv_rho_mix=1.0_wp/rho_a_amb
-        IF (qp(idx_h)>EPSILON(1.0_wp)) &
-            CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_mix,inv_rho_mix)
-        red_grav=(rho_mix-rho_a_amb)*inv_rho_mix*grav
+        IF (.NOT.accepted) RETURN
         remove_cell=rho_mix<rho_a_amb
-        accepted=.TRUE.
     END SUBROUTINE evaluate_buoyancy_removal
 
     !> Apply a uniform physical factor to all coupled exchange rates.

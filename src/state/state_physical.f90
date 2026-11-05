@@ -15,7 +15,7 @@ MODULE state_physical
     USE state_types, ONLY : reset_physical_state_real, reset_physical_state_complex
     USE state_composition, ONLY : close_composition
     USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, &
-        evaluate_mixture_phase_properties
+        evaluate_mixture_phase_properties, evaluate_mixture_density
 
     IMPLICIT NONE
     PRIVATE
@@ -24,6 +24,7 @@ MODULE state_physical
     PUBLIC :: build_physical_state_from_qp
     PUBLIC :: update_physical_state_kinematics
     PUBLIC :: refresh_physical_state
+    PUBLIC :: evaluate_density_from_qp
 
     INTERFACE build_physical_state_from_q
         MODULE PROCEDURE build_physical_state_from_q_real
@@ -46,6 +47,31 @@ MODULE state_physical
     END INTERFACE refresh_physical_state
 
 CONTAINS
+
+    !> Evaluate only mixture density and reduced gravity from a numerical
+    !> primitive cell, without constructing the full physical state.
+    !> The same composition closure and dry branch are used by
+    !> build_physical_state_from_qp_real.
+    SUBROUTINE evaluate_density_from_qp(qp,rho_m,red_grav,accepted)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
+        REAL(wp), INTENT(OUT) :: rho_m,red_grav
+        LOGICAL, INTENT(OUT) :: accepted
+        REAL(wp) :: inv_rho_m,xs(n_solid),xg(n_add_gas)
+
+        accepted=.FALSE.
+        rho_m=rho_a_amb
+        red_grav=0.0_wp
+        xs=qp(idx_solid_first:idx_solid_last)
+        xg=qp(idx_add_gas_first:idx_add_gas_last)
+        IF (.NOT.close_composition(xs,xg)) RETURN
+
+        IF (qp(idx_h)>EPSILON(1.0_wp)) THEN
+            CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_m,inv_rho_m)
+            red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
+        END IF
+        accepted=.TRUE.
+    END SUBROUTINE evaluate_density_from_qp
+
 
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)
         TYPE(physical_state_real), INTENT(INOUT) :: state

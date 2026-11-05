@@ -254,6 +254,19 @@ L'esecutore Lie invoca soltanto il criterio fisico, interpreta `accepted` (error
 
 **Gate:** verifica manuale del compilatore, EXAMPLE_TAAL, miscela negativa/neutra/positiva rispetto all'atmosfera, casi dry e diagnostiche del D19. Nessuna Action avviata dal cambio.
 
+### D.10 Correzione ulteriore A02: le proprietà della miscela appartengono a state (5 novembre 2026)
+
+**Vincolo architetturale esplicitato dall'utente:** non basta spostare il calcolo di densita e gravita ridotta da Lie a `physics`; **le proprieta dello stato devono essere calcolate dai moduli `src/state/`**. L'intervento D.9 era quindi incompleto quanto a ownership.
+
+**Nuova distribuzione:**
+- `src/state/state_physical.f90` espone `evaluate_density_from_qp(qp,rho_m,red_grav,accepted)`: chiusura della composizione, ramo dry, densita della miscela tramite il kernel `state_mixture:evaluate_mixture_density`, gravita ridotta. Non costruisce `physical_state_real`; non dipende da `physics` ne da `numerics`. Il contratto `accepted` rifiuta composizioni non ammissibili.
+- `src/physics/source_terms_2d.f90:evaluate_buoyancy_removal` chiede quelle **proprieta** a `state_physical` e applica solo il **criterio fisico di rimozione** `rho_mix<rho_a_amb`. Non valuta autonomamente composizione, densita, termodinamica o gravita ridotta.
+- `src/numerics/lie_source_executor_2d.f90` invoca il processo fisico, interpreta `accepted`/errore 15, registra le diagnostiche e pubblica l'eventuale rimozione conservativa. Nessuna proprieta di stato calcolata in Lie.
+
+**Distinzione vincolante per il resto del piano:** proprieta della miscela e derivate di `q`/`qp` in **state**; *leggi/processi e criteri fisici* in **physics**; integratori, accettazione, commit e rollback in **numerics**. Per A03 le leggi di iniezione possono coordinare il calcolo una volta per sweep, ma devono ottenere densita, cp e gravita ridotta dai kernel di `state` senza duplicarne le formule.
+
+**Verifica pendente sul nuovo SHA:** compilazione, TAAL, neutrali e wet/dry, confronti di `red_grav` con il costruttore fisico completo e diagnostiche D19. Nessuna Action avviata automaticamente.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
