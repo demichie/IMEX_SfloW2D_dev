@@ -381,6 +381,7 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
                                          state/state_conversions.$(OBJEXT) \
                                          state/state_fields.$(OBJEXT) \
+                                         stochastic/stochastic_module.$(OBJEXT) \
                                          numerics/lie_source_executor_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           core/constitutive_parameters_2d.$(OBJEXT) \

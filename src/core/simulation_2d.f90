@@ -134,19 +134,28 @@ CONTAINS
         CALL set_source_time_coefficients(step_start,step_length)
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_SOURCE_WINDOWS,step_start,step_length)
 
-        IF (stochastic_flag) CALL this%stochastic%prepare_timestep(this%state,step_length)
-        IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED,                                       &
-            step_start,step_length)
-
-        CALL this%time_integration%advance(this%state,step_start,                                                      &
-            step_length,this%stochastic%effective_Z,                                                                   &
-            this%domain,this%spatial_operator,pre_spatial_primitives_ready=pre_spatial_primitives_ready)
+        ! The stochastic OU stage belongs between spatial transport and
+        ! Lie sources, inside the integrator's unpublished trial transaction.
+        IF (PRESENT(observer)) THEN
+            CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
+                this%stochastic,this%domain,this%spatial_operator,                                                      &
+                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                              &
+                stochastic_prepared_hook=notify_stochastic_prepared)
+        ELSE
+            CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
+                this%stochastic,this%domain,this%spatial_operator,                                                      &
+                pre_spatial_primitives_ready=pre_spatial_primitives_ready)
+        END IF
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
-
 
         this%runtime%t=step_start+step_length
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED,                                            &
             this%runtime%t,step_length)
+    CONTAINS
+        SUBROUTINE notify_stochastic_prepared()
+            ! Report the new phase at its actual point, after spatial.
+            CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED,step_start,step_length)
+        END SUBROUTINE notify_stochastic_prepared
     END SUBROUTINE advance_simulation_timestep
 
     !> \brief Release the simulation state, metadata and solver workspaces.

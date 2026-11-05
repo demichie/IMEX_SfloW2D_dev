@@ -14,12 +14,18 @@ MODULE time_integration_2d
             initialize_dry_physical_cell,conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
     USE source_registry_2d, ONLY : source_registry_type
+    USE stochastic_module, ONLY : stochastic_workspace_type
+    USE parameters_2d, ONLY : stochastic_flag
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
         finalize_lie_source_executor,report_lie_source_profile,lie_source_executor_type
     IMPLICIT NONE
     PRIVATE
+    ABSTRACT INTERFACE
+        SUBROUTINE stochastic_stage_observer()
+        END SUBROUTINE stochastic_stage_observer
+    END INTERFACE
     PUBLIC :: time_integration_workspace_type
     !> @brief Scratch and transactional state buffers for one Lie integration.
     TYPE :: time_integration_workspace_type
@@ -29,6 +35,8 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: qp_before(:,:,:)
         !> Candidate fields: only worklist entries are initialized or published.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
+        ! Persistent OU rollback buffers; only used when stochastic physics is on.
+        REAL(wp), ALLOCATABLE :: stochastic_Z_before(:,:), stochastic_effective_before(:,:)
         !> Persistent status worklist for primitive and spatial checks.
         INTEGER, ALLOCATABLE :: cell_status(:)
         TYPE(lie_source_executor_type) :: lie_executor
@@ -76,10 +84,13 @@ CONTAINS
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
-    SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,domain,spatial_operator,pre_spatial_primitives_ready)
+    SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operator,pre_spatial_primitives_ready, &
+        stochastic_prepared_hook)
         CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
         CLASS(state_type), TARGET, INTENT(INOUT) :: state
-        REAL(wp), INTENT(IN) :: t,dt,stochastic_values(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: t,dt
+        CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
+        PROCEDURE(stochastic_stage_observer), OPTIONAL :: stochastic_prepared_hook
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
@@ -237,6 +248,20 @@ CONTAINS
             this%profile_spatial=this%profile_spatial+REAL(tock-tick,wp)/REAL(tick_rate,wp)
             tick=tock
         END IF
+        ! OU is now the post-spatial fractional stage.  q_trial/qp_trial
+        ! are valid only on the solve worklist, so stochastic%prepare_timestep
+        ! uses the published state for inactive cells. Keep both published
+        ! fluid arrays untouched until the final Lie transaction commits.
+        IF (stochastic_flag) THEN
+            IF (.NOT.ALLOCATED(this%stochastic_Z_before)) THEN
+                ALLOCATE(this%stochastic_Z_before(comp_cells_x,comp_cells_y))
+                ALLOCATE(this%stochastic_effective_before(comp_cells_x,comp_cells_y))
+            END IF
+            this%stochastic_Z_before=stochastic%Z
+            this%stochastic_effective_before=stochastic%effective_Z
+            CALL stochastic%prepare_timestep(state,dt,this%q_trial,this%qp_trial,domain)
+        END IF
+        IF (PRESENT(stochastic_prepared_hook)) CALL stochastic_prepared_hook()
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
         ! Later groups evaluate from each predecessor's updated state.
         ! Geometry stays frozen for all source groups; retain authoritative
@@ -253,7 +278,7 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
-            stochastic_values,t,state%q,qp_pre,source_step_failed,source_failure)
+            stochastic%effective_Z,t,state%q,qp_pre,source_step_failed,source_failure)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -262,6 +287,10 @@ CONTAINS
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
             IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
+            IF (stochastic_flag) THEN
+                stochastic%Z=this%stochastic_Z_before
+                stochastic%effective_Z=this%stochastic_effective_before
+            END IF
             IF (needs_substrate_snapshot) CALL state%restore_substrate(this%substrate_before)
             IF (needs_geometry_snapshot) CALL rollback_geometry_transaction
 
@@ -336,6 +365,8 @@ CONTAINS
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE publish_seconds=',this%profile_publish
         END IF
         CALL finalize_lie_source_executor(this%lie_executor)
+        IF (ALLOCATED(this%stochastic_Z_before)) DEALLOCATE(this%stochastic_Z_before)
+        IF (ALLOCATED(this%stochastic_effective_before)) DEALLOCATE(this%stochastic_effective_before)
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
         IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)

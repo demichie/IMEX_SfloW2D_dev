@@ -15,6 +15,7 @@
 
 MODULE stochastic_module
     USE parameters_2d, ONLY : idx_totMassEqn, wp, rheology_model, idx_stoch, idx_u, idx_v
+    USE parameters_2d, ONLY : idx_h
 
     USE domain_2d, ONLY: domain_type
     USE state_fields, ONLY: state_type
@@ -249,11 +250,13 @@ CONTAINS
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] dt Time increment [s].
 
-    SUBROUTINE update_stochastic_variable(this, state, dt)
+    SUBROUTINE update_stochastic_variable(this, state, dt, trial_q, trial_qp, domain)
         ! OU evolution is a fractional step distinct from conservative transport.
     IMPLICIT NONE
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN), OPTIONAL :: trial_q(:,:,:),trial_qp(:,:,:)
+        CLASS(domain_type), INTENT(IN), OPTIONAL :: domain
         INTEGER :: j,k
         INTEGER :: noise_size
         REAL(wp), INTENT(IN) :: dt
@@ -284,7 +287,16 @@ CONTAINS
 
             DO j = 1,comp_cells_x
                 ! Update the Ornstein-Uhlenback process
-                sigma_noise = getSigmaNoise(state,j,k)
+                IF (PRESENT(trial_q) .AND. PRESENT(trial_qp) .AND. PRESENT(domain)) THEN
+                    IF (domain%solve_mask(j,k)) THEN
+                        sigma_noise=getSigmaNoise_from_values(trial_q(idx_totMassEqn,j,k),                            &
+                            trial_qp(idx_u,j,k)**2+trial_qp(idx_v,j,k)**2)
+                    ELSE
+                        sigma_noise=getSigmaNoise(state,j,k)
+                    END IF
+                ELSE
+                    sigma_noise=getSigmaNoise(state,j,k)
+                END IF
                 this%Z(j,k) = EulerMaruyamaScheme(                                                                     &
                     this%Z(j,k), dt, sigma_noise, noise(j,k))
 
@@ -307,36 +319,65 @@ CONTAINS
     !>                      the OU step.
     !> \param[in] dt Time increment [s].
 
-    SUBROUTINE prepare_stochastic_timestep(this, state, dt)
-        ! Apply the OU fractional step and initialize M*Z for conservative transport.
+    SUBROUTINE prepare_stochastic_timestep(this,state,dt,trial_q,trial_qp,domain)
+        ! In the production Lie path, evolve OU after the spatial transport,
+        ! using post-spatial candidates without publishing the fluid state.
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(INOUT), OPTIONAL :: trial_q(:,:,:),trial_qp(:,:,:)
+        CLASS(domain_type), INTENT(IN), OPTIONAL :: domain
+        INTEGER :: l,j,k
+        LOGICAL :: use_trial
 
+        use_trial=PRESENT(trial_q) .AND. PRESENT(trial_qp) .AND. PRESENT(domain)
         IF (stoch_transport_flag) THEN
-            ! In wet cells, the OU process starts from the value transported during
-            ! the previous timestep. Dry cells retain their independently evolving Z.
+            ! The transported conservative scalar determines Z in wet cells.
+            ! Outside the active solve set its published state is authoritative.
             WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
-                this%Z = state%q(idx_stoch,:,:) / state%q(idx_totMassEqn,:,:)
-
+                this%Z=state%q(idx_stoch,:,:)/state%q(idx_totMassEqn,:,:)
             END WHERE
-
+            IF (use_trial) THEN
+                DO l=1,domain%solve_cells
+                    j=domain%j_cent(l)
+                    k=domain%k_cent(l)
+                    IF (trial_q(idx_totMassEqn,j,k)>EPSILON(1.0_wp))                                     &
+                        this%Z(j,k)=trial_q(idx_stoch,j,k)/trial_q(idx_totMassEqn,j,k)
+                END DO
+            END IF
         END IF
 
-        CALL this%update(state, dt)
-
-        IF (stoch_transport_flag) THEN
-            WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
-                state%q(idx_stoch,:,:) = state%q(idx_totMassEqn,:,:) * this%Z
-                state%qp(idx_stoch,:,:) = this%Z
-            ELSEWHERE
-                state%q(idx_stoch,:,:) = 0.0_wp
-                state%qp(idx_stoch,:,:) = 0.0_wp
-
-            END WHERE
-
+        IF (use_trial) THEN
+            CALL this%update(state,dt,trial_q,trial_qp,domain)
+        ELSE
+            CALL this%update(state,dt)
         END IF
 
+        IF (stoch_transport_flag) THEN
+            IF (use_trial) THEN
+                ! Modify only candidate cells, not the published state.
+                DO l=1,domain%solve_cells
+                    j=domain%j_cent(l)
+                    k=domain%k_cent(l)
+                    IF (trial_q(idx_totMassEqn,j,k)>EPSILON(1.0_wp)) THEN
+                        trial_q(idx_stoch,j,k)=trial_q(idx_totMassEqn,j,k)*this%Z(j,k)
+                        trial_qp(idx_stoch,j,k)=this%Z(j,k)
+                    ELSE
+                        trial_q(idx_stoch,j,k)=0.0_wp
+                        trial_qp(idx_stoch,j,k)=0.0_wp
+                    END IF
+                END DO
+            ELSE
+                ! Legacy/direct callers retain their published-state contract.
+                WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
+                    state%q(idx_stoch,:,:)=state%q(idx_totMassEqn,:,:)*this%Z
+                    state%qp(idx_stoch,:,:)=this%Z
+                ELSEWHERE
+                    state%q(idx_stoch,:,:)=0.0_wp
+                    state%qp(idx_stoch,:,:)=0.0_wp
+                END WHERE
+            END IF
+        END IF
     END SUBROUTINE prepare_stochastic_timestep
 
     !> \brief Derive the friction fluctuation from Z without changing the Gaussian OU state.
@@ -393,26 +434,23 @@ END FUNCTION VelocitySquared
     !> \return Local OU noise intensity; dry cells use std_max.
 
     REAL(wp) FUNCTION getSigmaNoise(state,j,k)
-    ! Compute the intensity of the noise depending of the friction used
-    IMPLICIT NONE
         CLASS(state_type), INTENT(IN) :: state
-        INTEGER, INTENT(IN) :: j, k
-        REAL(wp) :: velocity_squared
-
-        IF (state%q(idx_totMassEqn,j,k) <= EPSILON(1.0_wp)) THEN
-        ! Keep fluctuations available when flow enters a previously dry cell.
-        getSigmaNoise = std_max
-        ELSEIF ((TRIM(rheology_model) == 'froude') .OR.                                                                &
-                (TRIM(rheology_model) == 'lucas')) THEN
-        velocity_squared = VelocitySquared(state,j,k)
-        getSigmaNoise = expFormNoise(velocity_squared)
-        ELSE
-        getSigmaNoise = std_max
-
-        END IF
-
-        RETURN
+        INTEGER, INTENT(IN) :: j,k
+        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,j,k),VelocitySquared(state,j,k))
     END FUNCTION getSigmaNoise
+
+    !> OU forcing intensity for one selected conservative/primitive candidate.
+    !> Worklist ownership and staging remain outside this local calculation.
+    REAL(wp) FUNCTION getSigmaNoise_from_values(mass,velocity_squared)
+        REAL(wp), INTENT(IN) :: mass,velocity_squared
+        IF (mass<=EPSILON(1.0_wp)) THEN
+            getSigmaNoise_from_values=std_max
+        ELSEIF (TRIM(rheology_model)=='froude' .OR. TRIM(rheology_model)=='lucas') THEN
+            getSigmaNoise_from_values=expFormNoise(velocity_squared)
+        ELSE
+            getSigmaNoise_from_values=std_max
+        END IF
+    END FUNCTION getSigmaNoise_from_values
 
     !> \brief Evaluate the exponential transition between minimum and maximum noise intensities.
     !>

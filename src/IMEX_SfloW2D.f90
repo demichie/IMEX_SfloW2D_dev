@@ -484,12 +484,14 @@ PROGRAM IMEX_SfloW2D
         ! primitives, HP traces and characteristic speeds. Radial, circular
         ! and fissural sources run AFTER the spatial operator and do not
         ! change its reconstruction inputs between these two passes.
-        ! Retain the full path for disabled CFL, stochastic updates (which
-        ! may change transported q/qp), and lateral boundary injection:
-        ! its explicit CFL boundary-source override can differ from the
+        ! OU now runs AFTER spatial transport, on its unpublished candidate.
+        ! No stochastic state is changed between CFL and spatial, including
+        ! when the stochastic scalar is conservatively transported.
+        ! Keep the fallback for disabled CFL and lateral boundary injection:
+        ! the explicit CFL boundary-source override can differ from the
         ! fallback used by a fresh spatial reconstruction.
         CALL simulation%advance_timestep(pre_spatial_primitives_ready=                                              &
-            cfl/=-1.0_wp .AND. .NOT.stochastic_flag .AND. .NOT.lateral_source_flag)
+            cfl/=-1.0_wp .AND. .NOT.lateral_source_flag)
 
         ! advance_lie has already published a synchronized q/qp pair.
         ! Only the diagnostic dynamic pressure is needed; never reconvert qp.

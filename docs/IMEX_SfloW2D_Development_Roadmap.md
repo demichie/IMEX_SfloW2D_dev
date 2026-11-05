@@ -42,6 +42,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **A05 implementato selettivamente (5 novembre 2026, nuovo commit da validare):** completato l'audit della sequenza CFL → finestra sorgenti → spatial → Lie. Le iniezioni conservative radiale, circolare e fissurale non cambiano fra CFL e spatial né il vettore `q/qp` né la geometria/tracce necessarie alla ricostruzione; `pre_spatial_primitives_ready` puo riusare gli stessi prodotti anche quando tali sorgenti sono abilitate. Restano esclusi lo stocastico (potenziale mutazione del conservativo trasportato), l'iniezione laterale con condizioni di bordo potenzialmente differenti e `cfl=-1` (nessuna preflight CFL). Solo modifica del gate nel driver, nessuna nuova cache; build e confronto numerico dei casi con iniezione da effettuare. Evidenze e test in **D.13** della roadmap specialistica.
 
+**Splitting stocastico aggiornato su richiesta (5 novembre 2026, codice da compilare):** la sequenza operativa ora e `CFL → spatial(q_Z) → OU(post-spatial trial) → Lie sources(effective_Z) → commit`. Lo stage OU e coordinato in `time_integration_2d` ma calcolato esclusivamente da `stochastic_module`, senza aggiornare lo stato pubblicato prima del commit; `Z` ed `effective_Z` sono ripristinati sul rifiuto della transazione. Questo cambia intenzionalmente l'ordine dello splitting e la dipendenza della rumorosita dalle velocita, e richiede test con stocastico attivo. A05 ora consente di riusare CFL/HP-PCCU con stocastico attivo poiche OU non modifica piu `q/qp` prima dello spatial; le esclusioni conservate sono `cfl==-1` e iniezione laterale di bordo. Dettagli e controlli in D.14 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni
