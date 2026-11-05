@@ -4,6 +4,7 @@ PROGRAM test_state_equivalence
     USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, &
         old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, &
         physical_state_type, complex_physical_state_type, old_mixture=>mixt_var
+    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
     USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
@@ -28,6 +29,13 @@ PROGRAM test_state_equivalence
     liquid_flag=.FALSE.; gas_flag=.TRUE.
     CALL compare_case(0.0_wp,300.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,'dry')
     CALL compare_case(1.0E-12_wp,300.0_wp,100.0_wp,-50.0_wp,.15_wp,.10_wp,.05_wp,'near-dry')
+    ! A reconstructed trace may temporarily overfill; numerical face closure
+    ! must retain historical normalization instead of strict state rejection.
+    CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp,0.8_wp,0.8_wp,0.2_wp,qp)
+    CALL check_spatial_face_properties(qp,'overfilled face')
+    CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp, &
+        -32.0_wp*EPSILON(1.0_wp),0.15_wp,0.05_wp,qp)
+    CALL check_spatial_face_properties(qp,'roundoff face')
     WRITE(*,'(A)') 'PASS: state_new equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
@@ -54,6 +62,7 @@ CONTAINS
         material_qp=qp
         material_qp(idx_h)=1.0_wp
         material_qp(idx_u)=0.0_wp; material_qp(idx_v)=0.0_wp
+        CALL check_spatial_face_properties(qp,label)
         CALL old_mixture(material_qp,old_ri,old_rho,old_carrier,old_grav,old_cp_c,old_cp_m)
         CALL evaluate_mixture_density(material_qp(idx_T), &
             material_qp(idx_solid_first:idx_solid_last), &
@@ -66,6 +75,39 @@ CONTAINS
         CALL assert_scalar(label//' injection red grav',new_grav,old_grav,1.0E-9_wp)
 
     END SUBROUTINE compare_case
+    SUBROUTINE check_spatial_face_properties(face,label)
+        REAL(wp), INTENT(IN) :: face(n_vars)
+        CHARACTER(*), INTENT(IN) :: label
+        REAL(wp) :: old_ri,old_rho,old_rho_c,old_grav,old_cp_c,old_cp_m
+        REAL(wp) :: new_grav,gamma,minimum_speed,maximum_speed
+        REAL(wp) :: expected_min,expected_max,celerity,normal_speed
+        INTEGER :: direction,velocity_index
+
+        CALL old_mixture(face,old_ri,old_rho,old_rho_c,old_grav,old_cp_c,old_cp_m)
+        CALL eval_hydrostatic_coefficient(face,new_grav,gamma)
+        CALL assert_scalar(label//' face gravity',new_grav,old_grav,1.0E-10_wp)
+        CALL assert_scalar(label//' face gamma',gamma,old_rho*old_grav,1.0E-10_wp)
+        DO direction=1,2
+            IF (direction==1) THEN
+                velocity_index=idx_u
+            ELSE
+                velocity_index=idx_v
+            END IF
+            normal_speed=face(velocity_index)
+            IF (old_grav*face(idx_h)<0.0_wp) THEN
+                expected_min=normal_speed
+                expected_max=normal_speed
+            ELSE
+                celerity=SQRT(old_grav*face(idx_h))
+                expected_min=normal_speed-celerity
+                expected_max=normal_speed+celerity
+            END IF
+            CALL eval_local_speeds_direction(face,1.0_wp,velocity_index,minimum_speed,maximum_speed)
+            CALL assert_scalar(label//' face speed min',minimum_speed,expected_min,1.0E-10_wp)
+            CALL assert_scalar(label//' face speed max',maximum_speed,expected_max,1.0E-10_wp)
+        END DO
+    END SUBROUTINE check_spatial_face_properties
+
     SUBROUTINE make_qp(h,T,u,v,xs1,xs2,xg1,out)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1
         REAL(wp), INTENT(OUT) :: out(n_vars)

@@ -14,6 +14,7 @@ done
 for source in state_new_types.f90 state_new_composition.f90 state_new_mixture.f90 state_new_conversions.f90 state_new_physical.f90 state_new.f90; do
     gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/state_new" -I"$repo_dir/src/state" $netcdf_fflags -c "$repo_dir/src/state_new/$source"
 done
+gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/state_new" -I"$repo_dir/src/state" $netcdf_fflags -c "$repo_dir/src/physics/equation_terms_2d.f90"
 gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/state_new" -I"$repo_dir/src/state" $netcdf_fflags -c "$test_dir/test_state_equivalence.f90"
 gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace ./*.o -llapack -lblas $netcdf_flibs $netcdf_clibs -lm -o test_state_equivalence
 ./test_state_equivalence

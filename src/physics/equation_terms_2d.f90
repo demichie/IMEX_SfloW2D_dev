@@ -6,25 +6,15 @@
 
 MODULE equation_terms_2d
 
-    USE parameters_2d, ONLY : idx_h, idx_totMassEqn
+    USE parameters_2d, ONLY : wp,n_eqns,n_vars,n_solid,n_add_gas
+    USE parameters_2d, ONLY : idx_h,idx_u,idx_v,idx_T,idx_totMassEqn
+    USE parameters_2d, ONLY : idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last
+    USE parameters_2d, ONLY : idx_solidEqn_first,idx_solidEqn_last
+    USE parameters_2d, ONLY : idx_addGasEqn_first,idx_addGasEqn_last
+    USE constitutive_parameters_2d, ONLY : grav,rho_a_amb
     USE diagnostics_2d, ONLY : fatal_error
-    USE constitutive_parameters_2d
-    USE state_conversion_2d
-
-    USE parameters_2d, ONLY : wp,                                                                                      &
-            n_eqns,                                                                                                    &
-            n_vars,                                                                                                    &
-            thermal_cooling_flag,                                                                                      &
-            liquid_flag,                                                                                               &
-            gas_flag,                                                                                                  &
-            pore_pressure_flag,                                                                                        &
-            idx_pore,                                                                                                  &
-            idx_u,                                                                                                     &
-            idx_v,                                                                                                     &
-            idx_solidEqn_first,                                                                                        &
-            idx_solidEqn_last,                                                                                         &
-            idx_addGasEqn_first,                                                                                       &
-            idx_addGasEqn_last
+    USE state_new_mixture, ONLY : evaluate_mixture_density
+    USE state_new_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
 
@@ -94,10 +84,9 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qpj(n_vars)
         REAL(wp), INTENT(OUT) :: reduced_gravity, gamma
 
-        REAL(wp) :: Richardson, rho_m, rho_c
-        REAL(wp) :: sp_heat_c, sp_heat_mix
+        REAL(wp) :: rho_m
 
-        CALL mixt_var(qpj, Richardson, rho_m, rho_c, reduced_gravity, sp_heat_c, sp_heat_mix)
+        CALL eval_spatial_buoyancy(qpj,rho_m,reduced_gravity)
         gamma = rho_m * reduced_gravity
 
     END SUBROUTINE eval_hydrostatic_coefficient
@@ -120,10 +109,9 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qpj(n_vars), grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: vel_min, vel_max
-        REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
-        REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, r_h, normal_velocity, celerity
+        REAL(wp) :: r_rho_m,r_red_grav,r_h,normal_velocity,celerity
 
-        CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
+        CALL eval_spatial_buoyancy(qpj,r_rho_m,r_red_grav)
         r_h = qpj(idx_h)
         normal_velocity = qpj(normal_velocity_index)
 
@@ -137,6 +125,25 @@ CONTAINS
 
         END IF
     END SUBROUTINE eval_local_speeds_direction
+
+    !> Only density and reduced gravity are needed by hydrostatic PCCU.
+    !> Evaluate from the finalized trace; no mixture heat capacities or Ri.
+    SUBROUTINE eval_spatial_buoyancy(qp,rho_m,reduced_gravity)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
+        REAL(wp), INTENT(OUT) :: rho_m,reduced_gravity
+        REAL(wp) :: inv_rho_m
+        REAL(wp) :: xs(n_solid),xg(n_add_gas)
+
+        rho_m=rho_a_amb
+        reduced_gravity=0.0_wp
+        IF (qp(idx_h)<=EPSILON(1.0_wp)) RETURN
+        xs=qp(idx_solid_first:idx_solid_last)
+        xg=qp(idx_add_gas_first:idx_add_gas_last)
+        IF (.NOT.normalize_face_composition(xs,xg)) &
+            CALL fatal_error('Invalid component fractions in spatial face trace')
+        CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_m,inv_rho_m)
+        reduced_gravity=(rho_m-rho_a_amb)/rho_m*grav
+    END SUBROUTINE eval_spatial_buoyancy
 
     !> \brief Bound component-mass transport by the signed total-mixture mass flux.
     !>

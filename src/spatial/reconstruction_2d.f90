@@ -154,7 +154,6 @@ CONTAINS
     SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, source_boundary_enabled )
 
         ! External procedures
-    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
     USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
     USE parameters_2d, ONLY : limiter, theta
     USE geometry_2d, ONLY : minmod
@@ -1535,13 +1534,17 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @param[in] context Context string used in physical closure diagnostics.
     !> @param[in] kt_mode Selected KT trace reconstruction mode.
     SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, source_trace,h_selected,context,kt_mode)
-    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
+        USE state_new_composition, ONLY : normalize_face_composition
+        USE diagnostics_2d, ONLY : fatal_error
+        USE parameters_2d, ONLY : n_solid,n_add_gas,idx_solid_first,idx_solid_last, &
+            idx_add_gas_first,idx_add_gas_last
         REAL(wp), INTENT(INOUT) :: qp(n_vars)
         REAL(wp), INTENT(IN) :: eta,bed,h_minmod,h_froude
         LOGICAL, INTENT(IN) :: source_trace
         REAL(wp), INTENT(OUT) :: h_selected
         CHARACTER(LEN=*), INTENT(IN) :: context
         INTEGER, INTENT(IN) :: kt_mode
+        REAL(wp) :: xs(n_solid),xg(n_add_gas)
 
         SELECT CASE (kt_mode)
         CASE (1)
@@ -1556,8 +1559,14 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         END SELECT
 
         IF (source_trace) h_selected=MAX(qp(idx_h),0.0_wp)
-        IF (h_selected .GT. dry_thickness_tolerance)                                                                   &
-            CALL enforce_primitive_mass_fraction_closure(qp,context)
+        IF (h_selected .GT. dry_thickness_tolerance) THEN
+            xs=qp(idx_solid_first:idx_solid_last)
+            xg=qp(idx_add_gas_first:idx_add_gas_last)
+            IF (.NOT.normalize_face_composition(xs,xg)) &
+                CALL fatal_error(TRIM(context)//': Material negative face mass fraction')
+            qp(idx_solid_first:idx_solid_last)=xs
+            qp(idx_add_gas_first:idx_add_gas_last)=xg
+        END IF
     END SUBROUTINE select_final_transport_trace
 
 END MODULE reconstruction_2d

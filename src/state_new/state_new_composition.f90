@@ -3,11 +3,29 @@ MODULE state_new_composition
     IMPLICIT NONE
     PRIVATE
     REAL(wp), PARAMETER :: tol=4096.0_wp*EPSILON(1.0_wp)
-    PUBLIC :: close_composition
+    PUBLIC :: close_composition, normalize_face_composition
     INTERFACE close_composition
         MODULE PROCEDURE close_composition_real, close_composition_complex
     END INTERFACE
 CONTAINS
+    !> Closure of reconstructed face traces (distinct from strict state conversion).
+    !> Retains legacy HP-PCCU semantics: clip roundoff-negative species and
+    !> normalize any positive overfill, while rejecting materially negative input.
+    LOGICAL FUNCTION normalize_face_composition(xs,xg)
+        REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
+        REAL(wp) :: total
+        normalize_face_composition=.FALSE.
+        IF (ANY(xs<-tol) .OR. ANY(xg<-tol)) RETURN
+        xs=MAX(xs,0.0_wp)
+        xg=MAX(xg,0.0_wp)
+        total=SUM(xs)+SUM(xg)
+        IF (total>1.0_wp) THEN
+            xs=xs/total
+            xg=xg/total
+        END IF
+        normalize_face_composition=.TRUE.
+    END FUNCTION normalize_face_composition
+
     LOGICAL FUNCTION close_composition_real(xs,xg)
         REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
         REAL(wp) :: total
