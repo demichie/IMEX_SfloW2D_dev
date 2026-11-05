@@ -820,3 +820,8 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - Aggiunto `.github/scripts/check_fortran_dependencies.py` per controllare su ogni PR: copertura dei sorgenti nel Makefile, `USE` diretti, `.inc`, cicli e presenza delle quattro interfacce; nuova workflow `.github/workflows/fortran-dependency-audit.yml`.
 - Wrapper e duplicazioni non sono stati rimossi: servono prima evidenze sui chiamanti e regressioni; l'interfaccia pubblica di `state.f90` resta per ora invariata.
 - **Da validare:** esecuzione della nuova Action sul commit, build parallelo e regressioni scientifiche. Stato Blocco 1: `IN CORSO` fino a tali prove.
+
+### Blocco 1 - esito del primo controllo CI
+
+- La Action `Fortran architecture dependency audit`, run [42115367142](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42115367142), ha restituito **success** sul commit `a51f4fc6c04a` (verifica statica automatica, non compilazione).
+- Aggiunto un secondo job per una build `gfortran` parallela (`make -j4`), per confermare il comportamento delle dipendenze Fortran su ambiente CI. La build resta da osservare dopo il commit.
