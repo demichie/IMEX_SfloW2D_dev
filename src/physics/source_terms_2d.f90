@@ -381,101 +381,37 @@ CONTAINS
         END IF
     END SUBROUTINE eval_source_implicit_real
 
-    SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,                                                  &
-            c_nh_term_impl, r_qj , r_nh_term_impl, group, physical_scratch )
-
-    USE COMPLEXIFY
-
-    IMPLICIT NONE
-
-        REAL(wp), INTENT(IN) :: Bprimej_x
-        REAL(wp), INTENT(IN) :: Bprimej_y
-        REAL(wp), INTENT(IN):: Zij
-        COMPLEX(wp), INTENT(IN), OPTIONAL :: c_qj(n_vars)
-        COMPLEX(wp), INTENT(OUT), OPTIONAL :: c_nh_term_impl(n_eqns)
-        REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
-        REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
+    !> Evaluate the COMPLEX implicit rate for Newton complex-step Jacobians.
+    !> The real residual uses the distinct eval_source_implicit_real contract.
+    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch)
+        REAL(wp), INTENT(IN) :: Bprimej_x,Bprimej_y,Zij
+        COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
+        COMPLEX(wp), INTENT(OUT) :: c_nh_term_impl(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
         TYPE(physical_state_complex), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
-
-
-        COMPLEX(wp) :: qj(n_vars)
-        COMPLEX(wp) :: source_term(n_eqns)
-
-        INTEGER :: i
-
-        TYPE(physical_state_complex), TARGET :: physical_state_local
+        TYPE(physical_state_complex), TARGET :: local_state
         TYPE(physical_state_complex), POINTER :: physical_state
 
-        LOGICAL :: selected_rheology, selected_thermal
-
-        IF (PRESENT(c_qj) .AND. PRESENT(c_nh_term_impl) .AND.                                                          &
-            .NOT.PRESENT(r_qj) .AND. .NOT.PRESENT(r_nh_term_impl)) THEN
-
-            qj = c_qj
-
-        ELSEIF (PRESENT(r_qj) .AND. PRESENT(r_nh_term_impl) .AND.                                                      &
-            .NOT.PRESENT(c_qj) .AND. .NOT.PRESENT(c_nh_term_impl)) THEN
-
-            DO i = 1,n_vars
-
-                qj(i) = CMPLX( r_qj(i),0.0_wp,wp )
-
-            END DO
-
-        ELSE
-
-            CALL fatal_error('eval_source_implicit: provide matching real or complex input/output arguments')
-
-        END IF
-
-        IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
+        IF (group%method/=SOURCE_METHOD_NEWTON) &
             CALL fatal_error('eval_source_implicit requires a Newton Lie group')
-        selected_rheology=group%rheology_implicit
-        selected_thermal=group%thermal_active
+        c_nh_term_impl=CMPLX(0.0_wp,0.0_wp,wp)
+        IF (.NOT.group%rheology_implicit .AND. .NOT.group%thermal_active) RETURN
 
-        ! No cross-cell or module-shared state: use the caller's optional scratch.
+        physical_state=>local_state
         IF (PRESENT(physical_scratch)) THEN
             physical_state=>physical_scratch
         ELSE
-            physical_state=>physical_state_local
-            CALL initialize_physical_state_complex(physical_state_local)
+            CALL initialize_physical_state_complex(local_state)
         END IF
-
-        ! initialize the source terms
-        source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
-
-        IF (selected_rheology .OR. selected_thermal) THEN
-            CALL build_physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y,                                 &
-                0.0_wp, 0.0_wp, 0.0_wp)
-
+        CALL build_physical_state_from_q(c_qj,physical_state,Bprimej_x,Bprimej_y,0.0_wp,0.0_wp,0.0_wp)
+        IF (group%rheology_implicit) THEN
+            CALL eval_rheology_implicit_id(group%rheology_id,physical_state, &
+                stochastic_flag,Zij,c_nh_term_impl(2:3))
         END IF
-
-        IF (selected_rheology) THEN
-
-            CALL eval_rheology_implicit_id(group%rheology_id,physical_state,                                           &
-                stochastic_flag,Zij,source_term(2:3))
-
+        IF (group%thermal_active) THEN
+            CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state, &
+                radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
         END IF
-
-        IF (selected_thermal) THEN
-            CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                       &
-                radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
-
-        END IF
-
-        IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
-
-            c_nh_term_impl = source_term
-
-        ELSEIF ( present(r_qj) .AND. present(r_nh_term_impl) ) THEN
-
-            r_nh_term_impl = REAL(source_term)
-
-        END IF
-
-        RETURN
-
     END SUBROUTINE eval_source_implicit
 
 
