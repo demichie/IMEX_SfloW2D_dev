@@ -872,3 +872,9 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - `TEST_MASS_EXCHANGE` continua a rifiutare la transazione nel fixture nonostante l'allineamento `numerical_reconstruction`. La causa non e accertata senza il messaggio di dettaglio, che non compare nel log allegato prima dell'`ERROR STOP` (possibile buffering di stdout).
 - Per rendere il fallimento attribuibile a una causa, il fixture scrive ora il `failure_message` su `error_unit` e applica `FLUSH(error_unit)` prima dell'arresto; il gate CI abilita `IMEX_LIE_DIAGNOSTICS=1` per conservare il codice e il budget della prima cella respinta.
 - Nessuna formula fisica modificata. La correzione precedente relativa alla conversione rimane una ipotesi, non una causa dimostrata.
+
+### Blocco 1 - bug di layout nel fixture Lie mass exchange
+
+- Trovata una discrepanza concreta di shape: `TEST_MASS_EXCHANGE/test_projection_stress.f90` allocava `qp` e gli snapshot come `(nq+2,nx,ny)` mentre `execute_lie_source_groups` dichiara `qp(n_vars,comp_cells_x,comp_cells_y)` e il fixture imposta `nq=n_vars=6`. Per un dummy Fortran explicit-shape la differente dimensione della prima componente modifica lo stride atteso tra celle, producendo letture e scritture incoerenti nella griglia. La dimensione del fixture e stata corretta in tutti e cinque i punti (`qp`, `qp_before` in due routine, `qp_trial`, `qp_invalid`).
+- Si preserva `numerical_reconstruction=.TRUE.` per uniformita con il codice di produzione. Non e stato modificato `execute_lie_source_groups` o alcun kernel fisico.
+- L'ipotesi precedente sulle sole politiche di conversione non spiega questo disallineamento di layout. Il test resta da validare con la nuova Action; l'errore `Lie exchange transaction rejected` non e dichiarato risolto fino al PASS.

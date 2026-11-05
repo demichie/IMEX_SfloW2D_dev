@@ -445,7 +445,7 @@ CONTAINS
   SUBROUTINE allocate_grid
     comp_cells_x=nx; comp_cells_y=ny; comp_interfaces_x=nx+1; comp_interfaces_y=ny+1
     dx=1.0_wp/REAL(nx,wp); dy=1.0_wp/REAL(ny,wp); cell_size=dx
-    ALLOCATE(q(nq,nx,ny),qp(nq+2,nx,ny),rate(nx,ny),nodes(nx+1,ny+1),weights(nx+1,ny+1))
+    ALLOCATE(q(nq,nx,ny),qp(nq,nx,ny),rate(nx,ny),nodes(nx+1,ny+1),weights(nx+1,ny+1))
     ALLOCATE(B_vertex(nx+1,ny+1),B_cent(nx,ny),B_face_x(nx+1,ny),B_face_y(nx,ny+1))
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
@@ -505,7 +505,7 @@ CONTAINS
     TYPE(source_registry_type) :: registry
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
-    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
+    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: bed_before(nx+1,ny+1),available_before(ns,nx,ny)
     REAL(wp) :: pressure,fluid_delta,solid_delta,inventory_delta
@@ -573,9 +573,9 @@ CONTAINS
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
     TYPE(substrate_snapshot_type) :: substrate_before
-    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
-    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq+2,nx,ny)
-    REAL(wp) :: qp_invalid(nq+2,nx,ny)
+    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
+    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq,nx,ny)
+    REAL(wp) :: qp_invalid(nq,nx,ny)
     REAL(wp) :: bed_before(nx+1,ny+1)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: erodible_before(ns,nx,ny),lava_before(nx,ny)
