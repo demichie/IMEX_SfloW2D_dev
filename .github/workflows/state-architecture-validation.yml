@@ -76,3 +76,27 @@ jobs:
           name: state-regression-${{ matrix.suite }}-${{ github.run_id }}
           path: evidence/
           if-no-files-found: warn
+
+  state-equivalence:
+    name: Old/new state equivalence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install equivalence-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config
+      - name: Compare legacy and state_new backends
+        shell: bash
+        run: |
+          set -euo pipefail
+          TESTS/TEST_STATE_EQUIVALENCE/run_test.sh 2>&1 | tee state-equivalence.log
+      - name: Upload equivalence log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-equivalence-${{ github.run_id }}
+          path: state-equivalence.log
+          if-no-files-found: warn
