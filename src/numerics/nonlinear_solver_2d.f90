@@ -161,20 +161,27 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
         INTEGER :: group_pivot(SIZE(group_equations))
         INTEGER :: nl_iter, i, j, ok
-        LOGICAL :: check
+        LOGICAL :: check, residual_ready
         REAL(wp), PARAMETER :: STPMX = 100.0_wp
 
         converged = .FALSE.
         line_search_failed = .FALSE.
         linear_info = 0
         grad_f = 0.0_wp
+        ! A successful trial evaluation already provides the residual and merit
+        ! function at the next Newton iterate. Preserve that result rather than
+        ! rebuilding the identical REAL physical state on the next loop entry.
+        residual_ready = .FALSE.
         qj_org = MAX(ABS(qj),1.0E-3_wp)
         qj_rel = qj / qj_org
 
         DO nl_iter = 1, max_nl_iter
             iterations_used = iterations_used + 1
-            CALL eval_f(qj, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,            &
-                group_equations, source_group, real_scratch)
+            IF (.NOT.residual_ready) THEN
+                CALL eval_f(qj, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,        &
+                    group_equations, source_group, real_scratch)
+            END IF
+            residual_ready = .FALSE.
 
             IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
             residual_tol = tol_abs_local + tol_rel_local*residual_ref
@@ -263,6 +270,10 @@ CONTAINS
 
             END IF
 
+            ! Both the direct full-step branch and the line search evaluated
+            ! right_term/scal_f at the newly accepted qj. The unchanged
+            ! candidate becomes the input to the next iteration.
+            residual_ready = .TRUE.
             IF (MAXVAL(ABS(qj_rel-qj_rel_old)/MAX(ABS(qj_rel),1.0_wp)) .LT.                                            &
                 EPSILON(1.0_wp)) EXIT
 

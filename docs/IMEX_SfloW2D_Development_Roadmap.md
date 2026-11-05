@@ -20,6 +20,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Avanzamento C2 (5 novembre 2026):** ulteriormente eliminate le valutazioni della pressione dinamica `p_dyn` non consumate nei due operatori Lie, mantenendo il parametro opzionale per i chiamanti che lo usano.  `lie_source_executor_2d` riusa `qp_local` quando il candidato conservativo di un gruppo EXPLICIT, ANALYTIC o NEWTON e esattamente uguale a `q_local`; mantiene comunque controllo di ammissibilita, aggiornamenti di substrato e conversione dei candidati modificati. C2 ancora in corso: controlli completi dei percorsi, build del change set e misure da raccogliere. Dettagli nella roadmap specialistica. Actions solo manuali.
 
+**Avanzamento C3 (5 novembre 2026):** `nonlinear_solver_2d:solve_newton_group` riutilizza nella successiva iterazione il residuo REAL e la funzione merit gia valutati sul trial accettato, anziche rieseguire `eval_f` e ricostruire lo stesso stato fisico. Il Jacobiano COMPLEX continua a essere ricostruito con tutte le perturbazioni; nessuna cache globale. **C3 IN CORSO; build, complessita numerica e misure del nuovo commit da verificare.** La build verde e TAAL funzionante riferiti dall'utente precedono questo intervento. Actions soltanto manuali.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni
