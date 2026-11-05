@@ -1,8 +1,13 @@
 PROGRAM test_state_equivalence
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, physical_state_type, complex_physical_state_type
-    USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, physical_state_real, state_workspace_real, state_workspace_complex, initialize_state_workspace_real, initialize_state_workspace_complex
+    USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, &
+        old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, &
+        physical_state_type, complex_physical_state_type
+    USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
+        new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
+        state_workspace_real, state_workspace_complex, &
+        initialize_state_workspace_real, initialize_state_workspace_complex
     IMPLICIT NONE
     REAL(wp), ALLOCATABLE :: q(:),qp(:),q_old(:),qp_old(:),qp_new(:)
     COMPLEX(wp), ALLOCATABLE :: cq(:)
@@ -58,7 +63,8 @@ CONTAINS
         sp_heat_a=1005.0_wp; sp_gas_const_a=287.05_wp; sp_heat_g=[1850.0_wp]; sp_gas_const_g=[461.5_wp]
         sp_heat_l=4180.0_wp; rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; pres=101325.0_wp; inv_pres=1.0_wp/pres
         T_ambient=300.0_wp; rho_a_amb=pres/(sp_gas_const_a*T_ambient); grav=9.81_wp; eps_sing=1.0E-8_wp; eps_sing4=eps_sing**4
-        gas_flag=.TRUE.; liquid_flag=.FALSE.; stoch_transport_flag=.TRUE.; pore_pressure_flag=.TRUE.; slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
+        gas_flag=.TRUE.; liquid_flag=.FALSE.; stoch_transport_flag=.TRUE.
+        pore_pressure_flag=.TRUE.; slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
     END SUBROUTINE initialize_case
     SUBROUTINE assert_scalar(label,a,b,tol)
         CHARACTER(*), INTENT(IN) :: label; REAL(wp), INTENT(IN) :: a,b,tol
