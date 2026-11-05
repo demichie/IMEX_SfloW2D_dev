@@ -56,6 +56,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Regressioni deterministiche confermate (5 novembre 2026):** dopo la correzione del sink di buoyancy `de873fa` l'utente conferma esecuzioni complete senza errori di `EXAMPLE_TALL`, `EXAMPLE_ETNA` e `EXAMPLE_ETNA_LAVA`; confermata in precedenza anche la risoluzione del blocco `D19` di TAAL a circa 27.36 s. `TALL` potrebbe essere il nome digitato per `TAAL`: la denominazione resta come riferita dall'utente fino a controllo. Test stocastici, lake-at-rest e performance ancora aperti. Dettagli in D.20 della roadmap specialistica.
 
+**A08 reintrodotto su richiesta (5 novembre 2026, test pendenti):** in `src/spatial/hyperbolic_2d.f90` e ripristinata esattamente l'ottimizzazione originale `3e2b02d` del coefficiente idrostatico di faccia `Gamma` nei path interni, limitata a endpoint wet (profondita del path e profondita selezionata della faccia > EPSILON). L'anomalia D19 osservata nel precedente tentativo si riproduceva anche senza A08 ed e stata poi corretta; ora esiste una baseline con tre run deterministici completi. A08 e **DA VALIDARE** con nuova build e tre esempi completi; stocastico e lake-at-rest restano aperti. Vedi D.21 nella roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

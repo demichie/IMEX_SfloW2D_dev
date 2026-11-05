@@ -375,6 +375,16 @@ L'utente ha eseguito fino al **tempo finale** tutti e tre i casi `EXAMPLE_TALL`,
 
 **Stato:** regressioni deterministiche riferite dall'utente **PASS FINO A FINE RUN**; la validazione specifica con `stochastic_flag` / `stoch_transport_flag` attivi, test lake-at-rest, OpenMP riproducibilita e prestazioni restano **PENDING**. A08 resta revertito e non accettato; la conferma del run non ne dimostra l'equivalenza. Nessuna ulteriore modifica alla fisica introdotta in questo aggiornamento documentale.
 
+### D.21 A08 reintrodotto dopo risoluzione D19 — validazione richiesta (5 novembre 2026)
+
+**Decisione utente:** reintrodurre A08 ora che `EXAMPLE_TAAL/TALL`, `EXAMPLE_ETNA` e `EXAMPLE_ETNA_LAVA` sono stati eseguiti completamente con il fix di buoyancy `de873fa`.
+
+**Modifica effettuata:** `src/spatial/hyperbolic_2d.f90` ripristinato **esattamente** dal commit originario A08 `3e2b02debd5c6cdc3c0b8e54d1c62ce07b4f9082`. Prima della sostituzione era identico al file baseline `c8605e429fee93440be1097779a34cfe0fe8d920`; non sono state perse altre modifiche spaziali. Il path idrostatico interno riusa `gamma_interface_xR/xL/yT/yB` gia calcolato sulle tracce di faccia, soltanto quando profondita del path **e** profondita selezionata sulla faccia sono entrambe maggiori di `EPSILON(1.0_wp)`. Negli altri casi mantiene la valutazione originale `eval_hydrostatic_coefficient` e la `regularize_dry_gamma_pair`. Nessuna nuova cache, nessun cambiamento agli endpoint, nessuna modifica a `state` o ai gruppi Lie.
+
+**Rettifica storica:** il precedente blocco `D19` a `t≈27.36` non era attribuibile ad A08 in modo causale, dato che si ripresentava anche dopo il rollback del file spaziale. Il problema di TAAL e stato poi risolto con la rimozione anticipata delle miscele neutrali/galleggianti (`rho_mix<=rho_a_amb`), con conferma di run deterministici completi. A08 ora e **REINTRODOTTO / DA VALIDARE**, non ancora PASS.
+
+**Test richiesti:** ricompilazione, completamento di `EXAMPLE_TAAL/TALL`, `EXAMPLE_ETNA`, `EXAMPLE_ETNA_LAVA`, confronto quantitativo con la baseline immediatamente precedente, e test lake-at-rest, wet/dry e well-balancing. Solo a seguire stimare il beneficio di performance (numero di valutazioni termodinamiche saltate, wall-clock e scaling). Lo stocastico rimane fuori dal gate di validazione immediata, come concordato.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
