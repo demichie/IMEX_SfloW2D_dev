@@ -38,6 +38,7 @@ PROGRAM test_projection_stress
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
   CALL check_limiter_representability
+  CALL check_taal_saturated_species_budget
   CALL check_late_group_recipient_budget
   CALL check_injection_before_settling_budget
   CALL check_settling_drag_transition
@@ -116,6 +117,38 @@ CONTAINS
             ERROR STOP 'Deposition limiter left negative solid mass'
     END DO
   END SUBROUTINE check_limiter_representability
+
+  !> Exact conservative witness from EXAMPLE_TAAL group 4, cell (224,379).
+  !> The unbuffered active species bound rounded to a negative 1.43E-20.
+  !> Treat this as a cross-routine floating-point reproducibility regression.
+  SUBROUTINE check_taal_saturated_species_budget
+    REAL(wp) :: qref(nq),rates(nq),candidate(nq),scale,step_dt
+    LOGICAL :: valid
+
+    qref=0.0_wp
+    rates=0.0_wp
+    qref(idx_totMassEqn)=1.1179177442718284E-3_wp
+    qref(idx_uEqn)=3.8556231966220479E-3_wp
+    qref(idx_vEqn)=2.4512212438858446E-3_wp
+    qref(idx_engyEqn)=4.0886928508675646E+2_wp
+    qref(idx_solidEqn_first)=2.6224851927896702E-4_wp
+    step_dt=2.6630953223459757E-2_wp
+    rates(idx_totMassEqn)=3.5072004284224628E-1_wp
+    rates(idx_uEqn)=-3.3963392791815233E-2_wp
+    rates(idx_vEqn)=-2.1592304455133129E-2_wp
+    rates(idx_engyEqn)=1.0285961528261482E+5_wp
+    rates(idx_solidEqn_first)=-9.8475077883410835E-3_wp
+    ! Force a saturated negative species rate to exercise the limiter.
+    rates(idx_solidEqn_first)=NEAREST(rates(idx_solidEqn_first),-1.0_wp)
+    CALL limit_explicit_source_rates(qref,[REAL(wp)::],step_dt,rates, &
+         [REAL(wp)::],scale,valid)
+    IF (.NOT.valid) ERROR STOP 'TAAL D19 rate rejected by limiter'
+    candidate=qref+step_dt*(scale*rates)
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+         ERROR STOP 'TAAL D19 limiter returned negative component'
+    IF (candidate(idx_solidEqn_first)<=0.0_wp) &
+         ERROR STOP 'TAAL D19 depleted species at floating-point boundary'
+  END SUBROUTINE check_taal_saturated_species_budget
 
   !> A later Lie group consumes the state left by earlier groups, not
   !> the array held on entry to the entire source sweep.

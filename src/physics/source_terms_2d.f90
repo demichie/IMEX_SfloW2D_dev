@@ -177,6 +177,14 @@ CONTAINS
         carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
         IF (carrier_consumption>0.0_wp) limiter=MIN(limiter,                                                           &
             MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
+        ! When one or more species balances are saturated, reserve a small
+        ! relative buffer before the floating-point candidate check. A bound
+        ! with zero remaining species is susceptible to reassociation/FMA
+        ! differences between this routine and the caller (observed in TAAL
+        ! as -1.4293E-20 kg/m2 after the rate was reported admissible).
+        ! This is a numerical safety margin on source rates, not clipping q.
+        IF (limiter<1.0_wp .AND. limiter>0.0_wp) &
+            limiter=limiter*(1.0_wp-4096.0_wp*EPSILON(1.0_wp))
         ! Verify the exact floating-point update applied by the Lie executor:
         ! q_candidate=q_reference+dt*(limiter*rate). The analytical ratio can
         ! round up to 1, or leave a negative component at machine precision.
