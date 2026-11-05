@@ -249,8 +249,8 @@ CONTAINS
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
             B_zone,cell_source_fractions,cell_fissure_fractions,                                              &
             cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
-        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type, &
-            evaluate_buoyancy_removal
+        USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
+        USE state_physical, ONLY : evaluate_density_from_qp
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversions, ONLY : conservative_to_primitive
@@ -282,7 +282,7 @@ CONTAINS
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
-        REAL(wp) :: red_grav
+        REAL(wp) :: red_grav,rho_mix
         LOGICAL :: remove_buoyant
         ! Profiling counters are thread-owned: no atomics inside the cell loop.
         REAL(wp), ALLOCATABLE :: thread_group(:,:),thread_physics(:,:),thread_cell(:)
@@ -383,7 +383,7 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_updated,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,              &
-        !$OMP& red_grav,remove_buoyant,tid, &
+        !$OMP& red_grav,rho_mix,remove_buoyant,tid, &
         !$OMP& cell_tick,group_tick,                                                                                 &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
@@ -648,7 +648,7 @@ CONTAINS
             ! Restore the v2 buoyancy removal after all mass-exchange groups.
             ! This is a physical sink, not a numerical limiter on the source rates.
             IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
-                CALL evaluate_buoyancy_removal(qp_local,remove_buoyant,red_grav,conversion_ok)
+                CALL evaluate_density_from_qp(qp_local,rho_mix,red_grav,conversion_ok,remove_buoyant)
                 IF (.NOT.conversion_ok) THEN
                     cell_error=15
                 ELSE

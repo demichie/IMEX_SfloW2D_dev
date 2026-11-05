@@ -12,8 +12,7 @@ MODULE source_terms_2d
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
-    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp, &
-        evaluate_density_from_qp
+    USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
     USE state_mixture, ONLY : evaluate_mixture_heat_capacity
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_implicit_real, eval_thermal_analytic
@@ -41,7 +40,6 @@ MODULE source_terms_2d
     PUBLIC :: eval_source_semi_implicit, eval_source_implicit, eval_source_implicit_real, eval_source_analytic
     PUBLIC :: source_cell_context_type
     PUBLIC :: eval_geometry_curvature_explicit
-    PUBLIC :: evaluate_buoyancy_removal
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
     ! Cell-local geometry and stochastic context for analytic source solves.
     TYPE :: source_cell_context_type
@@ -51,21 +49,6 @@ MODULE source_terms_2d
     END TYPE source_cell_context_type
 CONTAINS
 
-    !> Evaluate the terminal cell-local buoyancy sink, independently of Lie.
-    !> Only density is needed; neutral material is retained (strict criterion).
-    SUBROUTINE evaluate_buoyancy_removal(qp,remove_cell,red_grav,accepted)
-        REAL(wp), INTENT(IN) :: qp(n_vars)
-        LOGICAL, INTENT(OUT) :: remove_cell,accepted
-        REAL(wp), INTENT(OUT) :: red_grav
-        REAL(wp) :: rho_mix
-
-        ! Mixture density and reduced gravity are state properties, not
-        ! source physics. Only the removal decision belongs here.
-        CALL evaluate_density_from_qp(qp,rho_mix,red_grav,accepted)
-        remove_cell=.FALSE.
-        IF (.NOT.accepted) RETURN
-        remove_cell=rho_mix<rho_a_amb
-    END SUBROUTINE evaluate_buoyancy_removal
 
     !> Apply a uniform physical factor to all coupled exchange rates.
     SUBROUTINE scale_mass_exchange_transfer(transfer,scale)

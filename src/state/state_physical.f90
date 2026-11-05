@@ -51,16 +51,19 @@ CONTAINS
     !> Evaluate only mixture density and reduced gravity from a numerical
     !> primitive cell, without constructing the full physical state.
     !> The same composition closure and dry branch are used by
-    !> build_physical_state_from_qp_real.
-    SUBROUTINE evaluate_density_from_qp(qp,rho_m,red_grav,accepted)
+    !> build_physical_state_from_qp_real. The optional below_ambient output
+    !> classifies the mixture against atmospheric density as a state property.
+    SUBROUTINE evaluate_density_from_qp(qp,rho_m,red_grav,accepted,below_ambient)
         REAL(wp), INTENT(IN) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: rho_m,red_grav
         LOGICAL, INTENT(OUT) :: accepted
+        LOGICAL, INTENT(OUT), OPTIONAL :: below_ambient
         REAL(wp) :: inv_rho_m,xs(n_solid),xg(n_add_gas)
 
         accepted=.FALSE.
         rho_m=rho_a_amb
         red_grav=0.0_wp
+        IF (PRESENT(below_ambient)) below_ambient=.FALSE.
         xs=qp(idx_solid_first:idx_solid_last)
         xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (.NOT.close_composition(xs,xg)) RETURN
@@ -69,6 +72,7 @@ CONTAINS
             CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_m,inv_rho_m)
             red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
         END IF
+        IF (PRESENT(below_ambient)) below_ambient=rho_m<rho_a_amb
         accepted=.TRUE.
     END SUBROUTINE evaluate_density_from_qp
 

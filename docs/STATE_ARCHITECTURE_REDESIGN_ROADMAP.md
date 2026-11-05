@@ -267,6 +267,14 @@ L'esecutore Lie invoca soltanto il criterio fisico, interpreta `accepted` (error
 
 **Verifica pendente sul nuovo SHA:** compilazione, TAAL, neutrali e wet/dry, confronti di `red_grav` con il costruttore fisico completo e diagnostiche D19. Nessuna Action avviata automaticamente.
 
+### D.11 Ownership A02 definitiva: criterio di densita come proprieta dello stato (5 novembre 2026)
+
+**Decisione architetturale dell'utente:** anche la classificazione `rho_mix<rho_a_amb` appartiene a `state`. Non deve esistere un wrapper in `physics` che contenga solo questo confronto.
+
+**Modifica effettuata:** `state_physical:evaluate_density_from_qp(qp,rho_m,red_grav,accepted,below_ambient)` restituisce, tramite output opzionale `below_ambient`, la classificazione di stato, inizializzata a `.FALSE.` e valorizzata solo dopo chiusura composizionale riuscita. La stessa routine continua a produrre la densita e la gravita ridotta con i kernel canonici, senza costruire un physical state completo. Eliminata interamente `source_terms_2d:evaluate_buoyancy_removal`. `lie_source_executor_2d` chiama direttamente `state_physical`, controlla `accepted`, registra `red_grav` e applica l'azzeramento del conservativo quando `below_ambient` e vero. Il criterio resta **stretto**: `rho_mix<rho_a_amb`; le miscele neutrali sono mantenute. Non esiste una seconda formula in `physics` o `numerics`.
+
+**Confine definitivo:** `state` possiede le proprieta derivate e i predicati di classificazione dello stato; `physics` possiede modelli/processi/rate fisici (senza contenitori per un semplice confronto di stato); `numerics` orchestra i gruppi, decide quando applicare gli aggiornamenti e gestisce transazioni. Nessun accesso a `j,k` in `state_physical` o `physics`. D.9-D.10 rimangono cronologia e sono superati da questa decisione. Build/test/TAAL sul nuovo SHA pendenti, Actions manuali.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.
