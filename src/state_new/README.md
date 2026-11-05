@@ -13,9 +13,11 @@ Il nucleo è organizzato attorno a prodotti computazionali distinti:
 - `build_physical_state_from_qp`
 - `update_physical_state_kinematics`
 
-Le formule REAL/COMPLEX comuni saranno mantenute in include `.inc`; i wrapper
-tipati dovranno limitarsi a fornire dichiarazioni, workspace e gestione dei
-branch necessari al complex-step.
+Le formule REAL/COMPLEX comuni sono mantenute in include `.inc`; i wrapper
+tipati forniscono soltanto dichiarazioni, workspace e gestione dei branch
+necessari al complex-step. Sono ora presenti i kernel di valutazione della
+miscela e le conversioni conservative/primitive, ancora non collegati ai
+consumatori di produzione.
 
 La migrazione dei consumatori e l’inserimento nel target principale inizieranno
 solo dopo i test di caratterizzazione e il confronto con l’implementazione
