@@ -16,6 +16,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Stato autorevole A03, 5 novembre 2026:** completata la migrazione di produzione a `src/state/` (`d8f4f57` cutover, `c9e576d` rinomina, `c5d6eb2` pulizia workflow). L'utente ha confermato una Action Build verde dopo il cutover; la compilazione non dimostra riuso ottimale. Il **traguardo computazionale e ancora aperto**: chiuderlo con i blocchi C0-C5 nella [roadmap degli stati](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md), che e l'unica specifica dettagliata per questo workstream. Audit statico, correttezza e performance hanno gate distinti; Actions solo manuali. Le annotazioni F5/F6/F7 del registro seguente sono una cronologia, non l'attuale struttura da migrare.
 
+**Avanzamento C0/C1 (5 novembre 2026):** audit statico iniziale degli intermedi in `time_integration_2d`, `lie_source_executor_2d`, `source_terms_2d`, `state_physical` e facce. Introdotto `evaluate_mixture_phase_properties` REAL/COMPLEX con formula condivisa; rimossa la seconda valutazione di cp dai costruttori fisici da `q` e quella non richiesta da `primitive_to_volume_fractions`. **C0/C1 IN CORSO, validazione e misure pendenti**. Dettagli e prossimi interventi nel registro C0/C1 della roadmap specialistica. Nessuna Action avviata.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

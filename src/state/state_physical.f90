@@ -14,7 +14,8 @@ MODULE state_physical
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE state_types, ONLY : reset_physical_state_real, reset_physical_state_complex
     USE state_composition, ONLY : close_composition
-    USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity
+    USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, &
+        evaluate_mixture_phase_properties
 
     IMPLICIT NONE
     PRIVATE
@@ -174,7 +175,8 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         state%T=q(4)/(mass*cp_m)
-        CALL evaluate_mixture(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,state%alphas,state%alphag)
+        CALL evaluate_mixture_phase_properties(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
+            state%alphas,state%alphag)
         state%h=mass*inv_rho_m
         IF (mass > eps_sing) THEN
             state%u=q(2)/mass; state%v=q(3)/mass
@@ -258,7 +260,8 @@ CONTAINS
             IF (.NOT.close_composition(xs,xg)) RETURN
             CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
             T=q(4)/(mass*cp_m)
-            CALL evaluate_mixture(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)
+            CALL evaluate_mixture_phase_properties(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
+                alphas,alphag)
             state%h=mass*inv_rho_m
             IF (REAL(mass,wp)>eps_sing) THEN
                 state%u=q(2)/mass; state%v=q(3)/mass
