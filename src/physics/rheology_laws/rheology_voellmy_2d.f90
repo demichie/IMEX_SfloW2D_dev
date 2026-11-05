@@ -54,7 +54,8 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value, rate)
+    SUBROUTINE eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,                   &
+            stochastic_value, rate)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
