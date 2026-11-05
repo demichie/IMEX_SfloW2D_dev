@@ -25,7 +25,7 @@
 MODULE rheology_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex, promote_physical_state
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_parameters_2d, ONLY : xi
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
@@ -60,22 +60,11 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: sx, sy
-        COMPLEX(wp) :: ix, iy
-        TYPE(physical_state_complex) :: cs
+        REAL(wp) :: sx,sy,ix,iy
 
-        CALL eval_rheology_voellmy_semi_implicit(state,                                                                &
-                grav_coeff,                                                                                            &
-                use_pore_pressure,                                                                                     &
-                sx,                                                                                                    &
-                sy)
-        CALL promote_physical_state(state, cs)
-        CALL eval_rheology_voellmy_implicit(cs,                                                                        &
-                use_stochastic,                                                                                        &
-                    stochastic_value,                                                                                  &
-                ix,                                                                                                    &
-                iy)
-        rate=[sx,sy]+REAL([ix,iy],wp)
+        CALL eval_rheology_voellmy_semi_implicit(state,grav_coeff,use_pore_pressure,sx,sy)
+        CALL eval_rheology_voellmy_implicit_real(state,use_stochastic,stochastic_value,ix,iy)
+        rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_voellmy_explicit
 
     !> \param[in] state Shared physical state (complex for the implicit contribution).
@@ -131,39 +120,26 @@ CONTAINS
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
-
-        TYPE(physical_state_complex), INTENT(IN) :: state
-
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
-        COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: xi_effective
+        TYPE(physical_state_complex), INTENT(IN) :: state
+        COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: turbulent_stress
 
-        ASSOCIATE(u => state%u,                                                                                        &
-                    v => state%v,                                                                                      &
-                    rhom => state%rho_m,                                                                               &
-                    red_grav => state%red_grav)
-        rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-        rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
-
-        IF (use_stochastic_xi) THEN
-            xi_effective = xi + stochastic_value
-            IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
-            IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
-
-        ELSE
-            xi_effective = xi
-
-        END IF
-
-        turbulent_stress = rhom * red_grav / xi_effective * state%mod_vel2
-        rate_x = -turbulent_stress * (u / state%mod_vel)
-        rate_y = -turbulent_stress * (v / state%mod_vel)
-
-        END ASSOCIATE
+        INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_voellmy_implicit
+
+    !> Evaluate the implicit-law contribution in REAL for explicit assembly.
+    SUBROUTINE eval_rheology_voellmy_implicit_real(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+        TYPE(physical_state_real), INTENT(IN) :: state
+        LOGICAL, INTENT(IN) :: use_stochastic_xi
+        REAL(wp), INTENT(IN) :: stochastic_value
+        REAL(wp), INTENT(OUT) :: rate_x, rate_y
+        REAL(wp) :: xi_effective,turbulent_stress
+
+        INCLUDE 'rheology_voellmy_turbulent.inc'
+    END SUBROUTINE eval_rheology_voellmy_implicit_real
 
     !> \param[in] state Shared real physical state before source integration.
     !> \brief Integrate the voellmy velocity source in time.

@@ -20,7 +20,7 @@
 MODULE rheology_lava_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex, promote_physical_state
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_parameters_2d, ONLY : T_ref
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
@@ -42,13 +42,11 @@ CONTAINS
 
 
         REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: sx, sy
-        COMPLEX(wp) :: ix, iy
-        TYPE(physical_state_complex) :: cs
-        CALL eval_rheology_lava_semi_implicit(state, sx, sy)
-        CALL promote_physical_state(state, cs)
-        CALL eval_rheology_lava_implicit(cs, ix, iy)
-        rate=[sx,sy]+REAL([ix,iy],wp)
+        REAL(wp) :: sx,sy,ix,iy
+
+        CALL eval_rheology_lava_semi_implicit(state,sx,sy)
+        CALL eval_rheology_lava_implicit_real(state,ix,iy)
+        rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_lava_explicit
 
 
@@ -67,31 +65,23 @@ CONTAINS
 
 
     SUBROUTINE eval_rheology_lava_implicit(state, rate_x, rate_y)
-
         TYPE(physical_state_complex), INTENT(IN) :: state
-
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: gamma
-        REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+        REAL(wp), PARAMETER :: h_threshold=1.0E-10_wp
 
-        rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-        rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-
-        IF (REAL(state%h, wp) .GT. h_threshold) THEN
-            gamma = 3.0_wp * nu_ref / state%h * EXP(-visc_par * (state%T - T_ref))
-
-        ELSE
-            gamma = 3.0_wp * nu_ref / h_threshold * EXP(-visc_par * (state%T - T_ref))
-
-        END IF
-
-        IF (((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) THEN
-            rate_x = -state%rho_m * gamma * state%u
-            rate_y = -state%rho_m * gamma * state%v
-
-        END IF
-
+        INCLUDE 'rheology_lava_viscous.inc'
     END SUBROUTINE eval_rheology_lava_implicit
+
+    !> Evaluate the implicit-law contribution in REAL for explicit assembly.
+    SUBROUTINE eval_rheology_lava_implicit_real(state, rate_x, rate_y)
+        TYPE(physical_state_real), INTENT(IN) :: state
+        REAL(wp), INTENT(OUT) :: rate_x, rate_y
+        REAL(wp) :: gamma
+        REAL(wp), PARAMETER :: h_threshold=1.0E-10_wp
+
+        INCLUDE 'rheology_lava_viscous.inc'
+    END SUBROUTINE eval_rheology_lava_implicit_real
 
 
     SUBROUTINE eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)

@@ -82,13 +82,17 @@ IMEX_SfloW2D_SOURCES = \
                 io/inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
-AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state -I$(srcdir)/state_new
+AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state -I$(srcdir)/state_new -I$(srcdir)/physics/rheology_laws
 CLEANFILES = *.mod
 EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservative.inc \
              state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
              state_new/mixture_heat_capacity.inc state_new/mixture_from_mass.inc \
              state_new/density_from_mass.inc state_new/kinematics.inc \
              state_new/richardson.inc \
+             physics/rheology_laws/rheology_voellmy_turbulent.inc \
+             physics/rheology_laws/rheology_lava_viscous.inc \
+             physics/rheology_laws/rheology_plastic_yield.inc \
+             physics/rheology_laws/rheology_quadratic_drag.inc \
              python_diagnostics/kt_ritter_1d.f90
 
 state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
@@ -483,3 +487,13 @@ physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
 spatial/hyperbolic_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT)
 state/state_conversion_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+
+physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): physics/rheology_laws/rheology_voellmy_turbulent.inc
+
+physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): physics/rheology_laws/rheology_voellmy_turbulent.inc
+
+physics/rheology_laws/rheology_lava_2d.$(OBJEXT): physics/rheology_laws/rheology_lava_viscous.inc
+
+physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): physics/rheology_laws/rheology_plastic_yield.inc
+
+physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): physics/rheology_laws/rheology_quadratic_drag.inc

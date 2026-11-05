@@ -14,7 +14,7 @@
 MODULE rheology_quadratic_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_new_types, ONLY : physical_state_real, physical_state_complex, promote_physical_state
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 solve_exact_velocity_flow, EXACT_FLOW_QUADRATIC
     IMPLICIT NONE
@@ -43,15 +43,11 @@ CONTAINS
 
 
             REAL(wp), INTENT(OUT) :: rate(2)
-            REAL(wp) :: sx, sy
-            COMPLEX(wp) :: ix, iy
-            TYPE(physical_state_complex) :: cs
-            CALL eval_rheology_quadratic_semi_implicit(state,sx,sy)
-            CALL promote_physical_state(state, cs)
-            CALL eval_rheology_quadratic_implicit(cs,                                                                  &
-                    ix,                                                                                                &
-                    iy)
-            rate=[sx,sy]+REAL([ix,iy],wp)
+        REAL(wp) :: sx,sy,ix,iy
+
+        CALL eval_rheology_quadratic_semi_implicit(state,sx,sy)
+        CALL eval_rheology_quadratic_implicit_real(state,ix,iy)
+        rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_quadratic_explicit
 
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -81,20 +77,19 @@ CONTAINS
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_quadratic_implicit(state, rate_x, rate_y)
+        TYPE(physical_state_complex), INTENT(IN) :: state
+        COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
-            TYPE(physical_state_complex), INTENT(IN) :: state
-
-
-            COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-
-            rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-            rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-            IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
-            rate_x = -state%rho_m * (state%u / state%mod_vel_hor)                                                      &
-                        * friction_factor * state%mod_vel2
-            rate_y = -state%rho_m * (state%v / state%mod_vel_hor)                                                      &
-                        * friction_factor * state%mod_vel2
+        INCLUDE 'rheology_quadratic_drag.inc'
     END SUBROUTINE eval_rheology_quadratic_implicit
+
+    !> Evaluate the implicit-law contribution in REAL for explicit assembly.
+    SUBROUTINE eval_rheology_quadratic_implicit_real(state, rate_x, rate_y)
+        TYPE(physical_state_real), INTENT(IN) :: state
+        REAL(wp), INTENT(OUT) :: rate_x, rate_y
+
+        INCLUDE 'rheology_quadratic_drag.inc'
+    END SUBROUTINE eval_rheology_quadratic_implicit_real
 
         !> \param[in] state Shared real state at the start of the analytic source step.
         !> \brief Integrate the quadratic velocity source in time.
