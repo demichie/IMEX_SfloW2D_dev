@@ -113,13 +113,13 @@ CONTAINS
                 ! Solid transport.
                 rate(idx_solidEqn_first:idx_solidEqn_last) =                                                           &
                     rate(idx_solidEqn_first:idx_solidEqn_last) +                                                       &
-                    t_coeff * h_dot * r_rho_m * xs_source(1:n_solid)
+                    t_coeff * h_dot * r_rho_m * source_xs
 
                 ! Additional gases.
 
                 rate(idx_addGasEqn_first:idx_addGasEqn_last) =                                                         &
                     rate(idx_addGasEqn_first:idx_addGasEqn_last) +                                                     &
-                    t_coeff * h_dot * r_rho_m * xg_source(1:n_add_gas)
+                    t_coeff * h_dot * r_rho_m * source_xg
 
 
                 IF ( pore_pressure_flag ) THEN

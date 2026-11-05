@@ -99,10 +99,10 @@ CONTAINS
                     h_dot * r_rho_m * r_sp_heat_mix * T_fissures(i_fissure))
                 rate(idx_solidEqn_first:idx_solidEqn_last) =                                                           &
                     rate(idx_solidEqn_first:idx_solidEqn_last) +                                                       &
-                    t_coeff * h_dot * r_rho_m * xs_fissures(1:n_solid,i_fissure)
+                    t_coeff * h_dot * r_rho_m * source_xs
                 rate(idx_addGasEqn_first:idx_addGasEqn_last) =                                                         &
                     rate(idx_addGasEqn_first:idx_addGasEqn_last) +                                                     &
-                    t_coeff * h_dot * r_rho_m * xg_fissures(1:n_add_gas,i_fissure)
+                    t_coeff * h_dot * r_rho_m * source_xg
 
 
                 IF (pore_pressure_flag) THEN
