@@ -17,8 +17,7 @@ jobs:
 
       - name: Install build and test dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
+          bash .github/scripts/install-ubuntu-deps.sh \
             autoconf automake gfortran make \
             liblapack-dev libnetcdff-dev python3-numpy unzip gdb
 

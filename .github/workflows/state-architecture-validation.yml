@@ -17,8 +17,7 @@ jobs:
 
       - name: Install Fortran test dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes gfortran
+          bash .github/scripts/install-ubuntu-deps.sh gfortran
 
       - name: Compile and run TEST_STATE_NEW
         shell: bash
@@ -55,8 +54,7 @@ jobs:
 
       - name: Install regression dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
+          bash .github/scripts/install-ubuntu-deps.sh \
             gfortran libnetcdff-dev libnetcdf-dev \
             liblapack-dev libblas-dev pkg-config python3-numpy
 
@@ -89,8 +87,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install equivalence-test dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config
+          bash .github/scripts/install-ubuntu-deps.sh gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config
       - name: Compare legacy and state_new backends
         shell: bash
         run: |
@@ -114,8 +111,7 @@ jobs:
 
       - name: Install full build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
+          bash .github/scripts/install-ubuntu-deps.sh \
             autoconf automake gfortran make \
             liblapack-dev libnetcdff-dev libnetcdf-dev
 

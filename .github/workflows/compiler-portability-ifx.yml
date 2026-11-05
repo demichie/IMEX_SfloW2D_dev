@@ -38,8 +38,7 @@ jobs:
 
       - name: Install Ubuntu dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
+          bash .github/scripts/install-ubuntu-deps.sh \
             autoconf automake libtool libtool-bin m4 make gcc g++ gfortran \
             libnetcdf-dev liblapack-dev libblas-dev \
             python3 python3-numpy unzip curl ca-certificates pkg-config file

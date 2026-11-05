@@ -22,8 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Fortran and profiling dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y autoconf automake gfortran make binutils liblapack-dev libnetcdff-dev unzip
+          bash .github/scripts/install-ubuntu-deps.sh autoconf automake gfortran make binutils liblapack-dev libnetcdff-dev unzip
       - name: Build with subroutine-level gprof instrumentation
         env:
           FC: gfortran

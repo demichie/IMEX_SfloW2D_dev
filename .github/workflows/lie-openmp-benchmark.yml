@@ -39,8 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install build and benchmark dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y autoconf automake gfortran make liblapack-dev libblas-dev libnetcdff-dev libnetcdf-dev python3-numpy python3-netcdf4
+          bash .github/scripts/install-ubuntu-deps.sh autoconf automake gfortran make liblapack-dev libblas-dev libnetcdff-dev libnetcdf-dev python3-numpy python3-netcdf4
       - name: Build optimized production executable
         env:
           FC: gfortran

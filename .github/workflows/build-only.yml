@@ -26,8 +26,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
+          bash .github/scripts/install-ubuntu-deps.sh \
             autoconf automake gfortran make \
             liblapack-dev libnetcdff-dev
 
