@@ -20,6 +20,7 @@ MODULE rheology_empirical_2d
     PUBLIC :: eval_rheology_empirical_explicit
     PUBLIC :: eval_rheology_empirical_semi_implicit
     PUBLIC :: eval_rheology_empirical_implicit
+    PUBLIC :: eval_rheology_empirical_implicit_real
     PUBLIC :: eval_rheology_empirical_analytic
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS

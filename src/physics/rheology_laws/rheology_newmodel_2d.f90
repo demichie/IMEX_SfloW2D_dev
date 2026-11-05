@@ -10,6 +10,7 @@ MODULE rheology_newmodel_2d
     PUBLIC :: eval_rheology_newmodel_explicit
     PUBLIC :: eval_rheology_newmodel_semi_implicit
     PUBLIC :: eval_rheology_newmodel_implicit
+    PUBLIC :: eval_rheology_newmodel_implicit_real
     PUBLIC :: eval_rheology_newmodel_analytic
 CONTAINS
         !> \brief Evaluate the explicit newmodel contribution to the horizontal momentum source.
@@ -56,9 +57,17 @@ CONTAINS
             COMPLEX(wp), INTENT(OUT) :: rate_x,rate_y
             REAL(wp), PARAMETER :: drag_coefficient=0.1_wp
 
-            rate_x=-drag_coefficient*state%rho_m*state%u
-            rate_y=-drag_coefficient*state%rho_m*state%v
+            INCLUDE 'rheology_newmodel_linear.inc'
     END SUBROUTINE eval_rheology_newmodel_implicit
+
+    !> REAL implicit rate sharing the exact Newton law.
+    SUBROUTINE eval_rheology_newmodel_implicit_real(state,rate_x,rate_y)
+        TYPE(physical_state_real), INTENT(IN) :: state
+        REAL(wp), INTENT(OUT) :: rate_x,rate_y
+        REAL(wp), PARAMETER :: drag_coefficient=0.1_wp
+
+        INCLUDE 'rheology_newmodel_linear.inc'
+    END SUBROUTINE eval_rheology_newmodel_implicit_real
 
         !> \brief Integrate the newmodel velocity source in time.
         !> \param[in] state Shared physical state (complex for implicit source).

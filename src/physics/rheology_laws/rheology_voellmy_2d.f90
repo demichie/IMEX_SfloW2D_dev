@@ -35,6 +35,7 @@ MODULE rheology_voellmy_2d
     PUBLIC :: eval_rheology_voellmy_explicit
     PUBLIC :: eval_rheology_voellmy_semi_implicit
     PUBLIC :: eval_rheology_voellmy_implicit
+    PUBLIC :: eval_rheology_voellmy_implicit_real
     PUBLIC :: eval_rheology_voellmy_analytic
     PUBLIC :: mu
     REAL(wp) :: mu

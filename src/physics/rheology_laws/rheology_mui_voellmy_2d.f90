@@ -37,6 +37,7 @@ MODULE rheology_mui_voellmy_2d
     PUBLIC :: eval_rheology_mui_voellmy_explicit
     PUBLIC :: eval_rheology_mui_voellmy_semi_implicit
     PUBLIC :: eval_rheology_mui_voellmy_implicit
+    PUBLIC :: eval_rheology_mui_voellmy_implicit_real
     PUBLIC :: eval_rheology_mui_voellmy_analytic
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS

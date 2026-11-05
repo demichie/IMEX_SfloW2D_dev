@@ -21,27 +21,34 @@ MODULE rheology_2d
             RHEOLOGY_ID_EMPIRICAL,RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_FROUDE,                                            &
             RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI,RHEOLOGY_ID_MUI_VOELLMY,RHEOLOGY_ID_NEWMODEL
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                                    &
+                eval_rheology_voellmy_implicit_real, &
                 eval_rheology_voellmy_implicit,                                                                        &
                 eval_rheology_voellmy_semi_implicit,                                                                   &
                 eval_rheology_voellmy_analytic
     USE rheology_plastic_2d, ONLY : eval_rheology_plastic_explicit,                                                    &
+                eval_rheology_plastic_implicit_real, &
                 eval_rheology_plastic_implicit,                                                                        &
                 eval_rheology_plastic_analytic
     USE rheology_lava_2d, ONLY : eval_rheology_lava_explicit,                                                          &
+                eval_rheology_lava_implicit_real, &
                 eval_rheology_lava_implicit,                                                                           &
                 eval_rheology_lava_semi_implicit,                                                                      &
                 eval_rheology_lava_analytic
     USE rheology_lahar_2d, ONLY : eval_rheology_lahar_explicit,                                                        &
+                eval_rheology_lahar_implicit_real, &
                 eval_rheology_lahar_implicit,                                                                          &
                 eval_rheology_lahar_semi_implicit,                                                                     &
                 eval_rheology_lahar_analytic
     USE rheology_empirical_2d, ONLY : eval_rheology_empirical_explicit,                                                &
+                eval_rheology_empirical_implicit_real, &
                 eval_rheology_empirical_implicit,                                                                      &
                 eval_rheology_empirical_analytic
     USE rheology_quadratic_2d, ONLY : eval_rheology_quadratic_explicit,                                                &
+                eval_rheology_quadratic_implicit_real, &
                 eval_rheology_quadratic_implicit,                                                                      &
                 eval_rheology_quadratic_analytic
     USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_explicit,                                                  &
+                eval_rheology_newmodel_implicit_real, &
                 eval_rheology_newmodel_implicit
     USE rheology_froude_2d, ONLY : eval_rheology_froude_explicit,                                                      &
                 eval_rheology_froude_semi_implicit,                                                                    &
@@ -54,6 +61,7 @@ MODULE rheology_2d
                 eval_rheology_mui_analytic
     USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_explicit,                                            &
                 eval_rheology_mui_voellmy_semi_implicit,                                                               &
+                eval_rheology_mui_voellmy_implicit_real, &
                 eval_rheology_mui_voellmy_implicit,                                                                    &
                 eval_rheology_mui_voellmy_analytic
 
@@ -64,7 +72,7 @@ MODULE rheology_2d
     PUBLIC :: curvature_acceleration
     PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
     PUBLIC :: eval_rheology_implicit, eval_rheology_analytic
-    PUBLIC :: eval_rheology_implicit_id, eval_rheology_semi_implicit_id
+    PUBLIC :: eval_rheology_implicit_id, eval_rheology_implicit_real_id, eval_rheology_semi_implicit_id
     PUBLIC :: limit_rheology_momentum_reversal
 
         ! Uniform treatment surface for this source family.
@@ -257,6 +265,38 @@ CONTAINS
         rate=process_rate
     END SUBROUTINE eval_rheology_implicit_id
 
+
+    !> Evaluate the implicit rheology contribution in REAL for Newton residuals.
+    SUBROUTINE eval_rheology_implicit_real_id(model_id,state,use_stochastic,stochastic_value,rate)
+        INTEGER, INTENT(IN) :: model_id
+        TYPE(physical_state_real), INTENT(IN) :: state
+        LOGICAL, INTENT(IN) :: use_stochastic
+        REAL(wp), INTENT(IN) :: stochastic_value
+        REAL(wp), INTENT(OUT) :: rate(2)
+        rate=0.0_wp
+        SELECT CASE(model_id)
+        CASE(RHEOLOGY_ID_VOELLMY)
+            CALL eval_rheology_voellmy_implicit_real(state,use_stochastic,stochastic_value,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_MUI_VOELLMY)
+            CALL eval_rheology_mui_voellmy_implicit_real(state,use_stochastic,stochastic_value,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_PLASTIC)
+            CALL eval_rheology_plastic_implicit_real(state,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_LAVA)
+            CALL eval_rheology_lava_implicit_real(state,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_LAHAR)
+            CALL eval_rheology_lahar_implicit_real(state,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_EMPIRICAL)
+            CALL eval_rheology_empirical_implicit_real(state,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_NEWMODEL)
+            CALL eval_rheology_newmodel_implicit_real(state,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_QUADRATIC)
+            CALL eval_rheology_quadratic_implicit_real(state,rate(1),rate(2))
+        CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_FROUDE,RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI)
+            CONTINUE
+        CASE DEFAULT
+            CALL fatal_error('Invalid rheology ID in REAL implicit dispatch')
+        END SELECT
+    END SUBROUTINE eval_rheology_implicit_real_id
 
     !> Integrate analytic rheology without copying state in the single-law Lie case.
     SUBROUTINE eval_rheology_analytic(models, dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &

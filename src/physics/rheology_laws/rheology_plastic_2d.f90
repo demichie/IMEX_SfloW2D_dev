@@ -24,6 +24,7 @@ MODULE rheology_plastic_2d
     PUBLIC :: eval_rheology_plastic_explicit
     PUBLIC :: eval_rheology_plastic_semi_implicit
     PUBLIC :: eval_rheology_plastic_implicit
+    PUBLIC :: eval_rheology_plastic_implicit_real
     PUBLIC :: eval_rheology_plastic_analytic
     PUBLIC :: tau
     REAL(wp) :: tau

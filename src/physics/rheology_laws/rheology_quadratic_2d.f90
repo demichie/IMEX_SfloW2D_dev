@@ -22,6 +22,7 @@ MODULE rheology_quadratic_2d
     PUBLIC :: eval_rheology_quadratic_explicit
     PUBLIC :: eval_rheology_quadratic_semi_implicit
     PUBLIC :: eval_rheology_quadratic_implicit
+    PUBLIC :: eval_rheology_quadratic_implicit_real
     PUBLIC :: eval_rheology_quadratic_analytic
     PUBLIC :: friction_factor
         REAL(wp) :: friction_factor

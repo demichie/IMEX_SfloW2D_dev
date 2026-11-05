@@ -45,6 +45,7 @@ MODULE rheology_lahar_2d
     PUBLIC :: eval_rheology_lahar_explicit
     PUBLIC :: eval_rheology_lahar_semi_implicit
     PUBLIC :: eval_rheology_lahar_implicit
+    PUBLIC :: eval_rheology_lahar_implicit_real
     PUBLIC :: eval_rheology_lahar_analytic
     PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
     PUBLIC :: eval_lahar_fluid_viscosity

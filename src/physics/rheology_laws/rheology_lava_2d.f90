@@ -29,6 +29,7 @@ MODULE rheology_lava_2d
     PUBLIC :: eval_rheology_lava_explicit
     PUBLIC :: eval_rheology_lava_semi_implicit
     PUBLIC :: eval_rheology_lava_implicit
+    PUBLIC :: eval_rheology_lava_implicit_real
     PUBLIC :: eval_rheology_lava_analytic
     PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
         REAL(wp) :: nu_ref
