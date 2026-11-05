@@ -52,6 +52,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Correzione mirata del limitatore sorgenti D19 (5 novembre 2026, da validare):** il log diagnostico dell'utente identifica in TAAL la cella (237,394), gruppo 4, con inventario di specie `1.0280442421462131E-313`, rate `-5.1467448673525914E-313` e candidato `-4.9406564584124654E-324`. Il margine relativo preesistente nel limitatore dei rate non sopravvive all'arrotondamento subnormale. Aggiunta una riserva locale di `32*SPACING` (limitata all'inventario) per soli budget subnormali in consumo: modifica il fattore comune del rate esplicito, non `q` ne il criterio rigoroso di ammissibilita. Build e regressioni da eseguire. Dettagli in D.18 della roadmap specialistica.
 
+**Decisione buoyancy aggiornata (5 novembre 2026, da validare):** il controllo della densita viene eseguito **prima di iniziare ogni gruppo Lie non-zero**, usando lo stato locale accettato precedente; se la miscela e neutra o galleggiante viene rimossa senza tentare ulteriori source candidate. `evaluate_density_from_qp` classifica `rho_mix <= rho_a_amb` (inclusa la convenzione near-dry che restituisce densita ambiente). Il gruppo 0 rimane libero di iniettare anche nelle celle inizialmente asciutte e il controllo finale resta presente. Nessuna conversione di candidati inammissibili. Build e regressioni da verificare. Dettagli in D.19 della roadmap specialistica.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

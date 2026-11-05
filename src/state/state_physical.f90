@@ -78,7 +78,9 @@ CONTAINS
             CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_m,inv_rho_m)
             red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
         END IF
-        IF (PRESENT(below_ambient)) below_ambient=rho_m<rho_a_amb
+        ! Neutral-buoyancy cells are removed as well. This includes
+        ! numerical near-dry states that return atmospheric density.
+        IF (PRESENT(below_ambient)) below_ambient=rho_m<=rho_a_amb
         accepted=.TRUE.
     END SUBROUTINE evaluate_density_from_qp
 

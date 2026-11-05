@@ -431,6 +431,28 @@ CONTAINS
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
+                ! The buoyancy sink precedes admissibility checks in the next
+                ! source transaction. Evaluate only accepted local states:
+                ! never interpret an inadmissible conservative candidate as
+                ! a physical mixture. Group zero must still be able to inject
+                ! into initially dry/ambient cells.
+                IF (executor%groups(group_index)%id/=0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
+                    CALL evaluate_density_from_qp(qp_local,rho_mix,red_grav,conversion_ok,remove_buoyant)
+                    IF (.NOT.conversion_ok) THEN
+                        cell_error=15
+                        EXIT group_loop
+                    END IF
+                    IF (remove_buoyant) THEN
+                        IF (executor%diagnostics_enabled .AND. cell_arc_perim(j,k)>0.0_wp) THEN
+                            executor%pre_buoyancy_mass(cell)=q_local(idx_totMassEqn)
+                            executor%pre_buoyancy_solids(cell)=SUM(q_local(idx_solidEqn_first:idx_solidEqn_last))
+                            executor%buoyancy_reduced_gravity(cell)=red_grav
+                        END IF
+                        q_local=0.0_wp
+                        CALL initialize_dry_physical_cell(qp_local)
+                        EXIT group_loop
+                    END IF
+                END IF
                 ! Group zero reads the pre-spatial primitive state; subsequent
                 ! groups read the previous group's accepted local state.
                 IF (executor%groups(group_index)%id==0) THEN
@@ -645,8 +667,9 @@ CONTAINS
 
             END DO group_loop
 
-            ! Restore the v2 buoyancy removal after all mass-exchange groups.
-            ! This is a physical sink, not a numerical limiter on the source rates.
+            ! Check buoyancy again after the final source group, including
+            ! cases with no subsequent group to trigger the early sink.
+            ! This is a physical sink, not a numerical limiter on source rates.
             IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
                 CALL evaluate_density_from_qp(qp_local,rho_mix,red_grav,conversion_ok,remove_buoyant)
                 IF (.NOT.conversion_ok) THEN
