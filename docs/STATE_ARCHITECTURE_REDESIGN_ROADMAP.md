@@ -12,6 +12,8 @@
 
 **F5 analytic dispatcher deduplication (5 novembre 2026):** `source_terms_2d` costruisce lo stato fisico una sola volta per l'unico modello analitico selezionato, invece di ripetere il codice in tre rami. Le reologie e la termica mantengono gli stessi dati geometrici; Darcy mantiene il no-op se la massa e zero. Non sono stati aggiunti controlli `accepted`, validazioni intermedie o cambiamenti al rollback Lie; eliminata la qualificazione `RECURSIVE` non necessaria. Compilazione e test regressivi del nuovo commit ancora da verificare.
 
+**F5 combined explicit source scratch reuse (5 novembre 2026):** quando un gruppo Lie esplicito combina sorgenti non-exchange e mass exchange valutati sulla stessa `qp_eval`, il dispatcher riusa lo stato fisico gia costruito nello scratch del worker invece di ricostruirlo una seconda volta. Il flag `physical_ready` viene restituito solo dopo la costruzione effettiva, quindi i casi dry con ritorno anticipato non riusano stato stale; i chiamanti standalone e quelli senza scratch conservano la costruzione autonoma. Nessuna modifica ai limiter, ai controlli di ammissibilita, alla sequenza Lie o al rollback. Test/CI del change set da eseguire.
+
 **Attivita differita - DOPO F5 (non bloccante per F5).** Riorganizzare il controllo di ammissibilita e il rollback di Lie come una sola transazione globale a fine time-step sull'intero dominio: nessun rollback di cella/gruppo, nessuna validazione anticipata dopo lo spazio o tra gruppi. Intervenire in `time_integration_2d.f90` e `lie_source_executor_2d.f90` dopo aver completato e validato la migrazione F5; aggiornare allora i test di rollback e OpenMP. **Non modificare ora questa logica come parte di F5.**
 
 ## 0. Sintesi delle decisioni vincolanti

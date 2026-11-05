@@ -86,23 +86,26 @@ CONTAINS
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
         LOGICAL, INTENT(OUT) :: has_exchange,valid
         REAL(wp) :: physical(n_eqns),exchange(n_eqns),coverage,scale
+        LOGICAL :: physical_ready
         has_exchange=exchange_selected
         valid=.FALSE.
         physical=0.0_wp
         exchange=0.0_wp
+        physical_ready=.FALSE.
         ! Partitioned immutable metadata comes from the Lie registry/executor.
         ! Never copy allocatable group members or PACK source names inside cells.
         IF (non_exchange_group%source_mask/=0) THEN
             CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch)
+                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
+                physical_ready)
         END IF
 
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch)
+                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -450,7 +453,8 @@ CONTAINS
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
-            lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch )
+            lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
+            physical_ready )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,                                           &
             time_param , bottom_radial_source_flag,                                                                    &
@@ -487,6 +491,7 @@ CONTAINS
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: stochastic_value
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
+        LOGICAL, INTENT(OUT), OPTIONAL :: physical_ready
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -506,6 +511,7 @@ CONTAINS
 
 
         expl_term(1:n_eqns) = 0.0_wp
+        IF (PRESENT(physical_ready)) physical_ready=.FALSE.
 
         q1 = 0.0_wp
 
@@ -523,6 +529,7 @@ CONTAINS
         END IF
         CALL build_physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y,                                   &
             Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
+        IF (PRESENT(physical_ready)) physical_ready=PRESENT(physical_scratch)
 
         ! Gravity terms - only meaningful when the cell has mass.
         IF ( qpj(idx_h) .GT. EPSILON(1.0_wp) ) THEN
@@ -629,7 +636,7 @@ CONTAINS
     !> \param[out] eqns_term Conservative equation source-rate vector.
     !> \param[out] topo_term Proposed bed-elevation rate.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch)
+            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready)
         REAL(wp), INTENT(IN) :: qpj(n_vars),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -638,16 +645,25 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
+        LOGICAL, INTENT(IN), OPTIONAL :: physical_ready
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: exchange_state
+        LOGICAL :: reuse_prepared_state
 
+        reuse_prepared_state=.FALSE.
+        IF (PRESENT(physical_ready)) THEN
+            IF (PRESENT(physical_scratch)) reuse_prepared_state=physical_ready
+        END IF
         exchange_state=>local_state
         IF (PRESENT(physical_scratch)) THEN
             exchange_state=>physical_scratch
         ELSE
             CALL initialize_physical_state_real(local_state)
         END IF
-        CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
+        ! The combined explicit group already prepared this same qp in its
+        ! worker-local scratch. Standalone exchange calls still build normally.
+        IF (.NOT.reuse_prepared_state) &
+            CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
         CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
             erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
