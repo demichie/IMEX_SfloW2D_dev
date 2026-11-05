@@ -2,7 +2,7 @@
 
 **Specifica tecnica operativa** · 5 novembre 2026 · Repository `demichie/IMEX_SfloW2D_dev` · Branch `master`.
 
-> **Ambito:** riprogettazione clean-slate dei contratti di stato e del loro utilizzo in numerica e fisica. Questo documento è una roadmap tecnica specialistica subordinata alla [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md): non introduce un piano generale concorrente. Aggiornare checklist, prove e rischi qui; riportare nella roadmap generale solo stato aggregato e priorità.
+> **Ambito:** progettazione clean-slate della gestione e implementazione degli stati e del loro utilizzo in numerica e fisica. Non è una riprogettazione dell’intero codice: leggi fisiche, discretizzazioni, integratori e consumatori vengono modificati solo nella misura necessaria per usare i nuovi contratti di stato. La destinazione deve essere ricavata dai flussi di dati, dai costi computazionali e dagli invarianti numerici, non dalla suddivisione attuale dei file o dalla compatibilità con organizzazioni storiche. Il codice esistente è una fonte di formule, invarianti e casi da preservare, non il vincolo architetturale di partenza. Questo documento è una roadmap tecnica specialistica subordinata alla [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md): non introduce un piano generale concorrente. Aggiornare checklist, prove e rischi qui; riportare nella roadmap generale solo stato aggregato e priorità.
 
 > **Stato:** PROPOSTA / DA IMPLEMENTARE. Analisi statica dei consumatori effettuata; non costituisce prova di equivalenza numerica, compilazione o prestazioni della nuova architettura.
 
@@ -13,6 +13,7 @@
 - [ ] Distinguere i *prodotti richiesti* (conversione numerica, proprietà di faccia, stato fisico completo), mai differenziare lo stato in base alla legge fisica.
 - [ ] Operazioni in `physics/` strettamente **cell-local**; nessun indice `j,k`, accesso alla griglia o cache globale mutabile.
 - [ ] Tutti i kernel numerici REAL/COMPLEX condividono le formule fisiche e preservano il complex-step; nessuna conversione COMPLEX che scarti perturbazioni.
+- [ ] Le formule condivise REAL/COMPLEX hanno una sola implementazione sorgente: gli include `.inc` o un meccanismo equivalente sono mantenuti per evitare duplicazione manuale dei kernel tipati.
 - [ ] Nessun wrapper o alias legacy solo per far compilare i chiamanti storici; migrazione diretta degli utilizzatori e rimozione del codice sostituito.
 - [ ] Conservarne **quattro** interfacce per ogni termine sorgente: EXPLICIT, SEMI_IMPLICIT, IMPLICIT, ANALYTIC; i metodi non disponibili devono generare errore esplicito.
 - [ ] Preservare Lie splitting, ammissibilità dello stato, conservazione, well-balanced HP-PCCU, gestione wet/dry e semantica delle sorgenti senza cambiare la fisica durante la migrazione.
@@ -21,7 +22,9 @@
 
 ## 1. Ambito, non-obiettivi e criteri di successo
 
-Questa roadmap definisce il progetto di destinazione, non la suddivisione dei file attuali. La struttura finale deriva da ruoli e contratti, non dall’organizzazione preesistente. Comprende conversioni conservative/primitive, proprietà della miscela, costruzione e aggiornamento dello stato fisico, workspace, flussi PCCU, termini sorgente, Newton/complex-step e validazione.
+Questa roadmap definisce il progetto di destinazione per la gestione degli stati, non la suddivisione dei file attuali né una sequenza di adattamento incrementale dell’architettura esistente. La struttura finale degli stati e delle relative API deriva da ruoli, dipendenze dei dati, costo per valutazione e contratti numerici. Comprende conversioni conservative/primitive, proprietà della miscela, costruzione e aggiornamento dello stato fisico, workspace e l’integrazione necessaria con flussi PCCU, termini sorgente e Newton/complex-step.
+
+La riorganizzazione deve ottimizzare il lavoro complessivo dell’algoritmo di soluzione: ogni intermedio già calcolato deve poter essere passato al consumatore successivo, senza ricostruzioni implicite o rivalutazioni dello stesso contenuto. La semplicità richiesta è semplicità del grafo computazionale e dei contratti di stato, non conservazione dei moduli o dei nomi attuali.
 
 Fuori ambito nella prima migrazione: modifica delle leggi di drag, delle reologie, della discretizzazione PCCU, del Lie splitting, delle soglie wet/dry e dei modelli di pressione di poro. Ogni eventuale revisione fisica va trattata in un progetto separato.
 
@@ -89,7 +92,7 @@ La struttura logica è composta da quattro kernel principali, più helper matema
 | conservative_to_primitive | q → qp + esito ammissibilità + pressione dinamica opzionale | Ri, curvature, calori del carrier non necessari, stato fisico completo |
 | primitive_to_conservative | qp → q con chiusura e proprietà minime | Stato fisico, Ri, curvature |
 | evaluate_mixture | T + composizione → densità, capacità termiche, frazioni volumetriche e inversi | Topografia, velocità, reologia |
-| build_physical_state | q o qp + geometria → physical_state completo REAL/COMPLEX | Accesso a celle adiacenti, coordinamento dei gruppi Lie |
+| build_physical_state_from_q / build_physical_state_from_qp | q o qp + geometria → physical_state completo REAL/COMPLEX | Accesso a celle adiacenti, coordinamento dei gruppi Lie |
 
 
 ### 4.1 Conversione q → qp: pipeline a passaggio singolo
@@ -109,7 +112,7 @@ Applicare la chiusura delle frazioni una sola volta, calcolare la composizione c
 
 ### 4.3 Valutazione termodinamica
 
-Un unico punto di definizione per le formule della miscela, con specializzazioni REAL e COMPLEX coerenti. Evitare kernel “universali” che calcolino tutte le proprietà su ogni faccia: prevedere una valutazione compatta per density/energy/pressure e una valutazione completa usata dal costruttore dello stato. Le due viste condividono le formule elementari, non due implementazioni indipendenti. L’assenza del carrier o dei gas aggiuntivi deve avere una semantica definita, compresi i limiti di frazione totale e le configurazioni liquide/gassose.
+Un unico punto di definizione per le formule della miscela, con specializzazioni REAL e COMPLEX coerenti. Le formule comuni devono essere scritte una sola volta, preferibilmente negli `.inc` già adottati dal progetto, e incluse da wrapper tipati minimi REAL/COMPLEX. Non duplicare manualmente i kernel in due procedure parallele. Evitare kernel “universali” che calcolino tutte le proprietà su ogni faccia: prevedere una valutazione compatta per density/energy/pressure e una valutazione completa usata dal costruttore dello stato. Le due viste condividono le formule elementari e gli intermedi, non due implementazioni indipendenti. L’assenza del carrier o dei gas aggiuntivi deve avere una semantica definita, compresi i limiti di frazione totale e le configurazioni liquide/gassose.
 
 
 ### 4.4 Costruttori dello stato fisico
@@ -121,7 +124,7 @@ Da qp: leggere direttamente le primitive; chiudere la composizione una volta; va
 
 La distinzione ammessa riguarda il prodotto richiesto, non il modello sorgente. I percorsi numerici producono primitive o proprietà di faccia senza creare uno stato fisico generale; ogni percorso che produce physical_state deve invece inizializzare tutti i campi, in REAL e COMPLEX. Non introdurre flag “requires_cp”, “is_MuI”, “state_partial” o registri per proprietà lette dalle singole reologie. Una reologia futura deve potersi collegare senza modificare la conversione degli stati.
 
-Per Newton il guadagno viene da una decodifica COMPLEX compatta, scratch preallocato e riuso degli intermedi nella singola valutazione, non da stati incompleti per modello. L’eventuale scelta di valutare un intero gruppo sorgente dipende dal registro fisico, ma non cambia il contratto dello stato che il gruppo riceve.
+Per Newton il guadagno viene da una decodifica COMPLEX compatta, scratch preallocato e riuso degli intermedi nella singola valutazione, non da stati incompleti per modello. La versione COMPLEX deve eseguire le stesse formule della versione REAL tramite gli stessi include `.inc` o sorgenti condivisi, preservando le perturbazioni immaginarie. L’eventuale scelta di valutare un intero gruppo sorgente dipende dal registro fisico, ma non cambia il contratto dello stato che il gruppo riceve.
 
 
 ## 6. Layout dati, memoria e parallelismo
@@ -188,15 +191,15 @@ I nomi dei file si decidono solo dopo la pulizia. La seguente è una gerarchia l
 | C. Conversioni | q ↔ qp, proprietà di faccia, costruzione fisica completa | A + B + geometria per il solo costruttore |
 | D. Consumatori | Spaziale, Lie, Newton, processi fisici, I/O | API di C, mai implementazioni private |
 
-No ai pass-through del tipo old_conversion → new_conversion, a meno che una funzione rappresenti un contratto veramente distinto: per esempio conversione con verifica di ammissibilità versus conversione garantita per input già validato. In quel caso la differenza va documentata e testata; non basta conservare un vecchio nome.
+Non mantenere pass-through o alias di compatibilità per conservare l’organizzazione storica. Due procedure possono coesistere soltanto quando rappresentano contratti realmente distinti, per esempio conversione con verifica di ammissibilità versus conversione garantita per input già validato. La differenza deve essere esplicita nel contratto, misurabile nei costi e testata; non deve dipendere dal nome precedente della routine.
 
 
 ## 10. Piano operativo e deliverable
 
 **Legenda stato:** `[ ]` non completato, `[x]` completato con evidenza verificabile. Ogni fase registra commit SHA, test, benchmark e rischi aperti. Un commit intermedio può non compilare; nessuna fase è verificata solo perché la modifica è stata committata.
 
-- [ ] **F0 — Baseline e matrice dei consumatori.** Inventariare tutte le API richieste dall'esterno, i campi utilizzati, la frequenza e gli invarianti; salvare riferimenti CI e risultati numerici sul commit iniziale.
-- [ ] **F1 — Contratti e invarianti di destinazione.** Specificare ownership, semantica di dry/wet, composizione, energia, velocità, Richardson, geometria e REAL/COMPLEX; definire API senza alias storici.
+- [ ] **F0 — Baseline e grafo dei consumatori.** Inventariare i prodotti realmente richiesti dall’algoritmo, i campi utilizzati, la frequenza, gli intermedi riutilizzabili e gli invarianti; salvare riferimenti CI e risultati numerici sul commit iniziale. L’inventario non deve imporre la struttura finale dei moduli.
+- [ ] **F1 — Contratti e invarianti di destinazione.** Progettare ownership, semantica dry/wet, composizione, energia, velocità, Richardson, geometria e REAL/COMPLEX a partire dal grafo computazionale; definire API nuove, senza alias storici, e il confine degli include condivisi.
 - [ ] **F2 — Termodinamica condivisa.** Realizzare un solo punto di definizione delle formule e kernel mirati (minimo per la numerica; completo per i sorgenti); verificare casi solidi/gas/liquidi e chiusure.
 - [ ] **F3 — Conversioni conservative/primitive.** Riscrivere `q → qp` e `qp → q` in passaggio singolo con controllo di ammissibilità e intermedi riutilizzati; testare near-dry e conservazione.
 - [ ] **F4 — Stato fisico generale REAL/COMPLEX.** Implementare costruzione completa da `q` e `qp`, conversioni e aggiornamento coerente dopo mutazioni; preparare scratch configurati una volta.
@@ -204,7 +207,7 @@ No ai pass-through del tipo old_conversion → new_conversion, a meno che una fu
 - [ ] **F6 — Proprietà delle facce HP-PCCU.** Riutilizzare proprietà della traccia finale per flussi, velocità caratteristiche, pressione idrostatica e conversioni; mantenere semantica wet/dry e well-balanced.
 - [ ] **F7 — Eliminazione delle API precedenti.** Eliminare routine non usate, calcoli duplicati, import, helper e documentazione obsoleti; ispezione finale delle dipendenze senza cicli.
 - [ ] **F8 — Gate numerici e scientifici.** Strict-debug, suite di conversione, complex-step/Newton, Lie/rollback, well-balanced, test per modelli e confronti di output.
-- [ ] **F9 — Profiling, scaling e chiusura.** Benchmark ripetuti 1/2/4/8 thread dove disponibili, profili granulari, confronto multi-esempio e aggiornamento di documenti e roadmap generale.
+- [ ] **F9 — Profiling, scaling e chiusura.** Benchmark ripetuti 1/2/4/8 thread dove disponibili, profili granulari per valutazione e per intermedio, confronto multi-esempio e aggiornamento di documenti e roadmap generale.
 
 ### Registro operativo sintetico
 
@@ -241,7 +244,7 @@ No ai pass-through del tipo old_conversion → new_conversion, a meno che una fu
 
 ## 12. Strategia di profiling e decisioni prestazionali
 
-Misurare non solo il wall time, ma anche numero di valutazioni e costo medio per valutazione. Profilare: conversioni per cella, build physical_state da qp e q, evaluate_mixture, complex-state per Jacobiano, proprietà di faccia, source group. Distinguere costo delle formule, controlli, copie e allocazioni. Benchmarkare configurazioni gas/solid, liquid/solid, gas aggiuntivi, differenti numeri di specie e regimi wet/dry.
+Misurare non solo il wall time, ma anche numero di valutazioni e costo medio per valutazione. Profilare: `conservative_to_primitive`, `primitive_to_conservative`, `build_physical_state_from_q`, `build_physical_state_from_qp`, `evaluate_mixture`, stato COMPLEX per Jacobiano, proprietà di faccia e source group. Distinguere costo delle formule, controlli, copie e allocazioni. Benchmarkare configurazioni gas/solid, liquid/solid, gas aggiuntivi, differenti numeri di specie e regimi wet/dry.
 
 Prima ipotesi qualitativa: il riuso sulle facce PCCU può offrire il beneficio maggiore; la conversione q→qp è una seconda opportunità; la costruzione fisica COMPLEX pesa soprattutto nei casi Newton. Non attribuire percentuali prima delle misure. Il criterio di accettazione non è solo velocità: ogni accelerazione deve preservare la fisica e non peggiorare in modo significativo scaling, footprint di memoria o manutenibilità.
 
@@ -280,12 +283,12 @@ call conservative_to_primitive(q, qp, accepted, p_dyn)
 call primitive_to_conservative(qp, q, accepted)
 
 call evaluate_mixture(T, xs, xg, mixture)
-call build_physical_state(q, geometry, state_real)
+call build_physical_state_from_q(q, geometry, state_real)
 
-call build_physical_state(qp, geometry, state_real)
-call build_physical_state(q_complex, geometry, state_complex)
+call build_physical_state_from_qp(qp, geometry, state_real)
+call build_physical_state_from_q(q_complex, geometry, state_complex)
 
-call update_state_kinematics(state_real, geometry, u_new, v_new)
+call update_physical_state_kinematics(state_real, geometry, u_new, v_new)
 ! Proprietà di faccia dalla traccia finale ricostruita:
 
 call prepare_face_properties(qp_face, face_properties)
