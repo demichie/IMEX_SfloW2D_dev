@@ -4,7 +4,7 @@
 MODULE mass_radial_injection_2d
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE state_new_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
     USE state_new_composition, ONLY : close_composition
 
@@ -28,7 +28,7 @@ CONTAINS
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -147,7 +147,7 @@ CONTAINS
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk,&
         rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -165,7 +165,7 @@ CONTAINS
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
@@ -183,7 +183,7 @@ CONTAINS
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)

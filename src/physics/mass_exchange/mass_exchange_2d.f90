@@ -14,7 +14,7 @@ MODULE mass_exchange_2d
         SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                      &
         SOURCE_ID_EXCHANGE_VAPORIZATION, SOURCE_ID_EXCHANGE_LAVA_DEPOSITION
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
@@ -50,7 +50,7 @@ CONTAINS
     SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term,     &
             scratch)
 
-            TYPE(physical_state_type), INTENT(IN) :: physical_state
+            TYPE(physical_state_real), INTENT(IN) :: physical_state
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
             INTEGER, INTENT(IN) :: B_zone
             INTEGER, INTENT(IN) :: source_mask
@@ -174,7 +174,7 @@ CONTAINS
         !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
         !> @param[out] eqns_term Zero-initialized conservative rate before reporting error.
     SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             CALL reset_mass_exchange_rates(total_rates)
@@ -189,7 +189,7 @@ CONTAINS
         !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
         !> @param[out] eqns_term Zero-initialized complex conservative rate before reporting error.
     SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
-            TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_complex), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             COMPLEX(wp), INTENT(OUT) :: eqns_term(n_eqns)
             CALL reset_mass_exchange_rates(total_rates)
@@ -204,7 +204,7 @@ CONTAINS
         !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
         !> @param[out] eqns_term Zero-initialized conservative rate before reporting error.
     SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             CALL reset_mass_exchange_rates(total_rates)
@@ -316,7 +316,7 @@ CONTAINS
 
             TYPE(mass_exchange_rates_type), INTENT(IN) :: p
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
 
             eqns_term(idx_totMassEqn)=eqns_term(idx_totMassEqn)+p%mixture_mass_rate

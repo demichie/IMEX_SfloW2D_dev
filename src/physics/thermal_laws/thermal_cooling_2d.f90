@@ -2,7 +2,7 @@
 MODULE thermal_cooling_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
@@ -17,7 +17,7 @@ CONTAINS
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] rate Thermal source rate.
     SUBROUTINE eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: rate
         rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
@@ -28,7 +28,7 @@ CONTAINS
     !> @param[in] state Local real physical state.
     !> @param[out] rate Zero thermal semi-implicit rate.
     SUBROUTINE eval_thermal_cooling_semi_implicit(state,rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate
         rate=0.0_wp
     END SUBROUTINE eval_thermal_cooling_semi_implicit
@@ -41,7 +41,7 @@ CONTAINS
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] rate Complex thermal source rate.
     SUBROUTINE eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         COMPLEX(wp), INTENT(OUT) :: rate
         rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)

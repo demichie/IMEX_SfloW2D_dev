@@ -5,7 +5,7 @@ MODULE mass_exchange_entrainment_2d
     USE parameters_2d, ONLY : wp, mass_exchange_rates_type,                                                            &
             reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, T_ambient, sp_heat_a
     IMPLICIT NONE
     PRIVATE
@@ -24,7 +24,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_explicit(state,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
             CALL reset_mass_exchange_rates(r)
 
@@ -39,7 +39,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(state,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
@@ -52,7 +52,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_implicit(state,r)
 
-            TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_complex), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
@@ -65,7 +65,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_entrainment_analytic(state,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)

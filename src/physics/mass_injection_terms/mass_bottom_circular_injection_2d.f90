@@ -5,7 +5,7 @@ MODULE mass_bottom_circular_injection_2d
     USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE state_new_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
     USE state_new_composition, ONLY : close_composition
 
@@ -33,7 +33,7 @@ CONTAINS
             n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
             xs_fissures, xg_fissures
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
@@ -178,7 +178,7 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_circular_injection_semi_implicit(state, time, cell_fract_jk, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         CALL fatal_error('bottom_circular_injection: semi_implicit treatment is unsupported')
@@ -192,7 +192,7 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_circular_injection_implicit(state, time, cell_fract_jk, rate)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         CALL fatal_error('bottom_circular_injection: implicit treatment is unsupported')
@@ -206,7 +206,7 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_circular_injection_analytic(state, time, cell_fract_jk, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         CALL fatal_error('bottom_circular_injection: analytic treatment is unsupported')

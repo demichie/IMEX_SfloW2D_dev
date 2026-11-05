@@ -5,7 +5,7 @@ MODULE mass_exchange_erosion_2d
     USE parameters_2d, ONLY : wp, n_solid, erodible_deposit_flag,                                                      &
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract,                           &
             alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
     IMPLICIT NONE
@@ -27,7 +27,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_explicit(state,erodible,dt,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
             REAL(wp) :: normal_speed, substrate_temperature, alpha
@@ -57,7 +57,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_semi_implicit(state,erodible,dt,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -73,7 +73,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_implicit(state,erodible,dt,r)
 
-            TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_complex), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -89,7 +89,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_erosion_analytic(state,erodible,dt,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

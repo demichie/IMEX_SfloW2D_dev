@@ -6,7 +6,7 @@ MODULE mass_exchange_carrier_liquid_loss_2d
             reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : loss_rate
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
 
     IMPLICIT NONE
     PRIVATE
@@ -23,7 +23,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit(state,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
@@ -45,7 +45,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_liquid_loss_semi_implicit(state,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
@@ -58,7 +58,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_liquid_loss_implicit(state,r)
 
-            TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_complex), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
@@ -71,7 +71,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_carrier_liquid_loss_analytic(state,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)

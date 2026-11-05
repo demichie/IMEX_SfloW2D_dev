@@ -4,7 +4,7 @@ MODULE thermal_laws_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_ID_THERMAL_COOLING
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit,                                                      &
             eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit,                                         &
             eval_thermal_cooling_analytic
@@ -25,7 +25,7 @@ CONTAINS
     !> @param[out] rate Assembled real thermal source rate.
     SUBROUTINE eval_thermal_explicit(model_id,state,radiative,convective,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: rate
         REAL(wp) :: process_rate
@@ -50,7 +50,7 @@ CONTAINS
     !> @param[out] rate Assembled real thermal source rate.
     SUBROUTINE eval_thermal_semi_implicit(models,state,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate
         REAL(wp) :: process_rate
         INTEGER :: i
@@ -85,7 +85,7 @@ CONTAINS
     !> @param[out] rate Assembled complex thermal source rate.
     SUBROUTINE eval_thermal_implicit(model_id,state,radiative,convective,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
         COMPLEX(wp), INTENT(OUT) :: rate
         COMPLEX(wp) :: process_rate
@@ -116,7 +116,7 @@ CONTAINS
     SUBROUTINE eval_thermal_analytic(models,state,interval,heat_capacity,                                              &
             radiative,convective,ambient,temperature_after)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: temperature_after
         REAL(wp) :: temperature_before

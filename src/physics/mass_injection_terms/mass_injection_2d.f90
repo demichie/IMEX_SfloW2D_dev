@@ -1,7 +1,7 @@
 !> @brief Assemble complete conservative rates from volumetric injection processes.
 MODULE mass_injection_2d
     USE parameters_2d, ONLY : wp, n_eqns
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE mass_bottom_circular_injection_2d, ONLY : eval_bottom_circular_injection_explicit,                             &
             eval_bottom_circular_injection_semi_implicit, eval_bottom_circular_injection_implicit,                     &
             eval_bottom_circular_injection_analytic
@@ -33,7 +33,7 @@ CONTAINS
     !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_explicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
         lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
         LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial
@@ -79,7 +79,7 @@ CONTAINS
     !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_semi_implicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,  &
         lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
         LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial
@@ -126,7 +126,7 @@ CONTAINS
     !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_implicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
         lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
         LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial
@@ -173,7 +173,7 @@ CONTAINS
     !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_analytic(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
         lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
         LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial

@@ -4,7 +4,7 @@
 MODULE mass_exchange_lava_deposition_2d
     USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
     USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
@@ -31,7 +31,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_explicit(state,dt,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -51,7 +51,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(state,dt,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -67,7 +67,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_implicit(state,dt,r)
 
-            TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_complex), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -83,7 +83,7 @@ CONTAINS
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_lava_deposition_analytic(state,dt,r)
 
-            TYPE(physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

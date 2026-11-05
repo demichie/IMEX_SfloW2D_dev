@@ -3,7 +3,7 @@
 !> to be added without changing any caller. Darcy is the only model today.
 MODULE pore_pressure_2d
     USE parameters_2d, ONLY : wp, n_solid, n_eqns, pore_pressure_flag
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_new_types, ONLY : physical_state_real, physical_state_complex
     USE diagnostics_2d, ONLY : fatal_error
     USE pore_pressure_darcy_2d, ONLY :                                                                                 &
             darcy_explicit => eval_pore_pressure_darcy_explicit,                                                       &
@@ -25,7 +25,7 @@ CONTAINS
     !> @param[in] include_gas_loss Optional switch for coupled interstitial gas loss.
     SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
         INTEGER :: i
@@ -52,7 +52,7 @@ CONTAINS
     !> @param[out] rate Conservative semi-implicit rate vector.
     SUBROUTINE eval_pore_pressure_semi_implicit(models,state,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER :: i
         rate=0.0_wp
@@ -78,7 +78,7 @@ CONTAINS
     !> @param[out] rate Complex conservative source vector.
     SUBROUTINE eval_pore_pressure_implicit(models,state,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
@@ -111,7 +111,7 @@ CONTAINS
     !> @param[in] include_gas_loss Optional coupled pore-gas loss switch.
     SUBROUTINE eval_pore_pressure_analytic(models, state, q_before, interval, rate, admissible, include_gas_loss)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(OUT) :: admissible
