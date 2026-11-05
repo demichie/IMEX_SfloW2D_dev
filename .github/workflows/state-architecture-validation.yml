@@ -95,7 +95,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TESTS/TEST_STATE_EQUIVALENCE/run_test.sh 2>&1 | tee state-equivalence.log
+          sh TESTS/TEST_STATE_EQUIVALENCE/run_test.sh 2>&1 | tee state-equivalence.log
       - name: Upload equivalence log
         if: always()
         uses: actions/upload-artifact@v4
