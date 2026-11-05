@@ -69,7 +69,7 @@ CONTAINS
 
     SUBROUTINE collapsing_volume(state)
 
-    USE state_conversion_2d, ONLY : eval_mixture_properties_from_volume_fractions
+    USE state_new_mixture, ONLY : evaluate_mixture_from_volume
     USE state_new_conversions, ONLY : numerical_primitive_to_conservative
     USE diagnostics_2d, ONLY : fatal_error
 
@@ -121,7 +121,7 @@ CONTAINS
 
 
         alphas_local = alphas_collapse(1:n_solid)
-        CALL eval_mixture_properties_from_volume_fractions(T_collapse, alphag_collapse(1:n_add_gas), alphas_local,     &
+        CALL evaluate_mixture_from_volume(T_collapse, alphag_collapse(1:n_add_gas), alphas_local,     &
             rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse, xc, sp_heat_c, sp_heat_mix)
 
         qp_init(5:4+n_solid) = xs_collapse

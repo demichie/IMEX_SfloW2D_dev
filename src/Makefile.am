@@ -159,7 +159,8 @@ numerics/lie_source_executor_2d.$(OBJEXT): state_new/state_new_types.$(OBJEXT)
 state_new/state_new_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state_new/state_new_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.
-state_new/state_new_mixture.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+state_new/state_new_mixture.$(OBJEXT): state_new/state_new_composition.$(OBJEXT) \
+                                     core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state_new/mixture_heat_capacity.inc \
                                      state_new/mixture_from_mass.inc \
@@ -387,7 +388,7 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          geometry/geometry_2d.$(OBJEXT)          \
                                          numerics/nonlinear_solver_2d.$(OBJEXT)  \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
-                                         state/state_conversion_2d.$(OBJEXT)  \
+                                         state_new/state_new_conversions.$(OBJEXT) \
                                          state/state_2d.$(OBJEXT) \
                                          numerics/lie_source_executor_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
@@ -401,7 +402,8 @@ numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           numerics/nonlinear_solver_2d.$(OBJEXT) \
                                           state/state_2d.$(OBJEXT) \
                                           geometry/geometry_2d.$(OBJEXT)     \
-                                          state/state_conversion_2d.$(OBJEXT)
+                                          state_new/state_new_conversions.$(OBJEXT) \
+                                          state_new/state_new_physical.$(OBJEXT)
 stochastic/stochastic_random_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 stochastic/stochastic_module.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                         geometry/domain_2d.$(OBJEXT)             \
@@ -425,7 +427,7 @@ core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
                         state/state_2d.$(OBJEXT)                                \
-                        state/state_conversion_2d.$(OBJEXT) \
+                        state_new/state_new_mixture.$(OBJEXT) \
                         state_new/state_new_conversions.$(OBJEXT)
 io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
                           core/diagnostics_2d.$(OBJEXT)
@@ -446,7 +448,9 @@ io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                         core/init_2d.$(OBJEXT)                                 \
                         core/runtime_2d.$(OBJEXT)                              \
                         state/state_2d.$(OBJEXT)                               \
-                        state/state_conversion_2d.$(OBJEXT)                    \
+                        state_new/state_new_physical.$(OBJEXT) \
+                        state_new/state_new_types.$(OBJEXT) \
+                        state_new/state_new_composition.$(OBJEXT) \
                         stochastic/stochastic_module.$(OBJEXT)                 \
                         stochastic/stochastic_random_2d.$(OBJEXT)              \
                         io/output_paths.$(OBJEXT)                              \

@@ -4,11 +4,13 @@
 MODULE state_new_mixture
 
     USE parameters_2d, ONLY : wp, gas_flag
-    USE parameters_2d, ONLY : n_solid, n_add_gas
+    USE parameters_2d, ONLY : n_solid, n_add_gas, n_vars, idx_h, idx_T, &
+        idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last
     USE constitutive_parameters_2d, ONLY : sp_heat_a, sp_heat_g, sp_heat_s, sp_heat_l
     USE constitutive_parameters_2d, ONLY : sp_gas_const_a, sp_gas_const_g
-    USE constitutive_parameters_2d, ONLY : inv_pres, rho_l, inv_rho_l
+    USE constitutive_parameters_2d, ONLY : inv_pres, pres, rho_l, inv_rho_l
     USE constitutive_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s
+    USE state_new_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
     PRIVATE
@@ -17,6 +19,7 @@ MODULE state_new_mixture
     PUBLIC :: evaluate_mixture_heat_capacity
     PUBLIC :: evaluate_mixture_density
     PUBLIC :: sauter_diameter, average_density_solids
+    PUBLIC :: evaluate_mixture_from_volume, primitive_to_volume_fractions
 
     INTERFACE evaluate_mixture
         MODULE PROCEDURE evaluate_mixture_real
@@ -92,6 +95,65 @@ CONTAINS
         INCLUDE 'mixture_heat_capacity.inc'
         INCLUDE 'mixture_from_mass.inc'
     END SUBROUTINE evaluate_mixture_complex
+
+    !> Convert prescribed volume fractions into the canonical source material.
+    !> This inverse composition operation cannot be replaced by a mass-based
+    !> density evaluation: the input fractions refer to constituent volumes.
+    SUBROUTINE evaluate_mixture_from_volume(T,alphag,alphas,rho_m,inv_rhom, &
+            rho_c,xs,xg,xc,cp_c,cp_m)
+        REAL(wp), INTENT(IN) :: T,alphag(n_add_gas)
+        REAL(wp), INTENT(INOUT) :: alphas(n_solid)
+        REAL(wp), INTENT(OUT) :: rho_m,inv_rhom,rho_c
+        REAL(wp), INTENT(OUT) :: xs(n_solid),xg(n_add_gas),xc,cp_c,cp_m
+        REAL(wp) :: alphas_tot,alphac,alpha_air,rho_a,rho_g(n_add_gas)
+
+        alphas_tot=SUM(alphas)
+        IF (alphas_tot>1.0_wp) THEN
+            alphas=alphas/alphas_tot
+        ELSEIF (alphas_tot<0.0_wp) THEN
+            alphas=0.0_wp
+        END IF
+        alphas_tot=SUM(alphas)
+        alphac=1.0_wp-alphas_tot
+        IF (gas_flag) THEN
+            rho_a=pres/(sp_gas_const_a*T)
+            rho_g=pres/(sp_gas_const_g*T)
+            alpha_air=alphac-SUM(alphag)
+            IF (alphac>EPSILON(1.0_wp)) THEN
+                rho_c=(alpha_air*rho_a+SUM(alphag*rho_g))/alphac
+            ELSE
+                rho_c=rho_a
+            END IF
+        ELSE
+            rho_c=rho_l
+            rho_g=0.0_wp
+        END IF
+        rho_m=SUM(alphas*rho_s)+alphac*rho_c
+        inv_rhom=1.0_wp/rho_m
+        xs=alphas*rho_s*inv_rhom
+        xg=alphag*rho_g*inv_rhom
+        xc=1.0_wp-SUM(xs)
+        CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+    END SUBROUTINE evaluate_mixture_from_volume
+
+    !> Primitive-state solid/gas volume fractions, zero for dry cells.
+    !> The caller's state is never modified during composition closure.
+    SUBROUTINE primitive_to_volume_fractions(qp,alphas,alphag)
+        REAL(wp), INTENT(IN) :: qp(n_vars)
+        REAL(wp), INTENT(OUT) :: alphas(n_solid),alphag(n_add_gas)
+        REAL(wp) :: xs(n_solid),xg(n_add_gas)
+        REAL(wp) :: rho_m,inv_rhom,rho_c,inv_rho_c,cp_m,cp_c
+
+        alphas=0.0_wp
+        alphag=0.0_wp
+        IF (qp(idx_h)<=EPSILON(1.0_wp)) RETURN
+        xs=qp(idx_solid_first:idx_solid_last)
+        xg=qp(idx_add_gas_first:idx_add_gas_last)
+        IF (.NOT.normalize_face_composition(xs,xg)) &
+            ERROR STOP 'Invalid primitive composition in volume conversion'
+        CALL evaluate_mixture(qp(idx_T),xs,xg,rho_m,inv_rhom,rho_c,inv_rho_c, &
+            cp_m,cp_c,alphas,alphag)
+    END SUBROUTINE primitive_to_volume_fractions
 
     !> Sauter diameter and volume-weighted particle density for granular laws.
     !> Keep the historical limiting behavior and arithmetic exactly unchanged.

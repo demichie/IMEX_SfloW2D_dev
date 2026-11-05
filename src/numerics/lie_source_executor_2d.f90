@@ -250,7 +250,8 @@ CONTAINS
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
-        USE state_conversion_2d, ONLY : qc_to_qp,mixt_var
+        USE state_new_conversions, ONLY : conservative_to_primitive
+        USE state_new_physical, ONLY : build_physical_state_from_qp
         USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                               &
             physical_cell_state_finite,finite_real_value
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
@@ -279,7 +280,7 @@ CONTAINS
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
-        REAL(wp) :: ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix
+        REAL(wp) :: red_grav
         ! Profiling counters are thread-owned: no atomics inside the cell loop.
         REAL(wp), ALLOCATABLE :: thread_group(:,:),thread_physics(:,:),thread_cell(:)
         INTEGER, ALLOCATABLE :: thread_evaluations(:,:)
@@ -512,7 +513,8 @@ CONTAINS
                     END IF
 
                     IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                        CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate',conversion_ok)
+                        CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                    &
+                            p_dyn=pressure,numerical_reconstruction=.TRUE.)
 
                         IF (.NOT.conversion_ok) THEN
                             cell_error=8
@@ -609,7 +611,8 @@ CONTAINS
                 END IF
 
                 IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                    CALL qc_to_qp(q_candidate,qp_candidate,pressure,TRIM(context),conversion_ok)
+                    CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                    &
+                        p_dyn=pressure,numerical_reconstruction=.TRUE.)
 
                     IF (.NOT.conversion_ok) THEN
                         cell_error=14
@@ -632,13 +635,19 @@ CONTAINS
             ! Restore the v2 buoyancy removal after all mass-exchange groups.
             ! This is a physical sink, not a numerical limiter on the source rates.
             IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
-                CALL mixt_var(qp_local,ri_mix,rho_mix,rho_carrier,red_grav,heat_carrier,heat_mix)
+                CALL build_physical_state_from_qp(qp_local,executor%source_physical_scratch(tid),                 &
+                    accepted=conversion_ok)
+                IF (.NOT.conversion_ok) THEN
+                    cell_error=15
+                ELSE
+                    red_grav=executor%source_physical_scratch(tid)%red_grav
+                END IF
                 IF (executor%diagnostics_enabled .AND. cell_arc_perim(j,k)>0.0_wp) THEN
                     executor%pre_buoyancy_mass(cell)=q_local(idx_totMassEqn)
                     executor%pre_buoyancy_solids(cell)=SUM(q_local(idx_solidEqn_first:idx_solidEqn_last))
                     executor%buoyancy_reduced_gravity(cell)=red_grav
                 END IF
-                IF (red_grav<=0.0_wp) THEN
+                IF (cell_error==0 .AND. red_grav<=0.0_wp) THEN
                     q_local=0.0_wp
                     CALL initialize_dry_physical_cell(qp_local)
                 END IF

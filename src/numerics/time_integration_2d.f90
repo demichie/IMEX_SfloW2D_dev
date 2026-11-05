@@ -9,7 +9,7 @@ MODULE time_integration_2d
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
             B_prime_x_geom,B_prime_y_geom,grav_coeff,B_zone
-    USE state_conversion_2d, ONLY : qc_to_qp
+    USE state_new_conversions, ONLY : conservative_to_primitive
     USE state_2d, ONLY : state_type,substrate_snapshot_type,                                                           &
             initialize_dry_physical_cell,conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
@@ -140,8 +140,8 @@ CONTAINS
             k=domain%k_reconstruction(l)
 
             IF (state%q(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL qc_to_qp(state%q(:,j,k),this%qp_before(:,j,k),pd,                                                 &
-                    'Lie pre-spatial reconstruction state',conversion_ok)
+                CALL conservative_to_primitive(state%q(:,j,k),this%qp_before(:,j,k),                              &
+                    accepted=conversion_ok,p_dyn=pd,numerical_reconstruction=.TRUE.)
                 IF (.NOT.conversion_ok) this%cell_status(l)=1
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
@@ -183,7 +183,8 @@ CONTAINS
             END IF
 
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
+                CALL conservative_to_primitive(this%q_trial(:,j,k),this%qp_trial(:,j,k),                            &
+                    accepted=conversion_ok,p_dyn=pd,numerical_reconstruction=.TRUE.)
                 IF (.NOT.conversion_ok) this%cell_status(l)=2
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))

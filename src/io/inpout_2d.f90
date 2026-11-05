@@ -121,7 +121,11 @@ MODULE inpout_2d
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     USE rheology_quadratic_2d, ONLY: friction_factor
     ! -- Functions used in the rheology calculations
-    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids
+    USE state_new_mixture, ONLY : sauter_diameter, average_density_solids, &
+        evaluate_mixture, evaluate_mixture_from_volume, primitive_to_volume_fractions
+    USE state_new_composition, ONLY : normalize_face_composition
+    USE state_new_types, ONLY : physical_state_real, initialize_physical_state_real
+    USE state_new_physical, ONLY : build_physical_state_from_qp
     USE constitutive_parameters_2d, ONLY: precompute_pascal_coefficient
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
@@ -1071,9 +1075,7 @@ CONTAINS
     USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
 
     USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
-    USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions,                                        &
-            eval_mixture_properties_from_volume_fractions,                                                             &
-            enforce_mass_fraction_closure
+
 
     USE rheology_lahar_2d, ONLY: n_td2
     USE constitutive_parameters_2d, ONLY: coeff_porosity,                                                              &
@@ -1082,7 +1084,7 @@ CONTAINS
     USE init_2d, ONLY: erodible_init
 
         ! External procedures
-    USE state_conversion_2d, ONLY: mixt_var
+
 
     IMPLICIT none
 
@@ -1119,6 +1121,8 @@ CONTAINS
         REAL(wp) :: red_grav
         REAL(wp) :: rho_c
         REAL(wp) :: rho_m
+        TYPE(physical_state_real) :: source_state
+        LOGICAL :: source_state_ok
 
         ! Source composition as given, for the per-fissure conversion
         LOGICAL :: composition_by_volume
@@ -4366,7 +4370,7 @@ CONTAINS
 
             IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
-                CALL eval_mixture_properties_from_volume_fractions(                                                    &
+                CALL evaluate_mixture_from_volume(                                                    &
                     ! IN
                     T_source, alphag_source(1:n_add_gas),                                                              &
                     ! INOUT
@@ -4380,7 +4384,8 @@ CONTAINS
 
             ! Source composition is canonical from here on, including for the
             ! bottom radial source, which does not enter the source-flow setup.
-            CALL enforce_mass_fraction_closure(xs_source(1:n_solid), xg_source(1:n_add_gas))
+            IF (.NOT.normalize_face_composition(xs_source(1:n_solid),xg_source(1:n_add_gas))) &
+                CALL fatal_error('Invalid source material composition')
 
             ! Every fissure carries the source composition at its own
             ! temperature. Converting volume fractions once, at T_FISSURES(1),
@@ -4396,7 +4401,7 @@ CONTAINS
                 IF (composition_by_volume) THEN
 
                     alphas_fissure(1:n_solid) = alphas_given(1:n_solid)
-                    CALL eval_mixture_properties_from_volume_fractions(                                                &
+                    CALL evaluate_mixture_from_volume(                                                &
                             ! IN
                             T_fissures(i), alphag_given(1:n_add_gas),                                                  &
                             ! INOUT
@@ -4406,7 +4411,8 @@ CONTAINS
                             xs_fissures(:, i), xg_fissures(:, i),                                                      &
                             xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
 
-                    CALL enforce_mass_fraction_closure(xs_fissures(:, i), xg_fissures(:, i))
+                    IF (.NOT.normalize_face_composition(xs_fissures(:,i),xg_fissures(:,i))) &
+                        CALL fatal_error('Invalid fissure material composition')
 
                 ELSE
 
@@ -4437,12 +4443,9 @@ CONTAINS
 
                 qp_source(idx_T) = T_source
 
-                CALL eval_mixture_properties_from_mass_fractions(                                                      &
-                    ! IN
-                    T_source, xs_source, xg_source,                                                                    &
-                    ! OUT
-                    rho_m, inv_rhom, rho_c, inv_rho_c,                                                                 &
-                    alphas_source, alphag_source)
+                CALL evaluate_mixture(T_source,xs_source(1:n_solid),xg_source(1:n_add_gas),                          &
+                    rho_m,inv_rhom,rho_c,inv_rho_c,sp_heat_mix,sp_heat_c,                                              &
+                    alphas_source(1:n_solid),alphag_source(1:n_add_gas))
 
                 WRITE (*, *) 'Source solid volume fraction =', alphas_source(1:n_solid)
 
@@ -4461,8 +4464,16 @@ CONTAINS
                 qp_source(idx_u) = vel_source
                 qp_source(idx_v) = 0.0_wp
 
-                ! compute the Richardson number for vel = 1.0 (or vel from input)
-                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
+                ! Evaluate source density and Richardson through the canonical state.
+                CALL initialize_physical_state_real(source_state)
+                CALL build_physical_state_from_qp(qp_source,source_state,accepted=source_state_ok)
+                IF (.NOT.source_state_ok) CALL fatal_error('Invalid source physical state')
+                Ri=source_state%Ri
+                rho_m=source_state%rho_m
+                rho_c=source_state%rho_c
+                red_grav=source_state%red_grav
+                sp_heat_c=source_state%cp_c
+                sp_heat_mix=source_state%cp_m
 
                 WRITE (*, *) 'Source density =', rho_m, '(kg/m3)'
                 WRITE (*, *) 'Source reduced gravity =', red_grav, '(m/s2)'
@@ -4493,7 +4504,14 @@ CONTAINS
                         qp_source(idx_v) = 0.0_wp
 
                         ! compute the Richardson number for vel = 1.0
-                        CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
+                        CALL build_physical_state_from_qp(qp_source,source_state,accepted=source_state_ok)
+                        IF (.NOT.source_state_ok) CALL fatal_error('Invalid source physical state')
+                        Ri=source_state%Ri
+                        rho_m=source_state%rho_m
+                        rho_c=source_state%rho_c
+                        red_grav=source_state%red_grav
+                        sp_heat_c=source_state%cp_c
+                        sp_heat_mix=source_state%cp_m
 
                         ! compute the correct velocity for the desired Richardson number
                         vel_source = SQRT(red_grav*h_source/Ri_source)
@@ -4502,7 +4520,14 @@ CONTAINS
 
                     ! mfr and velocity
 
-                    CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
+                    CALL build_physical_state_from_qp(qp_source,source_state,accepted=source_state_ok)
+                        IF (.NOT.source_state_ok) CALL fatal_error('Invalid source physical state')
+                        Ri=source_state%Ri
+                        rho_m=source_state%rho_m
+                        rho_c=source_state%rho_c
+                        red_grav=source_state%red_grav
+                        sp_heat_c=source_state%cp_c
+                        sp_heat_mix=source_state%cp_m
 
                     h_source = mfr_source/(source_length*rho_m*                                                        &
                                                     vel_source)
@@ -4525,7 +4550,14 @@ CONTAINS
                 qp_source(idx_u) = vel_source
 
                 ! Check that the Richardson number is correct
-                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c, sp_heat_mix)
+                CALL build_physical_state_from_qp(qp_source,source_state,accepted=source_state_ok)
+                        IF (.NOT.source_state_ok) CALL fatal_error('Invalid source physical state')
+                        Ri=source_state%Ri
+                        rho_m=source_state%rho_m
+                        rho_c=source_state%rho_c
+                        red_grav=source_state%red_grav
+                        sp_heat_c=source_state%cp_c
+                        sp_heat_mix=source_state%cp_m
 
                 WRITE (*, *) 'Source Richardson number =', Ri
                 WRITE (*, *) 'Source velocity =', vel_source, ' (m/s)'
@@ -5076,8 +5108,7 @@ CONTAINS
 
         ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-    USE state_conversion_2d, ONLY:                                                                                     &
-            eval_mixture_properties_from_volume_fractions
+
         ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
     USE geometry_2d, ONLY: B_cent, B_vertex
@@ -5398,7 +5429,7 @@ CONTAINS
         !----- END NEW INITIALIZATION OF THICKNESS FROM RESTART
 
         alphag_init_local = 0.0_wp
-        CALL eval_mixture_properties_from_volume_fractions(                                                            &
+        CALL evaluate_mixture_from_volume(                                                            &
                 ! IN
                 T_init, alphag_init_local,                                                                             &
                 ! INOUT
@@ -6749,7 +6780,7 @@ CONTAINS
     USE geometry_2d, ONLY: x_comp, y_comp
     USE parameters_2d, ONLY: n_vars
     USE geometry_2d, ONLY: interp_2d_scalarB
-    USE state_conversion_2d, ONLY: primitive_to_volume_fractions
+
 
     IMPLICIT NONE
 
@@ -6995,7 +7026,7 @@ CONTAINS
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
     USE parameters_2d, ONLY: n_solid, n_vars
-    USE state_conversion_2d, ONLY: primitive_to_volume_fractions
+
     IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: time
@@ -7593,7 +7624,7 @@ CONTAINS
     USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
     USE parameters_2d, ONLY: n_vars
-    USE state_conversion_2d, ONLY: mixt_var, primitive_to_volume_fractions
+
 
     IMPLICIT NONE
         REAL(wp), INTENT(IN) :: time_in
@@ -7606,6 +7637,8 @@ CONTAINS
 
 
         REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix
+        TYPE(physical_state_real) :: output_physical_state
+        LOGICAL :: output_state_ok
         REAL(wp) :: r_h, r_u, r_v, mod_hor_vel
         REAL(wp) :: grav_coeff, vert_stress_eff, eff_normal_stress
         REAL(wp) :: diam_characteristic, rho_particle, shear_rate
@@ -7649,6 +7682,7 @@ CONTAINS
         alphas2D = 0.0_wp
         alphag2D = 0.0_wp
         vertical_velocity = 0.0_wp
+        CALL initialize_physical_state_real(output_physical_state)
 
         DO j = 1, comp_cells_x
 
@@ -7656,8 +7690,15 @@ CONTAINS
 
             IF (state%qp(idx_h, j, k) .GT. dry_thickness_tolerance) THEN
 
-                CALL mixt_var(state%qp(1:n_vars, j, k), r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c,           &
-                    r_sp_heat_mix)
+                CALL build_physical_state_from_qp(state%qp(1:n_vars,j,k),output_physical_state,                  &
+                    accepted=output_state_ok)
+                IF (.NOT.output_state_ok) CALL fatal_error('Invalid output physical state')
+                r_Ri=output_physical_state%Ri
+                r_rho_m=output_physical_state%rho_m
+                r_rho_c=output_physical_state%rho_c
+                r_red_grav=output_physical_state%red_grav
+                r_sp_heat_c=output_physical_state%cp_c
+                r_sp_heat_mix=output_physical_state%cp_m
 
                 denom = state%q(idx_uEqn,j,k)**2 + state%q(idx_vEqn,j,k)**2
 

@@ -3,12 +3,15 @@ PROGRAM test_state_equivalence
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, &
         old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, &
-        physical_state_type, complex_physical_state_type, old_mixture=>mixt_var
+        physical_state_type, complex_physical_state_type, old_mixture=>mixt_var, &
+        old_from_volume=>eval_mixture_properties_from_volume_fractions, &
+        old_primitive_volume=>primitive_to_volume_fractions
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
     USE state_new, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
         numerical_primitive_to_conservative, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
+        evaluate_mixture_from_volume, primitive_to_volume_fractions, &
         state_workspace_real, state_workspace_complex, &
         initialize_state_workspace_real, initialize_state_workspace_complex
     IMPLICIT NONE
@@ -39,6 +42,7 @@ PROGRAM test_state_equivalence
     CALL check_spatial_face_properties(qp,'roundoff face')
     CALL check_numerical_decoder_limits
     CALL check_settling_trace_equivalence
+    CALL check_volume_conversion_equivalence
     WRITE(*,'(A)') 'PASS: state_new equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
@@ -198,6 +202,48 @@ CONTAINS
         CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
         IF (accepted) ERROR STOP 'numerical decoder accepted materially negative solids'
     END SUBROUTINE check_numerical_decoder_limits
+
+    !> I/O and initialization use the inverse volume->mass composition
+    !> independently of the conservative/primitive numerical conversions.
+    SUBROUTINE check_volume_conversion_equivalence
+        REAL(wp) :: volume_old(n_solid),volume_new(n_solid)
+        REAL(wp) :: gas_volume(n_add_gas),xs_old(n_solid),xs_new(n_solid)
+        REAL(wp) :: xg_old(n_add_gas),xg_new(n_add_gas)
+        REAL(wp) :: rho_old,inv_old,carrier_old,xc_old,heat_c_old,heat_m_old
+        REAL(wp) :: rho_new,inv_new,carrier_new,xc_new,heat_c_new,heat_m_new
+        REAL(wp) :: out_solids_old(n_solid),out_solids_new(n_solid)
+        REAL(wp) :: out_gas_old(n_add_gas),out_gas_new(n_add_gas)
+        INTEGER :: configuration
+
+        DO configuration=1,2
+            gas_flag=configuration==1
+            liquid_flag=.NOT.gas_flag
+            volume_old=[0.02_wp,0.03_wp]
+            volume_new=volume_old
+            gas_volume=0.0_wp
+            IF (gas_flag) gas_volume=0.01_wp
+            CALL old_from_volume(350.0_wp,gas_volume,volume_old,rho_old,inv_old, &
+                carrier_old,xs_old,xg_old,xc_old,heat_c_old,heat_m_old)
+            CALL evaluate_mixture_from_volume(350.0_wp,gas_volume,volume_new, &
+                rho_new,inv_new,carrier_new,xs_new,xg_new,xc_new,heat_c_new,heat_m_new)
+            CALL assert_vector('inverse volume solids',volume_new,volume_old,1.0E-12_wp)
+            CALL assert_vector('inverse volume mass solids',xs_new,xs_old,1.0E-12_wp)
+            CALL assert_vector('inverse volume mass gas',xg_new,xg_old,1.0E-12_wp)
+            CALL assert_scalar('inverse volume density',rho_new,rho_old,1.0E-12_wp)
+            CALL assert_scalar('inverse volume inverse density',inv_new,inv_old,1.0E-12_wp)
+            CALL assert_scalar('inverse volume carrier',carrier_new,carrier_old,1.0E-12_wp)
+            CALL assert_scalar('inverse volume heat carrier',heat_c_new,heat_c_old,1.0E-12_wp)
+            CALL assert_scalar('inverse volume heat mixture',heat_m_new,heat_m_old,1.0E-12_wp)
+            CALL make_qp(0.25_wp,350.0_wp,1.0_wp,0.0_wp, &
+                xs_new(1),xs_new(2),SUM(xg_new),qp)
+            CALL old_primitive_volume(qp,out_solids_old,out_gas_old)
+            CALL primitive_to_volume_fractions(qp,out_solids_new,out_gas_new)
+            CALL assert_vector('primitive solids volume',out_solids_new,out_solids_old,1.0E-12_wp)
+            CALL assert_vector('primitive gas volume',out_gas_new,out_gas_old,1.0E-12_wp)
+        END DO
+        gas_flag=.TRUE.
+        liquid_flag=.FALSE.
+    END SUBROUTINE check_volume_conversion_equivalence
 
     SUBROUTINE make_qp(h,T,u,v,xs1,xs2,xg1,out)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1
