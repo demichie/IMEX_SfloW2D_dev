@@ -24,6 +24,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **C3 — raffreddamento analitico (5 novembre 2026, validazione pendente):** il ramo wet `thermal_cooling` in `source_terms_2d` evita la costruzione di `physical_state_real` completo e usa solo `evaluate_mixture_heat_capacity` e la temperatura scalare, mantenendo il rapporto conservativo precedente e il ramo dry. `eval_thermal_analytic` riceve la temperatura invece del tipo fisico. Aggiornata la dipendenza Make; controlli scientifici e prestazionali ancora da effettuare. Nessuna Action avviata.
 
+**Avanzamento C4 (5 novembre 2026):** `hyperbolic_2d` riusa sui path di interfaccia i coefficienti idrostatici `gamma=rho_m*g'` calcolati insieme alle velocita caratteristiche sulle stesse tracce finali. Memorizzati nel workspace HP-PCCU, invalidati con il ricalcolo delle velocita e azzerati dove il dry-donor modifica la profondita; nessuna nuova cache globale o modifica delle formule. Evitate due ulteriori valutazioni termodinamiche per faccia, a costo di quattro matrici scalari aggiuntive da misurare. **C4 in corso: compilazione, risultati e profiling sul nuovo commit pendenti.** Dettagli nella roadmap specialistica; Actions solo manuali.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

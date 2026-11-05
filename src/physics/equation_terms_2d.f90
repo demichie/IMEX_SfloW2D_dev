@@ -105,13 +105,15 @@ CONTAINS
     !> \param[out] vel_min Lower characteristic speed [m s^-1].
     !> \param[out] vel_max Upper characteristic speed [m s^-1].
     !> \note normal_velocity_index must identify one of the two Cartesian velocity components.
-    SUBROUTINE eval_local_speeds_direction(qpj, grav_coeff, normal_velocity_index, vel_min, vel_max)
+    SUBROUTINE eval_local_speeds_direction(qpj, grav_coeff, normal_velocity_index, vel_min, vel_max, gamma)
         REAL(wp), INTENT(IN) :: qpj(n_vars), grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: vel_min, vel_max
+        REAL(wp), INTENT(OUT), OPTIONAL :: gamma
         REAL(wp) :: r_rho_m,r_red_grav,r_h,normal_velocity,celerity
 
         CALL eval_spatial_buoyancy(qpj,r_rho_m,r_red_grav)
+        IF (PRESENT(gamma)) gamma=r_rho_m*r_red_grav
         r_h = qpj(idx_h)
         normal_velocity = qpj(normal_velocity_index)
 

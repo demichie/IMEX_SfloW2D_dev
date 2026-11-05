@@ -40,6 +40,10 @@ MODULE hyperbolic_2d
         REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:)
         REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:)
         REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:)
+        ! Hydrostatic coefficients derived while evaluating the same final
+        ! endpoint traces for characteristic speeds. Owned by the HP workspace.
+        REAL(wp), ALLOCATABLE :: gamma_interface_xL(:,:),gamma_interface_xR(:,:)
+        REAL(wp), ALLOCATABLE :: gamma_interface_yB(:,:),gamma_interface_yT(:,:)
         REAL(wp), ALLOCATABLE :: G_interface_xL(:,:,:)
         REAL(wp), ALLOCATABLE :: G_interface_xR(:,:,:)
         REAL(wp), ALLOCATABLE :: G_interface_yB(:,:,:)
@@ -124,6 +128,10 @@ CONTAINS
         ALLOCATE( this%a_interface_xPos(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_yNeg(comp_cells_x,comp_interfaces_y) )
         ALLOCATE( this%a_interface_yPos(comp_cells_x,comp_interfaces_y) )
+        ALLOCATE( this%gamma_interface_xL(comp_interfaces_x,comp_cells_y) )
+        ALLOCATE( this%gamma_interface_xR(comp_interfaces_x,comp_cells_y) )
+        ALLOCATE( this%gamma_interface_yB(comp_cells_x,comp_interfaces_y) )
+        ALLOCATE( this%gamma_interface_yT(comp_cells_x,comp_interfaces_y) )
 
         ALLOCATE( this%G_interface_xL(n_eqns,comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%G_interface_xR(n_eqns,comp_interfaces_x,comp_cells_y) )
@@ -136,6 +144,10 @@ CONTAINS
         this%a_interface_xPos = 0.0_wp
         this%a_interface_yNeg = 0.0_wp
         this%a_interface_yPos = 0.0_wp
+        this%gamma_interface_xL = 0.0_wp
+        this%gamma_interface_xR = 0.0_wp
+        this%gamma_interface_yB = 0.0_wp
+        this%gamma_interface_yT = 0.0_wp
         this%G_interface_xL = 0.0_wp
         this%G_interface_xR = 0.0_wp
         this%G_interface_yB = 0.0_wp
@@ -448,7 +460,8 @@ CONTAINS
                         recon%h_selected_interfaceR(j,k),                                                              &
                     recon%qp_adv_interfaceL(:,j,k),                                                                    &
                     recon%qp_adv_interfaceR(:,j,k), grav_coeff_stag_x(j,k),                                            &
-                    a_minus, a_plus, PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
+                    a_minus, a_plus, this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),                      &
+                    PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
                     this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
 
@@ -522,7 +535,8 @@ CONTAINS
                         recon%h_selected_interfaceT(j,k),                                                              &
                     recon%qp_adv_interfaceB(:,j,k),                                                                    &
                     recon%qp_adv_interfaceT(:,j,k), grav_coeff_stag_y(j,k),                                            &
-                    a_minus, a_plus, PATH_DIR_Y, 3, j, k, use_dry_donor,                                               &
+                    a_minus, a_plus, this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k),                      &
+                    PATH_DIR_Y, 3, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
                     this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
 
@@ -671,12 +685,12 @@ CONTAINS
     !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
     SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face, h_selected_left,h_selected_right,                      &
             qp_adv_left,qp_adv_right,                                                                                  &
-            grav_coeff,a_minus,a_plus,direction,normal_momentum_index,face_i,                                          &
+            grav_coeff,a_minus,a_plus,gamma_left_cached,gamma_right_cached,                                          &
+            direction,normal_momentum_index,face_i,                                                                    &
             face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                                                     &
             value_left,value_right)
 
     USE equation_terms_2d, ONLY : eval_inertial_flux
-    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE equation_terms_2d, ONLY : limit_component_mass_flux
     USE state_conversions, ONLY : numerical_primitive_to_conservative
     USE diagnostics_2d, ONLY : fatal_error
@@ -691,6 +705,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
         REAL(wp), INTENT(IN) :: qp_adv_left(n_vars), qp_adv_right(n_vars)
         REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
+        REAL(wp), INTENT(IN) :: gamma_left_cached,gamma_right_cached
         INTEGER, INTENT(IN) :: direction, normal_momentum_index
         INTEGER, INTENT(IN) :: face_i, face_j
         LOGICAL, INTENT(IN) :: use_dry_donor
@@ -704,7 +719,6 @@ CONTAINS
         REAL(wp) :: path_contribution(n_eqns), interface_flux(n_eqns)
         REAL(wp) :: qp_path_left(n_vars), qp_path_right(n_vars)
         REAL(wp) :: gamma_left, gamma_right
-        REAL(wp) :: reduced_gravity_left, reduced_gravity_right
         REAL(wp) :: eta_scale, eta_roundoff
         REAL(wp) :: u_normal_left,u_normal_right
         REAL(wp) :: eta_path_left, eta_path_right
@@ -833,8 +847,14 @@ CONTAINS
 
         END IF
 
-        CALL eval_hydrostatic_coefficient(qp_path_left,reduced_gravity_left,gamma_left)
-        CALL eval_hydrostatic_coefficient(qp_path_right,reduced_gravity_right,gamma_right)
+        ! The characteristic-speed pass already evaluated rho_m*g' from the
+        ! identical finalized temperature and component fractions at this face.
+        ! Only the dry-donor path may change endpoint depth to zero; reproduce
+        ! exactly the hydrostatic kernel's zero-depth branch in that case.
+        gamma_left=gamma_left_cached
+        gamma_right=gamma_right_cached
+        IF (qp_path_left(1)<=EPSILON(1.0_wp)) gamma_left=0.0_wp
+        IF (qp_path_right(1)<=EPSILON(1.0_wp)) gamma_right=0.0_wp
         CALL regularize_dry_gamma_pair(qp_path_left(1),gamma_left, qp_path_right(1),gamma_right)
         CALL eval_hydrostatic_path(direction,qp_path_left(1),gamma_left,eta_path_left,                                 &
             grav_coeff,qp_path_right(1),gamma_right,eta_path_right,grav_coeff,                                         &
@@ -1052,6 +1072,10 @@ CONTAINS
         DEALLOCATE( this%a_interface_xPos )
         DEALLOCATE( this%a_interface_yNeg )
         DEALLOCATE( this%a_interface_yPos )
+        DEALLOCATE( this%gamma_interface_xL )
+        DEALLOCATE( this%gamma_interface_xR )
+        DEALLOCATE( this%gamma_interface_yB )
+        DEALLOCATE( this%gamma_interface_yT )
         DEALLOCATE( this%G_interface_xL )
         DEALLOCATE( this%G_interface_xR )
         DEALLOCATE( this%G_interface_yB )
@@ -1133,7 +1157,8 @@ CONTAINS
                     qp_eta_plus(idx_u:idx_v)=0.0_wp
 
 
-                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, grav_coeff_stag_x(j,k),idx_u,min_r,max_r)
+                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,grav_coeff_stag_x(j,k),idx_u,min_r,max_r, &
+                    this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k))
 
                 this%a_interface_xNeg(j,k) = min_r
                 this%a_interface_xPos(j,k) = max_r
@@ -1166,7 +1191,8 @@ CONTAINS
                     qp_eta_plus(idx_u:idx_v)=0.0_wp
 
 
-                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, grav_coeff_stag_y(j,k),idx_v,min_r,max_r)
+                CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,grav_coeff_stag_y(j,k),idx_v,min_r,max_r, &
+                    this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k))
 
                 this%a_interface_yNeg(j,k) = min_r
                 this%a_interface_yPos(j,k) = max_r
@@ -1203,7 +1229,8 @@ CONTAINS
     !> @param[in] normal_velocity_index Primitive normal-velocity component index.
     !> @param[out] speed_minus Lower characteristic bound.
     !> @param[out] speed_plus Upper characteristic bound.
-    SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff, normal_velocity_index,speed_minus,speed_plus)
+    SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff, normal_velocity_index,speed_minus,speed_plus,  &
+        gamma_minus,gamma_plus)
 
     USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
@@ -1212,11 +1239,11 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp_minus(:),qp_plus(:),grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: speed_minus,speed_plus
-
+        REAL(wp), INTENT(OUT) :: gamma_minus,gamma_plus
         REAL(wp) :: minus_min,minus_max,plus_min,plus_max
 
-        CALL eval_local_speeds_direction(qp_minus,grav_coeff, normal_velocity_index,minus_min,minus_max)
-        CALL eval_local_speeds_direction(qp_plus,grav_coeff, normal_velocity_index,plus_min,plus_max)
+        CALL eval_local_speeds_direction(qp_minus,grav_coeff,normal_velocity_index,minus_min,minus_max,gamma_minus)
+        CALL eval_local_speeds_direction(qp_plus,grav_coeff,normal_velocity_index,plus_min,plus_max,gamma_plus)
 
         speed_minus = MIN(minus_min,plus_min,0.0_wp)
         speed_plus = MAX(minus_max,plus_max,0.0_wp)
