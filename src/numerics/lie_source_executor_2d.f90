@@ -275,7 +275,7 @@ CONTAINS
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
-        REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
+        REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),source_time,noise
         LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
@@ -373,7 +373,7 @@ CONTAINS
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
         !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
-        !$OMP& analytic_rate,analytic_input,pressure,noise,cell_context,                                           &
+        !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_updated,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,              &
         !$OMP& red_grav,tid,                                                                                         &
@@ -517,7 +517,7 @@ CONTAINS
                     IF (ANY(q_candidate/=q_local)) THEN
                         IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
                             CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,             &
-                                p_dyn=pressure,numerical_reconstruction=.TRUE.)
+                                numerical_reconstruction=.TRUE.)
                             IF (.NOT.conversion_ok) THEN
                                 cell_error=8
                                 EXIT group_loop
@@ -618,7 +618,7 @@ CONTAINS
                 IF (ANY(q_candidate/=q_local)) THEN
                     IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
                         CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                &
-                            p_dyn=pressure,numerical_reconstruction=.TRUE.)
+                            numerical_reconstruction=.TRUE.)
                         IF (.NOT.conversion_ok) THEN
                             cell_error=14
                             EXIT group_loop

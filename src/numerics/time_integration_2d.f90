@@ -89,7 +89,6 @@ CONTAINS
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
-        REAL(wp) :: pd
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
         REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:),qp_authoritative(:,:,:),bed_before(:,:),                      &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
@@ -133,7 +132,7 @@ CONTAINS
         END IF
         IF (.NOT.reuse_cfl_traces) THEN
             ! Each cell initializes its own status in the conversion sweep.
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,conversion_ok)
         DO l=1,domain%reconstruction_cells
             this%cell_status(l)=0
             j=domain%j_reconstruction(l)
@@ -141,7 +140,7 @@ CONTAINS
 
             IF (state%q(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL conservative_to_primitive(state%q(:,j,k),this%qp_before(:,j,k),                              &
-                    accepted=conversion_ok,p_dyn=pd,numerical_reconstruction=.TRUE.)
+                    accepted=conversion_ok,numerical_reconstruction=.TRUE.)
                 IF (.NOT.conversion_ok) this%cell_status(l)=1
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
@@ -159,7 +158,7 @@ CONTAINS
         ! The spatial step is conservative; only admissibility is checked.
         CALL spatial_operator%evaluate(qp_pre,this%spatial_rate,t,domain,                                            &
             reuse_cfl_traces=reuse_cfl_traces)
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,conversion_ok)
         DO l=1,domain%solve_cells
             this%cell_status(l)=0
             j=domain%j_cent(l)
@@ -184,7 +183,7 @@ CONTAINS
 
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL conservative_to_primitive(this%q_trial(:,j,k),this%qp_trial(:,j,k),                            &
-                    accepted=conversion_ok,p_dyn=pd,numerical_reconstruction=.TRUE.)
+                    accepted=conversion_ok,numerical_reconstruction=.TRUE.)
                 IF (.NOT.conversion_ok) this%cell_status(l)=2
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
