@@ -835,3 +835,9 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - Le varianti di dispatch per nome della reologia sono ancora chiamate dai test di accettazione; la loro rimozione non rientra in una pulizia dimostrabilmente sicura. `eval_source_analytic_state` e un helper chiamato da `eval_source_analytic` per la mappa di stato esatta, non un wrapper di compatibilita inattivo.
 - Aggiunta una matrice CI con sei suite (`SOURCE_REGISTRY`, `SOURCE_MASS`, `MASS_EXCHANGE`, `RHEOLOGY_CELL_LOCAL`, `RHEOLOGY_FROUDE`, `STATE_CONVERSION`) per verificare il comportamento dopo l'audit. **Da osservare gli esiti sul nuovo commit.**
 - Resta una verifica esaustiva degli entry point pubblici contro tutti i consumatori prima di poter attestare l'assenza assoluta di wrapper inutilizzati; la sola ricerca testuale non costituisce prova sufficiente.
+
+### Blocco 1 - allineamento dei runner di regressione
+
+- La prima matrice di regression CI ha segnalato fallimenti in piu suite, pur con build parallelo e audit statico superati. Il confronto con il Makefile ha rilevato che cinque script di test compilavano i sorgenti senza gli include path delle reologie e del cooling; allineate le opzioni `-I` a quelle del Makefile.
+- `TEST_SOURCE_MASS` richiede l'eseguibile, non lo compila autonomamente: la workflow ora costruisce il programma prima di eseguire quella suite.
+- I risultati precedenti delle regressioni non sono considerati verifiche di fisica; attendere l'esito dei nuovi job prima di attribuire eventuali errori ai kernel.

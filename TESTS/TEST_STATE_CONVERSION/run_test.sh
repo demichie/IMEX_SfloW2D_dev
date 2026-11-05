@@ -24,13 +24,13 @@ for source in $sources; do
             ;;
         *.f90)
             gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace \
-                -I"$repo_dir/src/state" $netcdf_fflags \
+                -I"$repo_dir/src/state" -I"$repo_dir/src/physics/rheology_laws" -I"$repo_dir/src/physics/thermal_laws" $netcdf_fflags \
                 -c "$repo_dir/src/$source"
             ;;
     esac
 done
 gfortran -O0 -g -Wall -Wextra -fopenmp -fcheck=all -fbacktrace \
-    -I"$repo_dir/src/state" $netcdf_fflags \
+    -I"$repo_dir/src/state" -I"$repo_dir/src/physics/rheology_laws" -I"$repo_dir/src/physics/thermal_laws" $netcdf_fflags \
     -c "$test_dir/test_state_conversion.f90"
 gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace ./*.o \
     -llapack -lblas $netcdf_flibs $netcdf_clibs -lm -o test_state_conversion
