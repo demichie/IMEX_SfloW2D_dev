@@ -12,7 +12,7 @@ PROGRAM test_projection_stress
   USE state_conversions, ONLY : conservative_to_primitive
   USE source_terms_2d, ONLY : limit_explicit_source_rates
   USE omp_lib
-  USE, INTRINSIC :: iso_fortran_env, ONLY : int64
+  USE, INTRINSIC :: iso_fortran_env, ONLY : int64, error_unit
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite,ieee_value,ieee_quiet_nan
   IMPLICIT NONE
   INTEGER, PARAMETER :: ns=2, nq=6, rough_steps=32
@@ -535,8 +535,9 @@ CONTAINS
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message)
     IF (failed) THEN
-       WRITE(*,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
-       WRITE(*,'(A,I0,A,I0)') 'Lie exchange workset=',domain%solve_cells,', group=',groups(1)%id
+       WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
+       WRITE(error_unit,'(A,I0,A,I0)') 'Lie exchange workset=',domain%solve_cells,', group=',groups(1)%id
+       FLUSH(error_unit)
        ERROR STOP 'Lie exchange transaction rejected'
     END IF
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))

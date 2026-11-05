@@ -866,3 +866,9 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 
 - `check_lie_exchange_transaction` compila ma segnala una transazione respinta. Il test era migrato al ramo strict della conversione di stato, mentre il Lie executor usa esplicitamente `conservative_to_primitive(...,numerical_reconstruction=.TRUE.)`. Allineato il fixture a quest'ultimo per entrambe le transazioni; nessuna modifica ai kernel.
 - Il rifiuto stampa ora il `failure_message` con prefisso, per identificare la causa in caso di persistenza. La correzione e da validare in CI.
+
+### Blocco 1 - diagnostica del rifiuto Lie (5 novembre 2026)
+
+- `TEST_MASS_EXCHANGE` continua a rifiutare la transazione nel fixture nonostante l'allineamento `numerical_reconstruction`. La causa non e accertata senza il messaggio di dettaglio, che non compare nel log allegato prima dell'`ERROR STOP` (possibile buffering di stdout).
+- Per rendere il fallimento attribuibile a una causa, il fixture scrive ora il `failure_message` su `error_unit` e applica `FLUSH(error_unit)` prima dell'arresto; il gate CI abilita `IMEX_LIE_DIAGNOSTICS=1` per conservare il codice e il budget della prima cella respinta.
+- Nessuna formula fisica modificata. La correzione precedente relativa alla conversione rimane una ipotesi, non una causa dimostrata.
