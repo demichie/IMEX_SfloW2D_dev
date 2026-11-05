@@ -212,7 +212,7 @@ CONTAINS
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
 
-    RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
+    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -224,7 +224,7 @@ CONTAINS
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
         REAL(wp) :: heat_capacity,temperature_after
         REAL(wp) :: pore_rate(n_eqns)
-        LOGICAL :: pore_ok
+        LOGICAL :: pore_ok,physical_accepted
         LOGICAL :: supported
         CHARACTER(LEN=64) :: selected_model_name
         q_after=q_before
@@ -240,11 +240,21 @@ CONTAINS
             CALL initialize_physical_state_real(local_state)
         END IF
 
-        IF (INDEX(selected_model_name,'rheology_')==1) THEN
+        ! The same local state serves each analytic treatment; reject invalid
+        ! conservative fractions before consuming any mixture property.
+        IF (INDEX(selected_model_name,'rheology_')==1 .OR.                                                             &
+            selected_model_name=='thermal_cooling' .OR.                                                                 &
+            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp)) THEN
+            CALL build_physical_state_from_q(q_before,physical_state,                                                   &
+                context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                                  &
+                context%Bsecond_xy,context%Bsecond_yy,accepted=physical_accepted)
+            IF (.NOT.physical_accepted) THEN
+                status=-9
+                RETURN
+            END IF
+        END IF
 
-            CALL build_physical_state_from_q(q_before, physical_state,                                                 &
-                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
-                    context%Bsecond_xy,context%Bsecond_yy)
+        IF (INDEX(selected_model_name,'rheology_')==1) THEN
             horizontal_speed=physical_state%mod_vel_hor
             speed_ratio=1.0_wp
             IF (horizontal_speed>0.0_wp)                                                                               &
@@ -274,10 +284,6 @@ CONTAINS
             status=0
 
         ELSE IF (selected_model_name=='thermal_cooling') THEN
-            CALL build_physical_state_from_q(q_before, physical_state,                                                 &
-                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
-                    context%Bsecond_xy,context%Bsecond_yy)
-
             IF (physical_state%T<=0.0_wp) THEN
                 status=-3
                 RETURN
@@ -293,10 +299,6 @@ CONTAINS
 
         ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
             IF (q_before(1)>0.0_wp) THEN
-
-                CALL build_physical_state_from_q(q_before, physical_state,                                             &
-                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                              &
-                    context%Bsecond_xy,context%Bsecond_yy)
                 CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],                                              &
                         physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
 
@@ -329,6 +331,7 @@ CONTAINS
         TYPE(physical_state_real), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
+        LOGICAL :: physical_accepted
 
         rate=0.0_wp
         IF (group%method/=SOURCE_METHOD_NEWTON)                                                                        &
@@ -344,7 +347,8 @@ CONTAINS
             CALL initialize_physical_state_real(local_state)
         END IF
         CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                      &
-            0.0_wp,0.0_wp,0.0_wp)
+            0.0_wp,0.0_wp,0.0_wp,accepted=physical_accepted)
+        IF (.NOT.physical_accepted) CALL fatal_error('Invalid Newton semi-implicit physical state')
         CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
             grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
@@ -375,7 +379,7 @@ CONTAINS
         TYPE(physical_state_complex), TARGET :: physical_state_local
         TYPE(physical_state_complex), POINTER :: physical_state
 
-        LOGICAL :: selected_rheology, selected_thermal
+        LOGICAL :: selected_rheology, selected_thermal, physical_accepted
 
         IF (PRESENT(c_qj) .AND. PRESENT(c_nh_term_impl) .AND.                                                          &
             .NOT.PRESENT(r_qj) .AND. .NOT.PRESENT(r_nh_term_impl)) THEN
@@ -415,7 +419,8 @@ CONTAINS
 
         IF (selected_rheology .OR. selected_thermal) THEN
             CALL build_physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y,                                 &
-                0.0_wp, 0.0_wp, 0.0_wp)
+                0.0_wp, 0.0_wp, 0.0_wp, accepted=physical_accepted)
+            IF (.NOT.physical_accepted) CALL fatal_error('Invalid Newton implicit physical state')
 
         END IF
 
@@ -499,7 +504,7 @@ CONTAINS
 
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
-
+        LOGICAL :: physical_accepted
 
         REAL(wp) :: q1
 
@@ -524,7 +529,8 @@ CONTAINS
             CALL initialize_physical_state_real(local_state)
         END IF
         CALL build_physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y,                                   &
-            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
+            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, accepted=physical_accepted)
+        IF (.NOT.physical_accepted) CALL fatal_error('Invalid explicit source physical state')
 
         ! Gravity terms - only meaningful when the cell has mass.
         IF ( qpj(idx_h) .GT. EPSILON(1.0_wp) ) THEN
@@ -642,6 +648,7 @@ CONTAINS
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: exchange_state
+        LOGICAL :: physical_accepted
 
         exchange_state=>local_state
         IF (PRESENT(physical_scratch)) THEN
@@ -649,7 +656,8 @@ CONTAINS
         ELSE
             CALL initialize_physical_state_real(local_state)
         END IF
-        CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
+        CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y,accepted=physical_accepted)
+        IF (.NOT.physical_accepted) CALL fatal_error('Invalid mass exchange physical state')
         CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
             erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
