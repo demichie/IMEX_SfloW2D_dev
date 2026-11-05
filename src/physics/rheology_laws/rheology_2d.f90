@@ -258,6 +258,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_implicit_id
 
 
+    !> Integrate analytic rheology without copying state in the single-law Lie case.
     SUBROUTINE eval_rheology_analytic(models, dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
         use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported, bx, by, bxx, bxy, byy)
         CHARACTER(*), INTENT(IN) :: models(:)
@@ -266,59 +267,81 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         LOGICAL, INTENT(OUT) :: model_supported
-        TYPE(physical_state_real) :: current_state
-        REAL(wp) :: velocity_before(2)
         REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
+        TYPE(physical_state_real) :: current_state
         INTEGER :: i
-        current_state=state
+
         velocity_after=[state%u,state%v]
         model_supported=.TRUE.
+        IF (SIZE(models)==0) RETURN
 
+        IF (SIZE(models)==1) THEN
+            CALL dispatch_analytic_rheology(models(1),dt,state,speed_ratio,grav_coeff,                                 &
+                curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                             &
+                velocity_after,model_supported)
+            RETURN
+        END IF
+
+        ! Sequential laws require updated kinematics after every substep.
+        ! Only this uncommon multi-law path copies the physical composition.
+        current_state=state
         DO i=1,SIZE(models)
-            velocity_before = [current_state%u,current_state%v]
-            velocity_after=velocity_before
-            model_supported=.TRUE.
+            CALL dispatch_analytic_rheology(models(i),dt,current_state,speed_ratio,grav_coeff,                        &
+                curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                             &
+                velocity_after,model_supported)
+            IF (.NOT.model_supported) RETURN
+            current_state%u=velocity_after(1)
+            current_state%v=velocity_after(2)
+            CALL update_physical_state_kinematics(current_state,bx,by,bxx,bxy,byy)
+        END DO
+    END SUBROUTINE eval_rheology_analytic
 
-            SELECT CASE(TRIM(models(i)))
+    !> Select the model-specific exact velocity flow for one frozen physical state.
+    SUBROUTINE dispatch_analytic_rheology(model,dt,state,speed_ratio,grav_coeff,curvature_acceleration,                &
+        use_pore_pressure,use_stochastic,stochastic_value,velocity_after,model_supported)
+        CHARACTER(*), INTENT(IN) :: model
+        REAL(wp), INTENT(IN) :: dt,speed_ratio,grav_coeff,curvature_acceleration,stochastic_value
+        TYPE(physical_state_real), INTENT(IN) :: state
+        LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
+        REAL(wp), INTENT(OUT) :: velocity_after(2)
+        LOGICAL, INTENT(OUT) :: model_supported
+
+        velocity_after=[state%u,state%v]
+        model_supported=.TRUE.
+            SELECT CASE(TRIM(model))
             CASE ('none')
                 CONTINUE
             CASE ('rheology_voellmy')
-                CALL eval_rheology_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration,&
+                CALL eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,&
                     use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
             CASE ('rheology_plastic')
-                CALL eval_rheology_plastic_analytic(dt, current_state, speed_ratio, velocity_after)
+                CALL eval_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
             CASE ('rheology_lava')
-                CALL eval_rheology_lava_analytic(dt, current_state, speed_ratio, velocity_after)
+                CALL eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
             CASE ('rheology_lahar')
-                CALL eval_rheology_lahar_analytic(dt, current_state, speed_ratio, velocity_after)
+                CALL eval_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
             CASE ('rheology_empirical')
-                CALL eval_rheology_empirical_analytic(dt, current_state, speed_ratio, velocity_after)
+                CALL eval_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
             CASE ('rheology_quadratic')
-                CALL eval_rheology_quadratic_analytic(dt, current_state, speed_ratio, velocity_after)
+                CALL eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
             CASE ('rheology_froude')
-                CALL eval_rheology_froude_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+                CALL eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_stochastic, stochastic_value, velocity_after)
             CASE ('rheology_lucas')
-                CALL eval_rheology_lucas_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration,  &
+                CALL eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,  &
                     use_stochastic, stochastic_value, velocity_after)
             CASE ('rheology_mui')
-                CALL eval_rheology_mui_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration,    &
+                CALL eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,    &
                     use_pore_pressure, velocity_after)
             CASE ('rheology_mui_voellmy')
-                CALL eval_rheology_mui_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff,                    &
+                CALL eval_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff,                    &
                     curvature_acceleration, use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
             CASE DEFAULT
                 model_supported = .FALSE.
 
         END SELECT
+    END SUBROUTINE dispatch_analytic_rheology
 
-            IF (.NOT.model_supported) RETURN
-            current_state%u=velocity_after(1)
-            current_state%v=velocity_after(2)
-            CALL update_physical_state_kinematics(current_state,bx,by,bxx,bxy,byy)
-
-        END DO
-    END SUBROUTINE eval_rheology_analytic
 
 
         ! Both Newton components are evaluated on the same, unchanged physical state.
