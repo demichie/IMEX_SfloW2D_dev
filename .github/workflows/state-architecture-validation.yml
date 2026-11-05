@@ -2,6 +2,14 @@ name: State architecture validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'src/physics/source_terms_2d.f90'
+      - 'src/numerics/lie_source_executor_2d.f90'
+      - 'src/state_new/**'
+      - 'TESTS/TEST_MASS_EXCHANGE/**'
+      - '.github/workflows/state-architecture-validation.yml'
 
 permissions:
   contents: read
