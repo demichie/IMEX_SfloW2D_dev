@@ -848,3 +848,9 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - I job `TEST_STATE_CONVERSION`, `TEST_SOURCE_MASS`, `TEST_SOURCE_REGISTRY`, `TEST_MASS_EXCHANGE` e `TEST_RHEOLOGY_CELL_LOCAL` risultano `FAIL` al passo `Run regression`, anche dopo la correzione dei percorsi di include e la compilazione dell'eseguibile per il test integrato. Il job Froude non aveva ancora un esito definitivo al momento della rilevazione.
 - La cause di questi fallimenti non sono state accertate: lo stato dei job non contiene i messaggi del compilatore o le asserzioni che permetterebbero di distinguere problemi del runner da regressioni del codice. Non modificare la fisica sulla base dei soli exit code.
 - La PR #5 e il **Blocco 1 restano aperti**. Prima del merge occorre ispezionare i log/artifact della Action, distinguere cause infrastrutturali da difetti reali, correggere i problemi riproducibili e riottenere un gate di regressione verde.
+
+### Blocco 1 - correzione cause verificate dai log CI (5 novembre 2026)
+
+- `stochastic_module.mod` mancante: i runner seriali compilavano `time_integration_2d.f90` prima di `stochastic_module.f90`, seguendo un ordine scorretto in `IMEX_SfloW2D_SOURCES`. Spostati i due moduli stochastic prima del consumer.
+- `IOSTAT=5010` su `NUMERIC_PARAMETERS`: `TEST_SOURCE_MASS/make_cases.py` produceva `N_RK=2`, non più accettato dalla namelist di produzione. Rimossa la chiave obsoleta dai fixture.
+- L'audit CI verifica ora l'ordine seriale dei moduli e le chiavi del fixture numerico. Restano da verificare gli esiti delle nuove regressioni; non sono state modificate formule fisiche.

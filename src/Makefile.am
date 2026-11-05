@@ -71,9 +71,9 @@ IMEX_SfloW2D_SOURCES = \
                 spatial/hyperbolic_2d.f90 \
                 spatial/spatial_operator_2d.f90 \
                 numerics/lie_source_executor_2d.f90 \
-                numerics/time_integration_2d.f90 \
                 stochastic/stochastic_random_2d.f90 \
                 stochastic/stochastic_module.f90 \
+                numerics/time_integration_2d.f90 \
                 core/simulation_2d.f90 \
                 core/init_2d.f90 \
                 io/output_paths.f90 \

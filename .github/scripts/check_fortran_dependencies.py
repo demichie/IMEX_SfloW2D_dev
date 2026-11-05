@@ -48,6 +48,36 @@ def main() -> int:
         registered: set[str] = set()
     else:
         registered = set(re.findall(r"[\w/.-]+\.f90", match.group(1)))
+    # The legacy standalone test harnesses compile this list sequentially.
+    # Keep the producer before each direct module USE consumer.
+    ordered = [SOURCE / name for name in re.findall(
+        r"[\w/.-]+\.f90", match.group(1)
+    )] if match else []
+    order = {p: i for i, p in enumerate(ordered)}
+    for consumer in ordered:
+        for used in re.finditer(
+            r"(?im)^\s*use\b\s*(?:,\s*(?:non_)?intrinsic\s*::\s*|::\s*)?(\w+)",
+            contents.get(consumer, ""),
+        ):
+            provider = modules.get(used.group(1).lower())
+            if provider is not None and provider != consumer:
+                if order.get(provider, -1) >= order[consumer]:
+                    fail(f"serial source order: {consumer.relative_to(SOURCE)} "
+                         f"requires {provider.relative_to(SOURCE)}", findings)
+
+    # Guard against retired keys in the generated source-mass fixture.
+    reader = (SOURCE / "io/inpout_2d.f90").read_text(encoding="utf-8")
+    block = re.search(r"(?is)\bnamelist\s*/numeric_parameters/\s*(.*?)(?=\n\s*\n)", reader)
+    fixture = (ROOT / "TESTS/TEST_SOURCE_MASS/make_cases.py").read_text(encoding="utf-8")
+    sample = re.search(r"(?is)&numeric_parameters\s*(.*?)\s*/", fixture)
+    if block is None or sample is None:
+        fail("numeric namelist audit: missing declaration or fixture", findings)
+    else:
+        allowed = set(re.findall(r"\b[a-z_]\w*\b", block.group(1).lower()))
+        for key in re.findall(r"(?im)^\s*([a-z_]\w*)\s*=", sample.group(1)):
+            if key.lower() not in allowed:
+                fail(f"retired NUMERIC_PARAMETERS fixture key: {key}", findings)
+
     for path in sources:
         relative = path.relative_to(SOURCE).as_posix()
         if relative not in registered:
