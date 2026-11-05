@@ -811,3 +811,12 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - Il `src/Makefile.am` distribuiva gia `rheology_newmodel_linear.inc` e `thermal_cooling_rate.inc` tramite `EXTRA_DIST`, ma mancavano i due archi di dipendenza per la ricompilazione dei rispettivi oggetti: aggiunti in questo blocco.
 - Restano da verificare con controlli riproducibili: dipendenze `USE` vs regole Makefile, assenza di cicli sull'intero grafo, duplicazioni e wrapper realmente inutilizzati, correttezza dei quattro trattamenti per ciascun modello, e build/test CI del ramo di audit.
 - Nessuna rimozione di interfacce obbligatorie o modifica delle formule fisiche autorizzata dal solo audit statico.
+
+### Blocco 1 - verifica sistematica delle dipendenze (5 novembre 2026)
+
+- Sono stati verificati i `USE` dei 68 file `.f90` di produzione elencati in `src/` (esclusi i diagnostici Fortran sotto `python_diagnostics`). Il confronto tra i moduli interni e le regole esplicite del Makefile ha individuato **14 archi diretti mancanti**, ora aggiunti a `src/Makefile.am`.
+- Il grafo delle dipendenze di compilazione, integrato con questi 14 archi, non presenta cicli (verifica statica sul grafo delle regole); il risultato non sostituisce un build parallelo.
+- Le implementazioni esaminate sotto le cinque famiglie di sorgenti (`rheology`, `mass_exchange`, `mass_injection`, `pore_pressure`, `thermal`) hanno tutte le quattro firme previste. I metodi non supportati devono continuare a segnalare errore; la validazione dinamica dei singoli metodi non e inclusa nella verifica delle firme.
+- Aggiunto `.github/scripts/check_fortran_dependencies.py` per controllare su ogni PR: copertura dei sorgenti nel Makefile, `USE` diretti, `.inc`, cicli e presenza delle quattro interfacce; nuova workflow `.github/workflows/fortran-dependency-audit.yml`.
+- Wrapper e duplicazioni non sono stati rimossi: servono prima evidenze sui chiamanti e regressioni; l'interfaccia pubblica di `state.f90` resta per ora invariata.
+- **Da validare:** esecuzione della nuova Action sul commit, build parallelo e regressioni scientifiche. Stato Blocco 1: `IN CORSO` fino a tali prove.
