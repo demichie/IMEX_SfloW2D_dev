@@ -95,12 +95,9 @@ PROGRAM test_lava_cooling
 
 CONTAINS
   SUBROUTINE test_cooling_analytic(temperature,step,capacity,radiative,convective,ambient,result)
-    USE state_conversion_2d, ONLY : physical_state_type
     REAL(wp), INTENT(IN) :: temperature,step,capacity,radiative,convective,ambient
     REAL(wp), INTENT(OUT) :: result
-    TYPE(physical_state_type) :: state
-    state%T=temperature
-    CALL eval_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+    CALL eval_thermal_cooling_analytic(temperature,step,capacity,radiative,convective,ambient,result)
   END SUBROUTINE test_cooling_analytic
   FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)
     USE state_conversion_2d, ONLY : complex_physical_state_type

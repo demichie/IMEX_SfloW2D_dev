@@ -49,16 +49,16 @@ CONTAINS
 
 
     !> @brief Advance temperature under frozen-coefficient exact cooling.
-    !> @param[in] state Local frozen real physical state.
+    !> @param[in] initial_temperature Frozen initial mixture temperature [K].
     !> @param[in] interval Nonnegative cooling interval [s].
     !> @param[in] heat_capacity Positive mixture thermal capacity.
     !> @param[in] radiative Nonnegative radiative cooling coefficient.
     !> @param[in] convective Nonnegative convective cooling coefficient.
     !> @param[in] ambient Positive ambient temperature [K].
     !> @param[out] temperature_after Temperature following cooling interval [K].
-    SUBROUTINE eval_thermal_cooling_analytic(state,interval,heat_capacity,                                             &
+    SUBROUTINE eval_thermal_cooling_analytic(initial_temperature,interval,heat_capacity,                                             &
             radiative,convective,ambient,temperature_after)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: initial_temperature
         REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: temperature_after
         REAL(wp) :: temperature
@@ -68,7 +68,7 @@ CONTAINS
         INTEGER :: iteration
 
 
-        temperature = state%T
+        temperature = initial_temperature
 
         IF (.NOT. ieee_is_finite(temperature) .OR.                                                                     &
             .NOT. ieee_is_finite(interval) .OR.                                                                        &

@@ -119,23 +119,21 @@ CONTAINS
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: temperature_after
-        TYPE(physical_state_type) :: current_state
+        REAL(wp) :: temperature_before
         INTEGER :: i
-        current_state=state
         temperature_after=state%T
 
         DO i=1,SIZE(models)
+            temperature_before=temperature_after
 
         SELECT CASE (TRIM(models(i)))
         CASE ('thermal_cooling')
-            CALL eval_thermal_cooling_analytic(current_state,interval,heat_capacity,                                   &
+            CALL eval_thermal_cooling_analytic(temperature_before,interval,heat_capacity,                              &
                 radiative,convective,ambient,temperature_after)
         CASE DEFAULT
             CALL fatal_error('Unknown analytic thermal model: '//TRIM(models(i)))
 
         END SELECT
-
-        current_state%T=temperature_after
 
         END DO
     END SUBROUTINE eval_thermal_analytic
