@@ -6,8 +6,7 @@ MODULE mass_bottom_fissural_injection_2d
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE state_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
-    USE state_composition, ONLY : close_composition
+    USE mass_injection_coefficients_2d, ONLY : injection_material_type
 
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d
@@ -25,7 +24,7 @@ CONTAINS
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate)
+    SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate,materials)
     USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
             time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
             pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
@@ -36,10 +35,11 @@ CONTAINS
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
+        TYPE(injection_material_type), INTENT(IN) :: materials(:)
         REAL(wp) :: t_rem, t_coeff, h_dot
-        REAL(wp) :: r_rho_m, r_inv_rho_m, r_red_grav
+        REAL(wp) :: r_rho_m, r_red_grav
         REAL(wp) :: source_xs(n_solid), source_xg(n_add_gas)
-        REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
+        REAL(wp) :: r_sp_heat_mix, exc_pore_pres
         INTEGER :: i_fissure
 
         rate=0.0_wp
@@ -83,16 +83,12 @@ CONTAINS
                 IF (t_coeff .LE. 0.0_wp) CYCLE
 
                 h_dot = cell_fissure_fract(i_fissure) * linear_vel_fissures(i_fissure)
-                ! Source material is independent of the recipient cell.
-                ! Close fractions before evaluating only the necessary properties.
-                source_xs=xs_fissures(1:n_solid,i_fissure)
-                source_xg=xg_fissures(1:n_add_gas,i_fissure)
-                IF (.NOT.close_composition(source_xs,source_xg)) &
-                    CALL fatal_error('Invalid injection material composition')
-                CALL evaluate_mixture_density(T_fissures(i_fissure), &
-                    source_xs,source_xg,r_rho_m,r_inv_rho_m)
-                CALL evaluate_mixture_heat_capacity(source_xs,source_xg,r_sp_heat_mix,r_sp_heat_c)
-                r_red_grav=(r_rho_m-rho_a_amb)*r_inv_rho_m*grav
+                ! Material properties were evaluated once before the cell sweep.
+                source_xs=materials(i_fissure)%xs
+                source_xg=materials(i_fissure)%xg
+                r_rho_m=materials(i_fissure)%rho_m
+                r_sp_heat_mix=materials(i_fissure)%cp_m
+                r_red_grav=materials(i_fissure)%red_grav
 
                 rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
                 rate(4) = rate(4) + (t_coeff *                                                                         &

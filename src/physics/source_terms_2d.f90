@@ -6,6 +6,7 @@
 MODULE source_terms_2d
     USE parameters_2d, ONLY : idx_h
     USE mass_injection_2d, ONLY : eval_mass_injection_explicit
+    USE mass_injection_coefficients_2d, ONLY : injection_material_set_type
     USE mass_injection_coefficients_2d
     USE parameters_2d
     USE constitutive_parameters_2d
@@ -69,7 +70,7 @@ CONTAINS
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
-            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting)
+            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -81,6 +82,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: exchange_selected
         TYPE(physical_state_real), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
+        TYPE(injection_material_set_type), INTENT(IN) :: materials
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -104,7 +106,7 @@ CONTAINS
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
                 arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
-                physical_ready)
+                physical_ready,materials)
         END IF
 
         IF (has_exchange) THEN
@@ -477,7 +479,7 @@ CONTAINS
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
-            physical_ready )
+            physical_ready,materials )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,                                           &
             time_param , bottom_radial_source_flag,                                                                    &
@@ -515,6 +517,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         LOGICAL, INTENT(OUT), OPTIONAL :: physical_ready
+        TYPE(injection_material_set_type), INTENT(IN) :: materials
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -606,7 +609,7 @@ CONTAINS
             cell_fissure_fract,lat_arc_perim_jk,lat_n_x_jk,lat_n_y_jk,cell_area_jk,                                    &
             BTEST(group%source_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                            &
             BTEST(group%source_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                            &
-            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate)
+            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials)
         expl_term=expl_term+injection_rate
 
         RETURN

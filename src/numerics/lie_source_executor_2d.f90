@@ -7,7 +7,7 @@
 
 MODULE lie_source_executor_2d
     USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type, idx_totMassEqn,                   &
+    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,                   &
         idx_solidEqn_first, idx_solidEqn_last
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE domain_2d, ONLY : domain_type
@@ -18,6 +18,7 @@ MODULE lie_source_executor_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, initialize_physical_state_complex
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
+    USE mass_injection_coefficients_2d, ONLY : injection_material_set_type,prepare_injection_materials
 
     IMPLICIT NONE
 
@@ -43,6 +44,7 @@ MODULE lie_source_executor_2d
         TYPE(physical_state_complex), ALLOCATABLE :: source_complex_scratch(:)
         TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
         TYPE(mass_exchange_rates_type), ALLOCATABLE :: source_transfers(:)
+        TYPE(injection_material_set_type) :: injection_materials
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
         LOGICAL :: all_groups_dry_noop=.FALSE.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
@@ -325,6 +327,10 @@ CONTAINS
                 group_profile(1)%setup=group_profile(1)%setup+REAL(tock-tick,wp)/REAL(clock_rate,wp)
             tick=tock
         END IF
+        ! Source composition, temperature and material properties are shared
+        ! across cells. Refresh once before entering the parallel sweep to
+        ! reflect any changes to run-time source material configuration.
+        CALL prepare_injection_materials(executor%injection_materials)
         ! Allocate one reusable physical-state record per available worker.
         nthreads=1
         !$ nthreads=omp_get_max_threads()
@@ -380,7 +386,7 @@ CONTAINS
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
         !$OMP& cell_error,cell_updated,cell_detail,cell_iterations,cell_group,cell_mass,cell_components,              &
-        !$OMP& red_grav,rho_mix,inv_rho_mix,buoyancy_xs,buoyancy_xg,tid,                                                                                         &
+        !$OMP& red_grav,rho_mix,inv_rho_mix,buoyancy_xs,buoyancy_xg,tid, &
         !$OMP& cell_tick,group_tick,                                                                                 &
         !$OMP& physical_tick,profile_tock,physical_tick_rate)                                   &
         !$OMP& REDUCTION(MIN:first_failure)
@@ -469,7 +475,7 @@ CONTAINS
                         cell_arc_n_y(j,k),dx*dy,                                                                     &
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
-                        q_original(1:n_eqns,j,k))
+                        q_original(1:n_eqns,j,k),executor%injection_materials)
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

@@ -2,6 +2,7 @@
 MODULE mass_injection_2d
     USE parameters_2d, ONLY : wp, n_eqns
     USE state_types, ONLY : physical_state_real, physical_state_complex
+    USE mass_injection_coefficients_2d, ONLY : injection_material_type,injection_material_set_type
     USE mass_bottom_circular_injection_2d, ONLY : eval_bottom_circular_injection_explicit,                             &
             eval_bottom_circular_injection_semi_implicit, eval_bottom_circular_injection_implicit,                     &
             eval_bottom_circular_injection_analytic
@@ -32,29 +33,30 @@ CONTAINS
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_explicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
-        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
+        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate,materials)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
         LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
+        TYPE(injection_material_set_type), INTENT(IN) :: materials
         REAL(wp) :: process_rate(n_eqns)
         rate=0.0_wp
 
         IF (use_circular) THEN
-        CALL eval_bottom_circular_injection_explicit(state,time,cell_fract,process_rate)
+        CALL eval_bottom_circular_injection_explicit(state,time,cell_fract,process_rate,materials%common)
         rate=rate+process_rate
 
         END IF
 
         IF (use_fissural) THEN
-        CALL eval_bottom_fissural_injection_explicit(state,time,cell_fissure_fract,process_rate)
+        CALL eval_bottom_fissural_injection_explicit(state,time,cell_fissure_fract,process_rate,materials%fissure)
         rate=rate+process_rate
 
         END IF
 
         IF (use_radial) THEN
-        CALL eval_radial_injection_explicit(state, time, lat_arc_perim, lat_n_x, lat_n_y, cell_area, process_rate)
+        CALL eval_radial_injection_explicit(state,time,lat_arc_perim,lat_n_x,lat_n_y,cell_area,process_rate,materials%common)
         rate=rate+process_rate
 
         END IF

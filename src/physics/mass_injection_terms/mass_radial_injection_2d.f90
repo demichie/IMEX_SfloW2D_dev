@@ -5,8 +5,7 @@ MODULE mass_radial_injection_2d
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE state_mixture, ONLY : evaluate_mixture_density, evaluate_mixture_heat_capacity
-    USE state_composition, ONLY : close_composition
+    USE mass_injection_coefficients_2d, ONLY : injection_material_type
 
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d
@@ -27,15 +26,16 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
+    SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate,material)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
+        TYPE(injection_material_type), INTENT(IN) :: material
         REAL(wp) :: t_rem, t_coeff, h_dot
-        REAL(wp) :: r_rho_m, r_inv_rho_m, r_red_grav
+        REAL(wp) :: r_rho_m, r_red_grav
         REAL(wp) :: source_xs(n_solid), source_xg(n_add_gas)
-        REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
+        REAL(wp) :: r_sp_heat_mix, exc_pore_pres
 
         rate=0.0_wp
 
@@ -83,16 +83,12 @@ CONTAINS
 
             IF ( t_coeff .GT. 0.0_wp ) THEN
 
-                ! Source material is independent of the recipient cell.
-                ! Close fractions before evaluating only the necessary properties.
-                source_xs=xs_source(1:n_solid)
-                source_xg=xg_source(1:n_add_gas)
-                IF (.NOT.close_composition(source_xs,source_xg)) &
-                    CALL fatal_error('Invalid injection material composition')
-                CALL evaluate_mixture_density(T_source, &
-                    source_xs,source_xg,r_rho_m,r_inv_rho_m)
-                CALL evaluate_mixture_heat_capacity(source_xs,source_xg,r_sp_heat_mix,r_sp_heat_c)
-                r_red_grav=(r_rho_m-rho_a_amb)*r_inv_rho_m*grav
+                ! Material properties were evaluated once before the cell sweep.
+                source_xs=material%xs
+                source_xg=material%xg
+                r_rho_m=material%rho_m
+                r_sp_heat_mix=material%cp_m
+                r_red_grav=material%red_grav
 
                 ! Per-cell injection rate (m/s) - integrates to MFR over all cells.
                 h_dot = h_source * vel_source * lat_arc_perim_jk / cell_area_jk

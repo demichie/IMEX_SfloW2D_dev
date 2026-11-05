@@ -2,11 +2,18 @@
 !> @details Evaluates injection availability over the requested physical interval.
 !>          The coefficients are independent of retired Runge-Kutta stages.
 MODULE mass_injection_coefficients_2d
-    USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_fissures
+    USE parameters_2d, ONLY : radial_source_flag,bottom_radial_source_flag,bottom_fissural_source_flag
+    USE parameters_2d, ONLY : xs_source,xg_source,T_source,xs_fissures,xg_fissures,T_fissures
+    USE constitutive_parameters_2d, ONLY : rho_a_amb,grav
+    USE state_mixture, ONLY : evaluate_mixture_density,evaluate_mixture_heat_capacity
+    USE state_composition, ONLY : close_composition
+    USE diagnostics_2d, ONLY : fatal_error
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: set_source_time_coefficients
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
+    PUBLIC :: injection_material_type,injection_material_set_type,prepare_injection_materials
     !> Time-averaged bottom circular injection window coefficient.
     REAL(wp) :: bottom_coeff_step = -1.0_wp
     !> Time-averaged bottom injection velocity over configured intervals.
@@ -15,7 +22,57 @@ MODULE mass_injection_coefficients_2d
     REAL(wp) :: lateral_coeff_step = -1.0_wp
     !> Time-averaged injection window for each configured fissure.
     REAL(wp), ALLOCATABLE :: fissure_coeff_step(:)
+    !> Material properties shared by cells with the same injection composition.
+    !> Prepared outside the OpenMP cell sweep and passed read-only to physics.
+    TYPE :: injection_material_type
+        REAL(wp), ALLOCATABLE :: xs(:),xg(:)
+        REAL(wp) :: rho_m=0.0_wp,cp_m=0.0_wp,red_grav=0.0_wp
+    END TYPE injection_material_type
+
+    TYPE :: injection_material_set_type
+        TYPE(injection_material_type) :: common
+        TYPE(injection_material_type), ALLOCATABLE :: fissure(:)
+    END TYPE injection_material_set_type
+
 CONTAINS
+
+    !> Recompute material-only properties once per Lie sweep (also detects
+    !> changed source parameters). Temporal windows and geometry remain dynamic.
+    SUBROUTINE prepare_injection_materials(materials)
+        TYPE(injection_material_set_type), INTENT(INOUT) :: materials
+        INTEGER :: i
+
+        IF (radial_source_flag .OR. bottom_radial_source_flag) THEN
+            CALL prepare_material(materials%common,T_source,xs_source(1:n_solid),xg_source(1:n_add_gas))
+        END IF
+        IF (bottom_fissural_source_flag) THEN
+            IF (ALLOCATED(materials%fissure)) THEN
+                IF (SIZE(materials%fissure)/=n_fissures) DEALLOCATE(materials%fissure)
+            END IF
+            IF (.NOT.ALLOCATED(materials%fissure)) ALLOCATE(materials%fissure(n_fissures))
+            DO i=1,n_fissures
+                CALL prepare_material(materials%fissure(i),T_fissures(i),                                               &
+                    xs_fissures(1:n_solid,i),xg_fissures(1:n_add_gas,i))
+            END DO
+        END IF
+    END SUBROUTINE prepare_injection_materials
+
+    SUBROUTINE prepare_material(material,T,xs,xg)
+        TYPE(injection_material_type), INTENT(INOUT) :: material
+        REAL(wp), INTENT(IN) :: T,xs(n_solid),xg(n_add_gas)
+        REAL(wp) :: inv_rho_m,cp_c
+
+        IF (.NOT.ALLOCATED(material%xs)) ALLOCATE(material%xs(n_solid))
+        IF (.NOT.ALLOCATED(material%xg)) ALLOCATE(material%xg(n_add_gas))
+        material%xs=xs
+        material%xg=xg
+        IF (.NOT.close_composition(material%xs,material%xg)) &
+            CALL fatal_error('Invalid injection material composition')
+        CALL evaluate_mixture_density(T,material%xs,material%xg,material%rho_m,inv_rho_m)
+        CALL evaluate_mixture_heat_capacity(material%xs,material%xg,material%cp_m,cp_c)
+        material%red_grav=(material%rho_m-rho_a_amb)*inv_rho_m*grav
+    END SUBROUTINE prepare_material
+
     !> @brief Compute average injection-window coefficients over one physical interval.
     !> @details Reuses configured periodic, fissural, radial and tabulated
     !>          injection windows; returns unchanged for nonpositive durations.
