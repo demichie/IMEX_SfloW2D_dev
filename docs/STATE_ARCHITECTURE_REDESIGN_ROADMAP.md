@@ -854,3 +854,10 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - `stochastic_module.mod` mancante: i runner seriali compilavano `time_integration_2d.f90` prima di `stochastic_module.f90`, seguendo un ordine scorretto in `IMEX_SfloW2D_SOURCES`. Spostati i due moduli stochastic prima del consumer.
 - `IOSTAT=5010` su `NUMERIC_PARAMETERS`: `TEST_SOURCE_MASS/make_cases.py` produceva `N_RK=2`, non più accettato dalla namelist di produzione. Rimossa la chiave obsoleta dai fixture.
 - L'audit CI verifica ora l'ordine seriale dei moduli e le chiavi del fixture numerico. Restano da verificare gli esiti delle nuove regressioni; non sono state modificate formule fisiche.
+
+### Blocco 1 - rimozione dipendenze di test da API state legacy
+
+- I log CI identificano `state_2d.mod` e `state_conversion_2d.mod` referenziati da vecchi fixture: queste API sono state eliminate dalla produzione. `TEST_MASS_EXCHANGE/test_projection_stress.f90` ora importa `state_fields`, `state_conversions` e `state_mixture` e usa `conservative_to_primitive`, `evaluate_mixture_phase_properties` ed `evaluate_mixture_heat_capacity` con le firme correnti.
+- `TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90` sostituisce `mixt_var` con la valutazione canonica `build_physical_state_from_qp`; i valori usati dalle asserzioni vengono letti dal physical state.
+- La suite `TEST_STATE_CONVERSION` contiene molti altri riferimenti a simboli legacy e non e ancora migrata; nel gate architetturale si usa `TEST_STATE` (API canoniche), senza introdurre moduli di compatibilita. La suite legacy rimane nel repository ma richiede migrazione o archiviazione esplicita separata, non viene dichiarata superata.
+- Restano da verificare gli esiti CI della compilazione dei test aggiornati e le relative asserzioni numeriche.

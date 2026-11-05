@@ -3,13 +3,13 @@ PROGRAM test_projection_stress
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
-  USE state_2d, ONLY : state_type,substrate_snapshot_type,conservative_mass_admissible
+  USE state_fields, ONLY : state_type,substrate_snapshot_type,conservative_mass_admissible
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
   USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
        finalize_lie_source_executor,lie_source_executor_type
-  USE state_conversion_2d, ONLY : qc_to_qp
+  USE state_conversions, ONLY : conservative_to_primitive
   USE source_terms_2d, ONLY : limit_explicit_source_rates
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -373,8 +373,7 @@ CONTAINS
 
   !> \brief Verify that cached real and complex physical properties are complete.
   SUBROUTINE check_complete_physical_state
-    USE state_conversion_2d, ONLY : eval_mixture_properties_from_mass_fractions, &
-        eval_mixture_heat_capacity
+    USE state_mixture, ONLY : evaluate_mixture_phase_properties, evaluate_mixture_heat_capacity
     USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
     USE state_physical, ONLY : build_physical_state_from_qp
@@ -397,9 +396,9 @@ CONTAINS
     CALL build_physical_state_from_qp(primitive,wet)
     xs=primitive(idx_solid_first:idx_solid_last)
     xg=primitive(idx_add_gas_first:idx_add_gas_last)
-    CALL eval_mixture_properties_from_mass_fractions(primitive(idx_T),xs,xg, &
+    CALL evaluate_mixture_phase_properties(primitive(idx_T),xs,xg, &
         rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
-    CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
+    CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
     red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
     speed_squared=primitive(idx_u)**2+primitive(idx_v)**2
     buoyancy_depth=red_grav*primitive(idx_h)
@@ -522,7 +521,7 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie exchange registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie exchange test',accepted)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
           IF (.NOT.accepted) ERROR STOP 'Lie exchange initial state conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
@@ -591,7 +590,7 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie rejection test',accepted)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
           IF (.NOT.accepted) ERROR STOP 'Lie rejection primitive conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO

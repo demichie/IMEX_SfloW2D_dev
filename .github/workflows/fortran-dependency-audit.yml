@@ -61,7 +61,7 @@ jobs:
           - TEST_MASS_EXCHANGE
           - TEST_RHEOLOGY_CELL_LOCAL
           - TEST_RHEOLOGY_FROUDE
-          - TEST_STATE_CONVERSION
+          - TEST_STATE
     steps:
       - uses: actions/checkout@v4
       - name: Install regression dependencies
