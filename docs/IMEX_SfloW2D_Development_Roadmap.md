@@ -22,6 +22,8 @@ Il codice simula flussi geofisici depth-averaged 2D, multifase e polidispersi, c
 
 **Avanzamento C3 (5 novembre 2026):** `nonlinear_solver_2d:solve_newton_group` riutilizza nella successiva iterazione il residuo REAL e la funzione merit gia valutati sul trial accettato, anziche rieseguire `eval_f` e ricostruire lo stesso stato fisico. Il Jacobiano COMPLEX continua a essere ricostruito con tutte le perturbazioni; nessuna cache globale. **C3 IN CORSO; build, complessita numerica e misure del nuovo commit da verificare.** La build verde e TAAL funzionante riferiti dall'utente precedono questo intervento. Actions soltanto manuali.
 
+**C3 — raffreddamento analitico (5 novembre 2026, validazione pendente):** il ramo wet `thermal_cooling` in `source_terms_2d` evita la costruzione di `physical_state_real` completo e usa solo `evaluate_mixture_heat_capacity` e la temperatura scalare, mantenendo il rapporto conservativo precedente e il ramo dry. `eval_thermal_analytic` riceve la temperatura invece del tipo fisico. Aggiornata la dipendenza Make; controlli scientifici e prestazionali ancora da effettuare. Nessuna Action avviata.
+
 ## 2. Architettura attuale, vincolante
 
 ### Lie e transazioni

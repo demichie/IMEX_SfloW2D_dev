@@ -160,6 +160,14 @@ Aggiunto un flag locale `residual_ready` che trasferisce **solo il residuo e il 
 
 **Situazione verificata dall'utente prima di C3:** build verde ed `EXAMPLE_TAAL` in esecuzione sulle modifiche C2. Non assumere che questo confermi il nuovo commit C3. Nessuna Action avviata automaticamente.
 
+### D.4 Registro C3 — raffreddamento analitico: solo stato termico necessario (5 novembre 2026)
+
+**Codice modificato, compilazione e regressioni sul nuovo commit da verificare.** Audit di `source_terms_2d:eval_source_analytic_state`: nel ramo `thermal_cooling` l'integratore esatto usa esclusivamente la temperatura iniziale e la capacita termica totale congelata; prima veniva costruito un `physical_state_real` completo (miscela, volumi, gravita ridotta, Richardson e cinematica), anche quando nessuna di queste altre proprieta veniva letta.
+
+Ora per massa conservativa **positiva** il dispatcher calcola `xs` e `xg` da `q_before`, invoca il kernel canonico `evaluate_mixture_heat_capacity`, e ricava la temperatura con la stessa espressione `q_before(4)/(q_before(1)*cp_m)` del costruttore da `q`. La capacita termica congelata dell'integrazione analitica mantiene l'espressione precedente `q_before(4)/temperature_before`; il calcolo della temperatura e il rapporto conservativo mantengono quindi l'ordine delle operazioni. Il dispatcher termico `eval_thermal_analytic` riceve direttamente la temperatura scalare invece di uno stato fisico (nessun wrapper o modulo nuovo); l'integratore `eval_thermal_cooling_analytic` era gia scalare e non cambia. Per massa non positiva rimane la costruzione fisica storica, cosi da conservare il comportamento ambientale e di rifiuto; le altre leggi analitiche conservano lo stato fisico completo. Aggiornato `src/Makefile.am` per la nuova dipendenza diretta da `state_mixture`.
+
+**Evitato:** un `build_physical_state_from_q` completo per ogni valutazione wet di raffreddamento analitico, mantenendo il solo calcolo di `cp_m` necessario per ricostruire T. Nessuna modifica intenzionale ai rate, alle formule, agli inventari o alle quattro interfacce dei processi; test scientifici, comparazioni floating-point e timing ancora pendenti. C3 resta **IN CORSO**: completare audit degli altri consumatori REAL/COMPLEX e degli scratch, senza condividere dati fra candidati Newton perturbati distinti.
+
 ### E. Evidenze richieste e stati dei blocchi
 
 Per ciascun blocco riportare esplicitamente **DA FARE / IN CORSO / CODICE COMPLETATO / VERIFICATO**; separare l'evidenza statica dalla misura dinamica. Il commit architetturale `d8f4f57`, la rinomina `c9e576d` e la pulizia del workflow `c5d6eb2` non certificano un miglioramento prestazionale. Una Action Build verde certifica compilabilita sullo SHA effettivamente eseguito, non numero minimo di conversioni o parita scientifica.

@@ -120,22 +120,22 @@ CONTAINS
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
     !> @param[in] models Canonical thermal source names.
-    !> @param[in] state Frozen real physical cell state.
+    !> @param[in] initial_temperature Frozen mixture temperature; no full physical state is required.
     !> @param[in] interval Analytic substep duration [s].
     !> @param[in] heat_capacity Thermal capacity of the frozen mixture.
     !> @param[in] radiative Radiative heat-exchange coefficient.
     !> @param[in] convective Convective heat-exchange coefficient.
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] temperature_after Temperature after the thermal substep [K].
-    SUBROUTINE eval_thermal_analytic(models,state,interval,heat_capacity,                                              &
+    SUBROUTINE eval_thermal_analytic(models,initial_temperature,interval,heat_capacity,                               &
             radiative,convective,ambient,temperature_after)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_real), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: initial_temperature
         REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: temperature_after
         REAL(wp) :: temperature_before
         INTEGER :: i
-        temperature_after=state%T
+        temperature_after=initial_temperature
 
         DO i=1,SIZE(models)
             temperature_before=temperature_after

@@ -12,6 +12,7 @@ MODULE source_terms_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
     USE state_physical, ONLY : build_physical_state_from_q, build_physical_state_from_qp
+    USE state_mixture, ONLY : evaluate_mixture_heat_capacity
     USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit,                                          &
             eval_thermal_implicit_real, eval_thermal_analytic
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
@@ -266,7 +267,9 @@ CONTAINS
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
-        REAL(wp) :: heat_capacity,temperature_after
+        REAL(wp) :: heat_capacity,temperature_after,temperature_before,cp_m,cp_c
+        REAL(wp) :: xs(n_solid),xg(n_add_gas)
+        LOGICAL :: needs_physical_state
         REAL(wp) :: pore_rate(n_eqns)
         LOGICAL :: pore_ok
         LOGICAL :: supported
@@ -277,19 +280,21 @@ CONTAINS
         IF (.NOT.ALLOCATED(group%source_names)) RETURN
         IF (SIZE(group%source_names)/=1) RETURN
         selected_model_name=TRIM(group%source_names(1))
-        physical_state=>local_state
-        IF (PRESENT(physical_scratch)) THEN
-            physical_state=>physical_scratch
-        ELSE
-            CALL initialize_physical_state_real(local_state)
-        END IF
-
-        ! Build only for treatments that actually consume physical properties.
-        ! Darcy on zero mass stays a no-op; no new intermediate admissibility check.
-        IF (INDEX(selected_model_name,'rheology_')==1 .OR.                                                             &
-            selected_model_name=='thermal_cooling' .OR.                                                                 &
-            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp)) THEN
-            CALL build_physical_state_from_q(q_before,physical_state,                                                   &
+        ! Only rheology and positive-mass Darcy require the complete physical
+        ! state. For wet analytic cooling the sole thermodynamic dependency is
+        ! cp_m, which determines T from conservative energy. Keep the old dry
+        ! branch to preserve its ambient-temperature and rejection semantics.
+        needs_physical_state=INDEX(selected_model_name,'rheology_')==1 .OR.                                            &
+            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp) .OR.                            &
+            (selected_model_name=='thermal_cooling' .AND. q_before(1)<=0.0_wp)
+        IF (needs_physical_state) THEN
+            physical_state=>local_state
+            IF (PRESENT(physical_scratch)) THEN
+                physical_state=>physical_scratch
+            ELSE
+                CALL initialize_physical_state_real(local_state)
+            END IF
+            CALL build_physical_state_from_q(q_before,physical_state,                                                  &
                 context%Bprime_x,context%Bprime_y,context%Bsecond_xx,                                                  &
                 context%Bsecond_xy,context%Bsecond_yy)
         END IF
@@ -324,14 +329,24 @@ CONTAINS
             status=0
 
         ELSE IF (selected_model_name=='thermal_cooling') THEN
-            IF (physical_state%T<=0.0_wp) THEN
+            IF (q_before(1)>0.0_wp) THEN
+                xs=q_before(idx_solid_first:idx_solid_last)/q_before(1)
+                xg=q_before(idx_add_gas_first:idx_add_gas_last)/q_before(1)
+                CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+                temperature_before=q_before(4)/(q_before(1)*cp_m)
+            ELSE
+                temperature_before=physical_state%T
+            END IF
+            IF (temperature_before<=0.0_wp) THEN
                 status=-3
                 RETURN
 
             END IF
 
-            heat_capacity=q_before(4)/physical_state%T
-            CALL eval_thermal_analytic(['thermal_cooling'],physical_state,interval,                                    &
+            ! Preserve the original conservative-energy division and the
+            ! frozen heat capacity used by the exact cooling integrator.
+            heat_capacity=q_before(4)/temperature_before
+            CALL eval_thermal_analytic(['thermal_cooling'],temperature_before,interval,                               &
                     heat_capacity,radiative_term_coeff,convective_term_coeff,                                          &
                     T_env,temperature_after)
             q_after(4)=heat_capacity*temperature_after
