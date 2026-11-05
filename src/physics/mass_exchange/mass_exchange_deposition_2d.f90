@@ -60,7 +60,7 @@ CONTAINS
             r%energy_rate=state%T*(SUM(sp_heat_s*r%solid_mass_rate)-                                                   &
                         state%rho_c*state%cp_c*r%carrier_deposition_rate)
             IF (gas_flag .AND. n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                                       &
-                        r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                                         &
+                        r%add_gas_mass_rate= -state%rho_c*r%carrier_deposition_rate*                                         &
                         state%xg/gas_phase_mass_fraction
             r%dB_dt=SUM(r%solid_deposition_rate)+r%carrier_deposition_rate
     END SUBROUTINE eval_mass_exchange_deposition_explicit
