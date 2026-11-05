@@ -351,7 +351,8 @@ CONTAINS
     CHARACTER(LEN=256) :: message,error
     groups(1)%id=0
     groups(1)%method=SOURCE_METHOD_EXPLICIT
-    groups(1)%source_names=[CHARACTER(LEN=64)::'mass_exchange_erosion']
+    ! A mixed explicit group exercises reuse of the same worker physical state.
+    groups(1)%source_names=[CHARACTER(LEN=64)::'mass_exchange_erosion','geometry_curvature']
     groups(1)%equation_ids=[(l,l=1,nq)]
     CALL registry%initialize(nq,0,groups,error)
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie exchange registry initialization'
