@@ -801,3 +801,13 @@ Riferimento tecnico: repository demichie/IMEX_SfloW2D_dev, master; analisi dei c
 - Riportare nella [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) il progresso aggregato, senza duplicare i dettagli tecnici.
 - Se un'ottimizzazione modifica l'ordine di operazioni floating-point, registrarlo e usare tolleranze scientificamente giustificate; non dichiarare equivalenza bitwise non verificata.
 - Le regole di formattazione Fortran sono in [FORTRAN_STYLE.md](FORTRAN_STYLE.md); i test e le evidenze di accettazione rimangono in `TESTS/` e `docs/acceptance/`.
+
+## Audit architetturale finale - Blocco 1 (5 novembre 2026)
+
+Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093539` prima delle modifiche di questo blocco.
+
+- Le famiglie di termini sorgente esaminate espongono le interfacce `explicit`, `semi_implicit`, `implicit` e `analytic`; i metodi non implementati devono continuare a terminare con errore esplicito. Presenza delle firme non equivale a validazione dei comportamenti.
+- Nelle implementazioni `src/physics/**/*.f90` controllate non sono emersi accessi diretti a `q(j,k,...)` o `qp(j,k,...)`; le dipendenze da `geometry_2d` osservate nei kernel di iniezione, pore pressure e coefficienti sono limitate a utility geometriche (`pi_g`, `bottom_source_area_ratio`), da mantenere distinte dai campi globali.
+- Il `src/Makefile.am` distribuiva gia `rheology_newmodel_linear.inc` e `thermal_cooling_rate.inc` tramite `EXTRA_DIST`, ma mancavano i due archi di dipendenza per la ricompilazione dei rispettivi oggetti: aggiunti in questo blocco.
+- Restano da verificare con controlli riproducibili: dipendenze `USE` vs regole Makefile, assenza di cicli sull'intero grafo, duplicazioni e wrapper realmente inutilizzati, correttezza dei quattro trattamenti per ciascun modello, e build/test CI del ramo di audit.
+- Nessuna rimozione di interfacce obbligatorie o modifica delle formule fisiche autorizzata dal solo audit statico.

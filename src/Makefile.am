@@ -521,3 +521,6 @@ physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): physics/rheology_laws/rhe
 
 physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc
 
+# Blocco 1: include dependencies used by source kernels.
+physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): physics/rheology_laws/rheology_newmodel_linear.inc
+physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): physics/thermal_laws/thermal_cooling_rate.inc
