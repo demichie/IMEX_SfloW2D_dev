@@ -11,7 +11,7 @@ PROGRAM test_workspace_lifecycle
        begin_geometry_transaction, rollback_geometry_transaction, &
        commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
-  USE state_2d, ONLY : state_type, substrate_snapshot_type
+  USE state_fields, ONLY : state_type, substrate_snapshot_type
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   IMPLICIT NONE
