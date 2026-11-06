@@ -175,34 +175,32 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rho_m,inv_rhom,rho_c
         REAL(wp), INTENT(OUT) :: xs(n_solid),xg(n_add_gas),xc,cp_c,cp_m
         REAL(wp) :: alphas_tot,alphac,alpha_air,rho_a,rho_g(n_add_gas)
+        REAL(wp) :: rho_from_volume,inv_rho_c,phase_alphas(n_solid),phase_alphag(n_add_gas)
 
+        ! Only the volume-to-mass conversion belongs here. All resulting
+        ! thermodynamic properties come from the canonical mass-based kernel.
         alphas_tot=SUM(alphas)
         IF (alphas_tot>1.0_wp) THEN
             alphas=alphas/alphas_tot
         ELSEIF (alphas_tot<0.0_wp) THEN
             alphas=0.0_wp
         END IF
-        alphas_tot=SUM(alphas)
-        alphac=1.0_wp-alphas_tot
+        alphac=1.0_wp-SUM(alphas)
         IF (gas_flag) THEN
             rho_a=1.0_wp/evaluate_gas_specific_volume(T,sp_gas_const_a)
             rho_g=1.0_wp/evaluate_gas_specific_volume(T,sp_gas_const_g)
             alpha_air=alphac-SUM(alphag)
-            IF (alphac>EPSILON(1.0_wp)) THEN
-                rho_c=(alpha_air*rho_a+SUM(alphag*rho_g))/alphac
-            ELSE
-                rho_c=rho_a
-            END IF
+            rho_from_volume=SUM(alphas*rho_s)+alpha_air*rho_a+SUM(alphag*rho_g)
         ELSE
-            rho_c=rho_l
             rho_g=0.0_wp
+            rho_from_volume=SUM(alphas*rho_s)+alphac*rho_l
         END IF
-        rho_m=SUM(alphas*rho_s)+alphac*rho_c
-        inv_rhom=1.0_wp/rho_m
-        xs=alphas*rho_s*inv_rhom
-        xg=alphag*rho_g*inv_rhom
+        xs=alphas*rho_s/rho_from_volume
+        xg=alphag*rho_g/rho_from_volume
+
+        CALL evaluate_mixture(T,xs,xg,rho_m,inv_rhom,rho_c,inv_rho_c, &
+            cp_m,cp_c,phase_alphas,phase_alphag)
         xc=1.0_wp-SUM(xs)
-        CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
     END SUBROUTINE evaluate_mixture_from_volume
 
     !> Primitive-state solid/gas volume fractions, zero for dry cells.

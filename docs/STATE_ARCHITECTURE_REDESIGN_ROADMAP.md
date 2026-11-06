@@ -912,3 +912,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Added `gas_specific_volume.inc` as the sole equation-of-state kernel, through elemental REAL, COMPLEX, and COMPLEX-temperature/REAL-gas-constant variants of `evaluate_gas_specific_volume`; both mixture paths and the reverse conversion now use it. The reciprocal-density form can differ by final-bit rounding from `pres/(R*T)`; the algebraic law is unchanged.
 - `TEST_STATE` now checks the EOS, the reciprocal-density form and retention of complex-step temperature derivatives.
 - The only remaining significant semantic discrepancy in `src/state` identified by this formula audit is the REAL conservative physical-state builder's missing strict composition closure compared with COMPLEX; policy changes are deferred to a dedicated admissibility decision/test, not disguised as formula deduplication.
+
+### State inverse volume-composition conversion (master, 6 November 2026)
+
+- Audited all production call sites: collapse initialization in `src/core/init_2d.f90`; initial material and source/fissure material conversion in `src/io/inpout_2d.f90`. These are input interfaces where specified fractions are volumetric; mass fractions in `qp` are not available until after this inverse conversion.
+- Restricted `evaluate_mixture_from_volume` to producing species mass fractions by mass per volume; final mixture density, carrier density and heat capacities now come from the canonical `evaluate_mixture` kernel. The redundant carrier mixture-density expression was removed from the inverse branch. The historical solids-overfill normalization is retained.
+- Added `TEST_STATE` regression covering gas/liquid, zero solids, zero carrier, overfilled solid fractions and volume/mass conservation; no changes to source inputs, simulation dynamics or hot cell loops.
+- CI Actions remain manually launched; no automatic push-to-master CI trigger.

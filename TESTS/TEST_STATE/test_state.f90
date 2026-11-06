@@ -4,7 +4,7 @@ PROGRAM test_state
     USE state_types
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
         evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity, &
-        evaluate_gas_specific_volume
+        evaluate_gas_specific_volume, evaluate_mixture_from_volume, evaluate_mixture
     USE state_conversions
     USE state_physical
     IMPLICIT NONE
@@ -20,6 +20,7 @@ PROGRAM test_state
     CALL check_shared_density_kernel
     CALL check_shared_conservative_math
     CALL check_gas_eos
+    CALL check_inverse_volume_conversion
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -199,6 +200,71 @@ CONTAINS
         CALL assert_close('ideal-gas complex derivative', &
             AIMAG(complex_specific_volume)/1.0E-24_wp,sp_gas_const_a*inv_pres,5.0E-15_wp)
     END SUBROUTINE check_gas_eos
+
+    !> Initial and source materials are supplied as volume fractions. The
+    !> inverse conversion must agree with the canonical mass-based EOS.
+    SUBROUTINE check_inverse_volume_conversion
+        REAL(wp) :: alphas(2),alphag(1),given_alphas(2),given_alphag(1)
+        REAL(wp) :: xs(2),xg(1),xc,rho_m,inv_rhom,rho_c,cp_m,cp_c
+        REAL(wp) :: rho_ref,inv_rhom_ref,rho_c_ref,inv_rho_c_ref
+        REAL(wp) :: cp_m_ref,cp_c_ref,alphas_ref(2),alphag_ref(1)
+        REAL(wp) :: expected_density
+        INTEGER :: carrier_case,composition_case
+        DO carrier_case=1,2
+            gas_flag=carrier_case==1
+            liquid_flag=.NOT.gas_flag
+            DO composition_case=1,4
+                SELECT CASE(composition_case)
+                CASE(1)
+                    given_alphas=[0.08_wp,0.12_wp]
+                    given_alphag=[0.03_wp]
+                CASE(2)
+                    given_alphas=0.0_wp
+                    given_alphag=[0.02_wp]
+                CASE(3)
+                    given_alphas=[0.45_wp,0.55_wp]
+                    given_alphag=0.0_wp
+                CASE(4)
+                    ! Preserve the historical normalization of excess solids.
+                    given_alphas=[0.75_wp,0.75_wp]
+                    given_alphag=0.0_wp
+                END SELECT
+                alphas=given_alphas
+                alphag=given_alphag
+                CALL evaluate_mixture_from_volume(350.0_wp,alphag,alphas, &
+                    rho_m,inv_rhom,rho_c,xs,xg,xc,cp_c,cp_m)
+                CALL evaluate_mixture(350.0_wp,xs,xg,rho_ref,inv_rhom_ref, &
+                    rho_c_ref,inv_rho_c_ref,cp_m_ref,cp_c_ref,alphas_ref,alphag_ref)
+                CALL assert_close('volume inverse mixture density',rho_m,rho_ref,0.0_wp)
+                CALL assert_close('volume inverse inverse density',inv_rhom,inv_rhom_ref,0.0_wp)
+                CALL assert_close('volume inverse carrier density',rho_c,rho_c_ref,0.0_wp)
+                CALL assert_close('volume inverse cp_m',cp_m,cp_m_ref,0.0_wp)
+                CALL assert_close('volume inverse cp_c',cp_c,cp_c_ref,0.0_wp)
+                CALL assert_close('volume inverse xc',xc,1.0_wp-SUM(xs),0.0_wp)
+                IF (composition_case==4) THEN
+                    CALL assert_close('volume inverse normalized solid 1',alphas(1),0.5_wp,0.0_wp)
+                    CALL assert_close('volume inverse normalized solid 2',alphas(2),0.5_wp,0.0_wp)
+                END IF
+                IF (gas_flag) THEN
+                    expected_density=SUM(alphas*rho_s)+ &
+                        (1.0_wp-SUM(alphas)-SUM(alphag))* &
+                        (1.0_wp/evaluate_gas_specific_volume(350.0_wp,sp_gas_const_a))+ &
+                        SUM(alphag*(1.0_wp/evaluate_gas_specific_volume(350.0_wp,sp_gas_const_g)))
+                ELSE
+                    expected_density=SUM(alphas*rho_s)+(1.0_wp-SUM(alphas))*rho_l
+                END IF
+                CALL assert_close('volume inverse mass budget',rho_m,expected_density,1.0E-12_wp)
+                CALL assert_close('volume inverse solid mass 1',xs(1)*rho_m,alphas(1)*rho_s(1),1.0E-12_wp)
+                CALL assert_close('volume inverse solid mass 2',xs(2)*rho_m,alphas(2)*rho_s(2),1.0E-12_wp)
+                IF (gas_flag) THEN
+                    CALL assert_close('volume inverse gas mass',xg(1)*rho_m, &
+                        alphag(1)/evaluate_gas_specific_volume(350.0_wp,sp_gas_const_g(1)),1.0E-12_wp)
+                END IF
+            END DO
+        END DO
+        gas_flag=.TRUE.
+        liquid_flag=.FALSE.
+    END SUBROUTINE check_inverse_volume_conversion
 
     !> Preserve the granular descriptors from the original mixture formulas.
     SUBROUTINE check_particle_descriptors

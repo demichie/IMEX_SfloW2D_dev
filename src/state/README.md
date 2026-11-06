@@ -17,3 +17,10 @@ removed. The REAL/COMPLEX shared `.inc` kernels remain in this directory.
 
 This change intentionally does not alter the Lie splitting, settling,
 source rates or global time-step rollback rules.
+
+`evaluate_mixture_from_volume` is restricted to initialization/source input
+where constituent volume fractions are prescribed. It first obtains component
+masses per unit volume from the canonical gas equation of state and solid
+densities, then calls `evaluate_mixture` for all final thermodynamic outputs.
+Normal cell operations start from mass fractions in `qp` and do not use this
+inverse conversion.
