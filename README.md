@@ -57,7 +57,7 @@ The executable is copied in the bin folder.
 `make check` runs the legacy example integration cases in temporary
 directories, leaving the source fixtures untouched. The manually launched **Solver integration** Action also runs
 binary/stochastic restart and HP-PCCU Gate-H checks in optimized and
-strict-debug builds. The **Build only** Action compiles both profiles
+strict-debug builds. The **Build only** Action compiles the manually selected `optimized` or `debug` profile
 without running tests.
 
 The legacy test runner can optionally run the focused `TEST_DYNAMIC_FINH`

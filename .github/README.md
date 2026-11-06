@@ -8,7 +8,7 @@ No workflow is triggered by a push, pull request, release, tag or schedule.
 
 | Workflow | Purpose | When to run |
 | --- | --- | --- |
-| [Build (optimized and debug)](workflows/build-only.yml) | Compile the full Fortran executable with gfortran in **both** optimized and strict-debug profiles, in two independent jobs. **No tests run.** | After source changes, or for a fast compiler check. |
+| [Build (optimized and debug)](workflows/build-only.yml) | Compile the full Fortran executable with gfortran in the **selected** `optimized` or `debug` profile (debug enables `--enable-strict-debug`). Exactly one build job runs; **no tests run**. | After source changes, or for a fast compiler check. |
 | [Solver integration and OpenMP validation](workflows/solver-validation.yml) | Build in optimized (4 threads) and strict-debug (1 thread), run `make check`, restart and source-mass/PCCU acceptance regressions. An optional manual input adds a complete 1/2/4-thread field comparison. | Before merging numerical changes or after significant refactoring. |
 | [Cell physics and numerical regressions](workflows/physics-regressions.yml) | Run current focused `TESTS/` suites in three groups: state, physical sources and spatial discretization. Each suite has its own saved log. | After modifying a physical law, state conversion or spatial operator. |
 | [Static source and documentation audit](workflows/fortran-dependency-audit.yml) | Check Fortran module/Makefile dependencies, Doxygen/formatting, source interface contracts and indexing. Does not compile the full solver. | After modifying module dependencies, APIs, source terms or documentation. |

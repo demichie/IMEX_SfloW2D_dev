@@ -50,7 +50,7 @@ TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
 TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D
 ```
 
-These are in addition to `make check`; they do not replace tests targeted at the code being modified. All [active GitHub Actions](.github/README.md) run **only by manual dispatch**. Build-only compiles both optimized and strict-debug profiles without tests; separate manual workflows cover integration, focused regressions, OpenMP performance, static source checks and intentional Docker/documentation publication. No Action starts on push, pull request, tag, release or schedule.
+These are in addition to `make check`; they do not replace tests targeted at the code being modified. All [active GitHub Actions](.github/README.md) run **only by manual dispatch**. Build-only compiles the manually selected optimized or debug profile without tests; separate manual workflows cover integration, focused regressions, OpenMP performance, static source checks and intentional Docker/documentation publication. No Action starts on push, pull request, tag, release or schedule.
 
 ## Build release archives
 

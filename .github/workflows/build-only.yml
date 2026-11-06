@@ -2,19 +2,24 @@ name: Build (optimized and debug)
 
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Compilation profile'
+        type: choice
+        required: true
+        default: optimized
+        options:
+          - optimized
+          - debug
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: gfortran / ${{ matrix.profile }}
+    name: gfortran / ${{ inputs.profile }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [optimized, strict-debug]
     steps:
       - uses: actions/checkout@v4
       - name: Install compiler and libraries
@@ -28,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           autoreconf -fi
-          if [[ "${{ matrix.profile }}" == "strict-debug" ]]; then
+          if [[ "${{ inputs.profile }}" == "debug" ]]; then
             ./configure --with-netcdf=/usr --enable-strict-debug
           else
             ./configure --with-netcdf=/usr
@@ -43,6 +48,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.profile }}-${{ github.run_id }}
+          name: build-${{ inputs.profile }}-${{ github.run_id }}
           path: build.log
           if-no-files-found: warn
