@@ -13,7 +13,9 @@ This directory contains the sole production state implementation.
 
 Production code must not import or link `state_2d` or
 `state_conversion_2d`; the historical `src/state/` implementation was
-removed. The REAL/COMPLEX shared `.inc` kernels remain in this directory.
+removed. The REAL/COMPLEX shared `.inc` kernels live in `src/state/inc/`.
+The name `kinematics.inc` is retained because it computes velocities as well
+as curvature acceleration.
 
 This change intentionally does not alter the Lie splitting, settling,
 source rates or global time-step rollback rules.

@@ -104,7 +104,7 @@ CONTAINS
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        INCLUDE 'temperature_from_energy.inc'
+        INCLUDE 'inc/temperature_from_energy.inc'
     END SUBROUTINE evaluate_temperature_from_q_real
 
     !> Complex-step temperature-only primitive. Preserve the same composition
@@ -126,7 +126,7 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        INCLUDE 'temperature_from_energy.inc'
+        INCLUDE 'inc/temperature_from_energy.inc'
     END SUBROUTINE evaluate_temperature_from_q_complex
 
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)
@@ -256,12 +256,12 @@ CONTAINS
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        INCLUDE 'temperature_from_energy.inc'
+        INCLUDE 'inc/temperature_from_energy.inc'
         state%T=T
         CALL evaluate_mixture_phase_properties(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
             state%alphas,state%alphag)
         state%h=mass*inv_rho_m
-        INCLUDE 'velocity_from_momentum.inc'
+        INCLUDE 'inc/velocity_from_momentum.inc'
         state%u=u; state%v=v
         state%xs=xs; state%xg=xg; state%rho_m=rho_m; state%inv_rhom=inv_rho_m
         state%rho_c=rho_c; state%inv_rho_c=inv_rho_c; state%cp_m=cp_m; state%cp_c=cp_c
@@ -338,11 +338,11 @@ CONTAINS
             xs=q(idx_solid_first:idx_solid_last)/mass; xg=q(idx_add_gas_first:idx_add_gas_last)/mass
             IF (.NOT.close_composition(xs,xg)) RETURN
             CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-            INCLUDE 'temperature_from_energy.inc'
+            INCLUDE 'inc/temperature_from_energy.inc'
             CALL evaluate_mixture_phase_properties(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
                 alphas,alphag)
             state%h=mass*inv_rho_m
-            INCLUDE 'velocity_from_momentum.inc'
+            INCLUDE 'inc/velocity_from_momentum.inc'
             state%u=u; state%v=v
             state%T=T
             state%xs=xs; state%xg=xg; state%alphas=alphas; state%alphag=alphag
@@ -370,28 +370,28 @@ CONTAINS
     SUBROUTINE update_kinematics_real(state,bx,by,bxx,bxy,byy)
         TYPE(physical_state_real), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
-        INCLUDE 'kinematics.inc'
+        INCLUDE 'inc/kinematics.inc'
         state%Ri=richardson_real(state%h,state%u,state%v,state%red_grav)
     END SUBROUTINE update_kinematics_real
 
     SUBROUTINE update_kinematics_complex(state,bx,by,bxx,bxy,byy)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
-        INCLUDE 'kinematics.inc'
+        INCLUDE 'inc/kinematics.inc'
         state%Ri=richardson_complex(state%h,state%u,state%v,state%red_grav)
     END SUBROUTINE update_kinematics_complex
 
     REAL(wp) FUNCTION richardson_real(h,u,v,red_grav)
         REAL(wp), INTENT(IN) :: h,u,v,red_grav
         REAL(wp) :: speed2, ri
-        INCLUDE 'richardson.inc'
+        INCLUDE 'inc/richardson.inc'
         richardson_real=ri
     END FUNCTION richardson_real
 
     COMPLEX(wp) FUNCTION richardson_complex(h,u,v,red_grav)
         COMPLEX(wp), INTENT(IN) :: h,u,v,red_grav
         COMPLEX(wp) :: speed2, ri
-        INCLUDE 'richardson.inc'
+        INCLUDE 'inc/richardson.inc'
         richardson_complex=ri
     END FUNCTION richardson_complex
 

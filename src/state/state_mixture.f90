@@ -64,43 +64,43 @@ CONTAINS
     !> complex-step perturbations of temperature and mixture gas constant.
     PURE ELEMENTAL REAL(wp) FUNCTION gas_specific_volume_real(T,gas_const) RESULT(inv_rho)
         REAL(wp), INTENT(IN) :: T,gas_const
-        INCLUDE 'gas_specific_volume.inc'
+        INCLUDE 'inc/gas_specific_volume.inc'
     END FUNCTION gas_specific_volume_real
 
     PURE ELEMENTAL COMPLEX(wp) FUNCTION gas_specific_volume_complex(T,gas_const) RESULT(inv_rho)
         COMPLEX(wp), INTENT(IN) :: T,gas_const
-        INCLUDE 'gas_specific_volume.inc'
+        INCLUDE 'inc/gas_specific_volume.inc'
     END FUNCTION gas_specific_volume_complex
 
     PURE ELEMENTAL COMPLEX(wp) FUNCTION gas_specific_volume_complex_real_const(T,gas_const) RESULT(inv_rho)
         COMPLEX(wp), INTENT(IN) :: T
         REAL(wp), INTENT(IN) :: gas_const
-        INCLUDE 'gas_specific_volume.inc'
+        INCLUDE 'inc/gas_specific_volume.inc'
     END FUNCTION gas_specific_volume_complex_real_const
 
 
     PURE REAL(wp) FUNCTION evaluate_reduced_gravity_real(rho_m,inv_rho_m) RESULT(red_grav)
         REAL(wp), INTENT(IN) :: rho_m,inv_rho_m
-        INCLUDE 'reduced_gravity.inc'
+        INCLUDE 'inc/reduced_gravity.inc'
     END FUNCTION evaluate_reduced_gravity_real
 
     PURE COMPLEX(wp) FUNCTION evaluate_reduced_gravity_complex(rho_m,inv_rho_m) RESULT(red_grav)
         COMPLEX(wp), INTENT(IN) :: rho_m,inv_rho_m
-        INCLUDE 'reduced_gravity.inc'
+        INCLUDE 'inc/reduced_gravity.inc'
     END FUNCTION evaluate_reduced_gravity_complex
 
     SUBROUTINE evaluate_mixture_density_real(T,xs,xg,rho_m,inv_rho_m)
         REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
         REAL(wp), INTENT(OUT) :: rho_m, inv_rho_m
         REAL(wp) :: xc, gas_const_c, inv_rho_c
-        INCLUDE 'density_from_mass.inc'
+        INCLUDE 'inc/density_from_mass.inc'
     END SUBROUTINE evaluate_mixture_density_real
 
     SUBROUTINE evaluate_mixture_density_complex(T,xs,xg,rho_m,inv_rho_m)
         COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
         COMPLEX(wp), INTENT(OUT) :: rho_m, inv_rho_m
         COMPLEX(wp) :: xc, gas_const_c, inv_rho_c
-        INCLUDE 'density_from_mass.inc'
+        INCLUDE 'inc/density_from_mass.inc'
     END SUBROUTINE evaluate_mixture_density_complex
 
     SUBROUTINE evaluate_mixture_phase_properties_real(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
@@ -109,7 +109,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: alphas(n_solid),alphag(n_add_gas)
         REAL(wp) :: xc,gas_const_c,inv_rho_g(n_add_gas)
 
-        INCLUDE 'mixture_from_mass.inc'
+        INCLUDE 'inc/mixture_from_mass.inc'
     END SUBROUTINE evaluate_mixture_phase_properties_real
 
     SUBROUTINE evaluate_mixture_phase_properties_complex(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
@@ -118,21 +118,21 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: alphas(n_solid),alphag(n_add_gas)
         COMPLEX(wp) :: xc,gas_const_c,inv_rho_g(n_add_gas)
 
-        INCLUDE 'mixture_from_mass.inc'
+        INCLUDE 'inc/mixture_from_mass.inc'
     END SUBROUTINE evaluate_mixture_phase_properties_complex
 
     SUBROUTINE evaluate_mixture_heat_capacity_real(xs,xg,cp_m,cp_c)
         REAL(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
         REAL(wp), INTENT(OUT) :: cp_m, cp_c
         REAL(wp) :: xc, carrier_sp_heat_mass
-        INCLUDE 'mixture_heat_capacity.inc'
+        INCLUDE 'inc/mixture_heat_capacity.inc'
     END SUBROUTINE evaluate_mixture_heat_capacity_real
 
     SUBROUTINE evaluate_mixture_heat_capacity_complex(xs,xg,cp_m,cp_c)
         COMPLEX(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
         COMPLEX(wp), INTENT(OUT) :: cp_m, cp_c
         COMPLEX(wp) :: xc, carrier_sp_heat_mass
-        INCLUDE 'mixture_heat_capacity.inc'
+        INCLUDE 'inc/mixture_heat_capacity.inc'
     END SUBROUTINE evaluate_mixture_heat_capacity_complex
 
     SUBROUTINE evaluate_mixture_real(T, xs, xg, rho_m, inv_rho_m, rho_c, inv_rho_c, &
@@ -146,8 +146,8 @@ CONTAINS
         REAL(wp) :: inv_rho_g(n_add_gas)
         REAL(wp) :: carrier_sp_heat_mass
 
-        INCLUDE 'mixture_heat_capacity.inc'
-        INCLUDE 'mixture_from_mass.inc'
+        INCLUDE 'inc/mixture_heat_capacity.inc'
+        INCLUDE 'inc/mixture_from_mass.inc'
     END SUBROUTINE evaluate_mixture_real
 
     SUBROUTINE evaluate_mixture_complex(T, xs, xg, rho_m, inv_rho_m, rho_c, inv_rho_c, &
@@ -161,8 +161,8 @@ CONTAINS
         COMPLEX(wp) :: inv_rho_g(n_add_gas)
         COMPLEX(wp) :: carrier_sp_heat_mass
 
-        INCLUDE 'mixture_heat_capacity.inc'
-        INCLUDE 'mixture_from_mass.inc'
+        INCLUDE 'inc/mixture_heat_capacity.inc'
+        INCLUDE 'inc/mixture_from_mass.inc'
     END SUBROUTINE evaluate_mixture_complex
 
     !> Convert prescribed volume fractions into the canonical source material.

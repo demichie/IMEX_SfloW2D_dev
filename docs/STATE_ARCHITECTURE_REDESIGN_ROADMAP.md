@@ -919,3 +919,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Restricted `evaluate_mixture_from_volume` to producing species mass fractions by mass per volume; final mixture density, carrier density and heat capacities now come from the canonical `evaluate_mixture` kernel. The redundant carrier mixture-density expression was removed from the inverse branch. The historical solids-overfill normalization is retained.
 - Added `TEST_STATE` regression covering gas/liquid, zero solids, zero carrier, overfilled solid fractions and volume/mass conservation; no changes to source inputs, simulation dynamics or hot cell loops.
 - CI Actions remain manually launched; no automatic push-to-master CI trigger.
+
+### Organization of shared state mathematical kernels (2026-11-06)
+
+- Moved all ten `src/state/*.inc` files into `src/state/inc/`, retaining every filename (including `kinematics.inc`) and every mathematical expression.
+- Updated `INCLUDE` paths in `state_mixture.f90`, `state_conversions.f90`, `state_physical.f90`, including the nested density inclusion in `mixture_from_mass.inc`.
+- Updated Automake `EXTRA_DIST` and object prerequisites, preserving the existing `-I$(srcdir)/state` include search directory so `inc/...` resolves in both production and standalone tests.
+- No physical or numerical formula has been changed. CI Actions remain manually triggered; validation after this commit is pending.

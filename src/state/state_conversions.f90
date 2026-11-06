@@ -96,11 +96,11 @@ CONTAINS
         IF (numerical .AND. mass<=eps_sing) THEN
             T=T_ambient
         ELSE
-            INCLUDE 'temperature_from_energy.inc'
+            INCLUDE 'inc/temperature_from_energy.inc'
             IF (numerical .AND. T<=0.0_wp) T=T_ambient
         END IF
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
-        INCLUDE 'velocity_from_momentum.inc'
+        INCLUDE 'inc/velocity_from_momentum.inc'
         qp(idx_h)=mass*inv_rho_m
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=closed_xs
@@ -149,9 +149,9 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        INCLUDE 'temperature_from_energy.inc'
+        INCLUDE 'inc/temperature_from_energy.inc'
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
-        INCLUDE 'velocity_from_momentum.inc'
+        INCLUDE 'inc/velocity_from_momentum.inc'
         qp(idx_h)=mass*inv_rho_m
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=xs
@@ -182,7 +182,7 @@ CONTAINS
             RETURN
         END IF
         IF (.NOT.close_composition(xs,xg)) RETURN
-        INCLUDE 'conservative_from_primitive.inc'
+        INCLUDE 'inc/conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_real
 
@@ -206,7 +206,7 @@ CONTAINS
         xs=qp(idx_solid_first:idx_solid_last)
         xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (.NOT.normalize_face_composition(xs,xg)) RETURN
-        INCLUDE 'conservative_from_primitive.inc'
+        INCLUDE 'inc/conservative_from_primitive.inc'
         accepted=.TRUE.
     END SUBROUTINE numerical_primitive_to_conservative
 
@@ -227,7 +227,7 @@ CONTAINS
             RETURN
         END IF
         IF (.NOT.close_composition(xs,xg)) RETURN
-        INCLUDE 'conservative_from_primitive.inc'
+        INCLUDE 'inc/conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_complex
 

@@ -84,12 +84,12 @@ IMEX_SfloW2D_SOURCES = \
 AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state \
              -I$(srcdir)/physics/rheology_laws -I$(srcdir)/physics/thermal_laws
 CLEANFILES = *.mod
-EXTRA_DIST = state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
-             state/gas_specific_volume.inc \
-             state/density_from_mass.inc state/kinematics.inc \
-             state/richardson.inc state/reduced_gravity.inc \
-             state/temperature_from_energy.inc state/velocity_from_momentum.inc \
-             state/conservative_from_primitive.inc \
+EXTRA_DIST = state/inc/mixture_heat_capacity.inc state/inc/mixture_from_mass.inc \
+             state/inc/gas_specific_volume.inc \
+             state/inc/density_from_mass.inc state/inc/kinematics.inc \
+             state/inc/richardson.inc state/inc/reduced_gravity.inc \
+             state/inc/temperature_from_energy.inc state/inc/velocity_from_momentum.inc \
+             state/inc/conservative_from_primitive.inc \
              physics/rheology_laws/rheology_voellmy_turbulent.inc \
              physics/rheology_laws/rheology_lava_viscous.inc \
              physics/rheology_laws/rheology_plastic_yield.inc \
@@ -151,23 +151,23 @@ state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state/state_mixture.$(OBJEXT): state/state_composition.$(OBJEXT) \
                                      core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
-                                     state/mixture_heat_capacity.inc \
-                                     state/mixture_from_mass.inc \
-                                     state/density_from_mass.inc \
-                                     state/reduced_gravity.inc \
-                                     state/gas_specific_volume.inc
+                                     state/inc/mixture_heat_capacity.inc \
+                                     state/inc/mixture_from_mass.inc \
+                                     state/inc/density_from_mass.inc \
+                                     state/inc/reduced_gravity.inc \
+                                     state/inc/gas_specific_volume.inc
 state/state_conversions.$(OBJEXT): state/state_types.$(OBJEXT) \
                                          state/state_mixture.$(OBJEXT) \
                                          state/state_composition.$(OBJEXT) \
-                                         state/conservative_from_primitive.inc \
-                                         state/temperature_from_energy.inc \
-                                         state/velocity_from_momentum.inc
+                                         state/inc/conservative_from_primitive.inc \
+                                         state/inc/temperature_from_energy.inc \
+                                         state/inc/velocity_from_momentum.inc
 state/state_physical.$(OBJEXT): state/state_types.$(OBJEXT) \
                                       state/state_mixture.$(OBJEXT) \
                                       state/state_composition.$(OBJEXT) \
-                                      state/kinematics.inc state/richardson.inc \
-                                      state/temperature_from_energy.inc \
-                                      state/velocity_from_momentum.inc
+                                      state/inc/kinematics.inc state/inc/richardson.inc \
+                                      state/inc/temperature_from_energy.inc \
+                                      state/inc/velocity_from_momentum.inc
 state/state.$(OBJEXT): state/state_types.$(OBJEXT) \
                              state/state_fields.$(OBJEXT) \
                              state/state_composition.$(OBJEXT) \
