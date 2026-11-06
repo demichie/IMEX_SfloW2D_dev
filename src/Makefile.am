@@ -85,6 +85,7 @@ AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state \
              -I$(srcdir)/physics/rheology_laws -I$(srcdir)/physics/thermal_laws
 CLEANFILES = *.mod
 EXTRA_DIST = state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
+             state/gas_specific_volume.inc \
              state/density_from_mass.inc state/kinematics.inc \
              state/richardson.inc state/reduced_gravity.inc \
              state/temperature_from_energy.inc state/velocity_from_momentum.inc \
@@ -153,7 +154,8 @@ state/state_mixture.$(OBJEXT): state/state_composition.$(OBJEXT) \
                                      state/mixture_heat_capacity.inc \
                                      state/mixture_from_mass.inc \
                                      state/density_from_mass.inc \
-                                     state/reduced_gravity.inc
+                                     state/reduced_gravity.inc \
+                                     state/gas_specific_volume.inc
 state/state_conversions.$(OBJEXT): state/state_types.$(OBJEXT) \
                                          state/state_mixture.$(OBJEXT) \
                                          state/state_composition.$(OBJEXT) \

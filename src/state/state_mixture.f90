@@ -19,6 +19,7 @@ MODULE state_mixture
     PUBLIC :: evaluate_mixture_heat_capacity
     PUBLIC :: evaluate_mixture_density
     PUBLIC :: evaluate_reduced_gravity
+    PUBLIC :: evaluate_gas_specific_volume
     PUBLIC :: evaluate_mixture_phase_properties
     PUBLIC :: sauter_diameter, average_density_solids
     PUBLIC :: evaluate_mixture_from_volume, primitive_to_volume_fractions
@@ -46,12 +47,37 @@ MODULE state_mixture
         MODULE PROCEDURE evaluate_mixture_density_complex
     END INTERFACE evaluate_mixture_density
 
+    INTERFACE evaluate_gas_specific_volume
+        MODULE PROCEDURE gas_specific_volume_real
+        MODULE PROCEDURE gas_specific_volume_complex
+        MODULE PROCEDURE gas_specific_volume_complex_real_const
+    END INTERFACE evaluate_gas_specific_volume
+
     INTERFACE evaluate_reduced_gravity
         MODULE PROCEDURE evaluate_reduced_gravity_real
         MODULE PROCEDURE evaluate_reduced_gravity_complex
     END INTERFACE evaluate_reduced_gravity
 
 CONTAINS
+
+    !> Canonical ideal-gas specific volume. The COMPLEX variants retain
+    !> complex-step perturbations of temperature and mixture gas constant.
+    PURE ELEMENTAL REAL(wp) FUNCTION gas_specific_volume_real(T,gas_const) RESULT(inv_rho)
+        REAL(wp), INTENT(IN) :: T,gas_const
+        INCLUDE 'gas_specific_volume.inc'
+    END FUNCTION gas_specific_volume_real
+
+    PURE ELEMENTAL COMPLEX(wp) FUNCTION gas_specific_volume_complex(T,gas_const) RESULT(inv_rho)
+        COMPLEX(wp), INTENT(IN) :: T,gas_const
+        INCLUDE 'gas_specific_volume.inc'
+    END FUNCTION gas_specific_volume_complex
+
+    PURE ELEMENTAL COMPLEX(wp) FUNCTION gas_specific_volume_complex_real_const(T,gas_const) RESULT(inv_rho)
+        COMPLEX(wp), INTENT(IN) :: T
+        REAL(wp), INTENT(IN) :: gas_const
+        INCLUDE 'gas_specific_volume.inc'
+    END FUNCTION gas_specific_volume_complex_real_const
+
 
     PURE REAL(wp) FUNCTION evaluate_reduced_gravity_real(rho_m,inv_rho_m) RESULT(red_grav)
         REAL(wp), INTENT(IN) :: rho_m,inv_rho_m
@@ -159,8 +185,8 @@ CONTAINS
         alphas_tot=SUM(alphas)
         alphac=1.0_wp-alphas_tot
         IF (gas_flag) THEN
-            rho_a=pres/(sp_gas_const_a*T)
-            rho_g=pres/(sp_gas_const_g*T)
+            rho_a=1.0_wp/evaluate_gas_specific_volume(T,sp_gas_const_a)
+            rho_g=1.0_wp/evaluate_gas_specific_volume(T,sp_gas_const_g)
             alpha_air=alphac-SUM(alphag)
             IF (alphac>EPSILON(1.0_wp)) THEN
                 rho_c=(alpha_air*rho_a+SUM(alphag*rho_g))/alphac

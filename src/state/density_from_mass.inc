@@ -5,7 +5,7 @@
         ELSE
             gas_const_c=sp_gas_const_a
         END IF
-        inv_rho_c=gas_const_c*T*inv_pres
+        inv_rho_c=evaluate_gas_specific_volume(T,gas_const_c)
     ELSE
         inv_rho_c=inv_rho_l
     END IF

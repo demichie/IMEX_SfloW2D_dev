@@ -3,7 +3,8 @@ PROGRAM test_state
     USE constitutive_parameters_2d
     USE state_types
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
-        evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity
+        evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity, &
+        evaluate_gas_specific_volume
     USE state_conversions
     USE state_physical
     IMPLICIT NONE
@@ -18,6 +19,7 @@ PROGRAM test_state
     CALL check_particle_descriptors
     CALL check_shared_density_kernel
     CALL check_shared_conservative_math
+    CALL check_gas_eos
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -181,6 +183,22 @@ CONTAINS
             CALL assert_close('shared complex v',REAL(cqp_check(idx_v),wp),REAL(cphysical%v,wp),tolerance)
         END DO
     END SUBROUTINE check_shared_conservative_math
+
+    !> Gas law must be consistent for constituent and carrier evaluations.
+    SUBROUTINE check_gas_eos
+        REAL(wp) :: T,expected,actual
+        COMPLEX(wp) :: complex_temperature,complex_specific_volume
+        T=325.0_wp
+        actual=evaluate_gas_specific_volume(T,sp_gas_const_a)
+        expected=sp_gas_const_a*T*inv_pres
+        CALL assert_close('ideal-gas specific volume',actual,expected,0.0_wp)
+        CALL assert_close('ideal-gas density reciprocal',1.0_wp/actual, &
+            pres/(sp_gas_const_a*T),5.0E-15_wp)
+        complex_temperature=CMPLX(T,1.0E-24_wp,wp)
+        complex_specific_volume=evaluate_gas_specific_volume(complex_temperature,sp_gas_const_a)
+        CALL assert_close('ideal-gas complex derivative', &
+            AIMAG(complex_specific_volume)/1.0E-24_wp,sp_gas_const_a*inv_pres,5.0E-15_wp)
+    END SUBROUTINE check_gas_eos
 
     !> Preserve the granular descriptors from the original mixture formulas.
     SUBROUTINE check_particle_descriptors

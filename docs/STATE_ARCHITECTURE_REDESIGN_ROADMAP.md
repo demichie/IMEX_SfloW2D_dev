@@ -905,3 +905,10 @@ Scope: all files in `src/state`, prioritizing unique implementations of physical
 ### Direct-master CI gate
 
 The Fortran architecture workflow previously ran on pull requests and manual dispatch only. Added automatic `push` triggers for `master` (production sources, state tests and architecture checker) so direct-master changes receive parallel-build and regression verification without opening another pull request. The math-dedup commit must remain provisional until those checks pass.
+
+### EOS formula duplication closed
+
+- The ideal-gas specific volume `R*T/p` was encoded separately as `gas_const_c*T*inv_pres` in `density_from_mass.inc`, as `sp_gas_const_g*T*inv_pres` in `mixture_from_mass.inc`, and as `pres/(R*T)` in the reverse volume-fraction conversion. These are the same gas equation of state, not independent physical models.
+- Added `gas_specific_volume.inc` as the sole equation-of-state kernel, through elemental REAL, COMPLEX, and COMPLEX-temperature/REAL-gas-constant variants of `evaluate_gas_specific_volume`; both mixture paths and the reverse conversion now use it. The reciprocal-density form can differ by final-bit rounding from `pres/(R*T)`; the algebraic law is unchanged.
+- `TEST_STATE` now checks the EOS, the reciprocal-density form and retention of complex-step temperature derivatives.
+- The only remaining significant semantic discrepancy in `src/state` identified by this formula audit is the REAL conservative physical-state builder's missing strict composition closure compared with COMPLEX; policy changes are deferred to a dedicated admissibility decision/test, not disguised as formula deduplication.
