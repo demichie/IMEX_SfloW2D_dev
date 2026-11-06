@@ -145,7 +145,10 @@ CONTAINS
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
-            INCLUDE 'inc/wet_thermodynamics.inc'
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
@@ -167,7 +170,10 @@ CONTAINS
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
-            INCLUDE 'inc/wet_thermodynamics.inc'
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
@@ -208,7 +214,10 @@ CONTAINS
         IF (state%h <= EPSILON(1.0_wp)) THEN
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
-            INCLUDE 'inc/wet_thermodynamics.inc'
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
 
         geometry=0.0_wp
@@ -293,7 +302,10 @@ CONTAINS
         IF (REAL(state%h,wp) <= EPSILON(1.0_wp)) THEN
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
-            INCLUDE 'inc/wet_thermodynamics.inc'
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by

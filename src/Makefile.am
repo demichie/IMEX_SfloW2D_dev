@@ -84,8 +84,7 @@ IMEX_SfloW2D_SOURCES = \
 AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state \
              -I$(srcdir)/physics/rheology_laws -I$(srcdir)/physics/thermal_laws
 CLEANFILES = *.mod
-EXTRA_DIST = state/inc/dry_thermodynamics.inc state/inc/wet_thermodynamics.inc \
-             state/inc/mixture_heat_capacity.inc state/inc/mixture_from_mass.inc \
+EXTRA_DIST = state/inc/dry_thermodynamics.inc state/inc/mixture_heat_capacity.inc state/inc/mixture_from_mass.inc \
              state/inc/gas_specific_volume.inc \
              state/inc/density_from_mass.inc state/inc/kinematics.inc \
              state/inc/richardson.inc state/inc/reduced_gravity.inc \
@@ -169,8 +168,7 @@ state/state_physical.$(OBJEXT): state/state_types.$(OBJEXT) \
                                       state/inc/kinematics.inc state/inc/richardson.inc \
                                       state/inc/temperature_from_energy.inc \
                                       state/inc/velocity_from_momentum.inc \
-                                      state/inc/dry_thermodynamics.inc \
-                                      state/inc/wet_thermodynamics.inc
+                                      state/inc/dry_thermodynamics.inc
 state/state.$(OBJEXT): state/state_types.$(OBJEXT) \
                              state/state_fields.$(OBJEXT) \
                              state/state_composition.$(OBJEXT) \

@@ -963,9 +963,8 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Removed an existing duplicate `primitive_to_conservative` name in the state-equivalence test's USE ONLY statement.
 - No physical or numerical formula changed. Manual CI and examples on this commit still needed.
 
-### F3 wet thermodynamics assembly kernel (2026-11-06)
+### F3 correction: no call-only include kernel (2026-11-06)
 
-- Consolidated four identical wet-state assembly blocks in `state_physical.f90` (REAL/COMPLEX `build_physical_state_from_qp` and `refresh_physical_state`) into `inc/wet_thermodynamics.inc`. The include evaluates the canonical mixture, rejects `cp_m <= 0`, and computes reduced gravity with exactly the original call sequence and arithmetic.
-- Added `TEST_STATE` regression for REAL/COMPLEX gas/liquid qp construction versus wet refresh, including the complex-step imaginary response of density and reduced gravity. Updated `src/Makefile.am` dependencies/distribution and `src/state/README.md`.
-- Preserved separate dry-state policy and q-based state builders, no formulas or acceptance thresholds changed. Future F3 work should evaluate duplication in q-derived assembly only after a separate equivalence test; avoid adding an intermediate qp buffer or redoing mixture calculations.
-- No GitHub Actions were launched. Manual CI and EXAMPLE_TAAL / EXAMPLE_ETNA / EXAMPLE_ETNA_LAVA / EXAMPLE_CF remain verification gates for this commit.
+- Reverted commit 281a27a42fdef0b1beefdb4c9ba08607ac7af2c0: restored the four explicit wet-state orchestration blocks in REAL/COMPLEX qp builders and refresh; removed `inc/wet_thermodynamics.inc`, its Makefile distribution/dependency entries, and the regression introduced exclusively in that trial.
+- Architectural convention: an `.inc` must hold reusable physical/mathematical formulae or substantive algorithmic logic, not only a sequence of calls and an admissibility IF. Repetition of short orchestration in separate routines is acceptable. Existing genuine physical `.inc` kernels remain unchanged.
+- Continue F3 by auditing duplicated *formulae* in q-based conversion/build paths rather than wrapping repeated calls. No CI run for this revert; test manually as desired.
