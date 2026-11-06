@@ -28,7 +28,9 @@ Normal cell operations start from mass fractions in `qp` and do not use this
 inverse conversion.
 
 Dry-state thermodynamics for REAL and COMPLEX builders and refresh are
-shared by `inc/dry_thermodynamics.inc`.
+shared by `inc/dry_thermodynamics.inc`. The wet-state mixture, heat-capacity
+validation and reduced-gravity assembly shared by qp builders and refresh is
+implemented once in `inc/wet_thermodynamics.inc` (REAL and COMPLEX).
 
 The former single-field workspace containers and their forwarding initializers
 were removed; callers initialize the physical state directly. The conservative

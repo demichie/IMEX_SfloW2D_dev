@@ -25,6 +25,7 @@ PROGRAM test_state
     CALL check_complex_closure_limits
     CALL check_real_complex_invalid_candidates
     CALL check_dry_refresh_consistency
+    CALL check_wet_refresh_assembly
     CALL check_epsilon_dry_real_complex
     CALL check_nonpositive_heat_capacity
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
@@ -386,6 +387,60 @@ CONTAINS
         END DO
         gas_flag=.TRUE.; liquid_flag=.FALSE.
     END SUBROUTINE check_dry_refresh_consistency
+
+    !> Refresh and direct qp construction must assemble identical wet thermodynamics
+    !> for gas and liquid carrier, including COMPLEX perturbations.
+    SUBROUTINE check_wet_refresh_assembly
+        TYPE(physical_state_real) :: from_qp, refreshed
+        TYPE(physical_state_complex) :: cfrom_qp, crefreshed
+        REAL(wp) :: qp_case(n_vars)
+        COMPLEX(wp) :: cqp_case(n_vars)
+        LOGICAL :: ok
+        INTEGER :: mode
+        CALL initialize_physical_state_real(from_qp)
+        CALL initialize_physical_state_real(refreshed)
+        CALL initialize_physical_state_complex(cfrom_qp)
+        CALL initialize_physical_state_complex(crefreshed)
+        DO mode=1,2
+            gas_flag=(mode==1)
+            liquid_flag=(mode==2)
+            qp_case=0.0_wp
+            qp_case(idx_h)=2.0_wp
+            qp_case(idx_T)=320.0_wp
+            qp_case(idx_u)=3.0_wp
+            qp_case(idx_v)=-1.0_wp
+            qp_case(idx_solid_first:idx_solid_last)=[0.15_wp,0.1_wp]
+            IF (gas_flag) qp_case(idx_add_gas_first:idx_add_gas_last)=0.05_wp
+            CALL build_physical_state_from_qp(qp_case,from_qp,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'REAL wet qp builder rejected reference'
+            CALL build_physical_state_from_qp(qp_case,refreshed,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'REAL wet refresh setup rejected reference'
+            CALL refresh_physical_state(refreshed,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'REAL wet refresh rejected reference'
+            CALL assert_close('REAL wet density assembly',refreshed%rho_m,from_qp%rho_m,0.0_wp)
+            CALL assert_close('REAL wet cp assembly',refreshed%cp_m,from_qp%cp_m,0.0_wp)
+            CALL assert_close('REAL wet reduced gravity',refreshed%red_grav,from_qp%red_grav,0.0_wp)
+            CALL assert_close('REAL wet solids',SUM(refreshed%alphas),SUM(from_qp%alphas),0.0_wp)
+            cqp_case=CMPLX(qp_case,0.0_wp,wp)
+            cqp_case(idx_T)=CMPLX(qp_case(idx_T),1.0E-20_wp,wp)
+            CALL build_physical_state_from_qp(cqp_case,cfrom_qp,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'COMPLEX wet qp builder rejected reference'
+            CALL build_physical_state_from_qp(cqp_case,crefreshed,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'COMPLEX wet refresh setup rejected reference'
+            CALL refresh_physical_state(crefreshed,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'COMPLEX wet refresh rejected reference'
+            CALL assert_close('COMPLEX wet density assembly',REAL(crefreshed%rho_m,wp), &
+                REAL(cfrom_qp%rho_m,wp),0.0_wp)
+            CALL assert_close('COMPLEX wet density derivative',AIMAG(crefreshed%rho_m), &
+                AIMAG(cfrom_qp%rho_m),0.0_wp)
+            CALL assert_close('COMPLEX wet cp assembly',REAL(crefreshed%cp_m,wp), &
+                REAL(cfrom_qp%cp_m,wp),0.0_wp)
+            CALL assert_close('COMPLEX wet gravity derivative',AIMAG(crefreshed%red_grav), &
+                AIMAG(cfrom_qp%red_grav),0.0_wp)
+        END DO
+        gas_flag=.TRUE.
+        liquid_flag=.FALSE.
+    END SUBROUTINE check_wet_refresh_assembly
 
     SUBROUTINE check_nonpositive_heat_capacity
         REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_out(n_vars),temperature,old_cp_s(n_solid)

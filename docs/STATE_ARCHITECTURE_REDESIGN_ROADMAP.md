@@ -962,3 +962,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Removed the duplicate `conservative_mass_admissible` export from `state_fields`; time integration, Lie executor, and mass-exchange regression import it directly from its owner `state_composition`. Its mathematics and the `state` public facade remain unchanged.
 - Removed an existing duplicate `primitive_to_conservative` name in the state-equivalence test's USE ONLY statement.
 - No physical or numerical formula changed. Manual CI and examples on this commit still needed.
+
+### F3 wet thermodynamics assembly kernel (2026-11-06)
+
+- Consolidated four identical wet-state assembly blocks in `state_physical.f90` (REAL/COMPLEX `build_physical_state_from_qp` and `refresh_physical_state`) into `inc/wet_thermodynamics.inc`. The include evaluates the canonical mixture, rejects `cp_m <= 0`, and computes reduced gravity with exactly the original call sequence and arithmetic.
+- Added `TEST_STATE` regression for REAL/COMPLEX gas/liquid qp construction versus wet refresh, including the complex-step imaginary response of density and reduced gravity. Updated `src/Makefile.am` dependencies/distribution and `src/state/README.md`.
+- Preserved separate dry-state policy and q-based state builders, no formulas or acceptance thresholds changed. Future F3 work should evaluate duplication in q-derived assembly only after a separate equivalence test; avoid adding an intermediate qp buffer or redoing mixture calculations.
+- No GitHub Actions were launched. Manual CI and EXAMPLE_TAAL / EXAMPLE_ETNA / EXAMPLE_ETNA_LAVA / EXAMPLE_CF remain verification gates for this commit.
