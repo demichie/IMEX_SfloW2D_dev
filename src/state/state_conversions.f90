@@ -49,7 +49,7 @@ CONTAINS
 
     !> REAL state conversion. During the unified-policy trial the optional
     !> numerical_reconstruction argument is retained for call compatibility,
-    !> but both caller modes use the same strict mathematical conversion.
+    !> but both caller modes use the same policy: M <= epsilon is dry.
     SUBROUTINE conservative_to_primitive_real(q,qp,accepted,p_dyn,numerical_reconstruction)
         REAL(wp), INTENT(IN) :: q(n_vars)
         REAL(wp), INTENT(OUT) :: qp(n_vars)
@@ -65,7 +65,7 @@ CONTAINS
         IF (PRESENT(p_dyn)) p_dyn=0.0_wp
         mass=q(idx_totMassEqn)
         IF (mass<0.0_wp) RETURN
-        IF (mass==0.0_wp) THEN
+        IF (mass<=EPSILON(1.0_wp)) THEN
             qp(idx_T)=T_ambient
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
@@ -105,7 +105,7 @@ CONTAINS
         IF (PRESENT(p_dyn)) p_dyn=(0.0_wp,0.0_wp)
         mass=q(idx_totMassEqn)
         IF (REAL(mass,wp) < 0.0_wp) RETURN
-        IF (REAL(mass,wp) == 0.0_wp) THEN
+        IF (REAL(mass,wp) <= EPSILON(1.0_wp)) THEN
             qp(idx_T)=T_ambient
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
@@ -144,7 +144,7 @@ CONTAINS
         q=0.0_wp
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (h < 0.0_wp) RETURN
-        IF (h == 0.0_wp) THEN
+        IF (h <= EPSILON(1.0_wp)) THEN
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
@@ -174,7 +174,7 @@ CONTAINS
         q=(0.0_wp,0.0_wp)
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (REAL(qp(idx_h),wp) < 0.0_wp) RETURN
-        IF (REAL(qp(idx_h),wp) == 0.0_wp) THEN
+        IF (REAL(qp(idx_h),wp) <= EPSILON(1.0_wp)) THEN
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF

@@ -941,3 +941,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Unchanged: REAL/COMPLEX formulas, regularized velocity kernel, physical q/qp state construction, and the separate `normalize_face_composition` used by spatial face-specific algorithms.
 - `TEST_STATE_EQUIVALENCE` now checks strict/numerical agreement near dry and explicit rejection of substantially overfilled traces. The historical near-dry legacy-equality assertions are intentionally replaced; other valid-state legacy regression cases remain. Important: source/face workflows may now reject states that were previously repaired. Monitor full examples and mass-exchange/face tests before accepting this new behavior.
 - No Actions were launched; manually run CI and EXAMPLE_TALL, EXAMPLE_ETNA, EXAMPLE_ETNA_LAVA before judging the trial.
+
+### Single epsilon-machine dry policy (2026-11-06)
+
+- All REAL/COMPLEX q decoders, physical-state constructors and temperature-only decoders use M <= EPSILON(1.0_wp), after rejecting negative M, to assign the dry ambient state.
+- Both REAL/COMPLEX qp-to-conservative converters use h <= EPSILON(1.0_wp), after rejecting negative h. Physical-state constructors/refresh and density evaluation already use this depth criterion.
+- The numerical and strict conversions share this dry policy. eps_sing remains in velocity regularization only, not dry classification. Each entry point checks its own available state variable, M or h; both are not required simultaneously.
+- Updated equivalence regression for T_ambient below epsilon and energy temperature above it. Awaiting manually triggered full regression and examples.

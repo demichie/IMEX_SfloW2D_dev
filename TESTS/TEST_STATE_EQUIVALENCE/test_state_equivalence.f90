@@ -196,7 +196,12 @@ CONTAINS
             IF (.NOT.accepted) ERROR STOP 'unified numerical decoder rejected positive mass'
             CALL assert_vector('unified numerical and strict qp',numerical,strict,0.0_wp)
             CALL assert_scalar('unified dynamic pressure',pd_new,pd_strict,0.0_wp)
-            CALL assert_scalar('unified energy temperature',numerical(idx_T),900.0_wp,1.0E-12_wp)
+            IF (mass<=EPSILON(1.0_wp)) THEN
+                CALL assert_scalar('epsilon-dry temperature',numerical(idx_T),T_ambient,0.0_wp)
+                CALL assert_scalar('epsilon-dry depth',numerical(idx_h),0.0_wp,0.0_wp)
+            ELSE
+                CALL assert_scalar('positive-mass temperature',numerical(idx_T),900.0_wp,1.0E-12_wp)
+            END IF
         END DO
         q(idx_totMassEqn)=1.0_wp
         q(idx_solid_first)=-1.0E-3_wp
