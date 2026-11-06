@@ -7,7 +7,8 @@ PROGRAM test_curvature_source
   USE rheology_2d, ONLY : curvature_acceleration
   USE source_terms_2d, ONLY : eval_geometry_curvature_explicit
   USE source_terms_2d, ONLY : eval_source_explicit
-  USE mass_injection_coefficients_2d, ONLY : set_source_time_coefficients
+  USE mass_injection_coefficients_2d, ONLY : set_source_time_coefficients, prepare_injection_materials,            &
+       injection_material_set_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE,                                &
        SOURCE_ID_BOTTOM_CIRCULAR_INJECTION, SOURCE_ID_BOTTOM_FISSURAL_INJECTION, SOURCE_ID_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type
@@ -30,6 +31,7 @@ PROGRAM test_curvature_source
   REAL(wp) :: physical(5), original(5), explicit_source(5)
   TYPE(source_group_type) :: curvature_group, circular_injection_group
   TYPE(source_group_type) :: fissural_injection_group, radial_injection_group
+  TYPE(injection_material_set_type) :: materials
   INTEGER :: sample
 
   curvature_group%method=SOURCE_METHOD_EXPLICIT
@@ -82,6 +84,7 @@ PROGRAM test_curvature_source
   ALLOCATE(inv_rho_s(1),sp_heat_s(1),sp_heat_g(0),sp_gas_const_g(0))
   inv_rho_s=1.0_wp/2500.0_wp; sp_heat_s=1100.0_wp
   physical=0.0_wp; physical(4)=300.0_wp
+  CALL prepare_injection_materials(materials)
   DO sample=1,2
      physical(1)=dry_thickness_tolerance*REAL(sample,wp)/2.0_wp
      ! In the canonical primitive layout velocities occupy components 2/3.
@@ -90,14 +93,14 @@ PROGRAM test_curvature_source
      original=physical
      CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
           0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-          curvature_group,0.0_wp)
+          curvature_group,0.0_wp,materials=materials)
      CALL assert_small('dry curvature source',MAXVAL(ABS(explicit_source)),0.0_wp)
      CALL assert_small('dry physical state retained',MAXVAL(ABS(physical-original)),0.0_wp)
   END DO
   physical(1)=2.0_wp*dry_thickness_tolerance; physical(idx_u)=u; physical(idx_v)=v
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       curvature_group,0.0_wp)
+       curvature_group,0.0_wp,materials=materials)
   CALL eval_geometry_curvature_explicit(Bx,By,Bxx,Bxy,Byy,G,          &
        rho_l*physical(1),u,v,expected_x,expected_y)
   tolerance=128.0_wp*EPSILON(1.0_wp)*MAX(ABS(expected_x),ABS(expected_y))
@@ -109,15 +112,16 @@ PROGRAM test_curvature_source
   xs_source=0.0_wp; xg_source=0.0_wp
   bottom_radial_source_flag=.TRUE.; vel_source=0.01_wp; T_source=300.0_wp
   time_param=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
+  CALL prepare_injection_materials(materials)
   physical(1)=dry_thickness_tolerance/2.0_wp
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       curvature_group,0.0_wp)
+       curvature_group,0.0_wp,materials=materials)
   CALL assert_small('unselected circular injection excluded', &
        MAXVAL(ABS(explicit_source)),0.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp)
+       circular_injection_group,0.0_wp,materials=materials)
   expected_x=0.25_wp*vel_source*rho_l
   CALL assert_small('dry-cell mass injection retained',ABS(explicit_source(1)-expected_x), &
        64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -134,7 +138,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(4.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        4.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp)
+       circular_injection_group,0.0_wp,materials=materials)
   expected_x=0.5_wp*0.25_wp*vel_source*rho_l
   CALL assert_small('partially active step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -143,7 +147,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(0.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp)
+       circular_injection_group,0.0_wp,materials=materials)
   expected_x=0.75_wp*0.25_wp*vel_source*rho_l
   CALL assert_small('linearly ramped step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -152,7 +156,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(9.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        9.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp)
+       circular_injection_group,0.0_wp,materials=materials)
   expected_x=0.5_wp*0.25_wp*vel_source*rho_l
   CALL assert_small('period-wrapped step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -160,7 +164,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(5.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        5.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp)
+       circular_injection_group,0.0_wp,materials=materials)
   CALL assert_small('inactive step-averaged mass source', &
        MAXVAL(ABS(explicit_source)),0.0_wp)
 
@@ -170,10 +174,11 @@ PROGRAM test_curvature_source
   xs_fissures=0.0_wp; xg_fissures=0.0_wp
   linear_vel_fissures(1)=0.02_wp; T_fissures(1)=T_source
   time_param_fissures(:,1)=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
+  CALL prepare_injection_materials(materials)
   CALL set_source_time_coefficients(4.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        4.0_wp,0.0_wp,[0.25_wp],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       fissural_injection_group,0.0_wp)
+       fissural_injection_group,0.0_wp,materials=materials)
   expected_x=0.5_wp*0.25_wp*linear_vel_fissures(1)*rho_l
   CALL assert_small('partially active fissural source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -181,10 +186,11 @@ PROGRAM test_curvature_source
   bottom_fissural_source_flag=.FALSE.; radial_source_flag=.TRUE.
   h_source=2.0_wp; vel_source=0.01_wp
   time_param=[10.0_wp,4.0_wp,2.0_wp,3.0_wp]
+  CALL prepare_injection_materials(materials)
   CALL set_source_time_coefficients(0.0_wp,1.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.0_wp,[REAL(wp)::],2.0_wp,1.0_wp,0.0_wp,1.0_wp, &
-       radial_injection_group,0.0_wp)
+       radial_injection_group,0.0_wp,materials=materials)
   ramp_mean=0.5_wp-1.0_wp/ACOS(-1.0_wp)
   expected_x=ramp_mean*h_source*vel_source*2.0_wp*rho_l
   CALL assert_small('cosine-ramped radial source', &

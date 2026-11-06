@@ -6,9 +6,10 @@ PROGRAM test_spatial_operator
   USE domain_2d, ONLY : domain_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
-  USE state_conversion_2d, ONLY : qp_to_qc
+  USE state_conversions, ONLY : primitive_to_conservative
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE source_terms_2d, ONLY : eval_source_explicit
+  USE mass_injection_coefficients_2d, ONLY : injection_material_set_type, prepare_injection_materials
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_group_type
   USE omp_lib
@@ -21,6 +22,7 @@ PROGRAM test_spatial_operator
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
   TYPE(source_group_type) :: explicit_group
+  TYPE(injection_material_set_type) :: materials
   REAL(wp), ALLOCATABLE :: q_faceL(:,:,:), q_faceR(:,:,:), q_faceB(:,:,:), q_faceT(:,:,:)
   REAL(wp), ALLOCATABLE :: q(:,:,:), q0(:,:,:), qp(:,:,:), term(:,:,:), direct(:,:,:), cell_sources(:,:,:)
   REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0)
@@ -90,6 +92,7 @@ PROGRAM test_spatial_operator
   CALL same_bits('public operator delegates complete spatial term',     &
        RESHAPE(term,[SIZE(term)]),RESHAPE(direct,[SIZE(direct)]))
   IF (.NOT.ALL(ieee_is_finite(term))) ERROR STOP 'nonfinite spatial term'
+  CALL prepare_injection_materials(materials)
   cell_sources=0.0_wp
   DO k=1,ny
      DO j=1,nx
@@ -98,7 +101,7 @@ PROGRAM test_spatial_operator
              B_second_xx_geom(j,k),B_second_xy_geom(j,k),              &
              B_second_yy_geom(j,k),grav_coeff(j,k),qp(:,j,k),           &
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &
-             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp)
+             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp,materials=materials)
      END DO
   END DO
   IF (.NOT.ALL(ieee_is_finite(cell_sources))) ERROR STOP 'nonfinite local source'
@@ -182,15 +185,15 @@ PROGRAM test_spatial_operator
   DO k=1,ny
     DO j=1,nx+1
       IF (.NOT.domain%solve_mask_x(j,k)) CYCLE
-      CALL qp_to_qc(reconstruction%qp_adv_interfaceL(:,j,k),q_faceL(:,j,k))
-      CALL qp_to_qc(reconstruction%qp_adv_interfaceR(:,j,k),q_faceR(:,j,k))
+      CALL primitive_to_conservative(reconstruction%qp_adv_interfaceL(:,j,k),q_faceL(:,j,k))
+      CALL primitive_to_conservative(reconstruction%qp_adv_interfaceR(:,j,k),q_faceR(:,j,k))
     END DO
   END DO
   DO k=1,ny+1
     DO j=1,nx
       IF (.NOT.domain%solve_mask_y(j,k)) CYCLE
-      CALL qp_to_qc(reconstruction%qp_adv_interfaceB(:,j,k),q_faceB(:,j,k))
-      CALL qp_to_qc(reconstruction%qp_adv_interfaceT(:,j,k),q_faceT(:,j,k))
+      CALL primitive_to_conservative(reconstruction%qp_adv_interfaceB(:,j,k),q_faceB(:,j,k))
+      CALL primitive_to_conservative(reconstruction%qp_adv_interfaceT(:,j,k),q_faceT(:,j,k))
     END DO
   END DO
   OPEN(NEWUNIT=output_unit,FILE='result.bin',ACCESS='STREAM',           &
