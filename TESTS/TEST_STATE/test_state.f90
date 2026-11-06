@@ -25,6 +25,7 @@ PROGRAM test_state
     CALL check_complex_closure_limits
     CALL check_real_complex_invalid_candidates
     CALL check_dry_refresh_consistency
+    CALL check_epsilon_dry_real_complex
     CALL check_nonpositive_heat_capacity
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
@@ -416,6 +417,85 @@ CONTAINS
         CALL assert_close('negative cp COMPLEX temperature',REAL(ctemperature,wp),0.0_wp,0.0_wp)
         sp_heat_s=old_cp_s
     END SUBROUTINE check_nonpositive_heat_capacity
+
+    SUBROUTINE check_epsilon_dry_real_complex
+        REAL(wp) :: q_case(n_vars),qp_case(n_vars),decoded(n_vars),temperature
+        COMPLEX(wp) :: cq_case(n_vars),cqp_case(n_vars),cdecoded(n_vars),ctemperature
+        TYPE(physical_state_real) :: real_state
+        TYPE(physical_state_complex) :: complex_state
+        LOGICAL :: ok
+        INTEGER :: case_id
+        CALL initialize_physical_state_real(real_state)
+        CALL initialize_physical_state_complex(complex_state)
+        DO case_id=1,3
+            q_case=0.0_wp
+            SELECT CASE(case_id)
+            CASE(1)
+                q_case(idx_totMassEqn)=0.5_wp*EPSILON(1.0_wp)
+            CASE(2)
+                q_case(idx_totMassEqn)=EPSILON(1.0_wp)
+            CASE(3)
+                q_case(idx_totMassEqn)=2.0_wp*EPSILON(1.0_wp)
+            END SELECT
+            q_case(idx_engyEqn)=q_case(idx_totMassEqn)*sp_heat_a*400.0_wp
+            q_case(idx_stoch)=q_case(idx_totMassEqn)*0.2_wp
+            q_case(idx_pore)=q_case(idx_totMassEqn)*1000.0_wp
+            cq_case=CMPLX(q_case,0.0_wp,wp)
+            CALL conservative_to_primitive(q_case,decoded,ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon REAL q conversion rejected'
+            CALL conservative_to_primitive(cq_case,cdecoded,ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon COMPLEX q conversion rejected'
+            CALL build_physical_state_from_q(q_case,real_state,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon REAL state rejected'
+            CALL build_physical_state_from_q(cq_case,complex_state,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon COMPLEX state rejected'
+            CALL evaluate_temperature_from_q(q_case,temperature)
+            CALL evaluate_temperature_from_q(cq_case,ctemperature)
+            CALL assert_close('epsilon REAL/COMPLEX q temperature',decoded(idx_T), &
+                REAL(cdecoded(idx_T),wp),0.0_wp)
+            CALL assert_close('epsilon REAL/COMPLEX state temperature',real_state%T, &
+                REAL(complex_state%T,wp),0.0_wp)
+            IF (case_id<=2) THEN
+                CALL assert_close('epsilon dry q temperature',decoded(idx_T),T_ambient,0.0_wp)
+                CALL assert_close('epsilon dry state h',real_state%h,0.0_wp,0.0_wp)
+                CALL assert_close('epsilon dry scalar',REAL(complex_state%Zs,wp),0.0_wp,0.0_wp)
+                CALL assert_close('epsilon dry temperature only',temperature,T_ambient,0.0_wp)
+            ELSE
+                CALL assert_close('epsilon wet q temperature',decoded(idx_T),400.0_wp,1.0E-12_wp)
+                CALL assert_close('epsilon wet temperature only',temperature,400.0_wp,1.0E-12_wp)
+            END IF
+        END DO
+        DO case_id=1,3
+            qp_case=0.0_wp
+            SELECT CASE(case_id)
+            CASE(1)
+                qp_case(idx_h)=0.5_wp*EPSILON(1.0_wp)
+            CASE(2)
+                qp_case(idx_h)=EPSILON(1.0_wp)
+            CASE(3)
+                qp_case(idx_h)=2.0_wp*EPSILON(1.0_wp)
+            END SELECT
+            qp_case(idx_T)=400.0_wp
+            cqp_case=CMPLX(qp_case,0.0_wp,wp)
+            CALL primitive_to_conservative(qp_case,q_case,ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon REAL qp conversion rejected'
+            CALL primitive_to_conservative(cqp_case,cq_case,ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon COMPLEX qp conversion rejected'
+            CALL build_physical_state_from_qp(qp_case,real_state,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon REAL qp state rejected'
+            CALL build_physical_state_from_qp(cqp_case,complex_state,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'epsilon COMPLEX qp state rejected'
+            IF (case_id<=2) THEN
+                CALL assert_close('epsilon dry q mass',q_case(idx_totMassEqn),0.0_wp,0.0_wp)
+                CALL assert_close('epsilon dry state temperature',real_state%T,T_ambient,0.0_wp)
+                CALL assert_close('epsilon dry complex state temperature',REAL(complex_state%T,wp), &
+                    T_ambient,0.0_wp)
+            ELSE
+                IF (q_case(idx_totMassEqn)<=0.0_wp) ERROR STOP 'epsilon wet mass vanished'
+                CALL assert_close('epsilon wet state temperature',real_state%T,400.0_wp,0.0_wp)
+            END IF
+        END DO
+    END SUBROUTINE check_epsilon_dry_real_complex
 
     !> Preserve the granular descriptors from the original mixture formulas.
     SUBROUTINE check_particle_descriptors

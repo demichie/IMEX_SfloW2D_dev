@@ -329,8 +329,8 @@ CONTAINS
         mass=q(1); state%xs=0.0_wp; state%xg=0.0_wp
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (REAL(mass,wp) < 0.0_wp) RETURN
-        IF (stoch_transport_flag .AND. REAL(mass,wp)>0.0_wp) state%Zs=q(idx_stoch)/mass
-        IF (pore_pressure_flag .AND. REAL(mass,wp)>0.0_wp) state%exc_pore_pres=q(idx_pore)/mass
+        IF (stoch_transport_flag .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%Zs=q(idx_stoch)/mass
+        IF (pore_pressure_flag .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%exc_pore_pres=q(idx_pore)/mass
         IF (REAL(mass,wp)>EPSILON(1.0_wp)) THEN
             xs=q(idx_solid_first:idx_solid_last)/mass; xg=q(idx_add_gas_first:idx_add_gas_last)/mass
             IF (.NOT.close_composition(xs,xg)) RETURN
