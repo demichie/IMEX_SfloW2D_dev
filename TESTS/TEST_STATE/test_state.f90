@@ -3,7 +3,7 @@ PROGRAM test_state
     USE constitutive_parameters_2d
     USE state_types
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
-        evaluate_mixture_density, evaluate_mixture_phase_properties
+        evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity
     USE state_conversions
     USE state_physical
     IMPLICIT NONE
@@ -17,6 +17,7 @@ PROGRAM test_state
     CALL initialize_case
     CALL check_particle_descriptors
     CALL check_shared_density_kernel
+    CALL check_shared_conservative_math
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -129,6 +130,57 @@ CONTAINS
         gas_flag=.TRUE.
         liquid_flag=.FALSE.
     END SUBROUTINE check_shared_density_kernel
+
+    !> Two frontends consume the same thermodynamic and momentum formulas.
+    SUBROUTINE check_shared_conservative_math
+        REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_check(n_vars), gravity_value
+        COMPLEX(wp) :: cq_case(n_vars), cqp_check(n_vars)
+        TYPE(physical_state_real) :: physical
+        TYPE(physical_state_complex) :: cphysical
+        REAL(wp) :: test_mass, tolerance
+        INTEGER :: sample
+        LOGICAL :: ok
+
+        CALL initialize_physical_state_real(physical)
+        CALL initialize_physical_state_complex(cphysical)
+        tolerance=5.0E-12_wp
+        DO sample=1,3
+            qp_case=0.0_wp
+            qp_case(idx_h)=2.0_wp
+            qp_case(idx_T)=350.0_wp
+            qp_case(idx_u)=2.1_wp
+            qp_case(idx_v)=-0.7_wp
+            qp_case(idx_solid_first:idx_solid_last)=[0.2_wp,0.1_wp]
+            qp_case(idx_add_gas_first:idx_add_gas_last)=0.05_wp
+            IF (sample==2) THEN
+                qp_case(idx_h)=1.0E-12_wp
+                qp_case(idx_u)=0.02_wp
+            ELSE IF (sample==3) THEN
+                qp_case(idx_h)=1.0E-8_wp
+            END IF
+            CALL primitive_to_conservative(qp_case,q_case,ok)
+            IF (.NOT.ok) ERROR STOP 'shared math: failed to create q'
+            CALL conservative_to_primitive(q_case,qp_check,ok)
+            IF (.NOT.ok) ERROR STOP 'shared math: q->qp rejected valid q'
+            CALL build_physical_state_from_q(q_case,physical,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'shared math: q->state rejected valid q'
+            CALL assert_close('shared q->qp T',qp_check(idx_T),physical%T,tolerance)
+            CALL assert_close('shared q->qp u',qp_check(idx_u),physical%u,tolerance)
+            CALL assert_close('shared q->qp v',qp_check(idx_v),physical%v,tolerance)
+            CALL assert_close('shared q->qp h',qp_check(idx_h),physical%h,tolerance)
+            gravity_value=evaluate_reduced_gravity(physical%rho_m,physical%inv_rhom)
+            CALL assert_close('shared reduced gravity',gravity_value,physical%red_grav,0.0_wp)
+
+            cq_case=CMPLX(q_case,0.0_wp,wp)
+            CALL conservative_to_primitive(cq_case,cqp_check,ok)
+            IF (.NOT.ok) ERROR STOP 'shared complex q->qp rejected'
+            CALL build_physical_state_from_q(cq_case,cphysical,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'shared complex q->state rejected'
+            CALL assert_close('shared complex T',REAL(cqp_check(idx_T),wp),REAL(cphysical%T,wp),tolerance)
+            CALL assert_close('shared complex u',REAL(cqp_check(idx_u),wp),REAL(cphysical%u,wp),tolerance)
+            CALL assert_close('shared complex v',REAL(cqp_check(idx_v),wp),REAL(cphysical%v,wp),tolerance)
+        END DO
+    END SUBROUTINE check_shared_conservative_math
 
     !> Preserve the granular descriptors from the original mixture formulas.
     SUBROUTINE check_particle_descriptors

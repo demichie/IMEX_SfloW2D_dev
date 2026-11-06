@@ -96,17 +96,11 @@ CONTAINS
         IF (numerical .AND. mass<=eps_sing) THEN
             T=T_ambient
         ELSE
-            T=q(idx_engyEqn)/(mass*cp_m)
+            INCLUDE 'temperature_from_energy.inc'
             IF (numerical .AND. T<=0.0_wp) T=T_ambient
         END IF
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
-        IF (mass>eps_sing) THEN
-            u=q(idx_uEqn)/mass
-            v=q(idx_vEqn)/mass
-        ELSE
-            u=SQRT(2.0_wp)*mass*q(idx_uEqn)/SQRT(mass**4+eps_sing4)
-            v=SQRT(2.0_wp)*mass*q(idx_vEqn)/SQRT(mass**4+eps_sing4)
-        END IF
+        INCLUDE 'velocity_from_momentum.inc'
         qp(idx_h)=mass*inv_rho_m
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=closed_xs
@@ -155,15 +149,9 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        T=q(idx_engyEqn)/(mass*cp_m)
+        INCLUDE 'temperature_from_energy.inc'
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
-        IF (REAL(mass,wp) > eps_sing) THEN
-            u=q(idx_uEqn)/mass
-            v=q(idx_vEqn)/mass
-        ELSE
-            u=SQRT(2.0_wp)*mass*q(idx_uEqn)/SQRT(mass**4+eps_sing4)
-            v=SQRT(2.0_wp)*mass*q(idx_vEqn)/SQRT(mass**4+eps_sing4)
-        END IF
+        INCLUDE 'velocity_from_momentum.inc'
         qp(idx_h)=mass*inv_rho_m
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=xs

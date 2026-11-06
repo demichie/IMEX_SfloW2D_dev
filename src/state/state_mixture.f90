@@ -9,7 +9,7 @@ MODULE state_mixture
     USE constitutive_parameters_2d, ONLY : sp_heat_a, sp_heat_g, sp_heat_s, sp_heat_l
     USE constitutive_parameters_2d, ONLY : sp_gas_const_a, sp_gas_const_g
     USE constitutive_parameters_2d, ONLY : inv_pres, pres, rho_l, inv_rho_l
-    USE constitutive_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s
+    USE constitutive_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s, rho_a_amb, grav
     USE state_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
@@ -18,6 +18,7 @@ MODULE state_mixture
     PUBLIC :: evaluate_mixture
     PUBLIC :: evaluate_mixture_heat_capacity
     PUBLIC :: evaluate_mixture_density
+    PUBLIC :: evaluate_reduced_gravity
     PUBLIC :: evaluate_mixture_phase_properties
     PUBLIC :: sauter_diameter, average_density_solids
     PUBLIC :: evaluate_mixture_from_volume, primitive_to_volume_fractions
@@ -45,7 +46,22 @@ MODULE state_mixture
         MODULE PROCEDURE evaluate_mixture_density_complex
     END INTERFACE evaluate_mixture_density
 
+    INTERFACE evaluate_reduced_gravity
+        MODULE PROCEDURE evaluate_reduced_gravity_real
+        MODULE PROCEDURE evaluate_reduced_gravity_complex
+    END INTERFACE evaluate_reduced_gravity
+
 CONTAINS
+
+    PURE REAL(wp) FUNCTION evaluate_reduced_gravity_real(rho_m,inv_rho_m) RESULT(red_grav)
+        REAL(wp), INTENT(IN) :: rho_m,inv_rho_m
+        INCLUDE 'reduced_gravity.inc'
+    END FUNCTION evaluate_reduced_gravity_real
+
+    PURE COMPLEX(wp) FUNCTION evaluate_reduced_gravity_complex(rho_m,inv_rho_m) RESULT(red_grav)
+        COMPLEX(wp), INTENT(IN) :: rho_m,inv_rho_m
+        INCLUDE 'reduced_gravity.inc'
+    END FUNCTION evaluate_reduced_gravity_complex
 
     SUBROUTINE evaluate_mixture_density_real(T,xs,xg,rho_m,inv_rho_m)
         REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)

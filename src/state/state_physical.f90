@@ -9,13 +9,13 @@ MODULE state_physical
     USE parameters_2d, ONLY : idx_stoch, idx_pore
     USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag, liquid_flag
     USE parameters_2d, ONLY : slope_correction_flag, curvature_term_flag
-    USE parameters_2d, ONLY : eps_sing, eps_sing4
+    USE parameters_2d, ONLY : eps_sing, eps_sing4, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE constitutive_parameters_2d, ONLY : rho_a_amb, sp_heat_a, sp_heat_l, grav, T_ambient
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE state_types, ONLY : reset_physical_state_real, reset_physical_state_complex
     USE state_composition, ONLY : close_composition
     USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, &
-        evaluate_mixture_phase_properties, evaluate_mixture_density
+        evaluate_mixture_phase_properties, evaluate_mixture_density, evaluate_reduced_gravity
 
     IMPLICIT NONE
     PRIVATE
@@ -76,7 +76,7 @@ CONTAINS
 
         IF (qp(idx_h)>EPSILON(1.0_wp)) THEN
             CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_m,inv_rho_m)
-            red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
+            red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         END IF
         ! Neutral-buoyancy cells are removed as well. This includes
         ! numerical near-dry states that return atmospheric density.
@@ -104,7 +104,7 @@ CONTAINS
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        T=q(4)/(mass*cp_m)
+        INCLUDE 'temperature_from_energy.inc'
     END SUBROUTINE evaluate_temperature_from_q_real
 
     !> Complex-step temperature-only primitive. Preserve the same composition
@@ -126,7 +126,7 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        T=q(4)/(mass*cp_m)
+        INCLUDE 'temperature_from_energy.inc'
     END SUBROUTINE evaluate_temperature_from_q_complex
 
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)
@@ -140,7 +140,7 @@ CONTAINS
         IF (state%h<0.0_wp .OR. state%T<0.0_wp) RETURN
         CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
             state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
-        state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
+        state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -159,7 +159,7 @@ CONTAINS
         IF (REAL(state%h,wp)<0.0_wp .OR. REAL(state%T,wp)<0.0_wp) RETURN
         CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
             state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
-        state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
+        state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -209,7 +209,7 @@ CONTAINS
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
-            state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
 
         geometry=0.0_wp
@@ -228,7 +228,7 @@ CONTAINS
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         REAL(wp) :: mass, rho_m, inv_rho_m, rho_c, inv_rho_c, cp_m, cp_c
-        REAL(wp) :: xs(n_solid), xg(n_add_gas), geometry(5)
+        REAL(wp) :: xs(n_solid), xg(n_add_gas), geometry(5), T, u, v
 
         CALL require_real_storage(state)
         CALL reset_physical_state_real(state)
@@ -256,22 +256,19 @@ CONTAINS
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        state%T=q(4)/(mass*cp_m)
+        INCLUDE 'temperature_from_energy.inc'
+        state%T=T
         CALL evaluate_mixture_phase_properties(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
             state%alphas,state%alphag)
         state%h=mass*inv_rho_m
-        IF (mass > eps_sing) THEN
-            state%u=q(2)/mass; state%v=q(3)/mass
-        ELSE
-            state%u=SQRT(2.0_wp)*mass*q(2)/SQRT(mass**4+eps_sing4)
-            state%v=SQRT(2.0_wp)*mass*q(3)/SQRT(mass**4+eps_sing4)
-        END IF
+        INCLUDE 'velocity_from_momentum.inc'
+        state%u=u; state%v=v
         state%xs=xs; state%xg=xg; state%rho_m=rho_m; state%inv_rhom=inv_rho_m
         state%rho_c=rho_c; state%inv_rho_c=inv_rho_c; state%cp_m=cp_m; state%cp_c=cp_c
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (stoch_transport_flag) state%Zs=q(idx_stoch)/mass
         IF (pore_pressure_flag) state%exc_pore_pres=q(idx_pore)/mass
-        state%red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
+        state%red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -311,7 +308,7 @@ CONTAINS
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
-            state%red_grav=(state%rho_m-rho_a_amb)*state%inv_rhom*grav
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
@@ -325,7 +322,7 @@ CONTAINS
         TYPE(physical_state_complex), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
-        COMPLEX(wp) :: mass, T, cp_m, cp_c, rho_m, inv_rho_m, rho_c, inv_rho_c
+        COMPLEX(wp) :: mass, T, u, v, cp_m, cp_c, rho_m, inv_rho_m, rho_c, inv_rho_c
         COMPLEX(wp) :: xs(n_solid), xg(n_add_gas), alphas(n_solid), alphag(n_add_gas)
         REAL(wp) :: geometry(5)
 
@@ -341,20 +338,16 @@ CONTAINS
             xs=q(idx_solid_first:idx_solid_last)/mass; xg=q(idx_add_gas_first:idx_add_gas_last)/mass
             IF (.NOT.close_composition(xs,xg)) RETURN
             CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-            T=q(4)/(mass*cp_m)
+            INCLUDE 'temperature_from_energy.inc'
             CALL evaluate_mixture_phase_properties(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
                 alphas,alphag)
             state%h=mass*inv_rho_m
-            IF (REAL(mass,wp)>eps_sing) THEN
-                state%u=q(2)/mass; state%v=q(3)/mass
-            ELSE
-                state%u=SQRT(2.0_wp)*mass*q(2)/SQRT(mass**4+eps_sing4)
-                state%v=SQRT(2.0_wp)*mass*q(3)/SQRT(mass**4+eps_sing4)
-            END IF
+            INCLUDE 'velocity_from_momentum.inc'
+        state%u=u; state%v=v
             state%T=T
             state%xs=xs; state%xg=xg; state%alphas=alphas; state%alphag=alphag
             state%rho_m=rho_m; state%inv_rhom=inv_rho_m; state%rho_c=rho_c; state%inv_rho_c=inv_rho_c
-            state%cp_m=cp_m; state%cp_c=cp_c; state%red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
+            state%cp_m=cp_m; state%cp_c=cp_c; state%red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         ELSE
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp; state%T=0.0_wp
             state%rho_m=rho_a_amb; state%inv_rhom=1.0_wp/rho_a_amb; state%rho_c=rho_a_amb

@@ -885,3 +885,20 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - Ora `density_from_mass.inc` e l'unico kernel canonico di densita REAL/COMPLEX; `mixture_from_mass.inc` lo include e calcola soltanto `rho_c`, le densita inverse delle specie gas e `alphas`/`alphag`. Nessuna API pubblica nuova e nessun doppio calcolo della densita nelle routine full.
 - Aggiunto in `TEST_STATE` un confronto esatto tra `evaluate_mixture_density` e `evaluate_mixture_phase_properties` per gas/liquido, diverse composizioni (incluso carrier nullo), REAL e COMPLEX con perturbazione immaginaria.
 - La modifica va validata con la nuova Action CI; non si dichiara ancora il gate completato.
+
+
+### Final state math-dedup audit (6 November 2026, master)
+
+Scope: all files in `src/state`, prioritizing unique implementations of physical/math formulas rather than repetition of setup/assignment logic.
+
+- Mixture density: `density_from_mass.inc` is the unique mass-based density expression, used by both the density-only and full-mixture paths. The reverse volume-to-mass relation in `evaluate_mixture_from_volume` is a different mathematical direction and is retained.
+- Mixture heat capacity: `mixture_heat_capacity.inc` is shared across REAL/COMPLEX and full/partial evaluations.
+- Primitive-to-conservative mass, momentum, energy, transported species: `conservative_from_primitive.inc` is the single formula block in all three entry points.
+- Conservative energy-to-temperature: added `temperature_from_energy.inc`, consumed by REAL/COMPLEX conversions, temperature-only queries and REAL/COMPLEX physical-state construction. Numerical reconstruction retains its explicitly different ambient-temperature fallback.
+- Conservative momentum-to-velocity: added `velocity_from_momentum.inc`, consumed by REAL/COMPLEX conversions and REAL/COMPLEX physical-state construction. The same small-mass regularization is used by all four.
+- Reduced gravity: added REAL/COMPLEX generic `evaluate_reduced_gravity` in `state_mixture`, with the common expression in `reduced_gravity.inc`. All nonzero density-derived gravity calculations in `state_physical` now go through it.
+- Kinematics and curvature: the existing `kinematics.inc` remains the only formula block; Richardson: the existing `richardson.inc` remains canonical.
+- Composition closure: strict REAL and COMPLEX and numerical face-trace normalization intentionally differ. The REAL physical-state constructor from q currently lacks the strict-composition gate used in its COMPLEX counterpart: document as a potential semantic inconsistency, do not silently change accepted states in a formula-dedup change.
+- The tiny state workspace allocation/reset duplicates and the inverse substrate snapshot/restore assignments are structural, not independently maintained mathematical laws; unchanged.
+- Tests: extended `TEST_STATE` to compare state-from-q against q-to-qp for representative real/complex states and validate reduced gravity. Production build and test results must be checked after commit.
+

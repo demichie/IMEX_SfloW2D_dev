@@ -86,7 +86,8 @@ AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state \
 CLEANFILES = *.mod
 EXTRA_DIST = state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
              state/density_from_mass.inc state/kinematics.inc \
-             state/richardson.inc \
+             state/richardson.inc state/reduced_gravity.inc \
+             state/temperature_from_energy.inc state/velocity_from_momentum.inc \
              state/conservative_from_primitive.inc \
              physics/rheology_laws/rheology_voellmy_turbulent.inc \
              physics/rheology_laws/rheology_lava_viscous.inc \
@@ -151,15 +152,20 @@ state/state_mixture.$(OBJEXT): state/state_composition.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state/mixture_heat_capacity.inc \
                                      state/mixture_from_mass.inc \
-                                     state/density_from_mass.inc
+                                     state/density_from_mass.inc \
+                                     state/reduced_gravity.inc
 state/state_conversions.$(OBJEXT): state/state_types.$(OBJEXT) \
                                          state/state_mixture.$(OBJEXT) \
                                          state/state_composition.$(OBJEXT) \
-                                         state/conservative_from_primitive.inc
+                                         state/conservative_from_primitive.inc \
+                                         state/temperature_from_energy.inc \
+                                         state/velocity_from_momentum.inc
 state/state_physical.$(OBJEXT): state/state_types.$(OBJEXT) \
                                       state/state_mixture.$(OBJEXT) \
                                       state/state_composition.$(OBJEXT) \
-                                      state/kinematics.inc state/richardson.inc
+                                      state/kinematics.inc state/richardson.inc \
+                                      state/temperature_from_energy.inc \
+                                      state/velocity_from_momentum.inc
 state/state.$(OBJEXT): state/state_types.$(OBJEXT) \
                              state/state_fields.$(OBJEXT) \
                              state/state_composition.$(OBJEXT) \
