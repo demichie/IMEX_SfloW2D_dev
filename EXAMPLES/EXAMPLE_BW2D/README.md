@@ -33,7 +33,21 @@ The input generator requires Python 3 and NumPy.
 
 ## How to run
 
-Run `python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4`, then `../../bin/IMEX_SfloW2D`. The eight arguments are number of x cells, half-domain size (m), source radius (m), slope (degrees), source temperature (K), velocity (m/s), solid volume fraction and particle size (m). The original README incorrectly states six arguments.
+From this example directory, generate the inputs and run the solver in the following order:
+
+**Prepare the inputs:**
+
+```bash
+python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+The eight arguments are number of x cells, half-domain size (m), source radius (m), slope (degrees), source temperature (K), velocity (m/s), solid volume fraction and particle size (m). The original README incorrectly states six arguments.
 
 ## Expected output
 

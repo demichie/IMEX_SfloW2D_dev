@@ -29,7 +29,21 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## How to run
 
-Generate inputs with `./create_example.py 200 false` (x-cell count and plotting flag) and run `../../../bin/IMEX_SfloW2D` from this case directory.
+From this example directory, generate the inputs and run the solver in the following order:
+
+**Prepare the inputs:**
+
+```bash
+./create_example.py 200 false
+```
+
+**Run the solver:**
+
+```bash
+../../../bin/IMEX_SfloW2D
+```
+
+The generator arguments are the x-cell count and plotting flag.
 
 ## Expected output
 

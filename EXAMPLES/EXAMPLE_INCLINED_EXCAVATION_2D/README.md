@@ -36,7 +36,21 @@ The input generator requires Python 3 and NumPy. Matplotlib is required only whe
 
 ## How to run
 
-From this directory run `python3 create_example.py 120 --plot`; then run the compiled solver with the generated input. For the original verification case, preserve the documented solver flags and initial-state conditions.
+From this example directory, execute the following commands in order:
+
+**Prepare the inputs:**
+
+```bash
+python3 create_example.py 120 --plot
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+The input generator writes the solver input and initial-condition data. For the original verification case, preserve the documented solver flags and initial-state conditions.
 
 ## Expected output
 

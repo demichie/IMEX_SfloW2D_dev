@@ -32,15 +32,35 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 
 ## How to run
 
-From the repository root, run:
+From the repository root, execute these commands in order:
 
-```sh
+**Enter the example directory:**
+
+```bash
 cd EXAMPLES/EXAMPLE_ETNA_LAVA
+```
+
+**Prepare the input data:**
+
+```bash
 python3 prepare.py
+```
+
+**Run the solver:**
+
+```bash
 OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../bin/IMEX_SfloW2D
 ```
 
-`prepare.py` extracts `Etna2014_crop.asc` from `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip`, verifying both archive and raster SHA-256 checksums. Only the Python standard library is needed. For a separate clean run, call `python3 EXAMPLES/EXAMPLE_ETNA_LAVA/prepare.py --directory /absolute/path/to/new-run` from the repository root, then run the executable by absolute path from the prepared directory. **Do not run `create_input_ellipsoid.py` for this lava case**: it changes the initial topography and volume.
+`prepare.py` extracts `Etna2014_crop.asc` from `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip`, verifying the archive and raster SHA-256 checksums. Only the Python standard library is required.
+
+For a separate clean run, execute the following from the repository root and then run the solver by absolute path from the prepared directory:
+
+```bash
+python3 EXAMPLES/EXAMPLE_ETNA_LAVA/prepare.py --directory /absolute/path/to/new-run
+```
+
+**Do not run `create_input_ellipsoid.py` for this lava case**: it changes the initial topography and volume.
 
 ## Expected output
 

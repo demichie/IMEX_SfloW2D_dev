@@ -31,7 +31,39 @@ Requires Python 3, NumPy, and pandas for preprocessing. Matplotlib is required o
 
 ## How to run
 
-From this directory, extract the DEM archive into `DEM/`, edit `input_ellipsoid.py` and run `python create_input_ellipsoid.py`. Then execute `../../bin/IMEX_SfloW2D`. For cleaning, the tracked script is `./cleanFolder.sh` (the original README incorrectly wrote `./cleanfolder.sh`). For raster plotting, create a symbolic link with `ln -s ../../UTILS/plot_overlay.py .` and run `python plot_overlay.py`.
+From this example directory, execute the following commands in order:
+
+**Prepare the inputs:**
+
+```bash
+python create_input_ellipsoid.py
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+Before preparing the inputs, extract the DEM archive into `DEM/` and edit `input_ellipsoid.py` as appropriate. The tracked cleanup script is `cleanFolder.sh` (the original README incorrectly used lowercase spelling).
+
+To clean the example directory:
+
+```bash
+./cleanFolder.sh
+```
+
+For optional raster plotting, create the plotting-script link:
+
+```bash
+ln -s ../../UTILS/plot_overlay.py .
+```
+
+Then generate the raster overlay:
+
+```bash
+python plot_overlay.py
+```
 
 ## Expected output
 

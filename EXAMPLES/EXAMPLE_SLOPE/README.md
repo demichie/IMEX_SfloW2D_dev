@@ -29,7 +29,21 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## How to run
 
-Generate with `./create_example.py 400 1.0 300 false` (x cells, solids volume fraction, temperature in K, plot flag), then run `../../bin/IMEX_SfloW2D`.
+From this example directory, execute the following commands in order:
+
+**Prepare the inputs:**
+
+```bash
+./create_example.py 400 1.0 300 false
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+Generator arguments: x cells, solid volume fraction, temperature (K), plotting flag.
 
 ## Expected output
 

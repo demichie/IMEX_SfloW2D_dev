@@ -29,7 +29,21 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## How to run
 
-Run `./create_example.py 400 0.5 300 false` to prepare the simulation, followed by `../../bin/IMEX_SfloW2D`. Arguments: x-cell count, particle volume fraction, temperature (K), plotting flag.
+From this example directory, generate the inputs and run the solver in the following order:
+
+**Prepare the inputs:**
+
+```bash
+./create_example.py 400 0.5 300 false
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+Arguments: x-cell count, particle volume fraction, temperature (K), plotting flag.
 
 ## Expected output
 

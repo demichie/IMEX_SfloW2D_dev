@@ -35,7 +35,45 @@ The setup generator requires Python 3 and NumPy; Matplotlib is required only whe
 
 ## How to run
 
-Generate using `python create_dambreak.py 300 15 3.0 0.15 0.20 0.40 0.58 300 1.0 true`. Arguments: NX, NY, channel length (m), channel width (m), dam length (m), dam height (m), solids volume fraction, ambient temperature (K), hydrostatic pore-pressure fraction, plot flag. From the example directory, create a solver link (`ln -s ../../bin/IMEX_SfloW2D .`) and run `./IMEX_SfloW2D IMEX_SfloW2D.inp`. For centerline postprocessing, use `python height_summary_nc.py OUTPUT/dambreak2D/fields/dambreak2D.nc --center_fraction 0.5 --animate`. Clean with `python clean_folder.py` (dry run), followed by `python clean_folder.py --apply`.
+From this example directory, generate the inputs and run the solver in the following order:
+
+**Prepare the inputs:**
+
+```bash
+python create_dambreak.py 300 15 3.0 0.15 0.20 0.40 0.58 300 1.0 true
+```
+
+**Create the solver link:**
+
+```bash
+ln -s ../../bin/IMEX_SfloW2D .
+```
+
+**Run the solver:**
+
+```bash
+./IMEX_SfloW2D IMEX_SfloW2D.inp
+```
+
+Generator arguments: NX, NY, channel length (m), channel width (m), dam length (m), dam height (m), solids volume fraction, ambient temperature (K), hydrostatic pore-pressure fraction and plotting flag.
+
+To generate a centerline summary and animation after the run:
+
+```bash
+python height_summary_nc.py OUTPUT/dambreak2D/fields/dambreak2D.nc --center_fraction 0.5 --animate
+```
+
+To preview cleanup without deleting files:
+
+```bash
+python clean_folder.py
+```
+
+To apply the cleanup:
+
+```bash
+python clean_folder.py --apply
+```
 
 ## Expected output
 

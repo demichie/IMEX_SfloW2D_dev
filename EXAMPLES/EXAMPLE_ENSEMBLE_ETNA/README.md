@@ -32,16 +32,50 @@ Requires Python 3 and the IMEX_SfloW2D executable. NumPy and pandas are used for
 
 ## How to run
 
-From `EXAMPLE_ENSEMBLE_ETNA`, follow the sequence below.
+Work from the `EXAMPLES/EXAMPLE_ENSEMBLE_ETNA` directory. First prepare the
+template executable link and shared DEM using the commands in **Original
+directory layout and setup commands** below. Then execute these steps in order.
 
-1. Link `../../../bin/IMEX_SfloW2D` as `templatedir/IMEX_SfloW2D`.
-2. Unzip `DEM/Etna2014_crop.zip`, create `templatedir/DEM/`, and link its extracted raster into that folder. The original README's commands are reproduced in the workflow notes below.
-3. Execute `python create_ensemble.py` to generate the CSV of sampled uncertain parameters. Sampling ranges and sample count are configured in this script.
-4. Execute `python create_inputfiles.py` to create `ensemble.xxxxx` directories by copying `templatedir` and replacing placeholders of the form `ENSEMBLE_var1`.
-5. Execute `python launch_jobs.py` to run the `run.sh` script in each member directory. Configure `max_processes` in that script. The launcher waits for every member and exits with an error if any run fails.
-6. Execute `python create_prob_maps.py` to aggregate raster products, optionally grouping realizations with pandas `groupby`.
-7. Execute `python plot_ensemble.py` to make PNG maps.
-8. Optionally execute `python create_hazard_maps.py` to calculate exceedance maps from maximum-thickness rasters.
+**1. Sample uncertain parameters.** Sampling ranges and sample count are set
+in the script.
+
+```bash
+python create_ensemble.py
+```
+
+**2. Create realization directories.** This copies `templatedir` into
+`ensemble.xxxxx` directories and replaces the relevant `ENSEMBLE_var1`
+placeholders.
+
+```bash
+python create_inputfiles.py
+```
+
+**3. Launch simulations.** Configure `max_processes` in the launcher. It waits
+for every realization and reports any failed run.
+
+```bash
+python launch_jobs.py
+```
+
+**4. Aggregate probability rasters.** Grouping realizations with pandas
+`groupby` is optional.
+
+```bash
+python create_prob_maps.py
+```
+
+**5. Plot the ensemble results.**
+
+```bash
+python plot_ensemble.py
+```
+
+**6. Optionally compute exceedance maps** from maximum-thickness rasters.
+
+```bash
+python create_hazard_maps.py
+```
 
 ## Expected output
 
@@ -62,16 +96,43 @@ EXAMPLE_ENSEMBLE_ETNA/
 
 Its executable-link and DEM preparation instructions are:
 
-```sh
+```bash
 cd templatedir
+```
+
+```bash
 ln -s ../../../bin/IMEX_SfloW2D .
+```
+
+```bash
 cd ..
+```
+
+```bash
 cd DEM
+```
+
+```bash
 unzip Etna2014_crop.zip
+```
+
+```bash
 cd ../templatedir
+```
+
+```bash
 mkdir DEM
+```
+
+```bash
 cd DEM
+```
+
+```bash
 ln -s ../../DEM/Etna2014_crop.asc .
+```
+
+```bash
 cd ../..
 ```
 

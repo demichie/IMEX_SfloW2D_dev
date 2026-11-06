@@ -30,7 +30,21 @@ The input generator requires Python 3 and NumPy.
 
 ## How to run
 
-Run `python create_example.py 200 2000 2000 900 0.9 0.8` and then `../../bin/IMEX_SfloW2D`. The script expects six arguments: x cells, source radius, source thickness, temperature, Richardson number and solid mass fraction. The sixth argument is substituted into `XS_SOURCE`, which the solver reads as a mass fraction; the legacy description calling it a volume fraction is incorrect.
+From this example directory, execute the following commands in order:
+
+**Prepare the inputs:**
+
+```bash
+python create_example.py 200 2000 2000 900 0.9 0.8
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+The generator expects six arguments: x cells, source radius, source thickness, temperature, Richardson number and solid mass fraction. The sixth argument is substituted into `XS_SOURCE`, which the solver reads as a mass fraction; the legacy description calling it a volume fraction is incorrect.
 
 ## Expected output
 

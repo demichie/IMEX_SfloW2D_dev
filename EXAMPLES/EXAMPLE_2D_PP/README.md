@@ -26,7 +26,21 @@ An avalanche initially held within a hemispherical shell slides down a 35-degree
 
 ## How to run
 
-Run `python create_example.py 100 0.5 300 false`, then `../../bin/IMEX_SfloW2D`. Script arguments: x cells, solid volume fraction, temperature (K), plot flag. The generator requires Python 3 and NumPy; Matplotlib is required only when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it.
+From this example directory, generate the inputs and run the solver in the following order:
+
+**Prepare the inputs:**
+
+```bash
+python create_example.py 100 0.5 300 false
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+Script arguments: x cells, solid volume fraction, temperature (K), plot flag. The generator requires Python 3 and NumPy; Matplotlib is required only when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it.
 
 ## Expected output
 

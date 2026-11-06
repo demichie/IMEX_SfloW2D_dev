@@ -26,7 +26,21 @@ A finite granular mass initially confined in a hemispherical shell is released o
 
 ## How to run
 
-From this directory, generate the input files with `python create_example.py 100 0.5 300 false`, then run `../../bin/IMEX_SfloW2D`. The generator requires NumPy; Matplotlib is additionally required when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it. Arguments: number of x cells, initial solid volume fraction, temperature (K), plot flag.
+From this example directory, generate the inputs and run the solver in the following order:
+
+**Prepare the inputs:**
+
+```bash
+python create_example.py 100 0.5 300 false
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+The generator requires NumPy; Matplotlib is additionally required when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it. Arguments: number of x cells, initial solid volume fraction, temperature (K), plot flag.
 
 ## Expected output
 

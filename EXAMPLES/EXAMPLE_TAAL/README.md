@@ -30,7 +30,21 @@ A supercritical radial source injects a dilute gas–particle mixture onto the t
 
 ## How to run
 
-Create the local executable link with `ln -s ../../bin/IMEX_SfloW2D .` and run `./IMEX_SfloW2D` from the example directory. The input and `topography_dem.asc` are already tracked.
+From this example directory, execute the following commands in order:
+
+**Create a local executable link:**
+
+```bash
+ln -s ../../bin/IMEX_SfloW2D .
+```
+
+**Run the solver:**
+
+```bash
+./IMEX_SfloW2D
+```
+
+The input and `topography_dem.asc` are already tracked.
 
 ## Expected output
 

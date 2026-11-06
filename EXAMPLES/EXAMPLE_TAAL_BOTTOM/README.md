@@ -31,7 +31,20 @@ A dilute gas–particle flow over Taal terrain, with an elliptical bottom-source
 
 ## How to run
 
-Create an executable link with `ln -s ../../bin/IMEX_SfloW2D .`, then execute `./IMEX_SfloW2D` from this example directory.
+From this example directory, execute the following commands in order:
+
+**Create a local executable link:**
+
+```bash
+ln -s ../../bin/IMEX_SfloW2D .
+```
+
+**Run the solver:**
+
+```bash
+./IMEX_SfloW2D
+```
+
 
 ## Expected output
 

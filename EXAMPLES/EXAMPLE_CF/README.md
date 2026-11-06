@@ -28,7 +28,20 @@ Dilute gas–particle mixture collapsing over the Campi Flegrei area. Initial co
 
 ## How to run
 
-First run `unzip topo.zip` in this directory, then `../../bin/IMEX_SfloW2D`.
+From this example directory, execute the following commands in order:
+
+**Extract the topography archive:**
+
+```bash
+unzip topo.zip
+```
+
+**Run the solver:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
 
 ## Expected output
 
