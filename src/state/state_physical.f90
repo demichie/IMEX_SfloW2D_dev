@@ -103,7 +103,9 @@ CONTAINS
         END IF
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+        IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
     END SUBROUTINE evaluate_temperature_from_q_real
 
@@ -126,6 +128,7 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+        IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
     END SUBROUTINE evaluate_temperature_from_q_complex
 
@@ -209,6 +212,7 @@ CONTAINS
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
             state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
 
@@ -255,7 +259,9 @@ CONTAINS
         END IF
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
+        IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+        IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
         state%T=T
         CALL evaluate_mixture_phase_properties(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
@@ -308,6 +314,7 @@ CONTAINS
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
             state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
         geometry=0.0_wp
@@ -338,6 +345,7 @@ CONTAINS
             xs=q(idx_solid_first:idx_solid_last)/mass; xg=q(idx_add_gas_first:idx_add_gas_last)/mass
             IF (.NOT.close_composition(xs,xg)) RETURN
             CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+            IF (REAL(cp_m,wp)<=0.0_wp) RETURN
             INCLUDE 'inc/temperature_from_energy.inc'
             CALL evaluate_mixture_phase_properties(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
                 alphas,alphag)

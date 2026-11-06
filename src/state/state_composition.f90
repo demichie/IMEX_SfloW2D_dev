@@ -61,12 +61,20 @@ CONTAINS
     LOGICAL FUNCTION close_composition_complex(xs,xg)
         COMPLEX(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
         REAL(wp) :: total
+        COMPLEX(wp) :: total_complex
         close_composition_complex=.FALSE.
         IF (ANY(REAL(xs,wp)<-tol) .OR. ANY(REAL(xg,wp)<-tol)) RETURN
+        ! As in REAL, clip only roundoff-negative species. A clipped
+        ! fraction has a zero local derivative; others retain complex steps.
+        WHERE (REAL(xs,wp)<0.0_wp) xs=(0.0_wp,0.0_wp)
+        WHERE (REAL(xg,wp)<0.0_wp) xg=(0.0_wp,0.0_wp)
         total=SUM(REAL(xs,wp))+SUM(REAL(xg,wp))
         IF (total>1.0_wp+tol) RETURN
         IF (total>1.0_wp) THEN
-            xs=xs/total; xg=xg/total
+            ! Select the branch by real composition but differentiate
+            ! the complete normalization including the denominator.
+            total_complex=SUM(xs)+SUM(xg)
+            xs=xs/total_complex; xg=xg/total_complex
         END IF
         close_composition_complex=.TRUE.
     END FUNCTION close_composition_complex

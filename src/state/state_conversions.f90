@@ -92,7 +92,7 @@ CONTAINS
             closed_xg=xg
         END IF
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
-        IF (cp_m<=0.0_wp) RETURN
+        IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         IF (numerical .AND. mass<=eps_sing) THEN
             T=T_ambient
         ELSE
@@ -149,6 +149,7 @@ CONTAINS
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
+        IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
         INCLUDE 'inc/velocity_from_momentum.inc'
