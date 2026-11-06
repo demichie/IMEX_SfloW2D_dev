@@ -16,10 +16,9 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - name: Check out selected documentation revision
+      - name: Check out manually selected revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
           persist-credentials: false
 
       - name: Record source revision

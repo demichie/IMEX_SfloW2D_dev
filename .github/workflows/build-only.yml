@@ -1,50 +1,48 @@
-name: Build only
+name: Build (optimized and debug)
 
 on:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: "Compilation profile"
-        required: true
-        type: choice
-        options:
-          - optimized
-          - strict-debug
-        default: optimized
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: gfortran / ${{ inputs.profile }}
-    runs-on: ubuntu-latest
-
+    name: gfortran / ${{ matrix.profile }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [optimized, strict-debug]
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install build dependencies
+      - uses: actions/checkout@v4
+      - name: Install compiler and libraries
         run: |
           bash .github/scripts/install-ubuntu-deps.sh \
-            autoconf automake gfortran make \
-            liblapack-dev libnetcdff-dev
-
-      - name: Generate build system
-        run: autoreconf -fi
-
+            autoconf automake gfortran make liblapack-dev libnetcdff-dev
       - name: Configure
+        shell: bash
         env:
           FC: gfortran
         run: |
-          if [ "${{ inputs.profile }}" = "strict-debug" ]; then
+          set -euo pipefail
+          autoreconf -fi
+          if [[ "${{ matrix.profile }}" == "strict-debug" ]]; then
             ./configure --with-netcdf=/usr --enable-strict-debug
           else
             ./configure --with-netcdf=/usr
           fi
-
-      - name: Compile
-        run: make -j2
-
-      - name: Verify executable exists
-        run: test -f src/IMEX_SfloW2D
+      - name: Compile only
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -j4 2>&1 | tee build.log
+          test -x src/IMEX_SfloW2D
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.profile }}-${{ github.run_id }}
+          path: build.log
+          if-no-files-found: warn

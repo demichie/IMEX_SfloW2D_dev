@@ -1,4 +1,4 @@
-name: Lie OpenMP performance benchmark
+name: OpenMP performance benchmark
 
 on:
   workflow_dispatch:
@@ -49,8 +49,6 @@ jobs:
           ./configure --with-netcdf=/usr
           make -j2
           test -x src/IMEX_SfloW2D
-      - name: PCCU donor regression test
-        run: sh TESTS/TEST_PCCU/run_test.sh
       - name: Validate benchmark Python syntax
         run: |
           /usr/bin/python3 -m py_compile TESTS/TEST_LIE_OPENMP_BENCHMARK/run_benchmark.py

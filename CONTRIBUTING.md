@@ -50,7 +50,7 @@ TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
 TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D
 ```
 
-These are in addition to `make check`; they do not replace tests targeted at the code being modified. The GitHub Actions workflows validate GNU optimized/strict-debug builds, Docker configurations, and Intel `ifx` portability within their recorded scopes. These validation workflows run on tag pushes, published releases, or manual dispatch; they do not run on every branch commit or pull request.
+These are in addition to `make check`; they do not replace tests targeted at the code being modified. All [active GitHub Actions](.github/README.md) run **only by manual dispatch**. Build-only compiles both optimized and strict-debug profiles without tests; separate manual workflows cover integration, focused regressions, OpenMP performance, static source checks and intentional Docker/documentation publication. No Action starts on push, pull request, tag, release or schedule.
 
 ## Build release archives
 
@@ -126,7 +126,7 @@ For an existing example, update its `README.md` whenever changing its inputs, pr
 
 The website uses MkDocs Material and integrates Doxygen. The Examples pages are generated from `EXAMPLES/**/README.md` rather than maintained as duplicate copies. Static website content is located under `docs/website/`, and the generator is under `tools/docs/`.
 
-Publication is performed by [the documentation workflow](.github/workflows/publish-documentation.yml), which can be run manually or on tag/release events; it is **not** run for every ordinary commit. When modifying the generator, metadata rules, or page layout, verify the generated Examples catalogue and documentation build. Do not publish output directories or generated HTML directly into source folders.
+Publication is performed only by manually launching [the documentation workflow](.github/workflows/publish-documentation.yml); it does **not** run automatically on commits, tags or releases. When modifying the generator, metadata rules, or page layout, verify the generated Examples catalogue and documentation build. Do not publish output directories or generated HTML directly into source folders.
 
 ## Pull requests
 

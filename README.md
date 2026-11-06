@@ -55,16 +55,18 @@ defaults.
 The executable is copied in the bin folder.
 
 `make check` runs the legacy example integration cases in temporary
-directories, leaving the source fixtures untouched. The CI workflow also runs
-binary/stochastic restart and HP-PCCU Gate-H checks with actual one- and
-four-thread OpenMP teams in both build profiles.
+directories, leaving the source fixtures untouched. The manually launched **Solver integration** Action also runs
+binary/stochastic restart and HP-PCCU Gate-H checks in optimized and
+strict-debug builds. The **Build only** Action compiles both profiles
+without running tests.
 
 The legacy test runner can optionally run the focused `TEST_DYNAMIC_FINH`
 fixture with `TESTS/run_tests.sh /path/to/IMEX_SfloW2D TEST_DYNAMIC_FINH`.
-The Intel ifx portability workflow exposes the same focused diagnostic through
-the `diagnose_dynamic_fin_h` manual-dispatch input and uploads its solver log
-and elapsed-time record. The focused diagnostic uses the full ifx runtime
-checks and is limited to five minutes.
+This focused diagnostic is available from the local test runner; the
+historical Intel ifx diagnostic Action has been retired.
+
+The current manually triggered Actions and their purposes are documented
+in [the Actions guide](.github/README.md).
 
 Several examples can be found in the EXAMPLES folder.
 
