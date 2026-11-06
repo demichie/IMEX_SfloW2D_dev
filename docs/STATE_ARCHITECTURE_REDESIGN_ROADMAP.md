@@ -902,3 +902,6 @@ Scope: all files in `src/state`, prioritizing unique implementations of physical
 - The tiny state workspace allocation/reset duplicates and the inverse substrate snapshot/restore assignments are structural, not independently maintained mathematical laws; unchanged.
 - Tests: extended `TEST_STATE` to compare state-from-q against q-to-qp for representative real/complex states and validate reduced gravity. Production build and test results must be checked after commit.
 
+### Direct-master CI gate
+
+The Fortran architecture workflow previously ran on pull requests and manual dispatch only. Added automatic `push` triggers for `master` (production sources, state tests and architecture checker) so direct-master changes receive parallel-build and regression verification without opening another pull request. The math-dedup commit must remain provisional until those checks pass.

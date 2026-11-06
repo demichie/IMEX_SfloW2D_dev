@@ -343,7 +343,7 @@ CONTAINS
                 alphas,alphag)
             state%h=mass*inv_rho_m
             INCLUDE 'velocity_from_momentum.inc'
-        state%u=u; state%v=v
+            state%u=u; state%v=v
             state%T=T
             state%xs=xs; state%xg=xg; state%alphas=alphas; state%alphag=alphag
             state%rho_m=rho_m; state%inv_rhom=inv_rho_m; state%rho_c=rho_c; state%inv_rho_c=inv_rho_c

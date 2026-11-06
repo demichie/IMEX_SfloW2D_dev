@@ -1,6 +1,13 @@
 name: Fortran architecture dependency audit
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "TESTS/TEST_STATE/**"
+      - ".github/scripts/check_fortran_dependencies.py"
+      - ".github/workflows/fortran-dependency-audit.yml"
   pull_request:
     paths:
       - "src/**"

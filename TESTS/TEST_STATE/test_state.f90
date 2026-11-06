@@ -137,7 +137,7 @@ CONTAINS
         COMPLEX(wp) :: cq_case(n_vars), cqp_check(n_vars)
         TYPE(physical_state_real) :: physical
         TYPE(physical_state_complex) :: cphysical
-        REAL(wp) :: test_mass, tolerance
+        REAL(wp) :: tolerance
         INTEGER :: sample
         LOGICAL :: ok
 
