@@ -26,3 +26,6 @@ masses per unit volume from the canonical gas equation of state and solid
 densities, then calls `evaluate_mixture` for all final thermodynamic outputs.
 Normal cell operations start from mass fractions in `qp` and do not use this
 inverse conversion.
+
+Dry-state thermodynamics for REAL and COMPLEX builders and refresh are
+shared by `inc/dry_thermodynamics.inc`.

@@ -140,10 +140,16 @@ CONTAINS
         CALL require_real_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (.NOT.close_composition(state%xs,state%xg)) RETURN
-        IF (state%h<0.0_wp .OR. state%T<0.0_wp) RETURN
-        CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
-            state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
-        state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+        IF (REAL(state%h,wp)<0.0_wp) RETURN
+        IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
+            INCLUDE 'inc/dry_thermodynamics.inc'
+        ELSE
+            IF (REAL(state%T,wp)<0.0_wp) RETURN
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+        END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -159,10 +165,16 @@ CONTAINS
         CALL require_complex_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (.NOT.close_composition(state%xs,state%xg)) RETURN
-        IF (REAL(state%h,wp)<0.0_wp .OR. REAL(state%T,wp)<0.0_wp) RETURN
-        CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
-            state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
-        state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+        IF (REAL(state%h,wp)<0.0_wp) RETURN
+        IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
+            INCLUDE 'inc/dry_thermodynamics.inc'
+        ELSE
+            IF (REAL(state%T,wp)<0.0_wp) RETURN
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
+                state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
+            IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+        END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -200,15 +212,7 @@ CONTAINS
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
 
         IF (state%h <= EPSILON(1.0_wp)) THEN
-            state%T=T_ambient
-            state%rho_m=rho_a_amb; state%inv_rhom=1.0_wp/rho_a_amb
-            state%rho_c=rho_a_amb; state%inv_rho_c=1.0_wp/rho_a_amb
-            IF (liquid_flag) THEN
-                state%cp_c=sp_heat_l; state%cp_m=sp_heat_l
-            ELSE
-                state%cp_c=sp_heat_a; state%cp_m=sp_heat_a
-            END IF
-            state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp
+            INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
@@ -240,16 +244,10 @@ CONTAINS
         mass=q(1)
         IF (mass < 0.0_wp) RETURN
         IF (mass <= 0.0_wp) THEN
-            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp; state%T=T_ambient
-            state%rho_m=rho_a_amb; state%inv_rhom=1.0_wp/rho_a_amb
-            state%rho_c=rho_a_amb; state%inv_rho_c=1.0_wp/rho_a_amb
-            IF (liquid_flag) THEN
-                state%cp_m=sp_heat_l; state%cp_c=sp_heat_l
-            ELSE
-                state%cp_m=sp_heat_a; state%cp_c=sp_heat_a
-            END IF
-            state%xs=0.0_wp; state%xg=0.0_wp; state%alphas=0.0_wp; state%alphag=0.0_wp
-            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp; state%red_grav=0.0_wp
+            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
+            state%xs=0.0_wp; state%xg=0.0_wp
+            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
+            INCLUDE 'inc/dry_thermodynamics.inc'
             geometry=0.0_wp
             IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
             IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -302,15 +300,7 @@ CONTAINS
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
 
         IF (REAL(state%h,wp) <= EPSILON(1.0_wp)) THEN
-            state%T=T_ambient
-            state%rho_m=rho_a_amb; state%inv_rhom=1.0_wp/rho_a_amb
-            state%rho_c=rho_a_amb; state%inv_rho_c=1.0_wp/rho_a_amb
-            IF (liquid_flag) THEN
-                state%cp_m=sp_heat_l; state%cp_c=sp_heat_l
-            ELSE
-                state%cp_m=sp_heat_a; state%cp_c=sp_heat_a
-            END IF
-            state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp
+            INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
@@ -357,16 +347,8 @@ CONTAINS
             state%rho_m=rho_m; state%inv_rhom=inv_rho_m; state%rho_c=rho_c; state%inv_rho_c=inv_rho_c
             state%cp_m=cp_m; state%cp_c=cp_c; state%red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         ELSE
-            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp; state%T=0.0_wp
-            state%rho_m=rho_a_amb; state%inv_rhom=1.0_wp/rho_a_amb; state%rho_c=rho_a_amb
-            state%inv_rho_c=1.0_wp/rho_a_amb
-            IF (liquid_flag) THEN
-                state%cp_m=sp_heat_l; state%cp_c=sp_heat_l
-            ELSE
-                state%cp_m=sp_heat_a; state%cp_c=sp_heat_a
-            END IF
-            state%T=T_ambient
-            state%alphas=0.0_wp; state%alphag=0.0_wp; state%red_grav=0.0_wp
+            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
+            INCLUDE 'inc/dry_thermodynamics.inc'
         END IF
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by

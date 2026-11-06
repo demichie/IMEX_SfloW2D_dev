@@ -926,3 +926,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Updated `INCLUDE` paths in `state_mixture.f90`, `state_conversions.f90`, `state_physical.f90`, including the nested density inclusion in `mixture_from_mass.inc`.
 - Updated Automake `EXTRA_DIST` and object prerequisites, preserving the existing `-I$(srcdir)/state` include search directory so `inc/...` resolves in both production and standalone tests.
 - No physical or numerical formula has been changed. CI Actions remain manually triggered; validation after this commit is pending.
+
+### REAL/COMPLEX strict state checks (2026-11-06)
+
+- Strict REAL and COMPLEX composition now use consistent clipping and complex derivative-aware overfill normalization; REAL q-to-physical and temperature now close compositions as COMPLEX already did.
+- Strict q conversions, temperature-only and physical-state construction reject nonpositive mixture heat capacity consistently.
+- Shared canonical dry-state defaults are defined in `inc/dry_thermodynamics.inc`, consumed by both REAL and COMPLEX physical-state builders and refresh. Numerical reconstruction's different dry thresholds and face-trace closure remain unchanged.
+- Full regression via manually launched CI remains necessary.
