@@ -390,6 +390,7 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
                                          state/state_conversions.$(OBJEXT) \
                                          state/state_fields.$(OBJEXT) \
+                                         state/state_composition.$(OBJEXT) \
                                          stochastic/stochastic_module.$(OBJEXT) \
                                          numerics/lie_source_executor_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
@@ -402,6 +403,7 @@ numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT) \
                                           numerics/nonlinear_solver_2d.$(OBJEXT) \
                                           state/state_fields.$(OBJEXT) \
+                                          state/state_composition.$(OBJEXT) \
                                           geometry/geometry_2d.$(OBJEXT)     \
                                           state/state_conversions.$(OBJEXT) \
                                           state/state_physical.$(OBJEXT)

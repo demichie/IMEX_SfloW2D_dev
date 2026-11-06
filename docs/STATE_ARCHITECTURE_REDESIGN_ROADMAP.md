@@ -994,3 +994,8 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Require q(idx_engyEqn)>0 for wet REAL/COMPLEX conservative states before reconstructing composition and temperature; retain cp_m>0 as an independent check. Also reject reconstructed wet T<=0.
 - Require T>0 for wet REAL/COMPLEX primitive state construction, refresh and qp-to-q conversion and for REAL density-only evaluation. Dry states still permit zero q4 and canonicalize temperature to T_ambient.
 - TEST_STATE covers wet q4=0 and T=0 rejection through constructors, converters, refresh, density and temperature-only evaluation, plus dry zero-temperature conversion. No physical formula changes. Build, Actions and examples still need validation.
+
+### Direct USE prerequisite audit fix (2026-11-06)
+
+- Registered the missing direct `state/state_composition.$(OBJEXT)` prerequisite on `numerics/time_integration_2d.$(OBJEXT)` and `numerics/lie_source_executor_2d.$(OBJEXT)` in `src/Makefile.am`. Both consumers import `conservative_mass_admissible` directly from `state_composition` following the previous cleanup, so the build-order edges must be explicit even when indirect paths exist.
+- No Fortran sources, numerical/physical formulas or module APIs changed. GitHub Actions must rerun the dependency audit to verify the two missing prerequisites are resolved.
