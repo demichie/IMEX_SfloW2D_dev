@@ -1,6 +1,6 @@
     ! Single thermodynamic density kernel shared with evaluate_mixture_density.
     ! Keep the REAL/COMPLEX arithmetic and carrier fallback in one place.
-    INCLUDE 'density_from_mass.inc'
+    INCLUDE 'inc/density_from_mass.inc'
 
     ! Only phase-specific properties remain here. inv_rho_c, inv_rho_m and
     ! rho_m have already been computed by the shared density kernel.
