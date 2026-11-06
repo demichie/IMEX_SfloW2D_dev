@@ -1028,3 +1028,8 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 
 - Expanded `src/state/README.md` to introduce the purpose of the state layer before enumerating files: grid-wide ownership versus cell-local evaluation, conservative/primitive/physical representations, dry-state and acceptance contracts, and boundaries with physics/numerics.
 - Added per-module and per-include responsibility tables plus usage guidance and verification commands. Documentation only; no Fortran source, module API, numerical formula or build dependency changed.
+
+### Physics directory architectural README (2026-11-06)
+
+- Added `src/physics/README.md` to explain the physics layer and its boundary with `state`, `spatial` and `numerics`; the conservative/thermal quantities, four numerical treatment interfaces, REAL/COMPLEX source evaluation, source group workflow, and all physical subdirectories/files including shared `.inc` kernels.
+- Included model extension contracts (cell-local kernels, supported/unsupported treatments, immutable source metadata, scratch ownership, conservation, tests) and repository verification commands. Documentation-only change; no production Fortran, APIs or physical formulas modified.
