@@ -29,21 +29,30 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## How to run
 
-From this example directory, generate the inputs and run the solver in the following order:
+From this example directory, first prepare the inputs and then run the solver.
 
-**Prepare the inputs:**
+### 1. Generate the input files
+
+The generator accepts **2 positional arguments**, in this order:
+
+1. Number of computational cells along x (positive integer).
+2. Whether to plot the initial solution (`true` or `false`).
+
+The Python script sets up the specified SWASHES bump-flow test using a single constant-density phase, with neither friction nor mass-exchange processes.
+
+**Generator command:**
 
 ```bash
 ./create_example.py 200 false
 ```
 
-**Run the solver:**
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../../bin/IMEX_SfloW2D
 ```
-
-The generator arguments are the x-cell count and plotting flag.
 
 ## Expected output
 

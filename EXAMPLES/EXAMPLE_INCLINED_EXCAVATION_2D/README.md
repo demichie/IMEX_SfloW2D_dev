@@ -36,21 +36,40 @@ The input generator requires Python 3 and NumPy. Matplotlib is required only whe
 
 ## How to run
 
-From this example directory, execute the following commands in order:
+Run these commands from this example directory, in order.
 
-**Prepare the inputs:**
+### 1. Generate the default inclined-excavation case
+
+The script `create_example.py` takes the following options:
+
+1. **NX** — Number of cells along x (positive integer; default verification case: 120). The generator uses the documented 0.25 m spacing to obtain 120 × 80 cells.
+2. **--plot** — Optional switch to generate initial-thickness and centerline plots. Omit it to skip plotting (requires Matplotlib when enabled).
+
+Additional optional parameters are `--slope-deg` (bed slope in degrees,
+default 10) and `--depth` (excavation depth in m, default 2).
+Leave them at their defaults to reproduce the verification case.
+
+The resulting input uses the specified continuous, vertex-aligned Q1 bed geometry and matching initial state. For the original verification, preserve the documented solver flags and initial conditions.
+
+**Generator command:**
 
 ```bash
 python3 create_example.py 120 --plot
 ```
 
-**Run the solver:**
+The generator writes `topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`,
+`IMEX_SfloW2D.inp`, `initial_condition_reference.npz`,
+and, when plotting is requested, `initial_thickness.png` and
+`initial_centerline.png`.
+
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../bin/IMEX_SfloW2D
 ```
 
-The input generator writes the solver input and initial-condition data. For the original verification case, preserve the documented solver flags and initial-state conditions.
 
 ## Expected output
 

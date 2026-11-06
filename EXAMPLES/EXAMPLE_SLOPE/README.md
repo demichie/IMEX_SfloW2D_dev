@@ -29,21 +29,32 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## How to run
 
-From this example directory, execute the following commands in order:
+From this example directory, first prepare the inputs and then run the solver.
 
-**Prepare the inputs:**
+### 1. Generate the input files
+
+The generator accepts **4 positional arguments**, in this order:
+
+1. Number of computational cells along x.
+2. Initial solid-particle volume fraction (dimensionless, 0–1).
+3. Initial flow temperature (K).
+4. Whether to plot the initial solution (`true` or `false`).
+
+The test has a supercritical inlet, no friction, no sedimentation or entrainment; thermal content is transported by advection.
+
+**Generator command:**
 
 ```bash
 ./create_example.py 400 1.0 300 false
 ```
 
-**Run the solver:**
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../bin/IMEX_SfloW2D
 ```
-
-Generator arguments: x cells, solid volume fraction, temperature (K), plotting flag.
 
 ## Expected output
 

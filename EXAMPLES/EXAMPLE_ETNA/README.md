@@ -31,45 +31,20 @@ Requires Python 3, NumPy, and pandas for preprocessing. Matplotlib is required o
 
 ## How to run
 
-From this example directory, execute the following commands in order:
+Work from this example directory. Prepare the terrain and initial
+ellipsoidal excavation **before** launching the solver.
 
-**Prepare the inputs:**
+### 1. Prepare the DEM and ellipsoid configuration
 
-```bash
-python create_input_ellipsoid.py
-```
+Extract the DEM archive `DEM/Etna2014_crop.zip` into `DEM/`
+and edit `input_ellipsoid.py`, which defines the preprocessing
+parameters. The ellipsoid is constrained by the lowest and highest
+planimetric points of the initial avalanche, and its transverse
+semi-axis and target volume. The script searches the niche
+concavity to obtain the requested volume and generates both
+initial flow thickness and modified terrain.
 
-**Run the solver:**
-
-```bash
-../../bin/IMEX_SfloW2D
-```
-
-Before preparing the inputs, extract the DEM archive into `DEM/` and edit `input_ellipsoid.py` as appropriate. The tracked cleanup script is `cleanFolder.sh` (the original README incorrectly used lowercase spelling).
-
-To clean the example directory:
-
-```bash
-./cleanFolder.sh
-```
-
-For optional raster plotting, create the plotting-script link:
-
-```bash
-ln -s ../../UTILS/plot_overlay.py .
-```
-
-Then generate the raster overlay:
-
-```bash
-python plot_overlay.py
-```
-
-## Expected output
-
-Native NetCDF is enabled, and the legacy README describes ESRI ASCII `.asc` products and their visualization using GIS software or `plot_overlay.py`.
-
-## Original ellipsoid configuration example
+### Ellipsoid input parameters
 
 The values explicitly supplied in the original README are:
 
@@ -86,6 +61,55 @@ vol = 250000
 ```
 
 These are documentation example values, not a replacement for checking `input_ellipsoid.py` and the current model input. The method uses two points to establish the longitudinal orientation and extents, user-chosen third semi-axis, and an automatic concavity search to match the specified volume.
+
+### 2. Generate the initial condition
+
+The generator reads the parameters from `input_ellipsoid.py`
+rather than from positional command-line arguments.
+
+**Generator command:**
+
+```bash
+python create_input_ellipsoid.py
+```
+
+### 3. Run the solver
+
+**Solver command:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+### 4. Optional cleaning and plotting
+
+The tracked cleanup script uses a capital `F` in its name.
+Run it before generating a fresh case if previous outputs
+must be removed.
+
+**Cleanup command:**
+
+```bash
+./cleanFolder.sh
+```
+
+For optional raster plotting, link the plotting utility:
+
+```bash
+ln -s ../../UTILS/plot_overlay.py .
+```
+
+Then create the overlay images:
+
+```bash
+python plot_overlay.py
+```
+
+
+## Expected output
+
+Native NetCDF is enabled, and the legacy README describes ESRI ASCII `.asc` products and their visualization using GIS software or `plot_overlay.py`.
+
 
 ## Legacy documentation and preservation
 

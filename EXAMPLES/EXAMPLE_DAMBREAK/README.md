@@ -33,47 +33,129 @@ This long-channel dam break is designed to examine simultaneous compaction and g
 
 The setup generator requires Python 3 and NumPy; Matplotlib is required only when its plot flag is `true`. The centerline postprocessor requires NumPy, Matplotlib, and either netCDF4 or h5py to read the NetCDF file. MP4 output additionally requires `imageio[ffmpeg]`, `imageio-ffmpeg`, and system `ffmpeg`; without FFmpeg the script falls back to GIF.
 
+## Physical-model namelists in the legacy example
+
+The original documentation provides the following regularized
+`mu(I)` coefficients (Barker and Gray, 2017):
+
+```fortran
+&RHEOLOGY_PARAMETERS
+ RHEOLOGY_MODEL = 'mui',
+ MU_S = 0.55D0,
+ MU_2 = 0.73D0,
+ MUI_INF = 0.05D0,
+ I_0 = 0.279D0,
+/
+```
+
+The value `MUI_INF=0.05` regularizes the model; the legacy text notes
+that setting `MUI_INF=0` recovers the unregularized form.
+
+The documented pore-pressure and permeability settings are:
+
+```fortran
+&PORE_PRESSURE_PARAMETERS
+ hydraulic_permeability = 1.10D-11,
+ GAS_LOSS_FLAG = T,
+ ALPHA_TRANS = 0.2,
+ F_INHIBIT_MODE = 'DYNAMIC',
+ DYNAMIC_PERMEABILITY_FLAG = T,
+/
+```
+
+These blocks reproduce the historical settings for reference; consult
+the tracked input/template for the active run.
+
+
 ## How to run
 
-From this example directory, generate the inputs and run the solver in the following order:
+Run these steps from the example directory, in the order shown.
 
-**Prepare the inputs:**
+### 1. Generate the dam-break inputs
+
+The generator `create_dambreak.py` takes **ten positional arguments**:
+
+1. **NX** — Number of computational cells along the channel (x direction).
+2. **NY** — Number of computational cells across the channel (y direction).
+3. **X_LENGTH** — Total channel length (m).
+4. **Y_WIDTH** — Total channel width (m).
+5. **BED_LENGTH** — Initial dam extent along x (m).
+6. **BED_HEIGHT** — Initial dam height (m).
+7. **ALFAS** — Initial solid-particle volume fraction (dimensionless, 0–1).
+8. **T** — Initial/ambient temperature (K).
+9. **PORE_PRESSURE_FRACT** — Initial pore-pressure fraction relative to hydrostatic pressure (0–1).
+10. **PLOT_FLAG** — Whether to create a preview PNG (`true` or `false`).
+
+The first command writes `IMEX_SfloW2D.inp`, `topography_dem.asc`,
+the initial conservative state, and (when requested) the preview figure.
+The legacy README mentions `create_dambreak_static.py`; the tracked
+script to use is `create_dambreak.py`.
+
+**Generator command:**
 
 ```bash
 python create_dambreak.py 300 15 3.0 0.15 0.20 0.40 0.58 300 1.0 true
 ```
 
-**Create the solver link:**
+### 2. Link the compiled solver (first run only)
+
+**Create the executable link:**
 
 ```bash
 ln -s ../../bin/IMEX_SfloW2D .
 ```
 
-**Run the solver:**
+### 3. Run the simulation
+
+**Solver command:**
 
 ```bash
 ./IMEX_SfloW2D IMEX_SfloW2D.inp
 ```
 
-Generator arguments: NX, NY, channel length (m), channel width (m), dam length (m), dam height (m), solids volume fraction, ambient temperature (K), hydrostatic pore-pressure fraction and plotting flag.
+The simulation writes `OUTPUT/dambreak2D/fields/dambreak2D.nc`,
+viewable with ParaView, and snapshots under the run output directory.
 
-To generate a centerline summary and animation after the run:
+### 4. Post-process the channel centerline
+
+The postprocessor extracts the flow height at the specified fraction
+across the channel: `0` is the lower side, `0.5` the centerline,
+and `1` the upper side. `--animate` also creates an MP4 movie
+(or GIF when FFmpeg is unavailable).
+
+**Postprocessing command:**
 
 ```bash
 python height_summary_nc.py OUTPUT/dambreak2D/fields/dambreak2D.nc --center_fraction 0.5 --animate
 ```
 
-To preview cleanup without deleting files:
+For MP4 output, install the optional Python packages:
+
+```bash
+pip install -U "imageio[ffmpeg]" imageio-ffmpeg
+```
+
+On Ubuntu/Debian, the historical README also recommends installing
+the system FFmpeg executable:
+
+```bash
+sudo apt-get update && sudo apt-get install -y ffmpeg
+```
+
+### 5. Optional cleanup
+
+Preview which generated files would be removed:
 
 ```bash
 python clean_folder.py
 ```
 
-To apply the cleanup:
+Only after checking the dry-run output, apply the cleanup:
 
 ```bash
 python clean_folder.py --apply
 ```
+
 
 ## Expected output
 

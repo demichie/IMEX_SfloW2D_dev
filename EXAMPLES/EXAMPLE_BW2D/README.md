@@ -31,28 +31,6 @@ A 2-D radial flow with basal friction, sedimentation and entrainment above slopi
 
 The input generator requires Python 3 and NumPy.
 
-## How to run
-
-From this example directory, generate the inputs and run the solver in the following order:
-
-**Prepare the inputs:**
-
-```bash
-python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4
-```
-
-**Run the solver:**
-
-```bash
-../../bin/IMEX_SfloW2D
-```
-
-The eight arguments are number of x cells, half-domain size (m), source radius (m), slope (degrees), source temperature (K), velocity (m/s), solid volume fraction and particle size (m). The original README incorrectly states six arguments.
-
-## Expected output
-
-Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, viewable in ParaView.
-
 ## Source pulse timing in the original documentation
 
 The original README contains two descriptions of the four `TIME_PARAM` settings. An earlier description uses a 30 s period and 20 s duration; the later, explicit generated namelist states:
@@ -72,6 +50,44 @@ The original README contains two descriptions of the four `TIME_PARAM` settings.
 The generated template sets `BOTTOM_RADIAL_SOURCE_FLAG=T`, so `TIME_PARAM(4)` is a phase offset, not a cut-off. With the explicit values, the 50 s phase equals the ramp duration: the source starts at its peak, declines linearly to zero over the first 50 s, and stays off for the remainder of the 600 s period. The earlier 30 s/20 s prose does not describe this generated configuration.
 
 For steady-state injection, remove the `TIME_PARAM` line from the radial-source namelist.
+
+
+## How to run
+
+From this example directory, first generate the inputs and then run the solver.
+
+### 1. Generate the input files
+
+The generator expects **8 positional arguments**, in this exact order:
+
+1. Number of cells along x; the documented square grid has 300 × 300 cells.
+2. Half-domain width (m); 30,000 m gives a 60 km × 60 km domain.
+3. Radius of the circular bottom injection area (m).
+4. Topographic slope (degrees).
+5. Temperature of injected mixture (K).
+6. Vertical injection velocity (m/s).
+7. Initial solid-particle **volume fraction** of injected material (dimensionless, 0–1).
+8. Representative particle diameter (m).
+
+The legacy README says six arguments but actually lists and uses **eight**. In this invocation the source radius is 2,000 m, slope is 2°, temperature 330 K, speed 100 m/s, solid volume fraction 8×10⁻⁵ and particle diameter 2.5×10⁻⁴ m. Source pulsation is set in the generated namelist using `TIME_PARAM=600,100,50,50` (period, active duration, linear ramp, phase offset); see the detailed timing explanation below.
+
+**Generator command:**
+
+```bash
+python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4
+```
+
+### 2. Run the solver
+
+**Solver command:**
+
+```bash
+../../bin/IMEX_SfloW2D
+```
+
+## Expected output
+
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, viewable in ParaView.
 
 ## References
 

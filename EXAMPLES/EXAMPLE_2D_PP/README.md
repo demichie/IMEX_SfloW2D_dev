@@ -26,21 +26,32 @@ An avalanche initially held within a hemispherical shell slides down a 35-degree
 
 ## How to run
 
-From this example directory, generate the inputs and run the solver in the following order:
+From this example directory, first generate the inputs, then run the solver.
 
-**Prepare the inputs:**
+### 1. Generate the input files
+
+The generator takes **four positional arguments**, in this order:
+
+1. Number of computational cells along x.
+2. Initial solid-particle volume fraction (dimensionless, 0–1).
+3. Initial flow temperature (K).
+4. Plot the initial solution (`true` or `false`).
+
+Requires Python 3 and NumPy; Matplotlib is needed only for plotting. The historical Basemap dependency is obsolete.
+
+**Generator command:**
 
 ```bash
 python create_example.py 100 0.5 300 false
 ```
 
-**Run the solver:**
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../bin/IMEX_SfloW2D
 ```
-
-Script arguments: x cells, solid volume fraction, temperature (K), plot flag. The generator requires Python 3 and NumPy; Matplotlib is required only when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it.
 
 ## Expected output
 

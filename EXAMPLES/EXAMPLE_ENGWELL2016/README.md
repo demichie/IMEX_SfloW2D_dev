@@ -30,21 +30,34 @@ The input generator requires Python 3 and NumPy.
 
 ## How to run
 
-From this example directory, execute the following commands in order:
+From this example directory, first generate the inputs and then run the solver.
 
-**Prepare the inputs:**
+### 1. Generate the input files
+
+The generator expects **6 positional arguments**, in this exact order:
+
+1. Number of cells along x (positive integer).
+2. Source radius (m; positive).
+3. Source thickness (m; positive).
+4. Initial source temperature (K; positive).
+5. Initial Richardson number (dimensionless; below 1 for the supercritical inlet).
+6. Initial solid **mass fraction** (dimensionless, between 0 and 1).
+
+The sixth value is written to `XS_SOURCE`, a **mass fraction**; the older README also calls it a volume fraction, but that statement conflicts with the current generator. The supercritical regime (`Ri<1`) prevents characteristics from propagating upstream across the prescribed source.
+
+**Generator command:**
 
 ```bash
 python create_example.py 200 2000 2000 900 0.9 0.8
 ```
 
-**Run the solver:**
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../bin/IMEX_SfloW2D
 ```
-
-The generator expects six arguments: x cells, source radius, source thickness, temperature, Richardson number and solid mass fraction. The sixth argument is substituted into `XS_SOURCE`, which the solver reads as a mass fraction; the legacy description calling it a volume fraction is incorrect.
 
 ## Expected output
 

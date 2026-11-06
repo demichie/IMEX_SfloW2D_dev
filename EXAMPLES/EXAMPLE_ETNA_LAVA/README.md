@@ -32,35 +32,53 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 
 ## How to run
 
-From the repository root, execute these commands in order:
+From the repository root, execute the following steps in order.
 
-**Enter the example directory:**
+### 1. Enter the example directory
 
 ```bash
 cd EXAMPLES/EXAMPLE_ETNA_LAVA
 ```
 
-**Prepare the input data:**
+### 2. Prepare the terrain and input data
+
+`prepare.py` has no mandatory positional arguments. It extracts
+`Etna2014_crop.asc` from `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip`,
+checking both archive and raster SHA-256 hashes; only Python's standard
+library is required. Unlike the avalanche case, this simulation
+uses the **original DEM** and two bottom fissural sources.
+
+**Preparation command:**
 
 ```bash
 python3 prepare.py
 ```
 
-**Run the solver:**
+**Do not run `create_input_ellipsoid.py`** for this lava example:
+that script excavates the initial terrain and changes the simulated
+flow volume.
+
+### 3. Run the solver
+
+The command below requests four OpenMP threads and disables dynamic
+OpenMP team sizing.
+
+**Solver command:**
 
 ```bash
 OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../bin/IMEX_SfloW2D
 ```
 
-`prepare.py` extracts `Etna2014_crop.asc` from `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip`, verifying the archive and raster SHA-256 checksums. Only the Python standard library is required.
+### Optional: prepare an independent clean run
 
-For a separate clean run, execute the following from the repository root and then run the solver by absolute path from the prepared directory:
+From the repository root, `--directory` specifies the absolute
+destination of a separate prepared run. Launch the executable by
+absolute path while working in that destination.
 
 ```bash
 python3 EXAMPLES/EXAMPLE_ETNA_LAVA/prepare.py --directory /absolute/path/to/new-run
 ```
 
-**Do not run `create_input_ellipsoid.py` for this lava case**: it changes the initial topography and volume.
 
 ## Expected output
 

@@ -29,21 +29,32 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## How to run
 
-From this example directory, generate the inputs and run the solver in the following order:
+From this example directory, first generate the inputs, then run the solver.
 
-**Prepare the inputs:**
+### 1. Generate the input files
+
+The generator takes **four positional arguments**, in this order:
+
+1. Number of computational cells along x.
+2. Initial solid-particle volume fraction (dimensionless, 0–1).
+3. Initial flow temperature (K).
+4. Plot the initial solution (`true` or `false`).
+
+The example includes friction, settling/deposition and entrainment, and transports thermal content.
+
+**Generator command:**
 
 ```bash
 ./create_example.py 400 0.01 900 false
 ```
 
-**Run the solver:**
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../bin/IMEX_SfloW2D
 ```
-
-Generator arguments: cell count, solid volume fraction, temperature and plotting flag.
 
 ## Expected output
 

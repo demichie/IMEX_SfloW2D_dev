@@ -30,21 +30,34 @@ The input generator requires Python 3 and NumPy.
 
 ## How to run
 
-From this example directory, execute the following commands in order:
+From this example directory, first generate the inputs and then run the solver.
 
-**Prepare the inputs:**
+### 1. Generate the input files
+
+The generator expects **6 positional arguments**, in this exact order:
+
+1. Number of cells along x (positive integer).
+2. Lateral source extent (m; positive).
+3. Total source **mass-flow rate** (kg/s; positive), written to `MFR_SOURCE`. It is not a source thickness.
+4. Source temperature (K; positive).
+5. Initial Richardson number (dimensionless; below 1 for a supercritical source).
+6. Initial solid **volume fraction** (dimensionless, 0–1), written to `ALPHAS_SOURCE`.
+
+The legacy README inconsistently describes argument 3 as an initial thickness and argument 6 as a mass fraction. The active generator instead writes `MFR_SOURCE` and `ALPHAS_SOURCE`. `XS_SOURCE`, if used, would denote a solid mass fraction.
+
+**Generator command:**
 
 ```bash
 python create_example.py 200 250 10000000 900 0.5 0.01
 ```
 
-**Run the solver:**
+### 2. Run the solver
+
+**Solver command:**
 
 ```bash
 ../../bin/IMEX_SfloW2D
 ```
-
-The six arguments are x cells, source extent (m), total source mass-flow rate (kg/s), temperature (K), Richardson number and solid volume fraction. The generator puts the third argument in `MFR_SOURCE`; the solver derives source thickness from that rate. The sixth argument is written to `ALPHAS_SOURCE`, which specifies a volume fraction. `XS_SOURCE` instead specifies a mass fraction and must not be used for this example's 1% solid volume concentration.
 
 ## Expected output
 
