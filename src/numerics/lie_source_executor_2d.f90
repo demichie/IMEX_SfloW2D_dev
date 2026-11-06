@@ -9,7 +9,7 @@ MODULE lie_source_executor_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
         idx_solidEqn_first, idx_solidEqn_last
-    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
+    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
     USE domain_2d, ONLY : domain_type
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
