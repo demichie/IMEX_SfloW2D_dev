@@ -1183,12 +1183,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
-        REAL(wp) :: slope_hx,slope_hy,eta_center
-        REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
-        REAL(wp) :: eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm
-        REAL(wp) :: slope_eta2_x,slope_eta2_y
-        REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
-        REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
         INTEGER :: l,j,k,kt_mode
 
         ! Decode the configuration once, outside the reconstruction face loop.

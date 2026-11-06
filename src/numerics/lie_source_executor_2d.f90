@@ -7,7 +7,7 @@
 
 MODULE lie_source_executor_2d
     USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,                   &
+    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
         idx_solidEqn_first, idx_solidEqn_last
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE domain_2d, ONLY : domain_type
@@ -15,7 +15,7 @@ MODULE lie_source_executor_2d
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
         SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
     USE state_fields, ONLY : state_type
-    USE state_types, ONLY : physical_state_real, physical_state_complex, &
+    USE state_types, ONLY : physical_state_real, physical_state_complex,                                               &
         initialize_physical_state_real, initialize_physical_state_complex
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
     USE mass_injection_coefficients_2d, ONLY : injection_material_set_type,prepare_injection_materials
@@ -73,7 +73,6 @@ CONTAINS
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON
         USE parameters_2d, ONLY : topo_change_flag
         USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
-        USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         TYPE(source_registry_type), INTENT(IN) :: source_registry
         INTEGER :: group_index,env_status,parse_status,ncells,source_id
@@ -244,11 +243,10 @@ CONTAINS
     !> @param[out] failure_message Optional diagnostic describing rejected group.
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
         step_start_time,q_original,qp_original,step_failed,failure_message)
-        USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                         &
-            B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
-            project_cell_field_to_vertices,assign_topography_vertices,B_vertex, comp_interfaces_x,comp_interfaces_y,   &
-            B_zone,cell_source_fractions,cell_fissure_fractions,                                              &
-            cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
+        USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, B_second_xy_geom,                    &
+            B_second_yy_geom, grav_coeff, project_cell_field_to_vertices, assign_topography_vertices, B_vertex,        &
+            B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
+            dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
         USE state_physical, ONLY : evaluate_density_from_qp
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON

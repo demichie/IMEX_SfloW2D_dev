@@ -8,7 +8,7 @@ MODULE mass_bottom_circular_injection_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE mass_injection_coefficients_2d, ONLY : injection_material_type
 
-    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    USE geometry_2d, ONLY : bottom_source_area_ratio
     USE mass_injection_coefficients_2d
     USE diagnostics_2d, ONLY : fatal_error
     IMPLICIT NONE
@@ -25,13 +25,9 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate,material)
-    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
-            time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
-            pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
-            radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
-            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
-            xs_fissures, xg_fissures
-    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    USE parameters_2d, ONLY : vel_source, T_source, time_param, bottom_radial_source_flag, pore_pressure_flag,         &
+        pore_pres_fract, n_intervals, t_intervals, vel_intervals
+    USE geometry_2d, ONLY : bottom_source_area_ratio
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)

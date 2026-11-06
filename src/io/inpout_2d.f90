@@ -1095,7 +1095,7 @@ CONTAINS
 
         INTEGER :: i_file
 
-        INTEGER :: i, i_solid, j, k
+        INTEGER :: i, j, k
         INTEGER :: dem_ix_first,dem_ix_last,dem_iy_first,dem_iy_last
 
         INTEGER :: dot_idx

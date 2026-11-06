@@ -92,8 +92,8 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: qp(n_vars)
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         COMPLEX(wp), INTENT(OUT), OPTIONAL :: p_dyn
-        COMPLEX(wp) :: mass, rho_m, inv_rho_m, rho_c, inv_rho_c, cp_m, cp_c
-        COMPLEX(wp) :: T, u, v, alphas(n_solid), alphag(n_add_gas)
+        COMPLEX(wp) :: mass, rho_m, inv_rho_m, cp_m, cp_c
+        COMPLEX(wp) :: T, u, v
         COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
 
         qp=(0.0_wp,0.0_wp)

@@ -8,7 +8,6 @@ MODULE mass_bottom_fissural_injection_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE mass_injection_coefficients_2d, ONLY : injection_material_type
 
-    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
     USE mass_injection_coefficients_2d
     USE diagnostics_2d, ONLY : fatal_error
     IMPLICIT NONE
@@ -25,13 +24,8 @@ CONTAINS
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate,materials)
-    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
-            time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
-            pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
-            radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
-            n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
-            xs_fissures, xg_fissures
-    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    USE parameters_2d, ONLY : pore_pressure_flag, pore_pres_fract, bottom_fissural_source_flag, n_fissures,            &
+        linear_vel_fissures, T_fissures, time_param_fissures
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)

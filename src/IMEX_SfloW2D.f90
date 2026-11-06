@@ -84,8 +84,7 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : n_solid
     USE parameters_2d, ONLY : n_vars
     USE parameters_2d, ONLY : radial_source_flag
-    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, bottom_fissural_source_flag,            &
-        stochastic_flag, cfl
+    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, stochastic_flag, cfl
     USE parameters_2d, ONLY : collapsing_volume_flag
     USE parameters_2d, ONLY : serial_flag
 
