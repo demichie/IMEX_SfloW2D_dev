@@ -7,7 +7,7 @@ PROGRAM test_stochastic_evolution
        n_add_gas, n_dyn_pres_levels, n_eqns, n_pore_vars, n_solid,         &
        n_stoch_vars, n_thickness_levels, n_vars, configure_canonical_state_indices, &
        rheology_model, stochastic_flag, stoch_transport_flag, idx_u, idx_v
-  USE state_2d, ONLY : state_type
+  USE state_fields, ONLY : state_type
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise,     &
        noise_pow_val, std_max, std_min, std_slope_factor, tau_stochastic, &
        convolve_2d, expFormNoise, getSigmaNoise

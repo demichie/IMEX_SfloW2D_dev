@@ -1063,3 +1063,9 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - The manual `state` regression group failed in `TEST_N7_COMPOSITION/check_cases.py` because it imports `compare_stages` from `TEST_IMEX_STAGES`. Repository tree inspection confirmed that both `TEST_IMEX_STAGES/compare_stages.py` and `TEST_IMEX_STAGES/test_imex_stages.f90` are absent, so adjusting the Python import path cannot restore this historical N7 observer.
 - Replaced `TEST_N7_COMPOSITION` in the active manual regression workflow with `TEST_MODEL_LAYOUT`, which tests current layout metadata, index conventions and explicit rejection of unsupported layer counts. Retained `TEST_STATE` and `TEST_WORKSPACE_LIFECYCLE`. Original N7 files are preserved for archival study; this does not claim their old physics coverage is replaced.
 - **Pending:** manually rerun the complete `Cell physics and numerical regressions` Action. No production files, scientific formulas or solver interfaces were changed. No workflow run was initiated.
+
+### Restore stochastic evolution regression against canonical state (2026-11-06)
+
+- The manually dispatched `physical-sources` group compiled and passed `TEST_SOURCE_REGISTRY`, `TEST_MASS_EXCHANGE`, `TEST_CURVATURE_SOURCE`, `TEST_RHEOLOGY_FROUDE` and `TEST_RHEOLOGY_CELL_LOCAL`, then failed compiling `TEST_STOCHASTIC_EVOLUTION` because the test imported the retired `state_2d` module.
+- Updated the test to use `state_fields, ONLY : state_type`, the actual type imported by production `stochastic_module`. All OU evolution, transport, intensity and convolution assertions are untouched. Kept the stochastic evolution test in the active workflow rather than discarding its scientific coverage.
+- No source physics, executable numerical statements or Action dispatch conditions changed. **Pending:** repeat the manually triggered physical-sources regression group; no build or simulation was run as part of this edit.
