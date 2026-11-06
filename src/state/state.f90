@@ -1,3 +1,4 @@
+!> @brief Canonical state API facade, exposing the physical and numerical representations.
 !*******************************************************************************
 !> Public entry point for the new state architecture.
 !*******************************************************************************

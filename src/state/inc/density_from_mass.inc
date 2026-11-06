@@ -1,3 +1,5 @@
+!> @file density_from_mass.inc
+!> @brief Evaluate carrier and mixture specific volumes from mass fractions and temperature.
     xc = 1.0_wp - SUM(xs)
     IF (gas_flag) THEN
         IF (REAL(xc,wp)>EPSILON(1.0_wp)) THEN

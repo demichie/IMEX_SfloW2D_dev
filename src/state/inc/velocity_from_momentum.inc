@@ -1,3 +1,5 @@
+!> @file velocity_from_momentum.inc
+!> @brief Recover momentum velocities with the existing near-dry regularization.
     IF (REAL(mass,wp)>eps_sing) THEN
         u=q(idx_uEqn)/mass
         v=q(idx_vEqn)/mass

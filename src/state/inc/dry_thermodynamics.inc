@@ -1,3 +1,5 @@
+!> @file dry_thermodynamics.inc
+!> @brief Assign ambient mixture thermodynamics to a canonical dry physical state.
     state%T=T_ambient
     state%rho_m=rho_a_amb
     state%inv_rhom=1.0_wp/rho_a_amb

@@ -1,3 +1,5 @@
+!> @file richardson.inc
+!> @brief Compute the depth-averaged Richardson number with a large-value cap.
     speed2=u**2+v**2
     ri=0.0_wp
     IF (REAL(speed2,wp)>0.0_wp) THEN

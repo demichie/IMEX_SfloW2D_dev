@@ -1,6 +1,7 @@
+!> @brief Conservative mass budgets and closure of mass-fraction compositions.
 MODULE state_composition
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_eqns
-    USE parameters_2d, ONLY : idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last, &
+    USE parameters_2d, ONLY : idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                                     &
         idx_add_gas_first,idx_add_gas_last
     IMPLICIT NONE
     PRIVATE
@@ -10,37 +11,12 @@ MODULE state_composition
         MODULE PROCEDURE close_composition_real, close_composition_complex
     END INTERFACE
 CONTAINS
-    !> Strict conservative mass budget shared by the solver and source limiter.
-    !> Never silently clip a negative component or accept a tolerance violation.
-    PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
-        REAL(wp), INTENT(IN) :: q_cell(n_eqns)
-        valid=.FALSE.
-        IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
-        IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
-        IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
-        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))+ &
-            SUM(q_cell(idx_add_gas_first:idx_add_gas_last))>q_cell(idx_totMassEqn)) RETURN
-        valid=.TRUE.
-    END FUNCTION conservative_mass_admissible
 
-    !> Closure of reconstructed face traces (distinct from strict state conversion).
-    !> Retains legacy HP-PCCU semantics: clip roundoff-negative species and
-    !> normalize any positive overfill, while rejecting materially negative input.
-    LOGICAL FUNCTION normalize_face_composition(xs,xg)
-        REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
-        REAL(wp) :: total
-        normalize_face_composition=.FALSE.
-        IF (ANY(xs<-tol) .OR. ANY(xg<-tol)) RETURN
-        xs=MAX(xs,0.0_wp)
-        xg=MAX(xg,0.0_wp)
-        total=SUM(xs)+SUM(xg)
-        IF (total>1.0_wp) THEN
-            xs=xs/total
-            xg=xg/total
-        END IF
-        normalize_face_composition=.TRUE.
-    END FUNCTION normalize_face_composition
-
+    !> @brief Close REAL mass fractions without removing positive trace species.
+    !> @details Positive trace species are retained; only negative roundoff is clipped.
+    !> @param[inout] xs Solid mass fractions, with n_solid entries; may be clipped or normalized.
+    !> @param[inout] xg Additional-gas mass fractions, with n_add_gas entries; may be normalized.
+    !> @return True if the requested state or composition check succeeds.
     LOGICAL FUNCTION close_composition_real(xs,xg)
         REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
         REAL(wp) :: total
@@ -58,6 +34,12 @@ CONTAINS
         END IF
         close_composition_real=.TRUE.
     END FUNCTION close_composition_real
+
+    !> @brief Close COMPLEX mass fractions while preserving complex-step derivatives.
+    !> @details Composition branches use REAL parts; surviving imaginary steps remain active.
+    !> @param[inout] xs Solid mass fractions, with n_solid entries; may be clipped or normalized.
+    !> @param[inout] xg Additional-gas mass fractions, with n_add_gas entries; may be normalized.
+    !> @return True if the requested state or composition check succeeds.
     LOGICAL FUNCTION close_composition_complex(xs,xg)
         COMPLEX(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
         REAL(wp) :: total
@@ -78,4 +60,40 @@ CONTAINS
         END IF
         close_composition_complex=.TRUE.
     END FUNCTION close_composition_complex
+
+    !> @brief Normalize admissible reconstructed face mass fractions.
+    !> @details A materially negative species is rejected; positive overfill is normalized.
+    !> @param[inout] xs Solid mass fractions, with n_solid entries; may be clipped or normalized.
+    !> @param[inout] xg Additional-gas mass fractions, with n_add_gas entries; may be normalized.
+    !> @return True if the requested state or composition check succeeds.
+    LOGICAL FUNCTION normalize_face_composition(xs,xg)
+        REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
+        REAL(wp) :: total
+        normalize_face_composition=.FALSE.
+        IF (ANY(xs<-tol) .OR. ANY(xg<-tol)) RETURN
+        xs=MAX(xs,0.0_wp)
+        xg=MAX(xg,0.0_wp)
+        total=SUM(xs)+SUM(xg)
+        IF (total>1.0_wp) THEN
+            xs=xs/total
+            xg=xg/total
+        END IF
+        normalize_face_composition=.TRUE.
+    END FUNCTION normalize_face_composition
+
+    !> @brief Check the strict nonnegative conservative mass budget.
+    !> @details Strict budget checking does not clip any conservative mass component.
+    !> @param[in] q_cell Conservative cell vector; the mass components must satisfy strict closure.
+    !> @return True if the requested state or composition check succeeds.
+    PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
+        REAL(wp), INTENT(IN) :: q_cell(n_eqns)
+        valid=.FALSE.
+        IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
+        IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
+        IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
+        IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))+                                                         &
+            SUM(q_cell(idx_add_gas_first:idx_add_gas_last))>q_cell(idx_totMassEqn)) RETURN
+        valid=.TRUE.
+    END FUNCTION conservative_mass_admissible
+
 END MODULE state_composition

@@ -33,3 +33,14 @@ shared by `inc/dry_thermodynamics.inc`.
 The former single-field workspace containers and their forwarding initializers
 were removed; callers initialize the physical state directly. The conservative
 mass-admissibility function is exported by `state_composition`, not `state_fields`.
+
+## Source organization and review rules
+
+Follow [the Fortran style policy](../../docs/FORTRAN_STYLE.md): public and central
+operations precede internal helper routines, REAL and COMPLEX counterparts stay
+adjacent, and all procedures have explicit Doxygen parameter/return contracts.
+The shared `.inc` files contain mathematical kernels, not forwarding-only wrappers.
+Executable and numerical expressions must not be changed during style passes.
+Run the Doxygen contract checker, the Fortran style checker (including its
+structural report), and state/regression tests before treating a formatting
+change as validated.

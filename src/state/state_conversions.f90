@@ -1,3 +1,4 @@
+!> @brief Conversion between conservative and primitive cell-state variables.
 !*******************************************************************************
 !> Conservative/primitive conversions for the new state architecture.
 !*******************************************************************************
@@ -33,22 +34,12 @@ MODULE state_conversions
 
 CONTAINS
 
-    !> Diagnostic dynamic pressure from already synchronized q and qp.
-    !> The numerical q->qp conversion computed h=mass/rho_m and the final
-    !> primitive velocities. Reconstruct rho_m from that identity instead of
-    !> repeating heat capacity, density, composition and the whole conversion.
-    !> The reconstructed density can differ in last-bit rounding from rho_m.
-    PURE REAL(wp) FUNCTION dynamic_pressure_from_synchronized_state(q_mass,qp) RESULT(p_dyn)
-        REAL(wp), INTENT(IN) :: q_mass,qp(n_vars)
-
-        p_dyn=0.0_wp
-        IF (q_mass<=EPSILON(1.0_wp) .OR. qp(idx_h)<=0.0_wp) RETURN
-        p_dyn=0.5_wp*(q_mass/qp(idx_h))*(qp(idx_u)*qp(idx_u)+qp(idx_v)*qp(idx_v))
-    END FUNCTION dynamic_pressure_from_synchronized_state
-
-
-    !> REAL conservative-to-primitive conversion shared by numerical
-    !> reconstruction and physical-state consumers.
+    !> @brief Decode one REAL conservative state to primitive variables.
+    !> @details Dry mass yields ambient temperature; invalid wet states signal accepted=false.
+    !> @param[in] q Conservative cell vector: mass, momenta, thermal content and transported masses.
+    !> @param[out] qp Primitive cell vector: thickness, velocity, temperature and fractions.
+    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] p_dyn Dynamic pressure per unit volume, computed from synchronized state (Pa).
     SUBROUTINE conservative_to_primitive_real(q,qp,accepted,p_dyn)
         REAL(wp), INTENT(IN) :: q(n_vars)
         REAL(wp), INTENT(OUT) :: qp(n_vars)
@@ -89,6 +80,12 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE conservative_to_primitive_real
 
+    !> @brief Decode one COMPLEX conservative state to primitive variables.
+    !> @details REAL parts select the physical branches; complex perturbations are retained.
+    !> @param[in] q Conservative cell vector: mass, momenta, thermal content and transported masses.
+    !> @param[out] qp Primitive cell vector: thickness, velocity, temperature and fractions.
+    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] p_dyn Dynamic pressure per unit volume, computed from synchronized state (Pa).
     SUBROUTINE conservative_to_primitive_complex(q, qp, accepted, p_dyn)
         COMPLEX(wp), INTENT(IN) :: q(n_vars)
         COMPLEX(wp), INTENT(OUT) :: qp(n_vars)
@@ -131,6 +128,11 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE conservative_to_primitive_complex
 
+    !> @brief Encode one REAL primitive state as conservative variables.
+    !> @details Zero or machine-epsilon thickness produces the zero conservative state.
+    !> @param[in] qp Primitive cell vector: thickness, velocity, temperature and fractions.
+    !> @param[out] q Conservative cell vector: mass, momenta, thermal content and transported masses.
+    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
     SUBROUTINE primitive_to_conservative_real(qp, q, accepted)
         REAL(wp), INTENT(IN) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: q(n_vars)
@@ -154,6 +156,11 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_real
 
+    !> @brief Encode one COMPLEX primitive state as conservative variables.
+    !> @details The dry branch produces zero conservative variables.
+    !> @param[in] qp Primitive cell vector: thickness, velocity, temperature and fractions.
+    !> @param[out] q Conservative cell vector: mass, momenta, thermal content and transported masses.
+    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
     SUBROUTINE primitive_to_conservative_complex(qp, q, accepted)
         COMPLEX(wp), INTENT(IN) :: qp(n_vars)
         COMPLEX(wp), INTENT(OUT) :: q(n_vars)
@@ -175,5 +182,17 @@ CONTAINS
         INCLUDE 'inc/conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_complex
+
+    !> @brief Evaluate dynamic pressure from synchronized conservative and primitive states.
+    !> @param[in] q_mass Conservative mixture mass per unit horizontal area (kg/m2).
+    !> @param[in] qp Primitive cell vector: thickness, velocity, temperature and fractions.
+    !> @return Dynamic pressure (Pa).
+    PURE REAL(wp) FUNCTION dynamic_pressure_from_synchronized_state(q_mass,qp) RESULT(p_dyn)
+        REAL(wp), INTENT(IN) :: q_mass,qp(n_vars)
+
+        p_dyn=0.0_wp
+        IF (q_mass<=EPSILON(1.0_wp) .OR. qp(idx_h)<=0.0_wp) RETURN
+        p_dyn=0.5_wp*(q_mass/qp(idx_h))*(qp(idx_u)*qp(idx_u)+qp(idx_v)*qp(idx_v))
+    END FUNCTION dynamic_pressure_from_synchronized_state
 
 END MODULE state_conversions

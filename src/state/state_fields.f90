@@ -10,7 +10,7 @@
 
 MODULE state_fields
     USE, INTRINSIC :: iso_fortran_env, ONLY : int64
-    USE parameters_2d, ONLY : idx_h, idx_T,                                                            &
+    USE parameters_2d, ONLY : idx_h, idx_T,                                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
     USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity
@@ -31,9 +31,13 @@ MODULE state_fields
     PUBLIC :: substrate_snapshot_type
 
     !> Pre-step substrate inventory snapshot for transactional time integration.
+    !> @brief Snapshot of substrate inventories for transactional rollback.
     TYPE :: substrate_snapshot_type
+        !> Per-solid deposited, eroded and erodible inventories in grid cells.
         REAL(wp), ALLOCATABLE :: deposit(:,:,:),erosion(:,:,:),erodible(:,:,:)
+        !> Cellwise lava-deposit inventory.
         REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
+        !> Total deposited and eroded thickness fields for rollback.
         REAL(wp), ALLOCATABLE :: deposit_tot(:,:),erosion_tot(:,:)
     END TYPE substrate_snapshot_type
 
@@ -83,35 +87,10 @@ MODULE state_fields
 
 CONTAINS
 
-
-    !> @brief Check binary64 finite values without IEEE runtime state management.
-    !> @details The working precision is binary64 in supported GNU builds.
-    !>          Testing its exponent bits detects both NaN and infinities;
-    !>          this is not a physical admissibility check.
-    PURE ELEMENTAL LOGICAL FUNCTION finite_real_value(value) RESULT(valid)
-        REAL(wp), INTENT(IN) :: value
-        INTEGER(int64), PARAMETER :: exponent_mask=INT(Z'7FF0000000000000',int64)
-        INTEGER(int64) :: bits
-        bits=TRANSFER(value,0_int64)
-        valid=IAND(bits,exponent_mask)/=exponent_mask
-    END FUNCTION finite_real_value
-
-    !> @brief Check that all primitive cell components are finite.
-    !> @param[in] qp_cell One cell's physical variables, including velocities.
-    !> @return True if every entry is finite; this procedure does not change state.
-    PURE LOGICAL FUNCTION physical_cell_state_finite(qp_cell) RESULT(valid)
-        REAL(wp), INTENT(IN) :: qp_cell(:)
-        valid=ALL(finite_real_value(qp_cell))
-    END FUNCTION physical_cell_state_finite
-
-
-    !******************************************************************************
-    !> \brief Allocate and reset cell states and accumulated diagnostics for one model layout.
-    !>
-    !> \param[in,out] this Allocated conservative/physical cell state and accumulated diagnostics.
-    !> \param[in] model_layout Validated variable counts and canonical component indices.
-    !******************************************************************************
-
+    !> @brief Allocate and initialize all simulation-owned state fields.
+    !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
+    !> inventories.
+    !> @param[in] model_layout Validated runtime counts and canonical variable indices.
     SUBROUTINE initialize_state(this, model_layout)
 
         CLASS(state_type), INTENT(INOUT) :: this
@@ -164,21 +143,9 @@ CONTAINS
 
     END SUBROUTINE initialize_state
 
-    !> @brief Initialize one primitive cell, including halo, to the dry state.
-    !> @details Sets all components to zero except ambient temperature.
-    !> @param[out] qp_cell Local physical state vector to reset.
-    PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
-        REAL(wp), INTENT(OUT) :: qp_cell(:)
-        qp_cell = 0.0_wp
-        qp_cell(idx_T) = T_ambient
-    END SUBROUTINE initialize_dry_physical_cell
-
-    !******************************************************************************
-    !> \brief Release the physical/conservative state and diagnostic fields.
-    !>
-    !> \param[in,out] this Allocated conservative/physical cell state and accumulated diagnostics.
-    !******************************************************************************
-
+    !> @brief Deallocate simulation-owned state arrays and diagnostics.
+    !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
+    !> inventories.
     SUBROUTINE finalize_state(this)
 
         CLASS(state_type), INTENT(INOUT) :: this
@@ -196,16 +163,18 @@ CONTAINS
 
     END SUBROUTINE finalize_state
 
-    !> @brief Test finite, nonnegative and internally consistent mass inventories.
-    !> @details Checks total mass against summed solid and additional gas mass;
-    !>          does not clip or otherwise modify a candidate conservative state.
-    !> @param[in] q_cell One conservative cell vector of n_eqns entries.
-    !> @return True if the candidate satisfies all mass admissibility guards.
+    !> @brief Initialize a primitive cell vector to the canonical dry state.
+    !> @param[out] qp_cell Primitive cell vector with all variables for one cell.
+    PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
+        REAL(wp), INTENT(OUT) :: qp_cell(:)
+        qp_cell = 0.0_wp
+        qp_cell(idx_T) = T_ambient
+    END SUBROUTINE initialize_dry_physical_cell
 
-
-    !> @brief Snapshot all owned substrate inventories and their aggregates.
-    !> @param[in] this Authoritative state before the Lie source sweep.
-    !> @param[in,out] snapshot Reusable independent substrate snapshot for rollback.
+    !> @brief Capture substrate fields into reusable rollback storage.
+    !> @details The destination is INTENT(INOUT) so its allocatable buffers can be reused.
+    !> @param[in] this Authoritative simulation state owning grid arrays and substrate inventories.
+    !> @param[inout] snapshot Independent, reusable substrate inventory snapshot for rollback.
     SUBROUTINE snapshot_substrate(this,snapshot)
         CLASS(state_type), INTENT(IN) :: this
         ! Keep all substrate fields in the snapshot: exchange groups can update
@@ -222,9 +191,10 @@ CONTAINS
         snapshot%erosion_tot=this%erosion_tot
     END SUBROUTINE snapshot_substrate
 
-    !> @brief Restore substrate inventories after a rejected Lie source sweep.
-    !> @param[in,out] this State whose substrate fields are restored.
-    !> @param[in] snapshot Previously captured substrate snapshot.
+    !> @brief Restore substrate fields from a previously captured snapshot.
+    !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
+    !> inventories.
+    !> @param[in] snapshot Independent, reusable substrate inventory snapshot for rollback.
     SUBROUTINE restore_substrate(this,snapshot)
         CLASS(state_type), INTENT(INOUT) :: this
         TYPE(substrate_snapshot_type), INTENT(IN) :: snapshot
@@ -236,10 +206,10 @@ CONTAINS
         this%erosion_tot=snapshot%erosion_tot
     END SUBROUTINE restore_substrate
 
-    !> @brief Recompute deposit and erosion thickness totals from per-solid mass.
-    !> @details No solid species means zero deposit/erosion thickness without
-    !>          requiring substrate porosity. Otherwise invalid porosity is fatal.
-    !> @param[in,out] this State whose aggregate diagnostic fields are refreshed.
+    !> @brief Recompute deposited and eroded thickness from solid inventories.
+    !> @details No solids produces zero totals; an invalid substrate porosity is fatal.
+    !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
+    !> inventories.
     SUBROUTINE refresh_substrate_totals(this)
         CLASS(state_type), INTENT(INOUT) :: this
         ! No solids: there is no solid bed layer to convert into thickness.
@@ -257,5 +227,23 @@ CONTAINS
         this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
     END SUBROUTINE refresh_substrate_totals
 
-    !******************************************************************************
+    !> @brief Test finiteness of all primitive components in one cell.
+    !> @param[in] qp_cell Primitive cell vector with all variables for one cell.
+    !> @return True if the requested state or composition check succeeds.
+    PURE LOGICAL FUNCTION physical_cell_state_finite(qp_cell) RESULT(valid)
+        REAL(wp), INTENT(IN) :: qp_cell(:)
+        valid=ALL(finite_real_value(qp_cell))
+    END FUNCTION physical_cell_state_finite
+
+    !> @brief Detect finite binary64 values without altering IEEE runtime settings.
+    !> @param[in] value One REAL scalar to test for finite binary64 representation.
+    !> @return True if the requested state or composition check succeeds.
+    PURE ELEMENTAL LOGICAL FUNCTION finite_real_value(value) RESULT(valid)
+        REAL(wp), INTENT(IN) :: value
+        INTEGER(int64), PARAMETER :: exponent_mask=INT(Z'7FF0000000000000',int64)
+        INTEGER(int64) :: bits
+        bits=TRANSFER(value,0_int64)
+        valid=IAND(bits,exponent_mask)/=exponent_mask
+    END FUNCTION finite_real_value
+
 END MODULE state_fields

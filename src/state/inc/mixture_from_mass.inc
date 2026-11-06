@@ -1,3 +1,5 @@
+!> @file mixture_from_mass.inc
+!> @brief Compute mixture density and phase volume fractions from mass fractions.
     ! Single thermodynamic density kernel shared with evaluate_mixture_density.
     ! Keep the REAL/COMPLEX arithmetic and carrier fallback in one place.
     INCLUDE 'inc/density_from_mass.inc'

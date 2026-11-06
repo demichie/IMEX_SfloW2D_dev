@@ -1,3 +1,5 @@
+!> @file mixture_heat_capacity.inc
+!> @brief Compute mass-weighted mixture and carrier heat capacities.
     xc = 1.0_wp - SUM(xs)
 
     IF ( gas_flag ) THEN
