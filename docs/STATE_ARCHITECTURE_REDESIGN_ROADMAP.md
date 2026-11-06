@@ -801,3 +801,87 @@ Riferimento tecnico: repository demichie/IMEX_SfloW2D_dev, master; analisi dei c
 - Riportare nella [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) il progresso aggregato, senza duplicare i dettagli tecnici.
 - Se un'ottimizzazione modifica l'ordine di operazioni floating-point, registrarlo e usare tolleranze scientificamente giustificate; non dichiarare equivalenza bitwise non verificata.
 - Le regole di formattazione Fortran sono in [FORTRAN_STYLE.md](FORTRAN_STYLE.md); i test e le evidenze di accettazione rimangono in `TESTS/` e `docs/acceptance/`.
+
+## Audit architetturale finale - Blocco 1 (5 novembre 2026)
+
+Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093539` prima delle modifiche di questo blocco.
+
+- Le famiglie di termini sorgente esaminate espongono le interfacce `explicit`, `semi_implicit`, `implicit` e `analytic`; i metodi non implementati devono continuare a terminare con errore esplicito. Presenza delle firme non equivale a validazione dei comportamenti.
+- Nelle implementazioni `src/physics/**/*.f90` controllate non sono emersi accessi diretti a `q(j,k,...)` o `qp(j,k,...)`; le dipendenze da `geometry_2d` osservate nei kernel di iniezione, pore pressure e coefficienti sono limitate a utility geometriche (`pi_g`, `bottom_source_area_ratio`), da mantenere distinte dai campi globali.
+- Il `src/Makefile.am` distribuiva gia `rheology_newmodel_linear.inc` e `thermal_cooling_rate.inc` tramite `EXTRA_DIST`, ma mancavano i due archi di dipendenza per la ricompilazione dei rispettivi oggetti: aggiunti in questo blocco.
+- Restano da verificare con controlli riproducibili: dipendenze `USE` vs regole Makefile, assenza di cicli sull'intero grafo, duplicazioni e wrapper realmente inutilizzati, correttezza dei quattro trattamenti per ciascun modello, e build/test CI del ramo di audit.
+- Nessuna rimozione di interfacce obbligatorie o modifica delle formule fisiche autorizzata dal solo audit statico.
+
+### Blocco 1 - verifica sistematica delle dipendenze (5 novembre 2026)
+
+- Sono stati verificati i `USE` dei 68 file `.f90` di produzione elencati in `src/` (esclusi i diagnostici Fortran sotto `python_diagnostics`). Il confronto tra i moduli interni e le regole esplicite del Makefile ha individuato **14 archi diretti mancanti**, ora aggiunti a `src/Makefile.am`.
+- Il grafo delle dipendenze di compilazione, integrato con questi 14 archi, non presenta cicli (verifica statica sul grafo delle regole); il risultato non sostituisce un build parallelo.
+- Le implementazioni esaminate sotto le cinque famiglie di sorgenti (`rheology`, `mass_exchange`, `mass_injection`, `pore_pressure`, `thermal`) hanno tutte le quattro firme previste. I metodi non supportati devono continuare a segnalare errore; la validazione dinamica dei singoli metodi non e inclusa nella verifica delle firme.
+- Aggiunto `.github/scripts/check_fortran_dependencies.py` per controllare su ogni PR: copertura dei sorgenti nel Makefile, `USE` diretti, `.inc`, cicli e presenza delle quattro interfacce; nuova workflow `.github/workflows/fortran-dependency-audit.yml`.
+- Wrapper e duplicazioni non sono stati rimossi: servono prima evidenze sui chiamanti e regressioni; l'interfaccia pubblica di `state.f90` resta per ora invariata.
+- **Da validare:** esecuzione della nuova Action sul commit, build parallelo e regressioni scientifiche. Stato Blocco 1: `IN CORSO` fino a tali prove.
+
+### Blocco 1 - esito del primo controllo CI
+
+- La Action `Fortran architecture dependency audit`, run [42115367142](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42115367142), ha restituito **success** sul commit `a51f4fc6c04a` (verifica statica automatica, non compilazione).
+- Aggiunto un secondo job per una build `gfortran` parallela (`make -j4`), per confermare il comportamento delle dipendenze Fortran su ambiente CI. La build resta da osservare dopo il commit.
+
+### Blocco 1 - verifica build e contratti delle sorgenti
+
+- La build completa `gfortran` con `make -j4` e il controllo statico sono **PASS** nella [Action 42115531813](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42115531813). La dipendenza incrociata fra moduli e Makefile e quindi verificata anche da un compilatore in parallelo.
+- Audit dei modelli reologici: gli 11 modelli hanno le quattro interfacce; nei modelli con contributi reali/complessi comuni, i file `.inc` eliminano la duplicazione dei kernel senza introdurre conversioni improprie. Gli `explicit` che assemblano il semi-implicito e l'implicito reale costituiscono composizione prevista, non wrapper di compatibilita eliminabili.
+- `rheology_froude`, `rheology_lucas`, `rheology_mui`: la routine implicita restituisce zero, ma i tre termini sono catalogati come `has_newton=.FALSE.` e `default_method=EXPLICIT`; il test `TEST_RHEOLOGY_FROUDE` controlla anche il valore zero della sua interfaccia complessa. Non modificare il comportamento senza riprogettare esplicitamente il contratto di partizione semi-implicito/implicito.
+- `rheology_newmodel`: `explicit` e `analytic` falliscono esplicitamente e sono marcati non disponibili nel catalogo; il `semi_implicit` restituisce zero mentre il contributo fisico e nell'`implicit`. Questo non e un metodo pubblicizzato come implementato per i gruppi non consentiti.
+- Le varianti di dispatch per nome della reologia sono ancora chiamate dai test di accettazione; la loro rimozione non rientra in una pulizia dimostrabilmente sicura. `eval_source_analytic_state` e un helper chiamato da `eval_source_analytic` per la mappa di stato esatta, non un wrapper di compatibilita inattivo.
+- Aggiunta una matrice CI con sei suite (`SOURCE_REGISTRY`, `SOURCE_MASS`, `MASS_EXCHANGE`, `RHEOLOGY_CELL_LOCAL`, `RHEOLOGY_FROUDE`, `STATE_CONVERSION`) per verificare il comportamento dopo l'audit. **Da osservare gli esiti sul nuovo commit.**
+- Resta una verifica esaustiva degli entry point pubblici contro tutti i consumatori prima di poter attestare l'assenza assoluta di wrapper inutilizzati; la sola ricerca testuale non costituisce prova sufficiente.
+
+### Blocco 1 - allineamento dei runner di regressione
+
+- La prima matrice di regression CI ha segnalato fallimenti in piu suite, pur con build parallelo e audit statico superati. Il confronto con il Makefile ha rilevato che cinque script di test compilavano i sorgenti senza gli include path delle reologie e del cooling; allineate le opzioni `-I` a quelle del Makefile.
+- `TEST_SOURCE_MASS` richiede l'eseguibile, non lo compila autonomamente: la workflow ora costruisce il programma prima di eseguire quella suite.
+- I risultati precedenti delle regressioni non sono considerati verifiche di fisica; attendere l'esito dei nuovi job prima di attribuire eventuali errori ai kernel.
+
+### Blocco 1 - gate finale delle regressioni (Action 42116271701)
+
+- Sul commit `03502fe3a811`, i job **Fortran static audit** e **parallel build** sono `PASS`.
+- I job `TEST_STATE_CONVERSION`, `TEST_SOURCE_MASS`, `TEST_SOURCE_REGISTRY`, `TEST_MASS_EXCHANGE` e `TEST_RHEOLOGY_CELL_LOCAL` risultano `FAIL` al passo `Run regression`, anche dopo la correzione dei percorsi di include e la compilazione dell'eseguibile per il test integrato. Il job Froude non aveva ancora un esito definitivo al momento della rilevazione.
+- La cause di questi fallimenti non sono state accertate: lo stato dei job non contiene i messaggi del compilatore o le asserzioni che permetterebbero di distinguere problemi del runner da regressioni del codice. Non modificare la fisica sulla base dei soli exit code.
+- La PR #5 e il **Blocco 1 restano aperti**. Prima del merge occorre ispezionare i log/artifact della Action, distinguere cause infrastrutturali da difetti reali, correggere i problemi riproducibili e riottenere un gate di regressione verde.
+
+### Blocco 1 - correzione cause verificate dai log CI (5 novembre 2026)
+
+- `stochastic_module.mod` mancante: i runner seriali compilavano `time_integration_2d.f90` prima di `stochastic_module.f90`, seguendo un ordine scorretto in `IMEX_SfloW2D_SOURCES`. Spostati i due moduli stochastic prima del consumer.
+- `IOSTAT=5010` su `NUMERIC_PARAMETERS`: `TEST_SOURCE_MASS/make_cases.py` produceva `N_RK=2`, non più accettato dalla namelist di produzione. Rimossa la chiave obsoleta dai fixture.
+- L'audit CI verifica ora l'ordine seriale dei moduli e le chiavi del fixture numerico. Restano da verificare gli esiti delle nuove regressioni; non sono state modificate formule fisiche.
+
+### Blocco 1 - rimozione dipendenze di test da API state legacy
+
+- I log CI identificano `state_2d.mod` e `state_conversion_2d.mod` referenziati da vecchi fixture: queste API sono state eliminate dalla produzione. `TEST_MASS_EXCHANGE/test_projection_stress.f90` ora importa `state_fields`, `state_conversions` e `state_mixture` e usa `conservative_to_primitive`, `evaluate_mixture_phase_properties` ed `evaluate_mixture_heat_capacity` con le firme correnti.
+- `TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90` sostituisce `mixt_var` con la valutazione canonica `build_physical_state_from_qp`; i valori usati dalle asserzioni vengono letti dal physical state.
+- La suite `TEST_STATE_CONVERSION` contiene molti altri riferimenti a simboli legacy e non e ancora migrata; nel gate architetturale si usa `TEST_STATE` (API canoniche), senza introdurre moduli di compatibilita. La suite legacy rimane nel repository ma richiede migrazione o archiviazione esplicita separata, non viene dichiarata superata.
+- Restano da verificare gli esiti CI della compilazione dei test aggiornati e le relative asserzioni numeriche.
+
+### Blocco 1 - Lie mass exchange fixture dopo migrazione state
+
+- `check_lie_exchange_transaction` compila ma segnala una transazione respinta. Il test era migrato al ramo strict della conversione di stato, mentre il Lie executor usa esplicitamente `conservative_to_primitive(...,numerical_reconstruction=.TRUE.)`. Allineato il fixture a quest'ultimo per entrambe le transazioni; nessuna modifica ai kernel.
+- Il rifiuto stampa ora il `failure_message` con prefisso, per identificare la causa in caso di persistenza. La correzione e da validare in CI.
+
+### Blocco 1 - diagnostica del rifiuto Lie (5 novembre 2026)
+
+- `TEST_MASS_EXCHANGE` continua a rifiutare la transazione nel fixture nonostante l'allineamento `numerical_reconstruction`. La causa non e accertata senza il messaggio di dettaglio, che non compare nel log allegato prima dell'`ERROR STOP` (possibile buffering di stdout).
+- Per rendere il fallimento attribuibile a una causa, il fixture scrive ora il `failure_message` su `error_unit` e applica `FLUSH(error_unit)` prima dell'arresto; il gate CI abilita `IMEX_LIE_DIAGNOSTICS=1` per conservare il codice e il budget della prima cella respinta.
+- Nessuna formula fisica modificata. La correzione precedente relativa alla conversione rimane una ipotesi, non una causa dimostrata.
+
+### Blocco 1 - bug di layout nel fixture Lie mass exchange
+
+- Trovata una discrepanza concreta di shape: `TEST_MASS_EXCHANGE/test_projection_stress.f90` allocava `qp` e gli snapshot come `(nq+2,nx,ny)` mentre `execute_lie_source_groups` dichiara `qp(n_vars,comp_cells_x,comp_cells_y)` e il fixture imposta `nq=n_vars=6`. Per un dummy Fortran explicit-shape la differente dimensione della prima componente modifica lo stride atteso tra celle, producendo letture e scritture incoerenti nella griglia. La dimensione del fixture e stata corretta in tutti e cinque i punti (`qp`, `qp_before` in due routine, `qp_trial`, `qp_invalid`).
+- Si preserva `numerical_reconstruction=.TRUE.` per uniformita con il codice di produzione. Non e stato modificato `execute_lie_source_groups` o alcun kernel fisico.
+- L'ipotesi precedente sulle sole politiche di conversione non spiega questo disallineamento di layout. Il test resta da validare con la nuova Action; l'errore `Lie exchange transaction rejected` non e dichiarato risolto fino al PASS.
+
+### Blocco 1 - eliminata duplicazione delle formule di densita
+
+- `density_from_mass.inc` e `mixture_from_mass.inc` duplicavano i calcoli `xc`, `gas_const_c`, `inv_rho_c`, `inv_rho_m` e `rho_m`, con rischio di divergenza fra il ramo di sola densita e quello delle proprieta complete.
+- Ora `density_from_mass.inc` e l'unico kernel canonico di densita REAL/COMPLEX; `mixture_from_mass.inc` lo include e calcola soltanto `rho_c`, le densita inverse delle specie gas e `alphas`/`alphag`. Nessuna API pubblica nuova e nessun doppio calcolo della densita nelle routine full.
+- Aggiunto in `TEST_STATE` un confronto esatto tra `evaluate_mixture_density` e `evaluate_mixture_phase_properties` per gas/liquido, diverse composizioni (incluso carrier nullo), REAL e COMPLEX con perturbazione immaginaria.
+- La modifica va validata con la nuova Action CI; non si dichiara ancora il gate completato.

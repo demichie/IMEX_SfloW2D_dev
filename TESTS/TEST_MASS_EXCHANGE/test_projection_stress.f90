@@ -3,16 +3,16 @@ PROGRAM test_projection_stress
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
-  USE state_2d, ONLY : state_type,substrate_snapshot_type,conservative_mass_admissible
+  USE state_fields, ONLY : state_type,substrate_snapshot_type,conservative_mass_admissible
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
   USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
        finalize_lie_source_executor,lie_source_executor_type
-  USE state_conversion_2d, ONLY : qc_to_qp
+  USE state_conversions, ONLY : conservative_to_primitive
   USE source_terms_2d, ONLY : limit_explicit_source_rates
   USE omp_lib
-  USE, INTRINSIC :: iso_fortran_env, ONLY : int64
+  USE, INTRINSIC :: iso_fortran_env, ONLY : int64, error_unit
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite,ieee_value,ieee_quiet_nan
   IMPLICIT NONE
   INTEGER, PARAMETER :: ns=2, nq=6, rough_steps=32
@@ -373,8 +373,7 @@ CONTAINS
 
   !> \brief Verify that cached real and complex physical properties are complete.
   SUBROUTINE check_complete_physical_state
-    USE state_conversion_2d, ONLY : eval_mixture_properties_from_mass_fractions, &
-        eval_mixture_heat_capacity
+    USE state_mixture, ONLY : evaluate_mixture_phase_properties, evaluate_mixture_heat_capacity
     USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
     USE state_physical, ONLY : build_physical_state_from_qp
@@ -397,9 +396,9 @@ CONTAINS
     CALL build_physical_state_from_qp(primitive,wet)
     xs=primitive(idx_solid_first:idx_solid_last)
     xg=primitive(idx_add_gas_first:idx_add_gas_last)
-    CALL eval_mixture_properties_from_mass_fractions(primitive(idx_T),xs,xg, &
+    CALL evaluate_mixture_phase_properties(primitive(idx_T),xs,xg, &
         rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
-    CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
+    CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
     red_grav=(rho_m-rho_a_amb)*inv_rho_m*grav
     speed_squared=primitive(idx_u)**2+primitive(idx_v)**2
     buoyancy_depth=red_grav*primitive(idx_h)
@@ -446,7 +445,7 @@ CONTAINS
   SUBROUTINE allocate_grid
     comp_cells_x=nx; comp_cells_y=ny; comp_interfaces_x=nx+1; comp_interfaces_y=ny+1
     dx=1.0_wp/REAL(nx,wp); dy=1.0_wp/REAL(ny,wp); cell_size=dx
-    ALLOCATE(q(nq,nx,ny),qp(nq+2,nx,ny),rate(nx,ny),nodes(nx+1,ny+1),weights(nx+1,ny+1))
+    ALLOCATE(q(nq,nx,ny),qp(nq,nx,ny),rate(nx,ny),nodes(nx+1,ny+1),weights(nx+1,ny+1))
     ALLOCATE(B_vertex(nx+1,ny+1),B_cent(nx,ny),B_face_x(nx+1,ny),B_face_y(nx,ny+1))
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
@@ -506,7 +505,7 @@ CONTAINS
     TYPE(source_registry_type) :: registry
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
-    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
+    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: bed_before(nx+1,ny+1),available_before(ns,nx,ny)
     REAL(wp) :: pressure,fluid_delta,solid_delta,inventory_delta
@@ -522,7 +521,8 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie exchange registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie exchange test',accepted)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure, &
+               numerical_reconstruction=.TRUE.)
           IF (.NOT.accepted) ERROR STOP 'Lie exchange initial state conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
@@ -535,7 +535,9 @@ CONTAINS
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message)
     IF (failed) THEN
-       PRINT *, TRIM(message)
+       WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
+       WRITE(error_unit,'(A,I0,A,I0)') 'Lie exchange workset=',domain%solve_cells,', group=',groups(1)%id
+       FLUSH(error_unit)
        ERROR STOP 'Lie exchange transaction rejected'
     END IF
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
@@ -571,9 +573,9 @@ CONTAINS
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
     TYPE(substrate_snapshot_type) :: substrate_before
-    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
-    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq+2,nx,ny)
-    REAL(wp) :: qp_invalid(nq+2,nx,ny)
+    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
+    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq,nx,ny)
+    REAL(wp) :: qp_invalid(nq,nx,ny)
     REAL(wp) :: bed_before(nx+1,ny+1)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: erodible_before(ns,nx,ny),lava_before(nx,ny)
@@ -591,7 +593,8 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie rejection test',accepted)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure, &
+               numerical_reconstruction=.TRUE.)
           IF (.NOT.accepted) ERROR STOP 'Lie rejection primitive conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO

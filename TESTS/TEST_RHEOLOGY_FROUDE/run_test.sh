@@ -31,7 +31,7 @@ for profile in strict optimized; do
         case "$source" in
             *.c) ${CC:-cc} -c "$repo_dir/src/$source" -o "${object%.c}.o" ;;
             *) gfortran ${profile_flags:--O0 -g -fcheck=all} -fopenmp -fbacktrace \
-                 -ffpe-trap=invalid,zero,overflow -I"$repo_dir/src/state" \
+                 -ffpe-trap=invalid,zero,overflow -I"$repo_dir/src/state" -I"$repo_dir/src/physics/rheology_laws" -I"$repo_dir/src/physics/thermal_laws" \
                  $netcdf_fflags -c "$repo_dir/src/$source" ;;
         esac
         objects="$objects ${object%.*}.o"

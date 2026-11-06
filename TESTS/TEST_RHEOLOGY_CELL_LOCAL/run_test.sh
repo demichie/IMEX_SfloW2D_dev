@@ -31,7 +31,7 @@ for profile in strict optimized; do
         object=${source##*/}
         case "$source" in
             *.c) ${CC:-cc} -c "$repo_dir/src/$source" -o "${object%.c}.o" ;;
-            *.f90) "$compiler" $flags $common -I"$repo_dir/src/state" \
+            *.f90) "$compiler" $flags $common -I"$repo_dir/src/state" -I"$repo_dir/src/physics/rheology_laws" -I"$repo_dir/src/physics/thermal_laws" \
                 $netcdf_fflags -c "$repo_dir/src/$source" ;;
         esac
         objects="$objects ${object%.*}.o"

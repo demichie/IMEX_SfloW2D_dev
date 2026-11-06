@@ -4,7 +4,6 @@ PROGRAM test_rheology_froude
   USE parameters_2d
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
-  USE state_conversion_2d, ONLY : mixt_var
   USE state_types, ONLY : physical_state_real, physical_state_complex, &
        initialize_physical_state_real, promote_physical_state
   USE state_physical, ONLY : build_physical_state_from_qp
@@ -28,7 +27,13 @@ PROGRAM test_rheology_froude
   ! Set the ambient density from the same thermodynamic closure, guaranteeing
   ! exact neutral buoyancy independently of compiler rounding of ideal-gas rho.
   CALL make_state(1.0_wp, T_ambient, 0.0_wp, 3.0_wp, -4.0_wp)
-  CALL mixt_var(qp, Ri, rho_m, rho_c, g_reduced, cp_c, cp_mix)
+  CALL build_physical_state_from_qp(qp,local_state)
+  Ri=local_state%Ri
+  rho_m=local_state%rho_m
+  rho_c=local_state%rho_c
+  g_reduced=local_state%red_grav
+  cp_c=local_state%cp_c
+  cp_mix=local_state%cp_m
   rho_a_amb = rho_m
 
   DO mode = 0, 1
@@ -42,7 +47,13 @@ PROGRAM test_rheology_froude
      CALL assert_zero_source('neutral transported tail', 0.0_wp, 0.0_wp)
 
      CALL make_state(1.0_wp, 2.0_wp*T_ambient, 0.0_wp, 3.0_wp, -4.0_wp)
-     CALL mixt_var(qp, Ri, rho_m, rho_c, g_reduced, cp_c, cp_mix)
+     CALL build_physical_state_from_qp(qp,local_state)
+  Ri=local_state%Ri
+  rho_m=local_state%rho_m
+  rho_c=local_state%rho_c
+  g_reduced=local_state%red_grav
+  cp_c=local_state%cp_c
+  cp_mix=local_state%cp_m
      IF (g_reduced >= 0.0_wp) ERROR STOP 'buoyant fixture is not buoyant'
      CALL assert_zero_source('moving buoyant gas', 0.35_wp, -0.22_wp)
 
@@ -56,7 +67,13 @@ PROGRAM test_rheology_froude
   ! In the positive-gravity domain preserve the existing formula, with and
   ! without slope correction and with deterministic/shifted/clipped Froude.
   CALL make_state(2.0_wp, T_ambient, 0.5_wp, 3.0_wp, -4.0_wp)
-  CALL mixt_var(qp, Ri, rho_m, rho_c, g_reduced, cp_c, cp_mix)
+  CALL build_physical_state_from_qp(qp,local_state)
+  Ri=local_state%Ri
+  rho_m=local_state%rho_m
+  rho_c=local_state%rho_c
+  g_reduced=local_state%red_grav
+  cp_c=local_state%cp_c
+  cp_mix=local_state%cp_m
   IF (g_reduced <= 0.0_wp) ERROR STOP 'dense fixture has no buoyancy load'
   DO mode = 0, 5
      slope_correction_flag = MOD(mode, 2) == 1

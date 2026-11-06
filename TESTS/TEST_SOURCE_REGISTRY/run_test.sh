@@ -28,7 +28,7 @@ for profile in strict optimized; do
       case "$source" in
         *.c) cc -c "$repo_dir/src/$source" ;;
         *) "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-             -I"$repo_dir/src/state" $netcdf_fflags -c "$repo_dir/src/$source" ;;
+             -I"$repo_dir/src/state" -I"$repo_dir/src/physics/rheology_laws" -I"$repo_dir/src/physics/thermal_laws" $netcdf_fflags -c "$repo_dir/src/$source" ;;
       esac
     done
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \

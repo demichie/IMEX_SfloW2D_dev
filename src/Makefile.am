@@ -71,9 +71,9 @@ IMEX_SfloW2D_SOURCES = \
                 spatial/hyperbolic_2d.f90 \
                 spatial/spatial_operator_2d.f90 \
                 numerics/lie_source_executor_2d.f90 \
-                numerics/time_integration_2d.f90 \
                 stochastic/stochastic_random_2d.f90 \
                 stochastic/stochastic_module.f90 \
+                numerics/time_integration_2d.f90 \
                 core/simulation_2d.f90 \
                 core/init_2d.f90 \
                 io/output_paths.f90 \
@@ -521,3 +521,23 @@ physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): physics/rheology_laws/rhe
 
 physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc
 
+# Blocco 1: include dependencies used by source kernels.
+physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): physics/rheology_laws/rheology_newmodel_linear.inc
+physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): physics/thermal_laws/thermal_cooling_rate.inc
+
+# Block 1: missing direct USE edges, independently audited against all
+# 68 production Fortran sources. Keep these for deterministic parallel make.
+IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+core/init_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+geometry/domain_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_2d.$(OBJEXT) \
+    physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+physics/rheology_laws/rheology_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+physics/thermal_laws/thermal_laws_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+spatial/hyperbolic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+spatial/reconstruction_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+state/state_conversions.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT)
+state/state_physical.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT)

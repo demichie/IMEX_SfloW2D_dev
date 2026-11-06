@@ -26,7 +26,7 @@ for profile in strict optimized; do
         case "$source" in
             *.c) ${CC:-cc} -c "$repo_dir/src/$source" ;;
             *.f90) ${FC:-gfortran} $flags -fopenmp -fbacktrace -ffree-line-length-none \
-               -I"$repo_dir/src/state" $fflags -c "$repo_dir/src/$source" ;;
+               -I"$repo_dir/src/state" -I"$repo_dir/src/physics/rheology_laws" -I"$repo_dir/src/physics/thermal_laws" $fflags -c "$repo_dir/src/$source" ;;
         esac
     done
     ${FC:-gfortran} -O0 -g -fcheck=all -fopenmp -ffree-line-length-none \

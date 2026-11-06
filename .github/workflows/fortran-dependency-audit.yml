@@ -1,0 +1,94 @@
+name: Fortran architecture dependency audit
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - ".github/scripts/check_fortran_dependencies.py"
+      - ".github/workflows/fortran-dependency-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Fortran source architecture and Makefile prerequisites
+        run: python3 .github/scripts/check_fortran_dependencies.py
+
+  parallel-build:
+    name: Parallel gfortran build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          bash .github/scripts/install-ubuntu-deps.sh \
+            autoconf automake gfortran make \
+            liblapack-dev libnetcdff-dev libnetcdf-dev
+      - name: Configure and build in parallel
+        shell: bash
+        env:
+          FC: gfortran
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --with-netcdf=/usr
+          make -j4 2>&1 | tee parallel-build.log
+          test -x src/IMEX_SfloW2D
+      - name: Upload parallel build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortran-audit-parallel-build
+          path: parallel-build.log
+          if-no-files-found: warn
+
+  source-regressions:
+    name: Source architecture / ${{ matrix.suite }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - TEST_SOURCE_REGISTRY
+          - TEST_SOURCE_MASS
+          - TEST_MASS_EXCHANGE
+          - TEST_RHEOLOGY_CELL_LOCAL
+          - TEST_RHEOLOGY_FROUDE
+          - TEST_STATE
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install regression dependencies
+        run: |
+          bash .github/scripts/install-ubuntu-deps.sh \
+            gfortran libnetcdff-dev libnetcdf-dev \
+            liblapack-dev libblas-dev pkg-config python3-numpy autoconf automake make
+      - name: Run regression
+        shell: bash
+        env:
+          OMP_NUM_THREADS: '1'
+          OMP_DYNAMIC: 'FALSE'
+          IMEX_LIE_DIAGNOSTICS: '1'
+          PYTHON: /usr/bin/python3
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.suite }}" = TEST_SOURCE_MASS ]; then
+            autoreconf -fi
+            FC=gfortran ./configure --with-netcdf=/usr
+            make -j4
+            test -x src/IMEX_SfloW2D
+          fi
+          sh "TESTS/${{ matrix.suite }}/run_test.sh" 2>&1 | tee regression.log
+      - name: Upload regression log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-regression-${{ matrix.suite }}
+          path: regression.log
+          if-no-files-found: warn
