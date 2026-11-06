@@ -41,7 +41,7 @@ PROGRAM test_state_equivalence
     CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp, &
         -32.0_wp*EPSILON(1.0_wp),0.15_wp,0.05_wp,qp)
     CALL check_spatial_face_properties(qp,'roundoff face')
-    CALL check_numerical_decoder_limits
+    CALL check_dry_decoder_limits
     CALL check_settling_trace_equivalence
     CALL check_volume_conversion_equivalence
     WRITE(*,'(A)') 'PASS: state equivalence cases verified'
@@ -49,18 +49,14 @@ CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1
         CHARACTER(*), INTENT(IN) :: label
-        REAL(wp) :: pd_old,pd_new,pd_numerical
-        REAL(wp) :: qp_numerical(n_vars)
+        REAL(wp) :: pd_old,pd_new
         REAL(wp) :: material_qp(n_vars),old_ri,old_rho,old_carrier,old_grav
         REAL(wp) :: old_cp_c,old_cp_m,new_rho,new_inv_rho,new_cp_c,new_cp_m,new_grav
         CALL make_qp(h,T,u,v,xs1,xs2,xg1,qp)
         CALL old_qp_to_qc(qp,q_old); CALL primitive_to_conservative(qp,q)
         CALL old_qc_to_qp(q_old,qp_old,pd_old); CALL conservative_to_primitive(q,qp_new,ok,pd_new)
-        CALL conservative_to_primitive(q_old,qp_numerical,ok,pd_numerical)
-        IF (.NOT.ok) ERROR STOP 'new numerical decoder rejected valid conservative state'
-        CALL assert_vector(label//' numerical qp',qp_numerical,qp_old,1.0E-9_wp)
-        CALL assert_scalar(label//' numerical pressure',pd_numerical,pd_old,1.0E-9_wp)
         IF (.NOT.ok) ERROR STOP 'new conversion rejected valid state'
+        CALL assert_scalar(label//' dynamic pressure',pd_new,pd_old,1.0E-9_wp)
         CALL assert_vector(label//' q',q,q_old,1.0E-10_wp)
         CALL assert_vector(label//' qp',qp_new,qp_old,1.0E-9_wp)
         CALL old_state_qp(qp,old_real); CALL new_state_qp(qp,new_real%state,accepted=ok)
@@ -178,36 +174,36 @@ CONTAINS
         END DO
     END SUBROUTINE check_settling_trace_equivalence
 
-    SUBROUTINE check_numerical_decoder_limits
-        REAL(wp) :: numerical(n_vars),strict(n_vars),mass,pd_new,pd_strict
+    !> Test the single machine-epsilon dry boundary; there is no separate
+    !> numerical reconstruction or near-dry fallback path.
+    SUBROUTINE check_dry_decoder_limits
+        REAL(wp) :: decoded(n_vars),mass,p_dyn
         LOGICAL :: accepted
         INTEGER :: case_id
-        DO case_id=1,2
-            mass=0.1_wp*eps_sing
-            IF (case_id==2) mass=0.5_wp*EPSILON(1.0_wp)
+        DO case_id=1,3
+            mass=0.5_wp*EPSILON(1.0_wp)
+            IF (case_id==2) mass=EPSILON(1.0_wp)
+            IF (case_id==3) mass=2.0_wp*EPSILON(1.0_wp)
             q=0.0_wp
             q(idx_totMassEqn)=mass
             q(idx_engyEqn)=mass*sp_heat_a*900.0_wp
             q(idx_uEqn)=mass*20.0_wp
             q(idx_vEqn)=-mass*5.0_wp
-            CALL conservative_to_primitive(q,strict,accepted,pd_strict)
-            IF (.NOT.accepted) ERROR STOP 'strict decoder rejected positive mass'
-            CALL conservative_to_primitive(q,numerical,accepted,pd_new)
-            IF (.NOT.accepted) ERROR STOP 'unified numerical decoder rejected positive mass'
-            CALL assert_vector('unified numerical and strict qp',numerical,strict,0.0_wp)
-            CALL assert_scalar('unified dynamic pressure',pd_new,pd_strict,0.0_wp)
+            CALL conservative_to_primitive(q,decoded,accepted,p_dyn)
+            IF (.NOT.accepted) ERROR STOP 'epsilon-boundary decoder rejected valid mass'
             IF (mass<=EPSILON(1.0_wp)) THEN
-                CALL assert_scalar('epsilon-dry temperature',numerical(idx_T),T_ambient,0.0_wp)
-                CALL assert_scalar('epsilon-dry depth',numerical(idx_h),0.0_wp,0.0_wp)
+                CALL assert_scalar('epsilon-dry temperature',decoded(idx_T),T_ambient,0.0_wp)
+                CALL assert_scalar('epsilon-dry depth',decoded(idx_h),0.0_wp,0.0_wp)
+                CALL assert_scalar('epsilon-dry pressure',p_dyn,0.0_wp,0.0_wp)
             ELSE
-                CALL assert_scalar('positive-mass temperature',numerical(idx_T),900.0_wp,1.0E-12_wp)
+                CALL assert_scalar('positive-mass temperature',decoded(idx_T),900.0_wp,1.0E-12_wp)
             END IF
         END DO
         q(idx_totMassEqn)=1.0_wp
         q(idx_solid_first)=-1.0E-3_wp
-        CALL conservative_to_primitive(q,numerical,accepted,pd_new)
-        IF (accepted) ERROR STOP 'numerical decoder accepted materially negative solids'
-    END SUBROUTINE check_numerical_decoder_limits
+        CALL conservative_to_primitive(q,decoded,accepted,p_dyn)
+        IF (accepted) ERROR STOP 'decoder accepted materially negative solids'
+    END SUBROUTINE check_dry_decoder_limits
 
     !> I/O and initialization use the inverse volume->mass composition
     !> independently of the conservative/primitive numerical conversions.
