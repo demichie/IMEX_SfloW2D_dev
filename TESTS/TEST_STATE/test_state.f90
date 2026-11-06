@@ -5,6 +5,7 @@ PROGRAM test_state
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
         evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity, &
         evaluate_gas_specific_volume, evaluate_mixture_from_volume, evaluate_mixture
+    USE state_composition, ONLY : close_composition
     USE state_conversions
     USE state_physical
     IMPLICIT NONE
@@ -21,6 +22,10 @@ PROGRAM test_state
     CALL check_shared_conservative_math
     CALL check_gas_eos
     CALL check_inverse_volume_conversion
+    CALL check_complex_closure_limits
+    CALL check_real_complex_invalid_candidates
+    CALL check_dry_refresh_consistency
+    CALL check_nonpositive_heat_capacity
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -265,6 +270,152 @@ CONTAINS
         gas_flag=.TRUE.
         liquid_flag=.FALSE.
     END SUBROUTINE check_inverse_volume_conversion
+
+    !> Complex closure must reproduce REAL clipping and its local derivative.
+    SUBROUTINE check_complex_closure_limits
+        REAL(wp) :: xs(2),xg(1),base,total,expected_derivative
+        COMPLEX(wp) :: cxs(2),cxg(1)
+        REAL(wp), PARAMETER :: delta=1.0E-25_wp
+        LOGICAL :: real_ok,complex_ok
+
+        xs=[-1.0E-14_wp,0.2_wp]; xg=0.1_wp
+        cxs=CMPLX(xs,0.0_wp,wp); cxg=CMPLX(xg,0.0_wp,wp)
+        cxs(1)=CMPLX(xs(1),delta,wp)
+        real_ok=close_composition(xs,xg)
+        complex_ok=close_composition(cxs,cxg)
+        IF (.NOT.real_ok .OR. .NOT.complex_ok) ERROR STOP 'roundoff closure rejected'
+        CALL assert_close('clipped REAL species',xs(1),0.0_wp,0.0_wp)
+        CALL assert_close('clipped COMPLEX species',REAL(cxs(1),wp),0.0_wp,0.0_wp)
+        CALL assert_close('clipped derivative',AIMAG(cxs(1)),0.0_wp,0.0_wp)
+
+        xs=[0.7_wp,0.3_wp+1.0E-13_wp]; xg=0.0_wp
+        base=xs(1); total=SUM(xs)+SUM(xg)
+        cxs=CMPLX(xs,0.0_wp,wp); cxg=CMPLX(xg,0.0_wp,wp)
+        cxs(1)=CMPLX(xs(1),delta,wp)
+        real_ok=close_composition(xs,xg)
+        complex_ok=close_composition(cxs,cxg)
+        IF (.NOT.real_ok .OR. .NOT.complex_ok) ERROR STOP 'tolerated overfill rejected'
+        CALL assert_close('overfill REAL/COMPLEX baseline',REAL(cxs(1),wp),xs(1),1.0E-14_wp)
+        expected_derivative=(total-base)/(total*total)
+        CALL assert_close('complex overfill normalization derivative', &
+            AIMAG(cxs(1))/delta,expected_derivative,1.0E-12_wp)
+
+        xs=[0.2_wp,0.3_wp]; xg=0.0_wp
+        cxs=CMPLX(xs,0.0_wp,wp); cxg=CMPLX(xg,0.0_wp,wp)
+        cxs(1)=CMPLX(xs(1),delta,wp)
+        IF (.NOT.close_composition(cxs,cxg)) ERROR STOP 'positive complex fraction rejected'
+        CALL assert_close('positive fraction derivative retained',AIMAG(cxs(1))/delta,1.0_wp,1.0E-14_wp)
+
+        xs=[0.8_wp,0.5_wp]; xg=0.0_wp
+        cxs=CMPLX(xs,0.0_wp,wp); cxg=CMPLX(xg,0.0_wp,wp)
+        IF (close_composition(xs,xg)) ERROR STOP 'overfilled REAL composition accepted'
+        IF (close_composition(cxs,cxg)) ERROR STOP 'overfilled COMPLEX composition accepted'
+    END SUBROUTINE check_complex_closure_limits
+
+    SUBROUTINE check_real_complex_invalid_candidates
+        REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_result(n_vars),temperature
+        COMPLEX(wp) :: cq_case(n_vars),cqp_result(n_vars),ctemperature
+        TYPE(physical_state_real) :: rs
+        TYPE(physical_state_complex) :: cs
+        LOGICAL :: ok
+        CALL initialize_physical_state_real(rs)
+        CALL initialize_physical_state_complex(cs)
+        qp_case=0.0_wp
+        qp_case(idx_h)=1.0_wp; qp_case(idx_T)=350.0_wp
+        qp_case(idx_solid_first:idx_solid_last)=[0.2_wp,0.1_wp]
+        qp_case(idx_add_gas_first:idx_add_gas_last)=0.05_wp
+        CALL primitive_to_conservative(qp_case,q_case,ok)
+        IF (.NOT.ok) ERROR STOP 'invalid candidate fixture creation failed'
+        q_case(idx_solid_first)=1.3_wp*q_case(idx_totMassEqn)
+        cq_case=CMPLX(q_case,0.0_wp,wp)
+
+        CALL conservative_to_primitive(q_case,qp_result,ok)
+        IF (ok) ERROR STOP 'invalid REAL q->qp composition accepted'
+        CALL conservative_to_primitive(cq_case,cqp_result,ok)
+        IF (ok) ERROR STOP 'invalid COMPLEX q->qp composition accepted'
+        CALL build_physical_state_from_q(q_case,rs,accepted=ok)
+        IF (ok) ERROR STOP 'invalid REAL q->state composition accepted'
+        CALL build_physical_state_from_q(cq_case,cs,accepted=ok)
+        IF (ok) ERROR STOP 'invalid COMPLEX q->state composition accepted'
+        CALL evaluate_temperature_from_q(q_case,temperature)
+        CALL evaluate_temperature_from_q(cq_case,ctemperature)
+        CALL assert_close('invalid real temperature sentinel',temperature,0.0_wp,0.0_wp)
+        CALL assert_close('invalid complex temperature sentinel',REAL(ctemperature,wp),0.0_wp,0.0_wp)
+    END SUBROUTINE check_real_complex_invalid_candidates
+
+    SUBROUTINE check_dry_refresh_consistency
+        REAL(wp) :: qp_case(n_vars),before_rho,expected_cp
+        COMPLEX(wp) :: cqp_case(n_vars)
+        TYPE(physical_state_real) :: rs
+        TYPE(physical_state_complex) :: cs
+        INTEGER :: carrier_case
+        LOGICAL :: ok
+        CALL initialize_physical_state_real(rs)
+        CALL initialize_physical_state_complex(cs)
+        DO carrier_case=1,2
+            gas_flag=carrier_case==1; liquid_flag=.NOT.gas_flag
+            expected_cp=sp_heat_a
+            IF (liquid_flag) expected_cp=sp_heat_l
+            qp_case=0.0_wp; qp_case(idx_h)=0.0_wp
+            qp_case(idx_T)=350.0_wp
+            qp_case(idx_solid_first:idx_solid_last)=[0.2_wp,0.1_wp]
+            qp_case(idx_add_gas_first:idx_add_gas_last)=0.05_wp
+            cqp_case=CMPLX(qp_case,0.0_wp,wp)
+            CALL build_physical_state_from_qp(qp_case,rs,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'dry REAL state rejected'
+            CALL build_physical_state_from_qp(cqp_case,cs,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'dry COMPLEX state rejected'
+            before_rho=rs%rho_m
+            rs%T=500.0_wp; cs%T=CMPLX(500.0_wp,1.0E-20_wp,wp)
+            CALL refresh_physical_state(rs,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'dry REAL refresh rejected'
+            CALL refresh_physical_state(cs,accepted=ok)
+            IF (.NOT.ok) ERROR STOP 'dry COMPLEX refresh rejected'
+            CALL assert_close('dry REAL density unchanged',rs%rho_m,before_rho,0.0_wp)
+            CALL assert_close('dry density ambient',rs%rho_m,rho_a_amb,0.0_wp)
+            CALL assert_close('dry COMPLEX density',REAL(cs%rho_m,wp),rho_a_amb,0.0_wp)
+            CALL assert_close('dry REAL temperature ambient',rs%T,T_ambient,0.0_wp)
+            CALL assert_close('dry COMPLEX temperature ambient',REAL(cs%T,wp),T_ambient,0.0_wp)
+            CALL assert_close('dry REAL heat capacity',rs%cp_m,expected_cp,0.0_wp)
+            CALL assert_close('dry COMPLEX heat capacity',REAL(cs%cp_m,wp),expected_cp,0.0_wp)
+            CALL assert_close('dry REAL reduced gravity',rs%red_grav,0.0_wp,0.0_wp)
+            CALL assert_close('dry COMPLEX reduced gravity',REAL(cs%red_grav,wp),0.0_wp,0.0_wp)
+            CALL assert_close('dry REAL zero phase volume',SUM(rs%alphas),0.0_wp,0.0_wp)
+            CALL assert_close('dry COMPLEX zero phase volume',REAL(SUM(cs%alphas),wp),0.0_wp,0.0_wp)
+        END DO
+        gas_flag=.TRUE.; liquid_flag=.FALSE.
+    END SUBROUTINE check_dry_refresh_consistency
+
+    SUBROUTINE check_nonpositive_heat_capacity
+        REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_out(n_vars),temperature,old_cp_s(n_solid)
+        COMPLEX(wp) :: cq_case(n_vars),cqp_out(n_vars),ctemperature
+        TYPE(physical_state_real) :: rs
+        TYPE(physical_state_complex) :: cs
+        LOGICAL :: ok
+        CALL initialize_physical_state_real(rs)
+        CALL initialize_physical_state_complex(cs)
+        qp_case=0.0_wp; qp_case(idx_h)=1.0_wp; qp_case(idx_T)=350.0_wp
+        qp_case(idx_solid_first:idx_solid_last)=[0.5_wp,0.4_wp]
+        qp_case(idx_add_gas_first:idx_add_gas_last)=0.05_wp
+        CALL primitive_to_conservative(qp_case,q_case,ok)
+        IF (.NOT.ok) ERROR STOP 'cp test initial state creation failed'
+        cq_case=CMPLX(q_case,0.0_wp,wp)
+        old_cp_s=sp_heat_s
+        sp_heat_s=-1.0E6_wp
+        CALL conservative_to_primitive(q_case,qp_out,ok)
+        IF (ok) ERROR STOP 'negative cp REAL conversion accepted'
+        CALL conservative_to_primitive(cq_case,cqp_out,ok)
+        IF (ok) ERROR STOP 'negative cp COMPLEX conversion accepted'
+        CALL build_physical_state_from_q(q_case,rs,accepted=ok)
+        IF (ok) ERROR STOP 'negative cp REAL state accepted'
+        CALL build_physical_state_from_q(cq_case,cs,accepted=ok)
+        IF (ok) ERROR STOP 'negative cp COMPLEX state accepted'
+        CALL evaluate_temperature_from_q(q_case,temperature)
+        CALL evaluate_temperature_from_q(cq_case,ctemperature)
+        CALL assert_close('negative cp REAL temperature',temperature,0.0_wp,0.0_wp)
+        CALL assert_close('negative cp COMPLEX temperature',REAL(ctemperature,wp),0.0_wp,0.0_wp)
+        sp_heat_s=old_cp_s
+    END SUBROUTINE check_nonpositive_heat_capacity
 
     !> Preserve the granular descriptors from the original mixture formulas.
     SUBROUTINE check_particle_descriptors
