@@ -999,3 +999,9 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 
 - Registered the missing direct `state/state_composition.$(OBJEXT)` prerequisite on `numerics/time_integration_2d.$(OBJEXT)` and `numerics/lie_source_executor_2d.$(OBJEXT)` in `src/Makefile.am`. Both consumers import `conservative_mass_admissible` directly from `state_composition` following the previous cleanup, so the build-order edges must be explicit even when indirect paths exist.
 - No Fortran sources, numerical/physical formulas or module APIs changed. GitHub Actions must rerun the dependency audit to verify the two missing prerequisites are resolved.
+
+### B1 Newton acceptance propagation (2026-11-06)
+
+- Kept the strictly positive wet T/q4 admissibility checks. The REAL and COMPLEX Newton source evaluators now consume the acceptance status of temperature-only reconstruction and full physical-state reconstruction. Their optional accepted output is false for failed reconstruction; no cooling/rheology source formula is evaluated on an invalid state and the initialized zero rate is not treated as a valid evaluated rate.
+- Propagated acceptance through nonlinear_solver_2d residual (eval_f) and complex-step Jacobian (eval_jacobian). Failed initial residual/Jacobian/direct first Newton trial returns nonconverged with line_search_failed, allowing the existing solve_backward_euler_group rollback to the input group state. In subsequent line search, failed trial evaluations are rejected and the trial step is halved, with the normal minimum-step fallback if no accepted trial is found. Successful paths retain the existing rate, residual, Jacobian and Armijo formulas.
+- No physical formulas or dry convention changed. The new paths need compiler/CI verification and exercise of a Newton trial that crosses the thermal admissibility boundary. No GitHub Actions were launched from this change.

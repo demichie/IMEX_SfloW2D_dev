@@ -161,7 +161,7 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
         INTEGER :: group_pivot(SIZE(group_equations))
         INTEGER :: nl_iter, i, j, ok
-        LOGICAL :: check, residual_ready
+        LOGICAL :: check, residual_ready, evaluation_ok
         REAL(wp), PARAMETER :: STPMX = 100.0_wp
 
         converged = .FALSE.
@@ -179,7 +179,11 @@ CONTAINS
             iterations_used = iterations_used + 1
             IF (.NOT.residual_ready) THEN
                 CALL eval_f(qj, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,        &
-                    group_equations, source_group, real_scratch)
+                    group_equations, source_group, real_scratch, evaluation_ok)
+                IF (.NOT.evaluation_ok) THEN
+                    line_search_failed=.TRUE.
+                    RETURN
+                END IF
             END IF
             residual_ready = .FALSE.
 
@@ -193,7 +197,11 @@ CONTAINS
             END IF
 
             CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,               &
-                group_equations, source_group, implicit_scratch)
+                group_equations, source_group, implicit_scratch, evaluation_ok)
+            IF (.NOT.evaluation_ok) THEN
+                line_search_failed=.TRUE.
+                RETURN
+            END IF
             IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
 
             DO i = 1, SIZE(group_equations)
@@ -254,7 +262,11 @@ CONTAINS
                 END DO
 
                 CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,  &
-                    group_equations, source_group, real_scratch)
+                    group_equations, source_group, real_scratch, evaluation_ok)
+                IF (.NOT.evaluation_ok) THEN
+                    line_search_failed=.TRUE.
+                    RETURN
+                END IF
 
             END IF
 
@@ -616,6 +628,7 @@ CONTAINS
 
         REAL(wp) :: qj(n_vars)
         REAL(wp) :: right_term_old(n_eqns)
+        LOGICAL :: evaluation_ok
 
         ALF = 1.0e-4_wp
 
@@ -685,7 +698,21 @@ CONTAINS
             END DO
 
             CALL eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,      &
-                active_equations, source_group, real_scratch)
+                active_equations, source_group, real_scratch, evaluation_ok)
+
+            ! An invalid thermal or physical reconstruction is not an Armijo
+            ! value. Retry a shorter step without using the fallback rate.
+            IF (.NOT.evaluation_ok) THEN
+                IF (alam<=alamin) THEN
+                    qj_rel=qj_rel_NR_old
+                    scal_f=scal_f_old
+                    right_term=right_term_old
+                    check=.TRUE.
+                    EXIT optimal_step_search
+                END IF
+                alam=0.5_wp*alam
+                CYCLE optimal_step_search
+            END IF
 
             IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
@@ -801,7 +828,7 @@ CONTAINS
         !******************************************************************************
 
     SUBROUTINE eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y , f_nl , scal_f, Zij,             &
-        active_equations, source_group, real_scratch)
+        active_equations, source_group, real_scratch, accepted)
 
 
     IMPLICIT NONE
@@ -821,6 +848,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
+        LOGICAL, INTENT(OUT) :: accepted
 
         REAL(wp) :: nh_term_impl(n_eqns)
         INTEGER :: i, equation
@@ -830,7 +858,10 @@ CONTAINS
         ! before subtracting equal large states and falsely report zero residual.
         REAL(wp), VOLATILE :: delta_q(n_vars)
 
-        CALL eval_source_implicit_real(Bprimej_x,Bprimej_y,Zij,qj,nh_term_impl,source_group,real_scratch)
+        CALL eval_source_implicit_real(Bprimej_x,Bprimej_y,Zij,qj,nh_term_impl,source_group,real_scratch,accepted)
+        f_nl=0.0_wp
+        scal_f=0.0_wp
+        IF (.NOT.accepted) RETURN
 
         Rj = -nh_term_impl
 
@@ -876,7 +907,7 @@ CONTAINS
     !******************************************************************************
 
     SUBROUTINE eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,                 &
-        active_equations, source_group, implicit_scratch)
+        active_equations, source_group, implicit_scratch, accepted)
 
 
     IMPLICIT NONE
@@ -895,6 +926,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: active_equations(:)
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
+        LOGICAL, INTENT(OUT) :: accepted
 
         REAL(wp) :: complex_step_perturbation,inverse_complex_step_perturbation
         COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
@@ -903,6 +935,7 @@ CONTAINS
 
         INTEGER :: i, j, equation
 
+        accepted=.TRUE.
         ! Each Jacobian call owns its complex-step scale; no module-level mutable state.
         complex_step_perturbation=n_vars*EPSILON(1.0_wp)
         inverse_complex_step_perturbation=1.0_wp/complex_step_perturbation
@@ -930,7 +963,8 @@ CONTAINS
             qj_cmplx = qj_rel_cmplx * qj_org
 
             CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij, c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,    &
-                group=source_group, physical_scratch=implicit_scratch)
+                group=source_group, physical_scratch=implicit_scratch, accepted=accepted)
+            IF (.NOT.accepted) RETURN
 
             ! Assemble only the active Jacobian rows; inactive rows remain zero.
             ! No full-sized intermediate derivative matrix is required.

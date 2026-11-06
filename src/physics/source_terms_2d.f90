@@ -429,7 +429,7 @@ CONTAINS
 
     !> Evaluate the REAL implicit source directly for Newton residuals.
     !> The source formulas are identical to those used by COMPLEX Jacobians.
-    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch)
+    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,Zij,q_cell(n_vars)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
@@ -437,13 +437,20 @@ CONTAINS
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: temperature
+        LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+        LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
             CALL fatal_error('eval_source_implicit_real requires a Newton Lie group')
         rate=0.0_wp
+        IF (PRESENT(accepted)) accepted=.TRUE.
         IF (.NOT.group%rheology_implicit .AND. .NOT.group%thermal_active) RETURN
         IF (group%thermal_active .AND. .NOT.group%rheology_implicit) THEN
-            CALL evaluate_temperature_from_q(q_cell,temperature)
+            CALL evaluate_temperature_from_q(q_cell,temperature,state_ok)
+            IF (.NOT.state_ok) THEN
+                IF (PRESENT(accepted)) accepted=.FALSE.
+                RETURN
+            END IF
             CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
                 radiative_term_coeff,convective_term_coeff,T_env,rate(4))
             RETURN
@@ -454,7 +461,12 @@ CONTAINS
         ELSE
             CALL initialize_physical_state_real(local_state)
         END IF
-        CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp)
+        CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp, &
+            accepted=state_ok)
+        IF (.NOT.state_ok) THEN
+            IF (PRESENT(accepted)) accepted=.FALSE.
+            RETURN
+        END IF
         IF (group%rheology_implicit) THEN
             CALL eval_rheology_implicit_real_id(group%rheology_id,physical_state, &
                 stochastic_flag,Zij,rate(2:3))
@@ -467,7 +479,7 @@ CONTAINS
 
     !> Evaluate the COMPLEX implicit rate for Newton complex-step Jacobians.
     !> The real residual uses the distinct eval_source_implicit_real contract.
-    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch)
+    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted)
         REAL(wp), INTENT(IN) :: Bprimej_x,Bprimej_y,Zij
         COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
         COMPLEX(wp), INTENT(OUT) :: c_nh_term_impl(n_eqns)
@@ -476,13 +488,20 @@ CONTAINS
         TYPE(physical_state_complex), TARGET :: local_state
         TYPE(physical_state_complex), POINTER :: physical_state
         COMPLEX(wp) :: temperature
+        LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+        LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
             CALL fatal_error('eval_source_implicit requires a Newton Lie group')
         c_nh_term_impl=CMPLX(0.0_wp,0.0_wp,wp)
+        IF (PRESENT(accepted)) accepted=.TRUE.
         IF (.NOT.group%rheology_implicit .AND. .NOT.group%thermal_active) RETURN
         IF (group%thermal_active .AND. .NOT.group%rheology_implicit) THEN
-            CALL evaluate_temperature_from_q(c_qj,temperature)
+            CALL evaluate_temperature_from_q(c_qj,temperature,state_ok)
+            IF (.NOT.state_ok) THEN
+                IF (PRESENT(accepted)) accepted=.FALSE.
+                RETURN
+            END IF
             CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
                 radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
             RETURN
@@ -494,7 +513,12 @@ CONTAINS
         ELSE
             CALL initialize_physical_state_complex(local_state)
         END IF
-        CALL build_physical_state_from_q(c_qj,physical_state,Bprimej_x,Bprimej_y,0.0_wp,0.0_wp,0.0_wp)
+        CALL build_physical_state_from_q(c_qj,physical_state,Bprimej_x,Bprimej_y,0.0_wp,0.0_wp,0.0_wp, &
+            accepted=state_ok)
+        IF (.NOT.state_ok) THEN
+            IF (PRESENT(accepted)) accepted=.FALSE.
+            RETURN
+        END IF
         IF (group%rheology_implicit) THEN
             CALL eval_rheology_implicit_id(group%rheology_id,physical_state, &
                 stochastic_flag,Zij,c_nh_term_impl(2:3))
