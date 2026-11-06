@@ -97,8 +97,7 @@ EXTRA_DIST = state/inc/dry_thermodynamics.inc state/inc/mixture_heat_capacity.in
              physics/rheology_laws/rheology_empirical_drag.inc \
              physics/rheology_laws/rheology_lahar_drag.inc \
              physics/rheology_laws/rheology_newmodel_linear.inc \
-             physics/thermal_laws/thermal_cooling_rate.inc \
-             python_diagnostics/kt_ritter_1d.f90
+             physics/thermal_laws/thermal_cooling_rate.inc
 
 # Keep spatial cell scratch on each OpenMP thread's stack.
 spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays

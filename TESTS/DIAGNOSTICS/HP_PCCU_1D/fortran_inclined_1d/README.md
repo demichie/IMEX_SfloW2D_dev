@@ -1,6 +1,6 @@
 # Fortran 1-D inclined excavation counterpart
 
-This case is the Fortran setup corresponding to `python_diagnostics/kt_v2_1d.py`
+This case is the Fortran setup corresponding to `../kt_v2_1d.py`
 with `--integrator fortran2`. The Python solver and its spatial discretization
 are left untouched.
 
@@ -17,17 +17,25 @@ Python case; the restart thickness uses the exact cell-average face weights
 used by Python. Run the generator from this directory, then run the Fortran
 executable with this directory as the working directory:
 
-```sh
+```bash
 python3 create_case.py
-../../IMEX_SfloW2D
 ```
+
+Run the compiled solver from this case directory (Autotools builds it under `src/`):
+
+```bash
+../../../../src/IMEX_SfloW2D
+```
+
+If your build installs or places the executable in `bin/`, use
+`../../../../bin/IMEX_SfloW2D` instead.
 
 The expected Fortran behavior is not assumed to match the Python result yet:
 the purpose is to make any difference reproducible with identical initial
 geometry, state, and principal time-integration settings. Compare the console
 failure time and the saved conservative snapshots against:
 
-```sh
+```bash
 python3 ../kt_v2_1d.py --integrator fortran2 --t-end 1.5
 ```
 

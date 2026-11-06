@@ -1033,3 +1033,9 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 
 - Added `src/physics/README.md` to explain the physics layer and its boundary with `state`, `spatial` and `numerics`; the conservative/thermal quantities, four numerical treatment interfaces, REAL/COMPLEX source evaluation, source group workflow, and all physical subdirectories/files including shared `.inc` kernels.
 - Included model extension contracts (cell-local kernels, supported/unsupported treatments, immutable source metadata, scratch ownership, conservation, tests) and repository verification commands. Documentation-only change; no production Fortran, APIs or physical formulas modified.
+
+### Repository cleanup: relocate independent numerical diagnostics (2026-11-06)
+
+- Moved all 11 tracked files previously under `src/python_diagnostics/` to `TESTS/DIAGNOSTICS/HP_PCCU_1D/` (active Python references and inclined-excavation fixture) and `TESTS/DIAGNOSTICS/ARCHIVE/` (historical `kt_v2_original_1d.py` and standalone `kt_ritter_1d.f90`). Source bodies and fixture data are unchanged; only the moved fixture README has adjusted relative execution/documentation paths.
+- Removed the stale `src/Makefile.am` `EXTRA_DIST` entry for `python_diagnostics/kt_ritter_1d.f90`; registered the diagnostics and their READMEs in the root `Makefile.am` `EXTRA_DIST`, retaining availability in source distributions without linking the Fortran diagnostic into the production executable.
+- Added documentation of the new test-only diagnostic area. Historical acceptance metadata (including stored old file paths and checksums) was intentionally not rewritten. GitHub Actions and compiled/executed runtime tests have not been run as part of this file move.

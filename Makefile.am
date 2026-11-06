@@ -63,7 +63,21 @@ EXTRA_DIST = \
   TESTS/TEST_DAMBREAK/TEST_STEP_FINH/example_2D_0000.q_2d \
   TESTS/TEST_DAMBREAK/TEST_STEP_FINH/topography_dem.asc \
   EXAMPLES/EXAMPLE_CF/topo.zip \
-  EXAMPLES/EXAMPLE_TAAL/topography_dem.asc
+  EXAMPLES/EXAMPLE_TAAL/topography_dem.asc \
+  TESTS/DIAGNOSTICS/README.md \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/README.md \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/hp_pccu_1d_core.py \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/kt_v2_1d.py \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/run_inclined_1d.py \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/smooth_bump_reconstruction_1d.py \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/fortran_inclined_1d/README.md \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/fortran_inclined_1d/create_case.py \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/fortran_inclined_1d/IMEX_SfloW2D.inp \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/fortran_inclined_1d/inclined_excavation_1D_0000.q_2d \
+  TESTS/DIAGNOSTICS/HP_PCCU_1D/fortran_inclined_1d/topography_dem.asc \
+  TESTS/DIAGNOSTICS/ARCHIVE/README.md \
+  TESTS/DIAGNOSTICS/ARCHIVE/kt_v2_original_1d.py \
+  TESTS/DIAGNOSTICS/ARCHIVE/kt_ritter_1d.f90
 
 check-local:
 	$(SHELL) $(top_srcdir)/TESTS/TEST_OUTPUT_PATHS/run_test.sh \
