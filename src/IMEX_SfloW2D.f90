@@ -314,8 +314,7 @@ PROGRAM IMEX_SfloW2D
         IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
 
             CALL conservative_to_primitive(simulation%state%q(1:n_vars,j,k), &
-                simulation%state%qp(1:n_vars,j,k),accepted=conversion_ok,p_dyn=p_dyn, &
-                numerical_reconstruction=.TRUE.)
+                simulation%state%qp(1:n_vars,j,k),accepted=conversion_ok,p_dyn=p_dyn)
             IF (.NOT.conversion_ok) conversion_failed=.TRUE.
 
             IF ( .NOT. is_binary_restart )                                                                             &

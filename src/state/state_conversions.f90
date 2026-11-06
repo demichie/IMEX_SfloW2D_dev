@@ -18,7 +18,7 @@ MODULE state_conversions
     PRIVATE
 
     PUBLIC :: conservative_to_primitive
-    PUBLIC :: primitive_to_conservative, numerical_primitive_to_conservative
+    PUBLIC :: primitive_to_conservative
     PUBLIC :: dynamic_pressure_from_synchronized_state
 
     INTERFACE conservative_to_primitive
@@ -47,19 +47,15 @@ CONTAINS
     END FUNCTION dynamic_pressure_from_synchronized_state
 
 
-    !> REAL state conversion. During the unified-policy trial the optional
-    !> numerical_reconstruction argument is retained for call compatibility,
-    !> but both caller modes use the same policy: M <= epsilon is dry.
-    SUBROUTINE conservative_to_primitive_real(q,qp,accepted,p_dyn,numerical_reconstruction)
+    !> REAL conservative-to-primitive conversion shared by numerical
+    !> reconstruction and physical-state consumers.
+    SUBROUTINE conservative_to_primitive_real(q,qp,accepted,p_dyn)
         REAL(wp), INTENT(IN) :: q(n_vars)
         REAL(wp), INTENT(OUT) :: qp(n_vars)
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         REAL(wp), INTENT(OUT), OPTIONAL :: p_dyn
-        LOGICAL, INTENT(IN), OPTIONAL :: numerical_reconstruction
         REAL(wp) :: mass,rho_m,inv_rho_m,cp_m,cp_c,T,u,v
         REAL(wp) :: xs(n_solid),xg(n_add_gas)
-        ! Keep the optional argument for existing callers during the trial.
-        ! No separate reconstruction policy is selected.
         qp=0.0_wp
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (PRESENT(p_dyn)) p_dyn=0.0_wp
@@ -152,15 +148,6 @@ CONTAINS
         INCLUDE 'inc/conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_real
-
-    !> Compatibility entry point for the unified numerical/strict trial.
-    !> Remove once call sites have migrated to primitive_to_conservative.
-    SUBROUTINE numerical_primitive_to_conservative(qp,q,accepted)
-        REAL(wp), INTENT(IN) :: qp(n_vars)
-        REAL(wp), INTENT(OUT) :: q(n_vars)
-        LOGICAL, INTENT(OUT) :: accepted
-        CALL primitive_to_conservative_real(qp,q,accepted)
-    END SUBROUTINE numerical_primitive_to_conservative
 
     SUBROUTINE primitive_to_conservative_complex(qp, q, accepted)
         COMPLEX(wp), INTENT(IN) :: qp(n_vars)

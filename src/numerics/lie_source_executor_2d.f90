@@ -545,8 +545,7 @@ CONTAINS
                     ! representation valid. Exchange inventories may still change.
                     IF (ANY(q_candidate/=q_local)) THEN
                         IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                            CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,             &
-                                numerical_reconstruction=.TRUE.)
+                            CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok)
                             IF (.NOT.conversion_ok) THEN
                                 cell_error=8
                                 EXIT group_loop
@@ -646,8 +645,7 @@ CONTAINS
                 ! when the conservative vector actually changes.
                 IF (ANY(q_candidate/=q_local)) THEN
                     IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                        CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok,                &
-                            numerical_reconstruction=.TRUE.)
+                        CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok)
                         IF (.NOT.conversion_ok) THEN
                             cell_error=14
                             EXIT group_loop

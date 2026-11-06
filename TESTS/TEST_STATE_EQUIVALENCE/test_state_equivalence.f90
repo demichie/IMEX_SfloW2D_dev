@@ -9,7 +9,7 @@ PROGRAM test_state_equivalence
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
     USE state, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
-        numerical_primitive_to_conservative, &
+        primitive_to_conservative, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
         evaluate_mixture_from_volume, primitive_to_volume_fractions, &
         state_workspace_real, state_workspace_complex, &
@@ -36,7 +36,7 @@ PROGRAM test_state_equivalence
     ! Unified strict-policy trial: a substantially overfilled trace is
     ! rejected rather than silently normalized.
     CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp,0.8_wp,0.8_wp,0.2_wp,qp)
-    CALL numerical_primitive_to_conservative(qp,q,ok)
+    CALL primitive_to_conservative(qp,q,ok)
     IF (ok) ERROR STOP 'overfilled numerical face accepted under strict trial'
     CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp, &
         -32.0_wp*EPSILON(1.0_wp),0.15_wp,0.05_wp,qp)
@@ -56,7 +56,7 @@ CONTAINS
         CALL make_qp(h,T,u,v,xs1,xs2,xg1,qp)
         CALL old_qp_to_qc(qp,q_old); CALL primitive_to_conservative(qp,q)
         CALL old_qc_to_qp(q_old,qp_old,pd_old); CALL conservative_to_primitive(q,qp_new,ok,pd_new)
-        CALL conservative_to_primitive(q_old,qp_numerical,ok,pd_numerical,numerical_reconstruction=.TRUE.)
+        CALL conservative_to_primitive(q_old,qp_numerical,ok,pd_numerical)
         IF (.NOT.ok) ERROR STOP 'new numerical decoder rejected valid conservative state'
         CALL assert_vector(label//' numerical qp',qp_numerical,qp_old,1.0E-9_wp)
         CALL assert_scalar(label//' numerical pressure',pd_numerical,pd_old,1.0E-9_wp)
@@ -99,7 +99,7 @@ CONTAINS
         INTEGER :: direction,velocity_index
 
         CALL old_qp_to_qc(face,reference_q)
-        CALL numerical_primitive_to_conservative(face,new_q,face_ok)
+        CALL primitive_to_conservative(face,new_q,face_ok)
         IF (.NOT.face_ok) ERROR STOP 'valid reconstructed face conversion rejected'
         CALL assert_vector(label//' face conservative',new_q,reference_q,1.0E-10_wp)
         CALL old_mixture(face,old_ri,old_rho,old_rho_c,old_grav,old_cp_c,old_cp_m)
@@ -192,7 +192,7 @@ CONTAINS
             q(idx_vEqn)=-mass*5.0_wp
             CALL conservative_to_primitive(q,strict,accepted,pd_strict)
             IF (.NOT.accepted) ERROR STOP 'strict decoder rejected positive mass'
-            CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
+            CALL conservative_to_primitive(q,numerical,accepted,pd_new)
             IF (.NOT.accepted) ERROR STOP 'unified numerical decoder rejected positive mass'
             CALL assert_vector('unified numerical and strict qp',numerical,strict,0.0_wp)
             CALL assert_scalar('unified dynamic pressure',pd_new,pd_strict,0.0_wp)
@@ -205,7 +205,7 @@ CONTAINS
         END DO
         q(idx_totMassEqn)=1.0_wp
         q(idx_solid_first)=-1.0E-3_wp
-        CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
+        CALL conservative_to_primitive(q,numerical,accepted,pd_new)
         IF (accepted) ERROR STOP 'numerical decoder accepted materially negative solids'
     END SUBROUTINE check_numerical_decoder_limits
 

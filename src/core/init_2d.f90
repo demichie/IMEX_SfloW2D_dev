@@ -70,7 +70,7 @@ CONTAINS
     SUBROUTINE collapsing_volume(state)
 
     USE state_mixture, ONLY : evaluate_mixture_from_volume
-    USE state_conversions, ONLY : numerical_primitive_to_conservative
+    USE state_conversions, ONLY : primitive_to_conservative
     USE diagnostics_2d, ONLY : fatal_error
 
     USE geometry_2d, ONLY : compute_cell_fract
@@ -141,12 +141,12 @@ CONTAINS
                     qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas                                       &
                         +n_stoch_vars+n_pore_vars) = 1.0_wp
 
-                    CALL numerical_primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    CALL primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,j,k),converted)
                     IF (.NOT.converted) CALL fatal_error('Invalid collapsing-volume initial composition')
 
                 ELSE
 
-                    CALL numerical_primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    CALL primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,j,k),converted)
                     IF (.NOT.converted) CALL fatal_error('Invalid dry initial composition')
 
                 END IF

@@ -168,7 +168,7 @@ CONTAINS
 
             IF ( q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
                 CALL conservative_to_primitive(q(:,j,k),qp(:,j,k),accepted=conversion_ok, &
-                    p_dyn=dynamic_pressure,numerical_reconstruction=.TRUE.)
+                    p_dyn=dynamic_pressure)
                 IF (.NOT.conversion_ok) conversion_failed=.TRUE.
             ELSE
                 qp(:,j,k) = 0.0_wp

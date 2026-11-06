@@ -521,8 +521,7 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie exchange registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure, &
-               numerical_reconstruction=.TRUE.)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
           IF (.NOT.accepted) ERROR STOP 'Lie exchange initial state conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
@@ -593,8 +592,7 @@ CONTAINS
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
     DO b=1,ny
        DO a=1,nx
-          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure, &
-               numerical_reconstruction=.TRUE.)
+          CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
           IF (.NOT.accepted) ERROR STOP 'Lie rejection primitive conversion'
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO

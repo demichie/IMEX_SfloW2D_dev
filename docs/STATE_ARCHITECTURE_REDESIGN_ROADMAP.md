@@ -948,3 +948,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Both REAL/COMPLEX qp-to-conservative converters use h <= EPSILON(1.0_wp), after rejecting negative h. Physical-state constructors/refresh and density evaluation already use this depth criterion.
 - The numerical and strict conversions share this dry policy. eps_sing remains in velocity regularization only, not dry classification. Each entry point checks its own available state variable, M or h; both are not required simultaneously.
 - Updated equivalence regression for T_ambient below epsilon and energy temperature above it. Awaiting manually triggered full regression and examples.
+
+### State canonical conversion API cleanup (2026-11-06)
+
+- Following the manual Action and EXAMPLE_TAAL, EXAMPLE_ETNA, EXAMPLE_ETNA_LAVA and EXAMPLE_CF successes for epsilon-machine dry classification, removed the now-inert `numerical_reconstruction` optional argument from the REAL q-to-qp API and every caller (driver, spatial, time integration, Lie executor and tests).
+- Removed `numerical_primitive_to_conservative`, a forwarding-only compatibility routine. Initialization, PCCU face flux and equivalence tests use canonical `primitive_to_conservative` directly.
+- Kept `normalize_face_composition` where needed for actual spatial face and input composition normalization, separate from the strict conversions. The numerical formulae, REAL/COMPLEX closure and machine-epsilon dry convention remain unchanged.
+- Earlier roadmap descriptions of the legacy reconstruction policy are historical. The API cleanup itself awaits a new manual Action and example regression; no Actions were started here.

@@ -712,7 +712,7 @@ CONTAINS
 
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : limit_component_mass_flux
-    USE state_conversions, ONLY : numerical_primitive_to_conservative
+    USE state_conversions, ONLY : primitive_to_conservative
     USE diagnostics_2d, ONLY : fatal_error
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
@@ -773,9 +773,9 @@ CONTAINS
 
         END IF
 
-        CALL numerical_primitive_to_conservative(qp_adv_left_use,q_adv_left_use,face_conversion_ok)
+        CALL primitive_to_conservative(qp_adv_left_use,q_adv_left_use,face_conversion_ok)
         IF (.NOT.face_conversion_ok) CALL fatal_error('KT interface left advective trace: invalid composition')
-        CALL numerical_primitive_to_conservative(qp_adv_right_use,q_adv_right_use,face_conversion_ok)
+        CALL primitive_to_conservative(qp_adv_right_use,q_adv_right_use,face_conversion_ok)
         IF (.NOT.face_conversion_ok) CALL fatal_error('KT interface right advective trace: invalid composition')
 
         CALL eval_inertial_flux(q_adv_left_use,qp_adv_left_use,direction,flux_left)

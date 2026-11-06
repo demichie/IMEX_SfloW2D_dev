@@ -151,7 +151,7 @@ CONTAINS
 
             IF (state%q(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL conservative_to_primitive(state%q(:,j,k),this%qp_before(:,j,k),                              &
-                    accepted=conversion_ok,numerical_reconstruction=.TRUE.)
+                    accepted=conversion_ok)
                 IF (.NOT.conversion_ok) this%cell_status(l)=1
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
@@ -200,7 +200,7 @@ CONTAINS
                     this%qp_trial(:,j,k)=qp_pre(:,j,k)
                 ELSE
                     CALL conservative_to_primitive(this%q_trial(:,j,k),this%qp_trial(:,j,k),                        &
-                        accepted=conversion_ok,numerical_reconstruction=.TRUE.)
+                        accepted=conversion_ok)
                     IF (.NOT.conversion_ok) this%cell_status(l)=2
                 END IF
             ELSE
