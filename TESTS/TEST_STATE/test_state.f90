@@ -339,8 +339,10 @@ CONTAINS
         IF (ok) ERROR STOP 'invalid REAL q->state composition accepted'
         CALL build_physical_state_from_q(cq_case,cs,accepted=ok)
         IF (ok) ERROR STOP 'invalid COMPLEX q->state composition accepted'
-        CALL evaluate_temperature_from_q(q_case,temperature)
-        CALL evaluate_temperature_from_q(cq_case,ctemperature)
+        CALL evaluate_temperature_from_q(q_case,temperature,ok)
+        IF (ok) ERROR STOP 'invalid REAL q temperature unexpectedly accepted'
+        CALL evaluate_temperature_from_q(cq_case,ctemperature,ok)
+        IF (ok) ERROR STOP 'invalid COMPLEX q temperature unexpectedly accepted'
         CALL assert_close('invalid real temperature sentinel',temperature,0.0_wp,0.0_wp)
         CALL assert_close('invalid complex temperature sentinel',REAL(ctemperature,wp),0.0_wp,0.0_wp)
     END SUBROUTINE check_real_complex_invalid_candidates
@@ -463,8 +465,10 @@ CONTAINS
         IF (ok) ERROR STOP 'negative cp REAL state accepted'
         CALL build_physical_state_from_q(cq_case,cs,accepted=ok)
         IF (ok) ERROR STOP 'negative cp COMPLEX state accepted'
-        CALL evaluate_temperature_from_q(q_case,temperature)
-        CALL evaluate_temperature_from_q(cq_case,ctemperature)
+        CALL evaluate_temperature_from_q(q_case,temperature,ok)
+        IF (ok) ERROR STOP 'negative cp REAL temperature accepted'
+        CALL evaluate_temperature_from_q(cq_case,ctemperature,ok)
+        IF (ok) ERROR STOP 'negative cp COMPLEX temperature accepted'
         CALL assert_close('negative cp REAL temperature',temperature,0.0_wp,0.0_wp)
         CALL assert_close('negative cp COMPLEX temperature',REAL(ctemperature,wp),0.0_wp,0.0_wp)
         sp_heat_s=old_cp_s

@@ -89,17 +89,20 @@ CONTAINS
     !> Temperature-only primitive from a conservative REAL candidate.
     !> Mirrors the thermodynamic part of build_physical_state_from_q_real
     !> without computing density, phase volumes or kinematics.
-    SUBROUTINE evaluate_temperature_from_q_real(q,T)
+    SUBROUTINE evaluate_temperature_from_q_real(q,T,accepted)
         REAL(wp), INTENT(IN) :: q(n_vars)
         REAL(wp), INTENT(OUT) :: T
+        LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         REAL(wp) :: mass,cp_m,cp_c
         REAL(wp) :: xs(n_solid),xg(n_add_gas)
 
         T=0.0_wp
+        IF (PRESENT(accepted)) accepted=.FALSE.
         mass=q(1)
         IF (mass<0.0_wp) RETURN
         IF (mass<=EPSILON(1.0_wp)) THEN
             T=T_ambient
+            IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
         xs=q(idx_solid_first:idx_solid_last)/mass
@@ -108,22 +111,29 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
-        IF (REAL(T,wp)<0.0_wp) RETURN
+        IF (REAL(T,wp)<0.0_wp) THEN
+            T=0.0_wp
+            RETURN
+        END IF
+        IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE evaluate_temperature_from_q_real
 
     !> Complex-step temperature-only primitive. Preserve the same composition
     !> closure as build_physical_state_from_q_complex, including early rejection.
-    SUBROUTINE evaluate_temperature_from_q_complex(q,T)
+    SUBROUTINE evaluate_temperature_from_q_complex(q,T,accepted)
         COMPLEX(wp), INTENT(IN) :: q(n_vars)
         COMPLEX(wp), INTENT(OUT) :: T
+        LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         COMPLEX(wp) :: mass,cp_m,cp_c
         COMPLEX(wp) :: xs(n_solid),xg(n_add_gas)
 
         T=(0.0_wp,0.0_wp)
+        IF (PRESENT(accepted)) accepted=.FALSE.
         mass=q(1)
         IF (REAL(mass,wp)<0.0_wp) RETURN
         IF (REAL(mass,wp)<=EPSILON(1.0_wp)) THEN
             T=CMPLX(T_ambient,0.0_wp,wp)
+            IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
         xs=q(idx_solid_first:idx_solid_last)/mass
@@ -132,7 +142,11 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
-        IF (REAL(T,wp)<0.0_wp) RETURN
+        IF (REAL(T,wp)<0.0_wp) THEN
+            T=(0.0_wp,0.0_wp)
+            RETURN
+        END IF
+        IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE evaluate_temperature_from_q_complex
 
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)

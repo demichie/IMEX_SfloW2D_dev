@@ -975,3 +975,9 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Reject negative wet temperature in qp builders and qp-to-q conversions, negative energy-derived temperature in REAL/COMPLEX q conversions, temperature-only evaluations and q-based physical builders. Reject nonpositive heat capacity in the existing qp-to-q mathematical include before assembling conservative q.
 - Added TEST_STATE coverage for dry physical kinematics and refresh, negative depth and negative wet temperature. No numerical formula deduplication; xs=qs/M stays inline. Temperature-only Newton rejection signalling remains a separate contract follow-up.
 - Requires manual CI and examples; no Actions launched.
+
+### B1 temperature-only acceptance status (2026-11-06)
+
+- Added optional `accepted` to REAL/COMPLEX `evaluate_temperature_from_q` to distinguish a valid temperature (including T=0) from invalid conservative state or nonpositive mixture heat capacity. Invalid results retain the historical zero-temperature fallback; negative energy-derived temperature now returns the same sentinel consistently.
+- TEST_STATE exercises rejected composition and nonpositive cp with the new status. Existing call sites remain source-compatible. The thermal-only Newton source path must consume and propagate this status through solver trial rejection in a separate transactional change; do not replace it with fatal_error in a potentially recoverable Newton iteration.
+- No Actions launched; manual build and CI needed.
