@@ -1,22 +1,16 @@
-    xc = 1.0_wp - SUM(xs)
+    ! Single thermodynamic density kernel shared with evaluate_mixture_density.
+    ! Keep the REAL/COMPLEX arithmetic and carrier fallback in one place.
+    INCLUDE 'density_from_mass.inc'
 
-    IF ( gas_flag ) THEN
-        IF (REAL(xc,wp) > EPSILON(1.0_wp)) THEN
-            gas_const_c = ((xc - SUM(xg)) * sp_gas_const_a + &
-                SUM(xg * sp_gas_const_g)) / xc
-        ELSE
-            gas_const_c = sp_gas_const_a
-        END IF
-        inv_rho_c = gas_const_c * T * inv_pres
+    ! Only phase-specific properties remain here. inv_rho_c, inv_rho_m and
+    ! rho_m have already been computed by the shared density kernel.
+    IF (gas_flag) THEN
         rho_c = 1.0_wp / inv_rho_c
         inv_rho_g = sp_gas_const_g * T * inv_pres
     ELSE
         rho_c = rho_l
-        inv_rho_c = inv_rho_l
         inv_rho_g = 0.0_wp
     END IF
 
-    inv_rho_m = SUM(xs * inv_rho_s) + xc * inv_rho_c
-    rho_m = 1.0_wp / inv_rho_m
     alphas = xs * rho_m * inv_rho_s
     alphag = xg * rho_m * inv_rho_g

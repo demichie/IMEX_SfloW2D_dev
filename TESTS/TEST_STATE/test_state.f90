@@ -2,7 +2,8 @@ PROGRAM test_state
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_types
-    USE state_mixture, ONLY : sauter_diameter, average_density_solids
+    USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
+        evaluate_mixture_density, evaluate_mixture_phase_properties
     USE state_conversions
     USE state_physical
     IMPLICIT NONE
@@ -15,6 +16,7 @@ PROGRAM test_state
 
     CALL initialize_case
     CALL check_particle_descriptors
+    CALL check_shared_density_kernel
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -85,6 +87,48 @@ PROGRAM test_state
     WRITE(*,'(A)') 'PASS: state kernels verified'
 
 CONTAINS
+
+    !> Both APIs must use the same density closure for REAL and COMPLEX,
+    !> including the gas/liquid switch and the zero-carrier limit.
+    SUBROUTINE check_shared_density_kernel
+        REAL(wp) :: xs(2),xg(1),rho,inv_rho
+        REAL(wp) :: phase_rho,phase_inv_rho,rho_c,inv_rho_c
+        REAL(wp) :: alphas(2),alphag(1)
+        COMPLEX(wp) :: cxs(2),cxg(1),crho,cinv_rho
+        COMPLEX(wp) :: cphase_rho,cphase_inv_rho,crho_c,cinv_rho_c
+        COMPLEX(wp) :: calphas(2),calphag(1),temperature
+        INTEGER :: carrier_case,composition_case
+
+        DO carrier_case=1,2
+            gas_flag=carrier_case==1
+            liquid_flag=.NOT.gas_flag
+            DO composition_case=1,3
+                xs=[0.15_wp,0.10_wp]
+                xg=[0.05_wp]
+                IF (composition_case==2) xs=[0.0_wp,0.0_wp]
+                IF (composition_case==3) THEN
+                    xs=[0.6_wp,0.4_wp]
+                    xg=[0.0_wp]
+                END IF
+                CALL evaluate_mixture_density(350.0_wp,xs,xg,rho,inv_rho)
+                CALL evaluate_mixture_phase_properties(350.0_wp,xs,xg, &
+                    phase_rho,phase_inv_rho,rho_c,inv_rho_c,alphas,alphag)
+                CALL assert_close('shared REAL mixture rho',rho,phase_rho,0.0_wp)
+                CALL assert_close('shared REAL mixture inverse rho',inv_rho,phase_inv_rho,0.0_wp)
+
+                cxs=CMPLX(xs,0.0_wp,wp)
+                cxg=CMPLX(xg,0.0_wp,wp)
+                temperature=CMPLX(350.0_wp,1.0E-20_wp,wp)
+                CALL evaluate_mixture_density(temperature,cxs,cxg,crho,cinv_rho)
+                CALL evaluate_mixture_phase_properties(temperature,cxs,cxg, &
+                    cphase_rho,cphase_inv_rho,crho_c,cinv_rho_c,calphas,calphag)
+                IF (crho/=cphase_rho .OR. cinv_rho/=cphase_inv_rho) &
+                    ERROR STOP 'shared COMPLEX density kernel mismatch'
+            END DO
+        END DO
+        gas_flag=.TRUE.
+        liquid_flag=.FALSE.
+    END SUBROUTINE check_shared_density_kernel
 
     !> Preserve the granular descriptors from the original mixture formulas.
     SUBROUTINE check_particle_descriptors

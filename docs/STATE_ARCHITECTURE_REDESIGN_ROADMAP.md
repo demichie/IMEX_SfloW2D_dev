@@ -878,3 +878,10 @@ Stato: **IN CORSO**. Ricognizione statica del ramo `master` al commit `a84f6e093
 - Trovata una discrepanza concreta di shape: `TEST_MASS_EXCHANGE/test_projection_stress.f90` allocava `qp` e gli snapshot come `(nq+2,nx,ny)` mentre `execute_lie_source_groups` dichiara `qp(n_vars,comp_cells_x,comp_cells_y)` e il fixture imposta `nq=n_vars=6`. Per un dummy Fortran explicit-shape la differente dimensione della prima componente modifica lo stride atteso tra celle, producendo letture e scritture incoerenti nella griglia. La dimensione del fixture e stata corretta in tutti e cinque i punti (`qp`, `qp_before` in due routine, `qp_trial`, `qp_invalid`).
 - Si preserva `numerical_reconstruction=.TRUE.` per uniformita con il codice di produzione. Non e stato modificato `execute_lie_source_groups` o alcun kernel fisico.
 - L'ipotesi precedente sulle sole politiche di conversione non spiega questo disallineamento di layout. Il test resta da validare con la nuova Action; l'errore `Lie exchange transaction rejected` non e dichiarato risolto fino al PASS.
+
+### Blocco 1 - eliminata duplicazione delle formule di densita
+
+- `density_from_mass.inc` e `mixture_from_mass.inc` duplicavano i calcoli `xc`, `gas_const_c`, `inv_rho_c`, `inv_rho_m` e `rho_m`, con rischio di divergenza fra il ramo di sola densita e quello delle proprieta complete.
+- Ora `density_from_mass.inc` e l'unico kernel canonico di densita REAL/COMPLEX; `mixture_from_mass.inc` lo include e calcola soltanto `rho_c`, le densita inverse delle specie gas e `alphas`/`alphag`. Nessuna API pubblica nuova e nessun doppio calcolo della densita nelle routine full.
+- Aggiunto in `TEST_STATE` un confronto esatto tra `evaluate_mixture_density` e `evaluate_mixture_phase_properties` per gas/liquido, diverse composizioni (incluso carrier nullo), REAL e COMPLEX con perturbazione immaginaria.
+- La modifica va validata con la nuova Action CI; non si dichiara ancora il gate completato.
