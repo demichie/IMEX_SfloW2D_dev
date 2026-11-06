@@ -33,10 +33,11 @@ PROGRAM test_state_equivalence
     liquid_flag=.FALSE.; gas_flag=.TRUE.
     CALL compare_case(0.0_wp,300.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,'dry')
     CALL compare_case(1.0E-12_wp,300.0_wp,100.0_wp,-50.0_wp,.15_wp,.10_wp,.05_wp,'near-dry')
-    ! A reconstructed trace may temporarily overfill; numerical face closure
-    ! must retain historical normalization instead of strict state rejection.
+    ! Unified strict-policy trial: a substantially overfilled trace is
+    ! rejected rather than silently normalized.
     CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp,0.8_wp,0.8_wp,0.2_wp,qp)
-    CALL check_spatial_face_properties(qp,'overfilled face')
+    CALL numerical_primitive_to_conservative(qp,q,ok)
+    IF (ok) ERROR STOP 'overfilled numerical face accepted under strict trial'
     CALL make_qp(1.0_wp,300.0_wp,1.5_wp,-0.25_wp, &
         -32.0_wp*EPSILON(1.0_wp),0.15_wp,0.05_wp,qp)
     CALL check_spatial_face_properties(qp,'roundoff face')
@@ -178,25 +179,25 @@ CONTAINS
     END SUBROUTINE check_settling_trace_equivalence
 
     SUBROUTINE check_numerical_decoder_limits
-        REAL(wp) :: legacy(n_vars),numerical(n_vars),mass,pd_old,pd_new
+        REAL(wp) :: numerical(n_vars),strict(n_vars),mass,pd_new,pd_strict
         LOGICAL :: accepted
-        mass=0.1_wp*eps_sing
-        q=0.0_wp
-        q(idx_totMassEqn)=mass
-        q(idx_engyEqn)=mass*sp_heat_a*900.0_wp
-        q(idx_uEqn)=mass*20.0_wp
-        q(idx_vEqn)=-mass*5.0_wp
-        CALL old_qc_to_qp(q,legacy,pd_old)
-        CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
-        IF (.NOT.accepted) ERROR STOP 'near-dry numerical decoder rejected state'
-        CALL assert_vector('near-dry fallback',numerical,legacy,1.0E-9_wp)
-        CALL assert_scalar('near-dry pressure',pd_new,pd_old,1.0E-9_wp)
-        CALL assert_scalar('near-dry ambient temperature',numerical(idx_T),T_ambient,1.0E-12_wp)
-        q(idx_totMassEqn)=0.5_wp*EPSILON(1.0_wp)
-        CALL old_qc_to_qp(q,legacy,pd_old)
-        CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
-        IF (.NOT.accepted) ERROR STOP 'sub-epsilon numerical decoder rejected dry state'
-        CALL assert_vector('sub-epsilon dry',numerical,legacy,1.0E-12_wp)
+        INTEGER :: case_id
+        DO case_id=1,2
+            mass=0.1_wp*eps_sing
+            IF (case_id==2) mass=0.5_wp*EPSILON(1.0_wp)
+            q=0.0_wp
+            q(idx_totMassEqn)=mass
+            q(idx_engyEqn)=mass*sp_heat_a*900.0_wp
+            q(idx_uEqn)=mass*20.0_wp
+            q(idx_vEqn)=-mass*5.0_wp
+            CALL conservative_to_primitive(q,strict,accepted,pd_strict)
+            IF (.NOT.accepted) ERROR STOP 'strict decoder rejected positive mass'
+            CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)
+            IF (.NOT.accepted) ERROR STOP 'unified numerical decoder rejected positive mass'
+            CALL assert_vector('unified numerical and strict qp',numerical,strict,0.0_wp)
+            CALL assert_scalar('unified dynamic pressure',pd_new,pd_strict,0.0_wp)
+            CALL assert_scalar('unified energy temperature',numerical(idx_T),900.0_wp,1.0E-12_wp)
+        END DO
         q(idx_totMassEqn)=1.0_wp
         q(idx_solid_first)=-1.0E-3_wp
         CALL conservative_to_primitive(q,numerical,accepted,pd_new,numerical_reconstruction=.TRUE.)

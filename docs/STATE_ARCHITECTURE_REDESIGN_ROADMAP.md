@@ -933,3 +933,11 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Strict q conversions, temperature-only and physical-state construction reject nonpositive mixture heat capacity consistently.
 - Shared canonical dry-state defaults are defined in `inc/dry_thermodynamics.inc`, consumed by both REAL and COMPLEX physical-state builders and refresh. Numerical reconstruction's different dry thresholds and face-trace closure remain unchanged.
 - Full regression via manually launched CI remains necessary.
+
+### Experimental unification of numerical reconstruction and strict state conversions (2026-11-06)
+
+- Requested controlled trial: `conservative_to_primitive(...,numerical_reconstruction=.TRUE.)` now follows exactly the strict REAL conversion: dry only at zero total mass; no near-dry ambient-temperature substitution, no nonpositive-temperature fallback; composition is strictly closed *before* evaluating thermodynamics and the exact same closed composition is stored in qp.
+- `numerical_primitive_to_conservative` delegates to the strict REAL `primitive_to_conservative` path: dry only at exactly zero thickness; materially overfilled compositions are rejected instead of normalized. Its temporary public entry point and the optional reconstruction argument are retained only for API compatibility during this trial; should be removed if the trial is accepted.
+- Unchanged: REAL/COMPLEX formulas, regularized velocity kernel, physical q/qp state construction, and the separate `normalize_face_composition` used by spatial face-specific algorithms.
+- `TEST_STATE_EQUIVALENCE` now checks strict/numerical agreement near dry and explicit rejection of substantially overfilled traces. The historical near-dry legacy-equality assertions are intentionally replaced; other valid-state legacy regression cases remain. Important: source/face workflows may now reject states that were previously repaired. Monitor full examples and mass-exchange/face tests before accepting this new behavior.
+- No Actions were launched; manually run CI and EXAMPLE_TALL, EXAMPLE_ETNA, EXAMPLE_ETNA_LAVA before judging the trial.
