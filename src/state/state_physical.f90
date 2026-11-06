@@ -65,7 +65,7 @@ CONTAINS
     !> @param[in] bxx Second bed derivative in x (1/m).
     !> @param[in] bxy Mixed second bed derivative (1/m).
     !> @param[in] byy Second bed derivative in y (1/m).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE build_physical_state_from_q_real(q, state, bx, by, bxx, bxy, byy, accepted)
         REAL(wp), INTENT(IN) :: q(n_vars)
         TYPE(physical_state_real), INTENT(INOUT) :: state
@@ -79,6 +79,7 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.FALSE.
         mass=q(1)
         IF (mass < 0.0_wp) RETURN
+
         IF (mass <= EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
             state%xs=0.0_wp; state%xg=0.0_wp
@@ -91,6 +92,7 @@ CONTAINS
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
+
         IF (q(idx_engyEqn)<=0.0_wp) RETURN
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
@@ -128,7 +130,7 @@ CONTAINS
     !> @param[in] bxx Second bed derivative in x (1/m).
     !> @param[in] bxy Mixed second bed derivative (1/m).
     !> @param[in] byy Second bed derivative in y (1/m).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE build_physical_state_from_q_complex(q, state, bx, by, bxx, bxy, byy, accepted)
         COMPLEX(wp), INTENT(IN) :: q(n_vars)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
@@ -146,6 +148,7 @@ CONTAINS
         IF (REAL(mass,wp) < 0.0_wp) RETURN
         IF (stoch_transport_flag .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%Zs=q(idx_stoch)/mass
         IF (pore_pressure_flag .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%exc_pore_pres=q(idx_pore)/mass
+
         IF (REAL(mass,wp)>EPSILON(1.0_wp)) THEN
             IF (REAL(q(idx_engyEqn),wp)<=0.0_wp) RETURN
             xs=q(idx_solid_first:idx_solid_last)/mass; xg=q(idx_add_gas_first:idx_add_gas_last)/mass
@@ -167,6 +170,7 @@ CONTAINS
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
             INCLUDE 'inc/dry_thermodynamics.inc'
         END IF
+
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -184,7 +188,7 @@ CONTAINS
     !> @param[in] bxx Second bed derivative in x (1/m).
     !> @param[in] bxy Mixed second bed derivative (1/m).
     !> @param[in] byy Second bed derivative in y (1/m).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE build_physical_state_from_qp_real(qp, state, bx, by, bxx, bxy, byy, accepted)
         REAL(wp), INTENT(IN) :: qp(n_vars)
         TYPE(physical_state_real), INTENT(INOUT) :: state
@@ -237,7 +241,7 @@ CONTAINS
     !> @param[in] bxx Second bed derivative in x (1/m).
     !> @param[in] bxy Mixed second bed derivative (1/m).
     !> @param[in] byy Second bed derivative in y (1/m).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE build_physical_state_from_qp_complex(qp, state, bx, by, bxx, bxy, byy, accepted)
         COMPLEX(wp), INTENT(IN) :: qp(n_vars)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
@@ -269,6 +273,7 @@ CONTAINS
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
             state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
+
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -285,7 +290,7 @@ CONTAINS
     !> @param[in] bxx Second bed derivative in x (1/m).
     !> @param[in] bxy Mixed second bed derivative (1/m).
     !> @param[in] byy Second bed derivative in y (1/m).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)
         TYPE(physical_state_real), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx,by,bxx,bxy,byy
@@ -294,6 +299,7 @@ CONTAINS
         CALL require_real_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (REAL(state%h,wp)<0.0_wp) RETURN
+
         IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
             state%xs=0.0_wp; state%xg=0.0_wp
@@ -307,6 +313,7 @@ CONTAINS
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
             state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
+
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -323,7 +330,7 @@ CONTAINS
     !> @param[in] bxx Second bed derivative in x (1/m).
     !> @param[in] bxy Mixed second bed derivative (1/m).
     !> @param[in] byy Second bed derivative in y (1/m).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE refresh_physical_state_complex(state,bx,by,bxx,bxy,byy,accepted)
         TYPE(physical_state_complex), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN), OPTIONAL :: bx,by,bxx,bxy,byy
@@ -332,6 +339,7 @@ CONTAINS
         CALL require_complex_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
         IF (REAL(state%h,wp)<0.0_wp) RETURN
+
         IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
             state%xs=0.0_wp; state%xg=0.0_wp
@@ -345,6 +353,7 @@ CONTAINS
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
             state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
         END IF
+
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
         IF (PRESENT(bxx)) geometry(3)=bxx; IF (PRESENT(bxy)) geometry(4)=bxy; IF (PRESENT(byy)) geometry(5)=byy
@@ -356,7 +365,7 @@ CONTAINS
     !> @details For wet mass, a nonpositive q4, cp_m or recovered temperature is rejected.
     !> @param[in] q Conservative cell vector: mass, momenta, thermal content and transported masses.
     !> @param[out] T Mixture temperature (K).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE evaluate_temperature_from_q_real(q,T,accepted)
         REAL(wp), INTENT(IN) :: q(n_vars)
         REAL(wp), INTENT(OUT) :: T
@@ -368,11 +377,13 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.FALSE.
         mass=q(1)
         IF (mass<0.0_wp) RETURN
+
         IF (mass<=EPSILON(1.0_wp)) THEN
             T=T_ambient
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
+
         IF (q(idx_engyEqn)<=0.0_wp) RETURN
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
@@ -380,10 +391,12 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
+
         IF (REAL(T,wp)<=0.0_wp) THEN
             T=0.0_wp
             RETURN
         END IF
+
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE evaluate_temperature_from_q_real
 
@@ -391,7 +404,7 @@ CONTAINS
     !> @details The REAL part determines admissibility; imaginary perturbations are preserved.
     !> @param[in] q Conservative cell vector: mass, momenta, thermal content and transported masses.
     !> @param[out] T Mixture temperature (K).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     SUBROUTINE evaluate_temperature_from_q_complex(q,T,accepted)
         COMPLEX(wp), INTENT(IN) :: q(n_vars)
         COMPLEX(wp), INTENT(OUT) :: T
@@ -403,11 +416,13 @@ CONTAINS
         IF (PRESENT(accepted)) accepted=.FALSE.
         mass=q(1)
         IF (REAL(mass,wp)<0.0_wp) RETURN
+
         IF (REAL(mass,wp)<=EPSILON(1.0_wp)) THEN
             T=CMPLX(T_ambient,0.0_wp,wp)
             IF (PRESENT(accepted)) accepted=.TRUE.
             RETURN
         END IF
+
         IF (REAL(q(idx_engyEqn),wp)<=0.0_wp) RETURN
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
@@ -415,10 +430,12 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
+
         IF (REAL(T,wp)<=0.0_wp) THEN
             T=(0.0_wp,0.0_wp)
             RETURN
         END IF
+
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE evaluate_temperature_from_q_complex
 
@@ -427,7 +444,7 @@ CONTAINS
     !> @param[in] qp Primitive cell vector: thickness, velocity, temperature and fractions.
     !> @param[out] rho_m Bulk mixture density (kg/m3).
     !> @param[out] red_grav Reduced gravitational acceleration (m/s2).
-    !> @param[out] accepted True only when state reconstruction satisfies its admissibility contract.
+    !> @param[out] accepted True if state reconstruction was admissible.
     !> @param[out] below_ambient True for an accepted state at or below ambient density.
     SUBROUTINE evaluate_density_from_qp(qp,rho_m,red_grav,accepted,below_ambient)
         REAL(wp), INTENT(IN) :: qp(n_vars)
@@ -441,6 +458,7 @@ CONTAINS
         red_grav=0.0_wp
         IF (PRESENT(below_ambient)) below_ambient=.FALSE.
         IF (qp(idx_h)<0.0_wp) RETURN
+
         IF (qp(idx_h)>EPSILON(1.0_wp)) THEN
             IF (qp(idx_T)<=0.0_wp) RETURN
             xs=qp(idx_solid_first:idx_solid_last)
@@ -512,14 +530,14 @@ CONTAINS
     END FUNCTION richardson_complex
 
     !> @brief Require an initialized REAL physical-state workspace.
-    !> @param[in] state Initialized cell-local physical-state workspace; values are updated in place.
+    !> @param[in] state Initialized physical-state workspace inspected without modification.
     SUBROUTINE require_real_storage(state)
         TYPE(physical_state_real), INTENT(IN) :: state
         IF (.NOT.state%layout_valid) ERROR STOP 'state REAL workspace was not validated at setup'
     END SUBROUTINE require_real_storage
 
     !> @brief Require an initialized COMPLEX physical-state workspace.
-    !> @param[in] state Initialized cell-local physical-state workspace; values are updated in place.
+    !> @param[in] state Initialized physical-state workspace inspected without modification.
     SUBROUTINE require_complex_storage(state)
         TYPE(physical_state_complex), INTENT(IN) :: state
         IF (.NOT.state%layout_valid) ERROR STOP 'state COMPLEX workspace was not validated at setup'

@@ -29,9 +29,11 @@ CONTAINS
         xg=MAX(xg,0.0_wp)
         total=SUM(xs)+SUM(xg)
         IF (total>1.0_wp+tol) RETURN
+
         IF (total>1.0_wp) THEN
             xs=xs/total; xg=xg/total
         END IF
+
         close_composition_real=.TRUE.
     END FUNCTION close_composition_real
 
@@ -52,12 +54,14 @@ CONTAINS
         WHERE (REAL(xg,wp)<0.0_wp) xg=(0.0_wp,0.0_wp)
         total=SUM(REAL(xs,wp))+SUM(REAL(xg,wp))
         IF (total>1.0_wp+tol) RETURN
+
         IF (total>1.0_wp) THEN
             ! Select the branch by real composition but differentiate
             ! the complete normalization including the denominator.
             total_complex=SUM(xs)+SUM(xg)
             xs=xs/total_complex; xg=xg/total_complex
         END IF
+
         close_composition_complex=.TRUE.
     END FUNCTION close_composition_complex
 
@@ -74,10 +78,12 @@ CONTAINS
         xs=MAX(xs,0.0_wp)
         xg=MAX(xg,0.0_wp)
         total=SUM(xs)+SUM(xg)
+
         IF (total>1.0_wp) THEN
             xs=xs/total
             xg=xg/total
         END IF
+
         normalize_face_composition=.TRUE.
     END FUNCTION normalize_face_composition
 

@@ -227,12 +227,15 @@ CONTAINS
         ! Only the volume-to-mass conversion belongs here. All resulting
         ! thermodynamic properties come from the canonical mass-based kernel.
         alphas_tot=SUM(alphas)
+
         IF (alphas_tot>1.0_wp) THEN
             alphas=alphas/alphas_tot
         ELSEIF (alphas_tot<0.0_wp) THEN
             alphas=0.0_wp
         END IF
+
         alphac=1.0_wp-SUM(alphas)
+
         IF (gas_flag) THEN
             rho_a=1.0_wp/evaluate_gas_specific_volume(T,sp_gas_const_a)
             rho_g=1.0_wp/evaluate_gas_specific_volume(T,sp_gas_const_g)
@@ -242,6 +245,7 @@ CONTAINS
             rho_g=0.0_wp
             rho_from_volume=SUM(alphas*rho_s)+alphac*rho_l
         END IF
+
         xs=alphas*rho_s/rho_from_volume
         xg=alphag*rho_g/rho_from_volume
 
