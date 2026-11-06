@@ -12,8 +12,8 @@ PROGRAM test_state
 
     REAL(wp), ALLOCATABLE :: qp(:), qp_roundtrip(:), q(:)
     COMPLEX(wp), ALLOCATABLE :: cqp(:), cq(:)
-    TYPE(state_workspace_real) :: real_workspace
-    TYPE(state_workspace_complex) :: complex_workspace
+    TYPE(physical_state_real) :: real_workspace
+    TYPE(physical_state_complex) :: complex_workspace
     LOGICAL :: accepted
 
     CALL initialize_case
@@ -34,8 +34,8 @@ PROGRAM test_state
     qp(idx_add_gas_first:idx_add_gas_last)=0.05_wp
     qp(idx_stoch)=0.2_wp; qp(idx_pore)=1000.0_wp
 
-    CALL initialize_state_workspace_real(real_workspace)
-    CALL initialize_state_workspace_complex(complex_workspace)
+    CALL initialize_physical_state_real(real_workspace)
+    CALL initialize_physical_state_complex(complex_workspace)
     CALL primitive_to_conservative(qp,q)
     CALL conservative_to_primitive(q,qp_roundtrip)
     CALL assert_close('round-trip h',qp_roundtrip(idx_h),qp(idx_h),1.0E-11_wp)
@@ -43,57 +43,57 @@ PROGRAM test_state
     CALL assert_close('round-trip u',qp_roundtrip(idx_u),qp(idx_u),1.0E-11_wp)
     CALL check_admissibility(qp,q)
 
-    CALL build_physical_state_from_qp(qp,real_workspace%state,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL build_physical_state_from_qp(qp,real_workspace,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
     cqp=CMPLX(qp,0.0_wp,wp)
-    CALL build_physical_state_from_qp(cqp,complex_workspace%state,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
-    CALL assert_close('REAL/COMPLEX density',real_workspace%state%rho_m,REAL(complex_workspace%state%rho_m,wp),1.0E-11_wp)
-    CALL assert_close('REAL/COMPLEX Richardson',real_workspace%state%Ri,REAL(complex_workspace%state%Ri,wp),1.0E-11_wp)
-    CALL assert_close('REAL/COMPLEX kinematics',real_workspace%state%mod_vel,REAL(complex_workspace%state%mod_vel,wp),1.0E-11_wp)
+    CALL build_physical_state_from_qp(cqp,complex_workspace,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL assert_close('REAL/COMPLEX density',real_workspace%rho_m,REAL(complex_workspace%rho_m,wp),1.0E-11_wp)
+    CALL assert_close('REAL/COMPLEX Richardson',real_workspace%Ri,REAL(complex_workspace%Ri,wp),1.0E-11_wp)
+    CALL assert_close('REAL/COMPLEX kinematics',real_workspace%mod_vel,REAL(complex_workspace%mod_vel,wp),1.0E-11_wp)
 
     ! A velocity change must refresh both kinematics and Richardson without
     ! recomputing mixture properties, for both REAL and COMPLEX workspaces.
-    real_workspace%state%u=3.0_wp
-    real_workspace%state%v=4.0_wp
-    complex_workspace%state%u=CMPLX(3.0_wp,0.0_wp,wp)
-    complex_workspace%state%v=CMPLX(4.0_wp,0.0_wp,wp)
-    CALL update_physical_state_kinematics(real_workspace%state,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
-    CALL update_physical_state_kinematics(complex_workspace%state,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
-    CALL assert_close('velocity update Richardson',real_workspace%state%Ri, &
-        real_workspace%state%red_grav*real_workspace%state%h/25.0_wp,1.0E-11_wp)
-    CALL assert_close('velocity update REAL/COMPLEX Richardson',real_workspace%state%Ri, &
-        REAL(complex_workspace%state%Ri,wp),1.0E-11_wp)
-    CALL assert_close('velocity update REAL/COMPLEX speed',real_workspace%state%mod_vel, &
-        REAL(complex_workspace%state%mod_vel,wp),1.0E-11_wp)
-    CALL update_physical_state_kinematics(real_workspace%state,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
-    IF (real_workspace%state%layout_valid .EQV. .FALSE.) ERROR STOP 'workspace layout lost on velocity update'
+    real_workspace%u=3.0_wp
+    real_workspace%v=4.0_wp
+    complex_workspace%u=CMPLX(3.0_wp,0.0_wp,wp)
+    complex_workspace%v=CMPLX(4.0_wp,0.0_wp,wp)
+    CALL update_physical_state_kinematics(real_workspace,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL update_physical_state_kinematics(complex_workspace,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL assert_close('velocity update Richardson',real_workspace%Ri, &
+        real_workspace%red_grav*real_workspace%h/25.0_wp,1.0E-11_wp)
+    CALL assert_close('velocity update REAL/COMPLEX Richardson',real_workspace%Ri, &
+        REAL(complex_workspace%Ri,wp),1.0E-11_wp)
+    CALL assert_close('velocity update REAL/COMPLEX speed',real_workspace%mod_vel, &
+        REAL(complex_workspace%mod_vel,wp),1.0E-11_wp)
+    CALL update_physical_state_kinematics(real_workspace,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
+    IF (real_workspace%layout_valid .EQV. .FALSE.) ERROR STOP 'workspace layout lost on velocity update'
 
     liquid_flag=.TRUE.; gas_flag=.FALSE.
-    CALL build_physical_state_from_qp(qp,real_workspace%state,accepted=accepted)
+    CALL build_physical_state_from_qp(qp,real_workspace,accepted=accepted)
     IF (.NOT.accepted) ERROR STOP 'valid liquid/solid state rejected'
-    CALL assert_close('liquid carrier heat capacity',real_workspace%state%cp_c,sp_heat_l,1.0E-12_wp)
+    CALL assert_close('liquid carrier heat capacity',real_workspace%cp_c,sp_heat_l,1.0E-12_wp)
     liquid_flag=.FALSE.; gas_flag=.TRUE.
 
     cqp=CMPLX(qp,0.0_wp,wp)
     cqp(idx_T)=CMPLX(qp(idx_T),1.0E-12_wp,wp)
-    CALL build_physical_state_from_qp(cqp,complex_workspace%state,accepted=accepted)
+    CALL build_physical_state_from_qp(cqp,complex_workspace,accepted=accepted)
     IF (.NOT.accepted) ERROR STOP 'valid complex state rejected'
-    IF (AIMAG(complex_workspace%state%T)==0.0_wp) ERROR STOP 'complex temperature perturbation lost'
+    IF (AIMAG(complex_workspace%T)==0.0_wp) ERROR STOP 'complex temperature perturbation lost'
 
     qp(idx_h)=1.0E-12_wp
     qp(idx_u)=100.0_wp; qp(idx_v)=-50.0_wp
-    CALL build_physical_state_from_qp(qp,real_workspace%state,accepted=accepted)
+    CALL build_physical_state_from_qp(qp,real_workspace,accepted=accepted)
     IF (.NOT.accepted) ERROR STOP 'valid near-dry state rejected'
-    IF (.NOT.(real_workspace%state%mod_vel>=0.0_wp)) ERROR STOP 'near-dry velocity invalid'
+    IF (.NOT.(real_workspace%mod_vel>=0.0_wp)) ERROR STOP 'near-dry velocity invalid'
 
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp
     qp(idx_solid_first)=1.2_wp
-    CALL build_physical_state_from_qp(qp,real_workspace%state,accepted=accepted)
+    CALL build_physical_state_from_qp(qp,real_workspace,accepted=accepted)
     IF (accepted) ERROR STOP 'invalid physical state accepted'
 
     qp=0.0_wp
-    CALL build_physical_state_from_qp(qp,real_workspace%state)
-    IF (real_workspace%state%Ri /= 0.0_wp) ERROR STOP 'dry Richardson state is not zero'
+    CALL build_physical_state_from_qp(qp,real_workspace)
+    IF (real_workspace%Ri /= 0.0_wp) ERROR STOP 'dry Richardson state is not zero'
     WRITE(*,'(A)') 'PASS: state kernels verified'
 
 CONTAINS

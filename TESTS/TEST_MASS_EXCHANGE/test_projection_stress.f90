@@ -3,7 +3,8 @@ PROGRAM test_projection_stress
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
-  USE state_fields, ONLY : state_type,substrate_snapshot_type,conservative_mass_admissible
+  USE state_fields, ONLY : state_type,substrate_snapshot_type
+  USE state_composition, ONLY : conservative_mass_admissible
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT

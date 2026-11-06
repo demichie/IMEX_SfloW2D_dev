@@ -17,7 +17,6 @@ MODULE state_fields
 
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE model_layout_2d, ONLY : model_layout_type
-    USE state_composition, ONLY : conservative_mass_admissible
 
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
@@ -28,7 +27,6 @@ MODULE state_fields
 
     PRIVATE
     PUBLIC :: initialize_dry_physical_cell
-    PUBLIC :: conservative_mass_admissible
     PUBLIC :: physical_cell_state_finite, finite_real_value
     PUBLIC :: substrate_snapshot_type
 

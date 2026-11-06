@@ -955,3 +955,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Removed `numerical_primitive_to_conservative`, a forwarding-only compatibility routine. Initialization, PCCU face flux and equivalence tests use canonical `primitive_to_conservative` directly.
 - Kept `normalize_face_composition` where needed for actual spatial face and input composition normalization, separate from the strict conversions. The numerical formulae, REAL/COMPLEX closure and machine-epsilon dry convention remain unchanged.
 - Earlier roadmap descriptions of the legacy reconstruction policy are historical. The API cleanup itself awaits a new manual Action and example regression; no Actions were started here.
+
+### State cleanup: direct physical states and canonical admissibility import (2026-11-06)
+
+- Removed two one-field workspace container types and their two forwarding-only initialization procedures from `state_types`. The tests use directly initialized REAL/COMPLEX physical state objects, as production already did.
+- Removed the duplicate `conservative_mass_admissible` export from `state_fields`; time integration, Lie executor, and mass-exchange regression import it directly from its owner `state_composition`. Its mathematics and the `state` public facade remain unchanged.
+- Removed an existing duplicate `primitive_to_conservative` name in the state-equivalence test's USE ONLY statement.
+- No physical or numerical formula changed. Manual CI and examples on this commit still needed.

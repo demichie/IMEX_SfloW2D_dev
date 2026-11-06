@@ -9,24 +9,23 @@ PROGRAM test_state_equivalence
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
     USE state, ONLY : conservative_to_primitive, primitive_to_conservative, &
         new_state_qp=>build_physical_state_from_qp, new_state_q=>build_physical_state_from_q, &
-        primitive_to_conservative, &
         evaluate_mixture_density, evaluate_mixture_heat_capacity, &
         evaluate_mixture_from_volume, primitive_to_volume_fractions, &
-        state_workspace_real, state_workspace_complex, &
-        initialize_state_workspace_real, initialize_state_workspace_complex
+        physical_state_real, physical_state_complex, &
+        initialize_physical_state_real, initialize_physical_state_complex
     IMPLICIT NONE
     REAL(wp), ALLOCATABLE :: q(:),qp(:),q_old(:),qp_old(:),qp_new(:)
     COMPLEX(wp), ALLOCATABLE :: cq(:)
     TYPE(physical_state_type) :: old_real
     TYPE(complex_physical_state_type) :: old_complex
-    TYPE(state_workspace_real) :: new_real
-    TYPE(state_workspace_complex) :: new_complex
+    TYPE(physical_state_real) :: new_real
+    TYPE(physical_state_complex) :: new_complex
     LOGICAL :: ok
 
     CALL initialize_case
     ALLOCATE(q(n_vars),qp(n_vars),q_old(n_vars),qp_old(n_vars),qp_new(n_vars),cq(n_vars))
-    CALL initialize_state_workspace_real(new_real)
-    CALL initialize_state_workspace_complex(new_complex)
+    CALL initialize_physical_state_real(new_real)
+    CALL initialize_physical_state_complex(new_complex)
     CALL compare_case(2.0_wp,300.0_wp,1.5_wp,-0.25_wp,.15_wp,.10_wp,.05_wp,'wet gas-solid')
     liquid_flag=.TRUE.; gas_flag=.FALSE.
     CALL compare_case(2.0_wp,300.0_wp,1.5_wp,-0.25_wp,.15_wp,.10_wp,0.0_wp,'wet liquid-solid')
@@ -59,14 +58,14 @@ CONTAINS
         CALL assert_scalar(label//' dynamic pressure',pd_new,pd_old,1.0E-9_wp)
         CALL assert_vector(label//' q',q,q_old,1.0E-10_wp)
         CALL assert_vector(label//' qp',qp_new,qp_old,1.0E-9_wp)
-        CALL old_state_qp(qp,old_real); CALL new_state_qp(qp,new_real%state,accepted=ok)
+        CALL old_state_qp(qp,old_real); CALL new_state_qp(qp,new_real,accepted=ok)
         IF (.NOT.ok) ERROR STOP 'new REAL state rejected valid state'
-        CALL assert_scalar(label//' density',new_real%state%rho_m,old_real%rho_m,1.0E-9_wp)
-        CALL assert_scalar(label//' gravity',new_real%state%red_grav,old_real%red_grav,1.0E-9_wp)
-        CALL assert_scalar(label//' Richardson',new_real%state%Ri,old_real%Ri,1.0E-8_wp)
-        cq=CMPLX(q_old,0.0_wp,wp); CALL old_state_cq(cq,old_complex); CALL new_state_q(cq,new_complex%state,accepted=ok)
+        CALL assert_scalar(label//' density',new_real%rho_m,old_real%rho_m,1.0E-9_wp)
+        CALL assert_scalar(label//' gravity',new_real%red_grav,old_real%red_grav,1.0E-9_wp)
+        CALL assert_scalar(label//' Richardson',new_real%Ri,old_real%Ri,1.0E-8_wp)
+        cq=CMPLX(q_old,0.0_wp,wp); CALL old_state_cq(cq,old_complex); CALL new_state_q(cq,new_complex,accepted=ok)
         IF (.NOT.ok) ERROR STOP 'new COMPLEX state rejected valid state'
-        CALL assert_scalar(label//' complex density',REAL(new_complex%state%rho_m,wp),REAL(old_complex%rho_m,wp),1.0E-9_wp)
+        CALL assert_scalar(label//' complex density',REAL(new_complex%rho_m,wp),REAL(old_complex%rho_m,wp),1.0E-9_wp)
         ! The source material has its own composition, independently of the recipient cell.
         material_qp=qp
         material_qp(idx_h)=1.0_wp
@@ -147,29 +146,29 @@ CONTAINS
                     tiny_fraction,0.0_wp,tiny_fraction,qp)
             END SELECT
             CALL old_state_qp(qp,old_real)
-            CALL new_state_qp(qp,new_real%state,accepted=accepted)
+            CALL new_state_qp(qp,new_real,accepted=accepted)
             IF (.NOT.accepted) ERROR STOP 'tiny-positive source state rejected'
-            IF (ANY(new_real%state%xs/=old_real%xs)) &
+            IF (ANY(new_real%xs/=old_real%xs)) &
                 ERROR STOP 'F5 tiny-positive solid fraction differs from legacy'
-            IF (ANY(new_real%state%xg/=old_real%xg)) &
+            IF (ANY(new_real%xg/=old_real%xg)) &
                 ERROR STOP 'F5 tiny-positive gas fraction differs from legacy'
-            IF (ANY(new_real%state%alphas/=old_real%alphas)) &
+            IF (ANY(new_real%alphas/=old_real%alphas)) &
                 ERROR STOP 'F5 settling volume fraction differs from legacy'
             IF (ANY(qp(idx_solid_first:idx_solid_last)>0.0_wp) .AND. &
-                .NOT.ANY(new_real%state%alphas>0.0_wp)) &
+                .NOT.ANY(new_real%alphas>0.0_wp)) &
                 ERROR STOP 'F5 source closure removed positive solid volume'
             old_rate=MIN(old_real%alphas(1)*velocity, &
                 old_real%h*old_real%alphas(1)/dt)
-            new_rate=MIN(new_real%state%alphas(1)*velocity, &
-                new_real%state%h*new_real%state%alphas(1)/dt)
+            new_rate=MIN(new_real%alphas(1)*velocity, &
+                new_real%h*new_real%alphas(1)/dt)
             IF (new_rate/=old_rate) &
                 ERROR STOP 'F5 near-depleted settling input rate differs'
             ctrace=CMPLX(qp,0.0_wp,wp)
             ctrace(idx_solid_first)=ctrace(idx_solid_first)+ &
                 CMPLX(0.0_wp,1.0E-20_wp,wp)
-            CALL new_state_qp(ctrace,new_complex%state,accepted=accepted)
+            CALL new_state_qp(ctrace,new_complex,accepted=accepted)
             IF (.NOT.accepted) ERROR STOP 'tiny-positive complex source rejected'
-            IF (AIMAG(new_complex%state%xs(1))/=1.0E-20_wp) &
+            IF (AIMAG(new_complex%xs(1))/=1.0E-20_wp) &
                 ERROR STOP 'tiny-positive complex-step perturbation lost'
         END DO
     END SUBROUTINE check_settling_trace_equivalence

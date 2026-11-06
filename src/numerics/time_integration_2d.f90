@@ -10,8 +10,8 @@ MODULE time_integration_2d
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
             B_prime_x_geom,B_prime_y_geom,grav_coeff,B_zone
     USE state_conversions, ONLY : conservative_to_primitive
-    USE state_fields, ONLY : state_type,substrate_snapshot_type,                                                           &
-            initialize_dry_physical_cell,conservative_mass_admissible
+    USE state_fields, ONLY : state_type,substrate_snapshot_type,initialize_dry_physical_cell
+    USE state_composition, ONLY : conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type

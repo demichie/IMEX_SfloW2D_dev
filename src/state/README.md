@@ -4,8 +4,8 @@ This directory contains the sole production state implementation.
 
 - `state_fields.f90` owns grid fields (`q`, `qp`), substrate inventories,
   accumulated diagnostics and substrate transaction snapshots.
-- `state_types.f90` owns the REAL/COMPLEX cell-local physical state types
-  and reusable per-worker workspaces.
+- `state_types.f90` owns the REAL/COMPLEX cell-local physical state types,
+  initialized once and reusable directly per worker.
 - `state_composition.f90`, `state_mixture.f90`,
   `state_conversions.f90` and `state_physical.f90`
   implement canonical cell-local transformations and evaluations.
@@ -29,3 +29,7 @@ inverse conversion.
 
 Dry-state thermodynamics for REAL and COMPLEX builders and refresh are
 shared by `inc/dry_thermodynamics.inc`.
+
+The former single-field workspace containers and their forwarding initializers
+were removed; callers initialize the physical state directly. The conservative
+mass-admissibility function is exported by `state_composition`, not `state_fields`.

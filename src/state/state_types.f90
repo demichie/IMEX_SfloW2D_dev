@@ -1,7 +1,7 @@
 !*******************************************************************************
 !> Types for the clean-slate state architecture.
 !
-!> Canonical REAL/COMPLEX cell-local physical states and reusable workspaces.
+!> Canonical REAL/COMPLEX cell-local physical states, initialized for reuse.
 !> Grid-sized authoritative fields are owned by state_fields.
 !*******************************************************************************
 MODULE state_types
@@ -13,10 +13,6 @@ MODULE state_types
 
     PUBLIC :: physical_state_real
     PUBLIC :: physical_state_complex
-    PUBLIC :: state_workspace_real
-    PUBLIC :: state_workspace_complex
-    PUBLIC :: initialize_state_workspace_real
-    PUBLIC :: initialize_state_workspace_complex
     PUBLIC :: initialize_physical_state_real, initialize_physical_state_complex
     PUBLIC :: reset_physical_state_real
     PUBLIC :: reset_physical_state_complex
@@ -51,16 +47,6 @@ MODULE state_types
         COMPLEX(wp) :: curvature_acceleration=(0.0_wp,0.0_wp)
         COMPLEX(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
     END TYPE physical_state_complex
-
-    !> Reusable per-worker scratch for real state construction.
-    TYPE, PUBLIC :: state_workspace_real
-        TYPE(physical_state_real) :: state
-    END TYPE state_workspace_real
-
-    !> Reusable per-worker scratch for complex-step state construction.
-    TYPE, PUBLIC :: state_workspace_complex
-        TYPE(physical_state_complex) :: state
-    END TYPE state_workspace_complex
 
 CONTAINS
 
@@ -163,11 +149,6 @@ CONTAINS
         state%layout_valid=.TRUE.
     END SUBROUTINE initialize_physical_state_real
 
-    SUBROUTINE initialize_state_workspace_real(workspace)
-        TYPE(state_workspace_real), INTENT(INOUT) :: workspace
-        CALL initialize_physical_state_real(workspace%state)
-    END SUBROUTINE initialize_state_workspace_real
-
     !> Allocate and clear the arrays owned by a reusable COMPLEX state workspace.
     !> This routine belongs to setup/configuration, never to a cell-evaluation loop.
     SUBROUTINE initialize_physical_state_complex(state)
@@ -194,10 +175,5 @@ CONTAINS
         state%alphag=(0.0_wp,0.0_wp)
         state%layout_valid=.TRUE.
     END SUBROUTINE initialize_physical_state_complex
-
-    SUBROUTINE initialize_state_workspace_complex(workspace)
-        TYPE(state_workspace_complex), INTENT(INOUT) :: workspace
-        CALL initialize_physical_state_complex(workspace%state)
-    END SUBROUTINE initialize_state_workspace_complex
 
 END MODULE state_types

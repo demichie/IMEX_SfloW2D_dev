@@ -254,8 +254,8 @@ CONTAINS
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversions, ONLY : conservative_to_primitive
-        USE state_fields, ONLY : initialize_dry_physical_cell,conservative_mass_admissible,                               &
-            physical_cell_state_finite,finite_real_value
+        USE state_fields, ONLY : initialize_dry_physical_cell,physical_cell_state_finite,finite_real_value
+        USE state_composition, ONLY : conservative_mass_admissible
         USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
