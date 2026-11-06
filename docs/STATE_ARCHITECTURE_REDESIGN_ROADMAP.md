@@ -1023,3 +1023,8 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Corrected six continued SIZE(...) terms in state_types.f90 from 17 to 16 leading spaces; no executable tokens changed. Verified all seven state .f90 sources have no TAB, trailing whitespace or non-multiple-of-four indentation, and all 11 .inc fragments have no trailing whitespace or overlong code/Doxygen lines. Rechecked source lines at <=120 columns, Doxygen at <=100, and terminal Fortran continuation markers in column 120.
 - The routines had already been checked individually for unchanged ordered executable statements relative to pre-formatting commit 7832f044. The repository's whole-file --check-against-git compares source-order executable lines, so the deliberate routine reordering requires the per-routine equivalence comparison rather than an unmodified whole-file order check.
 - Static, text-based checks completed; compiler, full documentation/dependency scripts and EXAMPLE regressions still require a run in a checked-out repository or GitHub Actions.
+
+### State README architecture and file guide (2026-11-06)
+
+- Expanded `src/state/README.md` to introduce the purpose of the state layer before enumerating files: grid-wide ownership versus cell-local evaluation, conservative/primitive/physical representations, dry-state and acceptance contracts, and boundaries with physics/numerics.
+- Added per-module and per-include responsibility tables plus usage guidance and verification commands. Documentation only; no Fortran source, module API, numerical formula or build dependency changed.
