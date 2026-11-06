@@ -25,6 +25,7 @@ PROGRAM test_state
     CALL check_complex_closure_limits
     CALL check_real_complex_invalid_candidates
     CALL check_dry_refresh_consistency
+    CALL check_dry_invalid_payload_consistency
     CALL check_canonical_dry_kinematics
     CALL check_epsilon_dry_real_complex
     CALL check_nonpositive_heat_capacity
@@ -346,6 +347,67 @@ CONTAINS
         CALL assert_close('invalid real temperature sentinel',temperature,0.0_wp,0.0_wp)
         CALL assert_close('invalid complex temperature sentinel',REAL(ctemperature,wp),0.0_wp,0.0_wp)
     END SUBROUTINE check_real_complex_invalid_candidates
+
+    !> Dry classification must take precedence over otherwise invalid
+    !> composition or temperature payloads in all state entry points.
+    SUBROUTINE check_dry_invalid_payload_consistency
+        REAL(wp) :: qp_case(n_vars),q_case(n_vars),rho_mix,red_grav
+        COMPLEX(wp) :: cqp_case(n_vars),cq_case(n_vars)
+        TYPE(physical_state_real) :: rs
+        TYPE(physical_state_complex) :: cs
+        LOGICAL :: ok
+        CALL initialize_physical_state_real(rs)
+        CALL initialize_physical_state_complex(cs)
+        qp_case=0.0_wp
+        qp_case(idx_h)=0.5_wp*EPSILON(1.0_wp)
+        qp_case(idx_T)=-20.0_wp
+        qp_case(idx_u)=12.0_wp
+        qp_case(idx_solid_first)=1.5_wp
+        cqp_case=CMPLX(qp_case,0.0_wp,wp)
+        CALL build_physical_state_from_qp(qp_case,rs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'dry REAL qp payload rejected'
+        CALL build_physical_state_from_qp(cqp_case,cs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'dry COMPLEX qp payload rejected'
+        CALL assert_close('dry qp temperature',rs%T,T_ambient,0.0_wp)
+        CALL assert_close('dry qp composition',SUM(rs%xs),0.0_wp,0.0_wp)
+        CALL assert_close('dry complex qp composition',REAL(SUM(cs%xs),wp),0.0_wp,0.0_wp)
+        CALL evaluate_density_from_qp(qp_case,rho_mix,red_grav,ok)
+        IF (.NOT.ok) ERROR STOP 'dry density-only payload rejected'
+        CALL assert_close('dry density-only ambient',rho_mix,rho_a_amb,0.0_wp)
+
+        rs%h=0.5_wp*EPSILON(1.0_wp)
+        rs%T=-20.0_wp
+        rs%xs(1)=1.5_wp
+        cs%h=CMPLX(0.5_wp*EPSILON(1.0_wp),0.0_wp,wp)
+        cs%T=CMPLX(-20.0_wp,0.0_wp,wp)
+        cs%xs(1)=CMPLX(1.5_wp,0.0_wp,wp)
+        CALL refresh_physical_state(rs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'dry REAL refresh payload rejected'
+        CALL refresh_physical_state(cs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'dry COMPLEX refresh payload rejected'
+        CALL assert_close('dry REAL refresh composition',SUM(rs%xs),0.0_wp,0.0_wp)
+        CALL assert_close('dry COMPLEX refresh composition',REAL(SUM(cs%xs),wp),0.0_wp,0.0_wp)
+        q_case=0.0_wp
+        cq_case=CMPLX(q_case,0.0_wp,wp)
+        CALL build_physical_state_from_q(q_case,rs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'dry REAL q rejected'
+        CALL build_physical_state_from_q(cq_case,cs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'dry COMPLEX q rejected'
+        CALL assert_close('dry q and qp ambient temperature',rs%T,T_ambient,0.0_wp)
+        CALL assert_close('dry q and qp ambient density',REAL(cs%rho_m,wp),rho_a_amb,0.0_wp)
+
+        qp_case(idx_h)=1.0_wp
+        CALL evaluate_density_from_qp(qp_case,rho_mix,red_grav,ok)
+        IF (ok) ERROR STOP 'negative wet temperature density accepted'
+        rs%h=1.0_wp
+        cs%h=CMPLX(1.0_wp,0.0_wp,wp)
+        rs%T=-20.0_wp
+        cs%T=CMPLX(-20.0_wp,0.0_wp,wp)
+        CALL refresh_physical_state(rs,accepted=ok)
+        IF (ok) ERROR STOP 'negative wet REAL refresh temperature accepted'
+        CALL refresh_physical_state(cs,accepted=ok)
+        IF (ok) ERROR STOP 'negative wet COMPLEX refresh temperature accepted'
+    END SUBROUTINE check_dry_invalid_payload_consistency
 
     SUBROUTINE check_dry_refresh_consistency
         REAL(wp) :: qp_case(n_vars),before_rho,expected_cp

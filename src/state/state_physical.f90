@@ -71,11 +71,11 @@ CONTAINS
         red_grav=0.0_wp
         IF (PRESENT(below_ambient)) below_ambient=.FALSE.
         IF (qp(idx_h)<0.0_wp) RETURN
-        xs=qp(idx_solid_first:idx_solid_last)
-        xg=qp(idx_add_gas_first:idx_add_gas_last)
-        IF (.NOT.close_composition(xs,xg)) RETURN
-
         IF (qp(idx_h)>EPSILON(1.0_wp)) THEN
+            IF (qp(idx_T)<0.0_wp) RETURN
+            xs=qp(idx_solid_first:idx_solid_last)
+            xg=qp(idx_add_gas_first:idx_add_gas_last)
+            IF (.NOT.close_composition(xs,xg)) RETURN
             CALL evaluate_mixture_density(qp(idx_T),xs,xg,rho_m,inv_rho_m)
             red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         END IF
@@ -156,7 +156,6 @@ CONTAINS
         REAL(wp) :: geometry(5)
         CALL require_real_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
-        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         IF (REAL(state%h,wp)<0.0_wp) RETURN
         IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
@@ -165,6 +164,7 @@ CONTAINS
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
+            IF (.NOT.close_composition(state%xs,state%xg)) RETURN
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
@@ -184,7 +184,6 @@ CONTAINS
         REAL(wp) :: geometry(5)
         CALL require_complex_storage(state)
         IF (PRESENT(accepted)) accepted=.FALSE.
-        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         IF (REAL(state%h,wp)<0.0_wp) RETURN
         IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
@@ -193,6 +192,7 @@ CONTAINS
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
+            IF (.NOT.close_composition(state%xs,state%xg)) RETURN
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
@@ -229,7 +229,6 @@ CONTAINS
         state%xs=qp(idx_solid_first:idx_solid_last)
         state%xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (state%h < 0.0_wp) RETURN
-        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
@@ -241,6 +240,7 @@ CONTAINS
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
+            IF (.NOT.close_composition(state%xs,state%xg)) RETURN
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
@@ -322,7 +322,6 @@ CONTAINS
         state%xs=qp(idx_solid_first:idx_solid_last)
         state%xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (REAL(state%h,wp) < 0.0_wp) RETURN
-        IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
@@ -334,6 +333,7 @@ CONTAINS
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
+            IF (.NOT.close_composition(state%xs,state%xg)) RETURN
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN

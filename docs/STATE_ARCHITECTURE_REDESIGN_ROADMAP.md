@@ -981,3 +981,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Added optional `accepted` to REAL/COMPLEX `evaluate_temperature_from_q` to distinguish a valid temperature (including T=0) from invalid conservative state or nonpositive mixture heat capacity. Invalid results retain the historical zero-temperature fallback; negative energy-derived temperature now returns the same sentinel consistently.
 - TEST_STATE exercises rejected composition and nonpositive cp with the new status. Existing call sites remain source-compatible. The thermal-only Newton source path must consume and propagate this status through solver trial rejection in a separate transactional change; do not replace it with fatal_error in a potentially recoverable Newton iteration.
 - No Actions launched; manual build and CI needed.
+
+### B1/B2 dry precedence and admissibility alignment (2026-11-06)
+
+- In REAL/COMPLEX qp physical constructors and refresh, test negative thickness first, then canonical dry thickness before inspecting wet-only temperature or composition. Dry payload is always reset to the same ambient thermodynamics, zero species, velocities and passive scalars as q constructors; no change to formulas or the EPSILON dry cutoff.
+- The REAL density-only qp primitive now also accepts dry payload regardless of wet-only composition/temperature and explicitly rejects negative temperature for wet cells. It still rejects negative thickness and materially invalid wet composition.
+- The wet-state REAL/COMPLEX composition closure, heat-capacity check, mixture EOS and existing mathematical includes remain in place; only the order of preconditions changed. Invalid wet states continue to use accepted=.FALSE. The thermal-only Newton caller propagation is still a separate follow-up.
+- TEST_STATE adds dry qp/refresh/q REAL and COMPLEX consistency under invalid dry payload, and wet negative-temperature rejection for density and refresh. Full build, Actions and real examples are not run in this change set and remain required.
