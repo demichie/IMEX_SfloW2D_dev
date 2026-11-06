@@ -29,6 +29,7 @@ PROGRAM test_state
     CALL check_canonical_dry_kinematics
     CALL check_epsilon_dry_real_complex
     CALL check_nonpositive_heat_capacity
+    CALL check_strictly_positive_thermal_state
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
     qp=0.0_wp
     qp(idx_h)=2.0_wp; qp(idx_T)=300.0_wp; qp(idx_u)=1.5_wp; qp(idx_v)=-0.25_wp
@@ -502,6 +503,61 @@ CONTAINS
         CALL build_physical_state_from_qp(cqp_case,cs,accepted=ok)
         IF (ok) ERROR STOP 'negative-temperature COMPLEX state accepted'
     END SUBROUTINE check_canonical_dry_kinematics
+
+    !> Wet thermal energy and temperature must be strictly positive.
+    SUBROUTINE check_strictly_positive_thermal_state
+        REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_out(n_vars),temperature,rho_mix,red_grav
+        COMPLEX(wp) :: cqp_case(n_vars),cq_case(n_vars),cqp_out(n_vars),ctemperature
+        TYPE(physical_state_real) :: rs
+        TYPE(physical_state_complex) :: cs
+        LOGICAL :: ok
+        CALL initialize_physical_state_real(rs)
+        CALL initialize_physical_state_complex(cs)
+        qp_case=0.0_wp
+        qp_case(idx_h)=1.0_wp
+        qp_case(idx_T)=350.0_wp
+        CALL primitive_to_conservative(qp_case,q_case,ok)
+        IF (.NOT.ok) ERROR STOP 'positive thermal fixture rejected'
+        q_case(idx_engyEqn)=0.0_wp
+        cq_case=CMPLX(q_case,0.0_wp,wp)
+        CALL conservative_to_primitive(q_case,qp_out,ok)
+        IF (ok) ERROR STOP 'zero wet REAL q4 conversion accepted'
+        CALL conservative_to_primitive(cq_case,cqp_out,ok)
+        IF (ok) ERROR STOP 'zero wet COMPLEX q4 conversion accepted'
+        CALL build_physical_state_from_q(q_case,rs,accepted=ok)
+        IF (ok) ERROR STOP 'zero wet REAL q4 state accepted'
+        CALL build_physical_state_from_q(cq_case,cs,accepted=ok)
+        IF (ok) ERROR STOP 'zero wet COMPLEX q4 state accepted'
+        CALL evaluate_temperature_from_q(q_case,temperature,ok)
+        IF (ok) ERROR STOP 'zero wet REAL q4 temperature accepted'
+        CALL evaluate_temperature_from_q(cq_case,ctemperature,ok)
+        IF (ok) ERROR STOP 'zero wet COMPLEX q4 temperature accepted'
+
+        qp_case(idx_T)=0.0_wp
+        cqp_case=CMPLX(qp_case,0.0_wp,wp)
+        CALL primitive_to_conservative(qp_case,q_case,ok)
+        IF (ok) ERROR STOP 'zero wet REAL T conversion accepted'
+        CALL primitive_to_conservative(cqp_case,cq_case,ok)
+        IF (ok) ERROR STOP 'zero wet COMPLEX T conversion accepted'
+        CALL build_physical_state_from_qp(qp_case,rs,accepted=ok)
+        IF (ok) ERROR STOP 'zero wet REAL T state accepted'
+        CALL build_physical_state_from_qp(cqp_case,cs,accepted=ok)
+        IF (ok) ERROR STOP 'zero wet COMPLEX T state accepted'
+        CALL evaluate_density_from_qp(qp_case,rho_mix,red_grav,ok)
+        IF (ok) ERROR STOP 'zero wet T density accepted'
+        rs%h=1.0_wp
+        rs%T=0.0_wp
+        cs%h=CMPLX(1.0_wp,0.0_wp,wp)
+        cs%T=CMPLX(0.0_wp,0.0_wp,wp)
+        CALL refresh_physical_state(rs,accepted=ok)
+        IF (ok) ERROR STOP 'zero wet REAL T refresh accepted'
+        CALL refresh_physical_state(cs,accepted=ok)
+        IF (ok) ERROR STOP 'zero wet COMPLEX T refresh accepted'
+        qp_case(idx_h)=0.0_wp
+        CALL primitive_to_conservative(qp_case,q_case,ok)
+        IF (.NOT.ok) ERROR STOP 'dry zero T conversion rejected'
+        CALL assert_close('dry q4 zero',q_case(idx_engyEqn),0.0_wp,0.0_wp)
+    END SUBROUTINE check_strictly_positive_thermal_state
 
     SUBROUTINE check_nonpositive_heat_capacity
         REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_out(n_vars),temperature,old_cp_s(n_solid)

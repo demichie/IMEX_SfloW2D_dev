@@ -988,3 +988,9 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - The REAL density-only qp primitive now also accepts dry payload regardless of wet-only composition/temperature and explicitly rejects negative temperature for wet cells. It still rejects negative thickness and materially invalid wet composition.
 - The wet-state REAL/COMPLEX composition closure, heat-capacity check, mixture EOS and existing mathematical includes remain in place; only the order of preconditions changed. Invalid wet states continue to use accepted=.FALSE. The thermal-only Newton caller propagation is still a separate follow-up.
 - TEST_STATE adds dry qp/refresh/q REAL and COMPLEX consistency under invalid dry payload, and wet negative-temperature rejection for density and refresh. Full build, Actions and real examples are not run in this change set and remain required.
+
+### B1 strict wet thermal positivity (2026-11-06)
+
+- Require q(idx_engyEqn)>0 for wet REAL/COMPLEX conservative states before reconstructing composition and temperature; retain cp_m>0 as an independent check. Also reject reconstructed wet T<=0.
+- Require T>0 for wet REAL/COMPLEX primitive state construction, refresh and qp-to-q conversion and for REAL density-only evaluation. Dry states still permit zero q4 and canonicalize temperature to T_ambient.
+- TEST_STATE covers wet q4=0 and T=0 rejection through constructors, converters, refresh, density and temperature-only evaluation, plus dry zero-temperature conversion. No physical formula changes. Build, Actions and examples still need validation.

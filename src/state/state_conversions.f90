@@ -67,13 +67,14 @@ CONTAINS
             RETURN
         END IF
 
+        IF (REAL(q(idx_engyEqn),wp)<=0.0_wp) RETURN
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
-        IF (REAL(T,wp)<0.0_wp) RETURN
+        IF (REAL(T,wp)<=0.0_wp) RETURN
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
         INCLUDE 'inc/velocity_from_momentum.inc'
         qp(idx_h)=mass*inv_rho_m
@@ -108,13 +109,14 @@ CONTAINS
             RETURN
         END IF
 
+        IF (REAL(q(idx_engyEqn),wp)<=0.0_wp) RETURN
         xs=q(idx_solid_first:idx_solid_last)/mass
         xg=q(idx_add_gas_first:idx_add_gas_last)/mass
         IF (.NOT.close_composition(xs,xg)) RETURN
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
-        IF (REAL(T,wp)<0.0_wp) RETURN
+        IF (REAL(T,wp)<=0.0_wp) RETURN
         CALL evaluate_mixture_density(T,xs,xg,rho_m,inv_rho_m)
         INCLUDE 'inc/velocity_from_momentum.inc'
         qp(idx_h)=mass*inv_rho_m
@@ -147,7 +149,7 @@ CONTAINS
             RETURN
         END IF
         IF (.NOT.close_composition(xs,xg)) RETURN
-        IF (REAL(qp(idx_T),wp)<0.0_wp) RETURN
+        IF (REAL(qp(idx_T),wp)<=0.0_wp) RETURN
         INCLUDE 'inc/conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_real
@@ -169,7 +171,7 @@ CONTAINS
             RETURN
         END IF
         IF (.NOT.close_composition(xs,xg)) RETURN
-        IF (REAL(qp(idx_T),wp)<0.0_wp) RETURN
+        IF (REAL(qp(idx_T),wp)<=0.0_wp) RETURN
         INCLUDE 'inc/conservative_from_primitive.inc'
         IF (PRESENT(accepted)) accepted=.TRUE.
     END SUBROUTINE primitive_to_conservative_complex
