@@ -59,8 +59,11 @@ for pure_declaration in ("PURE SUBROUTINE limit(", "PURE ELEMENTAL REAL(wp) FUNC
 # Depth slopes in the hydrostatic reconstruction are required only by the
 # minmod and Froude-blended transport-depth selections.
 assert r.count("kt_trace_reconstruction=='minmod' .OR.") >= 2
-for expected in ("CASE ('h_x')", "CASE ('minmod')", "CASE ('froude_blend')",
-                 "qp_adv_left_use(1)=h_eta_left",
-                 "CALL qp_to_qc(qp_adv_left_use"):
+# Trace-mode dispatch lives in the reconstruction workspace. The
+# selected-depth conservative conversion lives in the PCCU interface.
+for expected in ("CASE ('h_x')", "CASE ('minmod')", "CASE ('froude_blend')"):
+    assert expected in r, expected
+for expected in ("qp_adv_left_use(1)=h_eta_left",
+                 "CALL primitive_to_conservative(qp_adv_left_use"):
     assert expected in f, expected
 print("PASS: selected-depth primitive reconstruction with discharge boundary conditions")

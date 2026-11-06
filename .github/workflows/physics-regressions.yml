@@ -35,7 +35,7 @@ jobs:
           mkdir -p evidence
           case "${{ matrix.group }}" in
             state)
-              suites="TEST_STATE TEST_STATE_CONVERSION TEST_STATE_INITIALIZATION TEST_WORKSPACE_LIFECYCLE"
+              suites="TEST_STATE TEST_N7_COMPOSITION TEST_WORKSPACE_LIFECYCLE"
               ;;
             physical-sources)
               suites="TEST_SOURCE_REGISTRY TEST_MASS_EXCHANGE TEST_CURVATURE_SOURCE TEST_RHEOLOGY_FROUDE TEST_RHEOLOGY_CELL_LOCAL TEST_STOCHASTIC_EVOLUTION"
