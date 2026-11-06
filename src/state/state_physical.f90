@@ -70,6 +70,7 @@ CONTAINS
         rho_m=rho_a_amb
         red_grav=0.0_wp
         IF (PRESENT(below_ambient)) below_ambient=.FALSE.
+        IF (qp(idx_h)<0.0_wp) RETURN
         xs=qp(idx_solid_first:idx_solid_last)
         xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (.NOT.close_composition(xs,xg)) RETURN
@@ -107,6 +108,7 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
+        IF (REAL(T,wp)<0.0_wp) RETURN
     END SUBROUTINE evaluate_temperature_from_q_real
 
     !> Complex-step temperature-only primitive. Preserve the same composition
@@ -130,6 +132,7 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
+        IF (REAL(T,wp)<0.0_wp) RETURN
     END SUBROUTINE evaluate_temperature_from_q_complex
 
     SUBROUTINE refresh_physical_state_real(state,bx,by,bxx,bxy,byy,accepted)
@@ -142,6 +145,9 @@ CONTAINS
         IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         IF (REAL(state%h,wp)<0.0_wp) RETURN
         IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
+            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
+            state%xs=0.0_wp; state%xg=0.0_wp
+            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
@@ -167,6 +173,9 @@ CONTAINS
         IF (.NOT.close_composition(state%xs,state%xg)) RETURN
         IF (REAL(state%h,wp)<0.0_wp) RETURN
         IF (REAL(state%h,wp)<=EPSILON(1.0_wp)) THEN
+            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
+            state%xs=0.0_wp; state%xg=0.0_wp
+            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
             IF (REAL(state%T,wp)<0.0_wp) RETURN
@@ -212,8 +221,12 @@ CONTAINS
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
 
         IF (state%h <= EPSILON(1.0_wp)) THEN
+            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
+            state%xs=0.0_wp; state%xg=0.0_wp
+            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
+            IF (REAL(state%T,wp)<0.0_wp) RETURN
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
@@ -261,6 +274,7 @@ CONTAINS
         CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
         IF (REAL(cp_m,wp)<=0.0_wp) RETURN
         INCLUDE 'inc/temperature_from_energy.inc'
+        IF (REAL(T,wp)<0.0_wp) RETURN
         state%T=T
         CALL evaluate_mixture_phase_properties(state%T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
             state%alphas,state%alphag)
@@ -300,8 +314,12 @@ CONTAINS
         IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
 
         IF (REAL(state%h,wp) <= EPSILON(1.0_wp)) THEN
+            state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
+            state%xs=0.0_wp; state%xg=0.0_wp
+            state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
             INCLUDE 'inc/dry_thermodynamics.inc'
         ELSE
+            IF (REAL(state%T,wp)<0.0_wp) RETURN
             CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom, &
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
@@ -337,6 +355,7 @@ CONTAINS
             CALL evaluate_mixture_heat_capacity(xs,xg,cp_m,cp_c)
             IF (REAL(cp_m,wp)<=0.0_wp) RETURN
             INCLUDE 'inc/temperature_from_energy.inc'
+            IF (REAL(T,wp)<0.0_wp) RETURN
             CALL evaluate_mixture_phase_properties(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c, &
                 alphas,alphag)
             state%h=mass*inv_rho_m

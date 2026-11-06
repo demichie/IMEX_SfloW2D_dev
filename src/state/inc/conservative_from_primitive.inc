@@ -1,4 +1,5 @@
     CALL evaluate_mixture(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,cp_m,cp_c,alphas,alphag)
+    IF (REAL(cp_m,wp)<=0.0_wp) RETURN
     mass=rho_m*qp(idx_h)
     q(idx_totMassEqn)=mass
     q(idx_uEqn)=mass*qp(idx_u)

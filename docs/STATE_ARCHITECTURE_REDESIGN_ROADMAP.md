@@ -968,3 +968,10 @@ The Fortran architecture workflow previously ran on pull requests and manual dis
 - Reverted commit 281a27a42fdef0b1beefdb4c9ba08607ac7af2c0: restored the four explicit wet-state orchestration blocks in REAL/COMPLEX qp builders and refresh; removed `inc/wet_thermodynamics.inc`, its Makefile distribution/dependency entries, and the regression introduced exclusively in that trial.
 - Architectural convention: an `.inc` must hold reusable physical/mathematical formulae or substantive algorithmic logic, not only a sequence of calls and an admissibility IF. Repetition of short orchestration in separate routines is acceptable. Existing genuine physical `.inc` kernels remain unchanged.
 - Continue F3 by auditing duplicated *formulae* in q-based conversion/build paths rather than wrapping repeated calls. No CI run for this revert; test manually as desired.
+
+### B1/B2 first pass (2026-11-06)
+
+- Reject negative depth in density-only qp evaluation. Canonicalize dry h/u/v, compositions and passive scalars in REAL/COMPLEX qp physical builders and refresh, matching q-based builders. Dry cutoff remains EPSILON(1.0_wp).
+- Reject negative wet temperature in qp builders and qp-to-q conversions, negative energy-derived temperature in REAL/COMPLEX q conversions, temperature-only evaluations and q-based physical builders. Reject nonpositive heat capacity in the existing qp-to-q mathematical include before assembling conservative q.
+- Added TEST_STATE coverage for dry physical kinematics and refresh, negative depth and negative wet temperature. No numerical formula deduplication; xs=qs/M stays inline. Temperature-only Newton rejection signalling remains a separate contract follow-up.
+- Requires manual CI and examples; no Actions launched.

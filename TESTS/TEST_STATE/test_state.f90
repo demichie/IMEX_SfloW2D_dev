@@ -25,6 +25,7 @@ PROGRAM test_state
     CALL check_complex_closure_limits
     CALL check_real_complex_invalid_candidates
     CALL check_dry_refresh_consistency
+    CALL check_canonical_dry_kinematics
     CALL check_epsilon_dry_real_complex
     CALL check_nonpositive_heat_capacity
     ALLOCATE(qp(n_vars),qp_roundtrip(n_vars),q(n_vars),cqp(n_vars),cq(n_vars))
@@ -386,6 +387,57 @@ CONTAINS
         END DO
         gas_flag=.TRUE.; liquid_flag=.FALSE.
     END SUBROUTINE check_dry_refresh_consistency
+
+    SUBROUTINE check_canonical_dry_kinematics
+        REAL(wp) :: qp_case(n_vars),q_case(n_vars),rho_mix,red_grav
+        COMPLEX(wp) :: cqp_case(n_vars),cq_case(n_vars)
+        TYPE(physical_state_real) :: rs
+        TYPE(physical_state_complex) :: cs
+        LOGICAL :: ok
+        CALL initialize_physical_state_real(rs)
+        CALL initialize_physical_state_complex(cs)
+        qp_case=0.0_wp
+        qp_case(idx_h)=0.5_wp*EPSILON(1.0_wp)
+        qp_case(idx_T)=650.0_wp; qp_case(idx_u)=17.0_wp; qp_case(idx_v)=-9.0_wp
+        qp_case(idx_solid_first)=0.2_wp
+        qp_case(idx_stoch)=2.0_wp; qp_case(idx_pore)=5.0_wp
+        cqp_case=CMPLX(qp_case,0.0_wp,wp)
+        CALL build_physical_state_from_qp(qp_case,rs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'canonical REAL dry qp rejected'
+        CALL build_physical_state_from_qp(cqp_case,cs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'canonical COMPLEX dry qp rejected'
+        CALL assert_close('dry REAL velocity',rs%u,0.0_wp,0.0_wp)
+        CALL assert_close('dry COMPLEX velocity',REAL(cs%u,wp),0.0_wp,0.0_wp)
+        CALL assert_close('dry REAL thickness',rs%h,0.0_wp,0.0_wp)
+        CALL assert_close('dry COMPLEX thickness',REAL(cs%h,wp),0.0_wp,0.0_wp)
+        CALL assert_close('dry REAL species',SUM(rs%xs),0.0_wp,0.0_wp)
+        CALL assert_close('dry COMPLEX species',REAL(SUM(cs%xs),wp),0.0_wp,0.0_wp)
+        CALL assert_close('dry REAL scalar',rs%Zs,0.0_wp,0.0_wp)
+        rs%u=11.0_wp; rs%h=0.5_wp*EPSILON(1.0_wp)
+        cs%u=CMPLX(11.0_wp,1.0E-20_wp,wp)
+        cs%h=CMPLX(0.5_wp*EPSILON(1.0_wp),0.0_wp,wp)
+        CALL refresh_physical_state(rs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'canonical REAL dry refresh rejected'
+        CALL refresh_physical_state(cs,accepted=ok)
+        IF (.NOT.ok) ERROR STOP 'canonical COMPLEX dry refresh rejected'
+        CALL assert_close('dry REAL refreshed velocity',rs%u,0.0_wp,0.0_wp)
+        CALL assert_close('dry COMPLEX refreshed velocity',REAL(cs%u,wp),0.0_wp,0.0_wp)
+        CALL assert_close('dry REAL refreshed depth',rs%h,0.0_wp,0.0_wp)
+        qp_case(idx_h)=-1.0_wp
+        CALL evaluate_density_from_qp(qp_case,rho_mix,red_grav,ok)
+        IF (ok) ERROR STOP 'negative-depth density evaluation accepted'
+        qp_case(idx_h)=1.0_wp; qp_case(idx_T)=-10.0_wp
+        CALL primitive_to_conservative(qp_case,q_case,ok)
+        IF (ok) ERROR STOP 'negative-temperature qp accepted'
+        cq_case=CMPLX(qp_case,0.0_wp,wp)
+        CALL primitive_to_conservative(cq_case,cqp_case,ok)
+        IF (ok) ERROR STOP 'negative-temperature COMPLEX qp accepted'
+        CALL build_physical_state_from_qp(qp_case,rs,accepted=ok)
+        IF (ok) ERROR STOP 'negative-temperature physical state accepted'
+        cqp_case=CMPLX(qp_case,0.0_wp,wp)
+        CALL build_physical_state_from_qp(cqp_case,cs,accepted=ok)
+        IF (ok) ERROR STOP 'negative-temperature COMPLEX state accepted'
+    END SUBROUTINE check_canonical_dry_kinematics
 
     SUBROUTINE check_nonpositive_heat_capacity
         REAL(wp) :: qp_case(n_vars),q_case(n_vars),qp_out(n_vars),temperature,old_cp_s(n_solid)
