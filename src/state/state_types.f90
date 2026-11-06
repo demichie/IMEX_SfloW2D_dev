@@ -77,9 +77,9 @@ CONTAINS
             ALLOCATE(state%xs(n_solid), state%xg(n_add_gas),                                                           &
                 state%alphas(n_solid), state%alphag(n_add_gas))
         ELSE IF (SIZE(state%xs) /= n_solid .OR.                                                                        &
-                 SIZE(state%xg) /= n_add_gas .OR.                                                                      &
-                 SIZE(state%alphas) /= n_solid .OR.                                                                    &
-                 SIZE(state%alphag) /= n_add_gas) THEN
+                SIZE(state%xg) /= n_add_gas .OR.                                                                       &
+                SIZE(state%alphas) /= n_solid .OR.                                                                     &
+                SIZE(state%alphag) /= n_add_gas) THEN
             ERROR STOP 'state REAL workspace has incompatible composition layout'
         END IF
 
@@ -106,9 +106,9 @@ CONTAINS
             ALLOCATE(state%xs(n_solid), state%xg(n_add_gas),                                                           &
                 state%alphas(n_solid), state%alphag(n_add_gas))
         ELSE IF (SIZE(state%xs) /= n_solid .OR.                                                                        &
-                 SIZE(state%xg) /= n_add_gas .OR.                                                                      &
-                 SIZE(state%alphas) /= n_solid .OR.                                                                    &
-                 SIZE(state%alphag) /= n_add_gas) THEN
+                SIZE(state%xg) /= n_add_gas .OR.                                                                       &
+                SIZE(state%alphas) /= n_solid .OR.                                                                     &
+                SIZE(state%alphag) /= n_add_gas) THEN
             ERROR STOP 'state COMPLEX workspace has incompatible composition layout'
         END IF
 
