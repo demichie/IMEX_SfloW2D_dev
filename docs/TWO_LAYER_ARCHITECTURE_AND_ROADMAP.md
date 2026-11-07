@@ -66,6 +66,23 @@ Restano **distinte le due leggi fisiche**: deposizione granulare per sedimentazi
 
 La razionalizzazione del deposito è un blocco autonomo di compatibilità single-layer, senza cambiare le formule fisiche.
 
+### 3.4 Contratto di aggiornamento e derivazione di \`deposit_tot\`
+
+\`deposit_tot\` è lo **spessore cumulativo positivo di materiale immobilizzato** rispetto allo stato iniziale, non il cambiamento netto di quota topografica e non l'inventario erodibile. È un campo del substrato privo dell'indice layer. L'erosione ha il suo inventario e la propria semantica; l'eventuale incorporazione del deposito nell'erodibile deve seguire \`erodible_deposit_flag\` e le convenzioni attuali.
+
+Nel codice attuale \`state_fields:refresh_substrate_totals\` azzera \`deposit_tot\` quando \`n_solid=0\`, oppure lo ricostruisce **solo** da \`deposit\`. Il Lie accumula \`lava_deposit\` separatamente e chiama il refresh a fine gruppo di scambio; il restart v7 salva \`lava_deposit\` e richiama il refresh dopo il caricamento. Per ottenere il comportamento canonico sono quindi indispensabili **due rami fisici esclusivi e verificabili**:
+
+\`\`\`text
+granular carrier: deposit_tot = SUM(deposit_volumes)/(1-erodible_porosity)
+lava carrier:     deposit_tot = accumulated immobilized lava thickness
+\`\`\`
+
+Nel ramo lava, \`n_solid=0\` è valido e non implica deposito nullo; non leggere né validare \`erodible_porosity\` per costruire il deposito lavico. Non sommare \`lava_deposit\` a \`deposit_tot\` e non aggiornare entrambi come inventari indipendenti. Il rate \`dB_dt\` è il **rate della geometria**: aggiornamento dell'inventario e proiezione sulle quote nodali \`B_vertex\` devono avvenire una volta sola, evitando conversioni/cumulazioni doppie. Il dato canonico deve essere coerente anche se \`topo_change_flag=.FALSE.\` e il materiale si deposita.
+
+La sorgente lava attuale fornisce \`lava_deposit_rate\` e \`dB_dt\`; l'integratore usa \`lava_deposit\` come candidato cell-local, controlla il suo valore e lo include nel rollback. La migrazione sostituisce tali usi con il candidato \`deposit_tot\` **solo dove il ramo è lava**; nel granulare le classi solide continuano a costituire l'inventario autorevole e \`deposit_tot\` è derivato. Valutare se sostituire il campo \`lava_deposit_rate\` del contratto \`mass_exchange_rates_type\` con una denominazione generica del trasferimento geometrico, oppure mantenerlo come rate identificato dalla legge lavica, senza trasformarlo in secondo inventario.
+
+Per rollback si salvano tutti gli inventari autorevoli modificabili e la geometria; per restart lo spessore canonico deve essere ripristinato senza perdita, preservando la lettura esplicita del formato storico v7 o documentandone il rifiuto. I test confrontano separatamente casi granulari e lava, anche con \`n_solid=0\`, prima/dopo restart e con/senza \`topo_change_flag\`.
+
 ## 4. Partizione matematica e integrazione temporale
 
 Per i due vettori conservativi mobili `q1` e `q2`:
@@ -83,6 +100,16 @@ dq2/dt = H2(q1,q2,B) + S_local2(q2) - Gamma(q1,q2) + S_external2
 Il codice usa **un solo Lie splitting globale**, con sequenza ordinata di gruppi, timestep condiviso, scelta CFL globale, validazione e rollback atomico. Ogni gruppo ha un metodo e uno scope `L1`, `L2` o `INTERLAYER`. Il gruppo 0 e la combinazione fra operatori spaziali e sorgenti mantengono la loro semantica attuale fino alla verifica delle dipendenze.
 
 Le quattro interfacce di trattamento fisico (EXPLICIT, SEMI_IMPLICIT, IMPLICIT, ANALYTIC) mantengono il contratto di disponibilità: le modalità non implementate producono errore esplicito, non fallback impliciti o no-op. I gruppi monolayer indipendenti possono essere eseguiti separatamente; un'eventuale fusione delle fasi commutanti è un'ottimizzazione successiva.
+
+### 4.1 Configurazione per layer: stato del codice e contratto
+
+Oggi \`parameters_2d\` e \`constitutive_parameters_2d\` contengono numerosi parametri globali, inclusi \`rheology_model\`, flag di fase, termica e proprietà costitutive. \`source_configuration_2d\` costruisce un catalogo unico di nomi attivi; \`source_registry_2d\` rifiuta una seconda sorgente reologica, la ripetizione dello stesso nome e gruppi di scambio massico in più gruppi; \`source_input_2d\` usa namelist e gruppo singoli. **Aggiungere il campo scope non basta a configurare due reologie indipendenti.**
+
+Il modello two-layer usa una configurazione **immutabile per layer** risolta in inizializzazione, con: carrier e specie condivise compatibili, scelta reologica, coefficienti della sua legge, modalità e ordine sorgenti, termica, settling L1/L2, eventuali variabili fisiche inattive, opzioni di interfaccia e validazione di combinazioni consentite. La scelta di una reologia per-layer può riutilizzare gli stessi ID del catalogo, ma la regola di unicità va applicata a \`(source_identity, scope)\`; ogni gruppo può avere footprint e parametri diversi, con un unico ordinamento Lie globale.
+
+Le interfacce cell-local ricevono la configurazione del proprio layer come dato **read-only** oppure usano un contesto esplicitamente posseduto dalla simulazione. È vietato selezionare L1/L2 cambiando temporaneamente parametri globali in un loop OpenMP, perché provocherebbe race e cambierebbe la semantica del single-layer. Non si duplicano moduli di reologia; si rendono passabili i parametri effettivamente diversi. La migrazione dei parametri viene pianificata per dipendenze reali, senza convertire indiscriminatamente tutte le costanti del modello.
+
+\`N_LAYERS=1\` mantiene la sintassi, i default e i gruppi attuali. \`N_LAYERS=2\` dispone di input per L1, L2 e coppia (settling, elutriazione, drag, pressure coupling, lofting), con controllo di completezza dei dati, proprietà per specie e combinazioni fisiche consentite. La modalità two-layer riguarda una corrente densa e una nube diluita nello **stesso scenario gas/solidi**: il fatto che il codice supporti anche lava monolayer non autorizza combinazioni lava+granulare tra layer.
 
 ## 5. Termini non conservativi e discretizzazione HP-PCCU
 
@@ -153,6 +180,22 @@ Il two-layer richiede:
 
 I nuovi contributi idrostatici appartengono all'**operatore spaziale**, non a un gruppo sorgente Lie locale. Il nucleo di quadratura `nonconservative_2d.f90` non richiede modifiche.
 
+### 5.4 Specifica dei percorsi e della CFL accoppiata
+
+La routine corrente \`pccu_2d:eval_hydrostatic_path\` usa lo stato esteso single-layer \`(h,Gamma,eta,G)\` con \`eta=B+h\`; le sue tracce sono preparate da \`reconstruction_2d\` e i percorsi sono assemblati da \`hyperbolic_2d\`. Nel two-layer si definiscono esplicitamente **tre superfici geometriche**:
+
+\`\`\`text
+B          = quota del substrato
+eta_1      = B + h1            (interfaccia L1/L2)
+eta_tot    = B + h1 + h2       (superficie superiore)
+\`\`\`
+
+La ricostruzione accoppiata usa la stessa geometria alle facce, mantiene \`h1,h2>=0\` e fornisce a ciascun layer le proprie tracce e le superfici fisiche corrette. Non è corretto utilizzare \`eta=B+h2\` come superficie del secondo layer quando L1 è presente. Se L1 è assente, l'interfaccia coincide con B. Occorre definire la regolarizzazione delle proprietà di L2 agli estremi asciutti, analogamente alla regolarizzazione di \`Gamma\` nelle facce single-layer.
+
+La callback dell'accoppiamento riceve le grandezze estese e le tangenti, già fornite dal chiamante; il percorso (primitive, conservative o esteso) è specificato insieme alla coppia di interfacce. Il prodotto completo include gli effetti di \`dG/ds\`; usare la stessa quadratura per L1 e L2, senza sovrascrivere i contributi idrostatici propri o la topografia. L'identità esatta di somma è un test del path integrato, mentre la riduzione del **residuo idrostatico completo** al single-layer richiede verificare anche il posizionamento di \`G\` nei flussi e nelle sorgenti.
+
+Le velocità caratteristiche correnti (\`equation_terms_2d:eval_local_speeds_direction\`) usano \`u±sqrt(G*gprime*h)\` **per una sola corrente**. Non costituiscono da sole un bound dimostrato per il sistema accoppiato. Prima della modalità di produzione, identificare il Jacobiano/sistema dei modi, le ipotesi di iperbolicità, un bound documentato e un fallback in caso di shear o perdita di iperbolicità. CFL, positività e dry/wet devono essere verificati con scenari in cui entrambe le correnti sono presenti; non assumere che \`min(dt_L1,dt_L2)\` sia sempre sufficiente.
+
 ## 6. Sorgenti fisiche accoppiate ed esterne
 
 ### 6.1 Trasferimenti strettamente interni
@@ -180,6 +223,20 @@ Il limite di inventario è condiviso: non si applicano limitatori indipendenti c
 - **Pore pressure:** chiusura propria di L1 e slot non attivo L2.
 - **Reologia e termica:** moduli esistenti riutilizzati per ciascun layer con parametri distinti.
 - **Lofting L2:** rimozione/esportazione e possibile reindirizzamento dei solidi secondo le opzioni del manoscritto, senza eliminare impropriamente L1; bilanci di massa e plume identificabili.
+
+### 6.3 Specifica delle chiusure fisiche del manoscritto
+
+Il riuso dei moduli attuali identifica le **leggi di base disponibili**, non implica che tutte le chiusure previste per L1 siano già implementate:
+
+- **Sedimentazione L2→L1:** velocità terminali disponibili in \`mass_exchange_deposition_2d\`; configurazione per-layer di hindered settling, limiti per classe, trasferimento di momento a \`u_Gamma\` coerente con interfaccia e opzioni \`CHI_XFER_L2\`, \`H_PLUG_XFER_L2\`, \`XFER_U2_AMP_CAP\`, salvo esclusione scientificamente documentata. Il limite alla velocità del donatore deve preservare il momento trasferendo l'eventuale differenza a L1.
+- **Consolidazione L1→terreno:** il manoscritto prevede \`ALPHA_PACKING_L1\`, seppellimento di gas interstiziale, opzioni per settling con \`d32\` comune alle classi e inibizione per stress efficace/pressione interstiziale. Il codice esistente usa una legge di deposito con coefficiente di porosità e fattori di hindered settling fissati nel kernel; il comportamento del manoscritto richiede quindi un'estensione **fisica esplicita** di tali chiusure (senza duplicarne inutilmente la velocità terminale). L'inventario del substrato resta distinto dallo scambio L2→L1.
+- **Elutriazione:** modalità \`SHEAR_POWER\` con stress d'interfaccia e di superficie, filtro Rouse e Shields, factor di availability \`Apack\`, opzione \`LINEAR_USTAR\`, cold-start quando L2 è sottile, limite di disponibilità per specie e co-lift di gas determinato dalla densità target.
+- **Drag:** gate di spessore e formula vettoriale Chézy completa; l'eventuale rimozione/dissipazione dell'energia cinetica resta distinta dal trasferimento della variabile termica.
+- **Lofting:** soglia di buoyancy per L2, esportazione di gas/specie/momento/energia e diagnostica per classe; opzioni di trasferimento di solidi verso L1 (tutti o ripartizione in funzione della velocità di salita del plume). In presenza di solo L2 buoyant non cancellare L1.
+- **Parametro packing:** distinguere chiaramente \`ALPHA_PACKING_L1\`, la concentrazione di jamming dello hindered settling e il packing massimo di ammissibilità; sono coefficienti fisici differenti, non sinonimi.
+- **Pressione interstiziale:** il seeding di pressione nei nuovi sedimenti mobili L1 e la sua successiva dissipazione richiedono termini specifici; non attivare la stessa equazione in L2.
+
+Le formule, le unità, i limiti di validità e i default devono essere mappati puntualmente alle sezioni 2.5–2.7, 2.12 e 2.14 del manoscritto in un **catalogo di chiusure** prima di implementare TL08–TL11. Le opzioni non implementate non vengono attivate silenziosamente sotto il nome del modello completo.
 
 ## 7. Proprietà del Lie globale e parallelismo
 
@@ -226,27 +283,41 @@ src/
 
 Non introdurre wrapper di solo inoltro, duplicazioni delle leggi fisiche, un nuovo framework per prodotti non conservativi o estrazioni di formule elementari senza beneficio reale. I moduli nuovi sono inseriti nell'elenco esplicito di `src/Makefile.am` solo quando vengono effettivamente implementati.
 
+### 8.1 Formati di input, NetCDF, restart e compatibilità
+
+L'I/O corrente è prevalentemente single-layer e risiede in \`src/io/inpout_2d.f90\`:
+- il NetCDF usa \`dimids(3)=(x,y,time)\`, variabili come \`h\`, \`eta\`, \`u\`, \`v\`, \`T\` e \`deposit__XX\` senza dimensione layer;
+- il restart binario **v7** registra \`q\`, topografia nodale e inventari, con una registrazione finale separata di \`lava_deposit\`, e rifiuta versioni diverse; nell'header dimensionale non compare \`n_layers\`;
+- \`N_LAYERS=2\` è attualmente respinto sia dall'inizializzazione del layout sia dall'I/O;
+- sono presenti anche formati legacy \`.asc\` / \`.q_2d\` e diagnostiche/probe/runout, che richiedono uno schema di compatibilità definito.
+
+**Contratto single-layer:** per \`N_LAYERS=1\` preservare il contenuto e i nomi dei campi NetCDF e dei file legacy, salvo una modifica deliberata e testata del deposito canonico. La forma interna rank-4 non deve automaticamente produrre una dimensione layer negli output monolayer. Per restart v7, scegliere in modo esplicito se mantenere un percorso writer/reader byte-compatibile o introdurre un reader di conversione v7→nuovo schema. Non affermare retrocompatibilità se non è supportata da test reali.
+
+**Contratto two-layer:** identificare nell'header \`n_layers\`, layout, tipo di modello, flag/chiusure e versione; memorizzare i due stati fluidi e gli eventuali slot inattivi, substrato condiviso, topografia nodale, numeriche di continuazione, stato stocastico e diagnostiche. Per NetCDF definire la dimensione layer o suffissi L1/L2, le superfici \`eta_1\` e \`eta_tot\`, la densità, il Ri, il budget co-ignimbrite e \`deposit_tot\` **una sola volta** come campo del substrato. Documentare il trattamento di plotter, postprocessing e output storici.
+
+I test I/O sono effettuati sia senza scambi sia con scambi e modifica del terreno; un restart alla stessa istantanea deve riprodurre una continuazione identica entro il contratto di riproducibilità dichiarato.
+
 ## 9. Roadmap operativa
 
 Tutti i blocchi seguenti sono **DA INIZIARE**. Ogni blocco è un intervento separato e verificabile; i primi gate proteggono il single-layer funzionante.
 
 | ID | Obiettivo tecnico | Criteri di accettazione |
 |---|---|---|
-| **TL00 — baseline e audit** | Identificare commit single-layer validato, fissare tag annotato; definire branch di sviluppo separato; inventario delle dipendenze rank-3 e dei consumatori di `deposit_tot`/`lava_deposit`; misurare risultati, output, tempi e memoria degli esempi. | Riferimento immutabile, mappa dipendenze e test riproducibili. La protezione di `master` e lo stato del branch sono verificati, non presunti. |
-| **TL00a — deposito canonico** | Rendere `deposit_tot` lo spessore unico per granulari **oppure** lava; mantenere le leggi fisiche separate; audit e rimozione dell'inventario `lava_deposit` solo se davvero ridondante; allineare rollback, topografia, I/O e restart. | Deposito/erosione e geometria invariati fisicamente; EXAMPLE_ETNA_LAVA e casi granulari confrontati; nessun doppio conteggio o conversione di porosità nel ramo lava. |
+| **TL00 — baseline e audit** | Identificare commit single-layer validato, fissare tag annotato; definire branch di sviluppo separato e verificarne la protezione; inventario di rank-3, globali di fisica e configurazione, variabili di deposito, NetCDF/legacy/restart v7, geometria, domain worklist, sorgenti e test. Catalogare formule/opzioni del manoscritto, test baseline e costi. | Riferimento immutabile, mappa dipendenze e test riproducibili. La protezione di `master` e lo stato del branch sono verificati, non presunti. |
+| **TL00a — deposito canonico** | Rendere `deposit_tot` lo spessore unico per granulari **oppure** lava, con derivazione granulare e incremento lavico esplicitamente distinti; eliminare `lava_deposit` come inventario autonomo dopo migrazione degli usi; allineare rate fisici, rollback, topografia, I/O e restart v7. | Deposito/erosione e geometria invariati fisicamente; EXAMPLE_ETNA_LAVA e casi granulari confrontati anche con `n_solid=0`, topografia on/off e restart v7; nessun azzeramento del deposito lavico, doppio conteggio o uso della porosità granulare nel ramo lava. |
 | **TL01 — layout rank-4, un layer** | Introdurre il secondo indice layer nei campi fluidi globali e nei metadati, lasciando ammesso soltanto `N_LAYERS=1`; preservare i kernel cell-local. | Build e test di stato/convertitori, nessuna modifica intenzionale delle formule. |
 | **TL02 — migrazione consumer globali** | Adeguare Lie, workspace, spatial, ricostruzione, BC/IC, driver, output, NetCDF, restart, diagnosi, snapshot e test. | EXAMPLES, restart round-trip, bounds, OpenMP e formati documentati. |
 | **TL03 — gate single-layer** | Confrontare evoluzioni, campi, budget, performance, memoria, rami wet/dry, buoyancy, rollback e risultati finali con il baseline taggato. | Nessuna regressione inspiegata; bitwise quando realisticamente ottenibile. Nessuna abilitazione two-layer prima della chiusura del gate. |
-| **TL04 — stato two-layer inerte** | Slot L1/L2, variabili inattive, configurazioni/reologie distinte, dry state, IC/BC e output per layer, senza accoppiamento. | Round-trip e validità per wet/wet, wet/dry, dry/wet, dry/dry. |
-| **TL05 — HP-PCCU per layer** | Ricostruzione e flussi di ciascun layer, dominio/halo coerenti, timestep globale preliminare. | Ciascuno slot riproduce il comportamento del singolo flusso in assenza di accoppiamento. |
-| **TL06 — pressione interlayer** | Utilizzare **l'attuale `nonconservative_2d` invariato** con callback della coppia idrostatica; assemblare percorsi di faccia e interni, topografia, metriche, clamp e CFL accoppiato. | Identità dei due path, riduzione single-layer con topografia, equilibrio su fondo piano/inclinato, residuo curvo caratterizzato, casi wet/dry, test di stabilità. |
-| **TL07 — Lie con scope e trasferimento di coppia** | Registro L1/L2/INTERLAYER, `Gamma` unico, limiter condiviso, due candidati simultanei, validazione e rollback atomici, rispetto del gruppo 0. | Test manufactured di conservazione, positività dei donatori, rollback e OpenMP. |
-| **TL08 — settling L2 → L1** | Riutilizzare chiusure di settling; trasferire specie, massa, momento ed energia con donatore L2; considerare il gas packing e i limiti thin/dry. | Conservazione dei trasferimenti interni, eccezioni diagnosticate, **nessun deposito al terreno**. |
-| **TL09 — elutriazione L1 → L2** | Implementare legge shear, filtro granulometrico, co-lift e rate di coppia. | Bilanci conservativi, limite d'inventario e trasporto termico/momento coerenti. |
+| **TL04 — stato two-layer inerte** | Slot L1/L2, variabili inattive, **contesti fisici read-only per layer** (nessun cambio di globali dentro OpenMP), proprietà specie comuni, input/validazione delle due reologie, registry con univocità per `(identità,scope)`, dry state, IC/BC e output, senza accoppiamento. | Round-trip e validità per wet/wet, wet/dry, dry/wet, dry/dry. |
+| **TL05 — HP-PCCU per layer** | Ricostruzione e flussi di ciascun layer, dominio/halo coerenti, timestep globale preliminare. | Ciascuno slot riproduce il comportamento del singolo flusso in assenza di accoppiamento; `eta_1=B+h1`, `eta_tot=B+h1+h2` e trattamenti dry/vuoto verificati. |
+| **TL06 — pressione interlayer** | Utilizzare **l'attuale `nonconservative_2d` invariato** con callback della coppia idrostatica; assemblare percorsi di faccia e interni, topografia, metriche, clamp e CFL accoppiato. | Identità dei due path, riduzione del **residuo idrostatico completo** a single-layer con topografia, equilibrio su fondo piano/inclinato, residuo curvo caratterizzato, clamp, casi wet/dry; bound CFL accoppiato giustificato e perdita di iperbolicità gestita. |
+| **TL07 — Lie con scope e trasferimento di coppia** | Registro L1/L2/INTERLAYER, riuso configurabile degli stessi termini in layer diversi, `Gamma` unico, limiter condiviso, due candidati simultanei, validazione e rollback atomici, rispetto del gruppo 0, ordine e footprint per-layer. | Test manufactured di conservazione, positività dei donatori, rollback e OpenMP. |
+| **TL08 — settling L2 → L1** | Riutilizzare velocità terminale e chiusure di settling; trasferire specie, massa, momento ed energia con velocità d'interfaccia `u_Gamma`, blend per thin-donor e cap di amplificazione conservativo; contabilizzare separatamente l'approssimazione gas packing. | Conservazione dei trasferimenti interni, eccezioni diagnosticate, **nessun deposito al terreno**. |
+| **TL09 — elutriazione L1 → L2** | Implementare SHEAR_POWER / LINEAR_USTAR, stress da slip e superficie, Rouse/Shields, cold-start con L2 sottile, availability factor, co-lift verso densità target e limiter di coppia. | Bilanci conservativi, limite d'inventario e trasporto termico/momento coerenti. |
 | **TL10 — drag interfaciale** | Forza quadratica uguale e opposta sui momenti; verificare rigidità esplicita. | Momento totale conservato, forza nulla nei casi limite, stabilità. |
-| **TL11 — sorgenti esterne e chiusure** | Entrainment atmosfera→L2, L1↔terreno, pressione interstiziale L1, reologie differenziate, lofting L2, budget plume, corretto uso del deposito canonico. | Nessun doppio entrainment o modifica del deposito da soli scambi interlayer; budget e output diagnostici coerenti. |
+| **TL11 — sorgenti esterne e chiusure** | Entrainment atmosfera→L2, consolidazione/deposizione L1→terreno con packing/gas burial/d32/stress efficace secondo opzioni, eventuale erosione, pressione interstiziale L1, reologie differenziate, lofting L2 e budget plume, deposito canonico. | Nessun doppio entrainment o modifica del deposito da soli scambi interlayer; budget e output diagnostici coerenti. |
 | **TL12 — validazione scientifica** | Benchmark del manoscritto, resting states, topografia curva, coppie di processi simultanei, wet/dry, CFL, restart, OpenMP e confronto con single-layer. | Matrice test e differenze scientifiche documentate, baseline 1-layer ancora superato. |
-| **TL13 — finalizzazione** | Documentazione di configurazione, output/restart e limiti scientifici; aggiornamento tracker generale; verifica integrata e abilitazione `N_LAYERS=2`. | Review finale, test superati e decisione esplicita di abilitazione. |
+| **TL13 — finalizzazione** | Documentazione delle chiusure, loro default, configurazione per layer, NetCDF/restart versionato e retrocompatibilità v7, limiti scientifici; aggiornamento tracker generale; verifica integrata e abilitazione `N_LAYERS=2`. | Review finale, test superati e decisione esplicita di abilitazione. |
 
 **Dipendenze principali:** TL00 → TL00a → TL01 → TL02 → TL03 (gate) → TL04 → TL05 → TL06; TL07 precede TL08–TL10; TL11 completa l'interazione con ambiente e substrato; TL12 e TL13 concludono. Eventuali test fisici isolati possono essere preparati prima senza saltare i gate di integrazione.
 
@@ -294,6 +365,7 @@ Tutti i blocchi seguenti sono **DA INIZIARE**. Ogni blocco è un intervento sepa
 - Le ottimizzazioni non pertinenti al two-layer e il precedente workstream di ulteriore refactoring dello stato restano fuori ambito.
 - La compilazione da sola non chiude un gate scientifico; i benchmark e il confronto degli output hanno valore separato.
 - Il progresso di TL00–TL13 viene riportato sinteticamente nella roadmap generale, mantenendo questo file come specifica tecnica consolidata.
+- Le evidenze e i rischi emersi dall'ispezione statica del sorgente sono catalogati nel [rapporto di audit del codice e della roadmap](TWO_LAYER_CODE_AUDIT.md). L'audit non equivale a una compilazione o all'esecuzione dei benchmark.
 
 ## 13. Riferimenti
 
