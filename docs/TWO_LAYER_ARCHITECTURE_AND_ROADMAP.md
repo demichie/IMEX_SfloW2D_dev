@@ -2,7 +2,7 @@
 
 **Riferimento:** 7 novembre 2026  
 **Ambito:** architettura di produzione e piano di implementazione per `N_LAYERS=1` e `N_LAYERS=2`.  
-**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. I blocchi TL00–TL13 sono aperti.  
+**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. I blocchi TL00–TL13 e i gate M0–M6 sono aperti.  
 **Tracciamento:** [Roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) per lo stato complessivo del progetto; questo documento è la specifica tecnica del percorso two-layer.
 
 ## 1. Obiettivo e configurazioni del modello
@@ -321,7 +321,65 @@ Tutti i blocchi seguenti sono **DA INIZIARE**. Ogni blocco è un intervento sepa
 
 **Dipendenze principali:** TL00 → TL00a → TL01 → TL02 → TL03 (gate) → TL04 → TL05 → TL06; TL07 precede TL08–TL10; TL11 completa l'interazione con ambiente e substrato; TL12 e TL13 concludono. Eventuali test fisici isolati possono essere preparati prima senza saltare i gate di integrazione.
 
-## 10. Matrice di validazione
+## 10. Milestone di integrazione in `master`
+
+Le milestone sono **punti di rilascio incrementale** lungo la roadmap tecnica TL00–TL13. Il completamento di un singolo blocco TL non autorizza automaticamente il merge: ciascuna milestone raggruppa blocchi che insieme producono uno stato del codice **coerente, funzionante, verificato e mantenibile in `master`**.
+
+**Principio fondamentale:** `master` deve continuare a compilare, eseguire gli esempi single-layer e mantenere la propria interfaccia pubblica, a prescindere dal fatto che il two-layer sia ancora incompleto. Fino alla milestone di rilascio **M6**, `N_LAYERS=2` rimane disabilitato nelle build di produzione e viene eventualmente attivato **solo negli harness diagnostici espliciti** delle funzionalità già implementate. Non esporre una modalità two-layer che restituisce risultati fisicamente incompleti senza avvertimento.
+
+### 10.1 Milestone, confini e risultati
+
+| Milestone | Blocchi coperti | Risultato integrabile in `master` | Condizione specifica di merge |
+|---|---|---|---|
+| **M0 — Baseline e specifiche** | TL00 (documentazione e audit) | Baseline single-layer identificato, tag e documentazione architetturale verificati; branch e regole di integrazione definiti. | Il riferimento baseline è realmente riproducibile; l'aggiornamento documentale non descrive come implementate funzioni ancora assenti. **Nessuna modifica fisica.** |
+| **M1 — Deposito canonico single-layer** | TL00a | Un solo `deposit_tot` per lo spessore del deposito granulare **oppure** lavico, con leggi indipendenti e rollback/I/O coerenti. | Esempi granulari e lava, test `n_solid=0`, erosione, topografia on/off e restart; nessuna regressione fisica o ambiguità sul formato storico. |
+| **M2 — Layout layer-aware certificato, ancora single-layer** | TL01–TL03 | Stato e consumer fluidi con indice layer; la configurazione pubblica continua a supportare soltanto `N_LAYERS=1`. | Gate TL03 chiuso: build, regressioni, full EXAMPLES, NetCDF, restart, OpenMP, memoria/performance; confronto con baseline M1. `N_LAYERS=2` ancora rifiutato. |
+| **M3 — Infrastruttura two-layer isolata** | TL04–TL05 | Stato L1/L2, configurazioni fisiche per layer, ricostruzioni e trasporti indipendenti verificabili tramite test dedicati; nessuna simulazione coupled pubblica. | Test a entrambi gli slot, dry/wet in ogni combinazione, assenza di race su parametri, proprietà di isolamento e compatibilità single-layer; l'accoppiamento fisico resta disattivato. |
+| **M4 — Operatore spaziale accoppiato verificato** | TL06 | Idrostatica interlayer HP-PCCU, geometria delle due superfici, percorsi non conservativi e criterio CFL accoppiato, tutti testati separatamente. | Identità di coppia e riduzione single-layer dell'operatore completo, well-balancing nei casi previsti, clamp, wet/dry, bound CFL e iperbolicità documentati; feature ancora non selezionabile in produzione. |
+| **M5 — Accoppiamento locale e chiusure fisiche** | TL07–TL11 | Gruppi Lie per layer e coppia, limiter/rollback atomici, settling, elutriazione, drag, entrainment, deposito basale e lofting, con diagnostiche e configurazioni definite. | Test di conservazione e casi limite per ogni chiusura, budget esterni espliciti, restart/output coupled, nessun doppio scambio o perdita di inventario, regressioni single-layer; codice two-layer ancora protetto dal gate di produzione. |
+| **M6 — Rilascio del modello two-layer** | TL12–TL13 | Modalità `N_LAYERS=2` abilitata all'utente con input, output, restart, documentazione delle chiusure e benchmark scientifici. | Benchmark del manoscritto e matrice completa di validazione superati, limiti scientifici dichiarati, performance e stabilità verificate, approvazione esplicita al rilascio. |
+
+**Regola sui blocchi non ancora completamente attivati:** è ammissibile integrare un componente interno non pubblico soltanto se il codice di produzione non lo raggiunge per `N_LAYERS=1`, i test dedicati ne verificano l'implementazione e non esistono fallback silenziosi o configurazioni apparentemente supportate. Non utilizzare `N_LAYERS=2` come test di produzione prima di M6.
+
+### 10.2 Gate comuni obbligatori per ogni merge
+
+Ogni milestone deve soddisfare **tutti** i requisiti comuni, oltre a quelli specifici indicati nella tabella:
+
+1. **Ambito chiuso:** tutti i blocchi TL richiesti dalla milestone sono implementati; nessun cambiamento non correlato viene incluso per comodità.
+2. **Build e test realmente eseguiti:** compilazione pulita con configurazioni di riferimento; test di unità e integrazione interessati; suite regressiva single-layer completa in base al piano di accettazione, con risultati registrati. Una Action non avviata non vale come test superato. Gli esempi di lunga durata possono richiedere esecuzione manuale documentata.
+3. **Fisica e numerica:** nessun cambiamento intenzionale non documentato di equazioni, schemi HP-PCCU o ordine Lie; bilanci, positività, wet/dry e rollback verificati nei processi interessati. Nessuna nuova modalità resa disponibile se non supera i propri test scientifici.
+4. **Compatibilità:** configurazioni `N_LAYERS=1`, input esistenti, output attesi, diagnostiche e restart gestiti secondo il contratto della milestone; ogni incompatibilità deliberata è versionata, documentata e testata.
+5. **Prestazioni e concorrenza:** assenza di regressioni non spiegate in memoria, temporanei e OpenMP; ogni nuovo percorso usa parametri read-only e scratch appropriati.
+6. **Tracciabilità:** commit di partenza, file modificati, risultati/test, differenze dal baseline, limiti conosciuti e stato dei blocchi registrati nel tracker generale; roadmap specialistica aggiornata come **stato corrente consolidato**, non come cronologia di patch.
+7. **Revisione prima del merge:** Pull Request da `feature/two-layer` a `master` esaminata, conflitti risolti, gate verificati e **approvazione esplicita**. Il passaggio non è automatico al semplice completamento dei test.
+
+Se un gate fallisce, la milestone **non** è raggiunta: il lavoro rimane sul branch di sviluppo. Se dopo la fusione emerge un problema, si interviene con una correzione isolata o con rollback del commit di integrazione; non si lascia `master` in uno stato non funzionante.
+
+### 10.3 Ciclo di sviluppo e sincronizzazione dei branch
+
+1. Il lavoro in corso procede su **`feature/two-layer`**; i blocchi TL possono essere committati e verificati singolarmente sul branch prima della milestone.
+2. Al raggiungimento di M0–M6, preparare una **PR circoscritta** verso `master`, contenente tutti e soltanto i cambiamenti non ancora integrati. I test e le evidenze di accettazione sono allegati alla PR.
+3. Dopo il merge, considerare `master` come nuovo riferimento stabile; registrare il commit di integrazione e, quando utile, un tag di milestone (`two-layer-M1`, `two-layer-M2`, ...). I tag si creano **solo su commit realmente validati e integrati**, non preventivamente.
+4. Continuare su `feature/two-layer` **sincronizzandolo con `master` dopo ogni merge**, senza riscrivere la storia pubblicata, cancellare commit o reintrodurre modifiche già integrate. Se la strategia di merge scelta produce una storia divergente (per esempio squash merge), allineare consapevolmente i rami prima di riprendere lo sviluppo: non presumere che un successivo PR diff sia automaticamente pulito.
+5. Mantenere `master` protetto da push diretti e force-push, secondo le regole effettivamente disponibili e verificate nel repository. Le milestone non richiedono nuovi branch permanenti: eventuali branch temporanei sono strumenti di revisione, non workstream paralleli.
+6. I lavori che non appartengono al modello two-layer, inclusi possibili nuovi metodi del secondo ordine per le sorgenti, **non** entrano in questa roadmap né nelle sue milestone.
+
+### 10.4 Stato delle milestone
+
+| Milestone | Stato | Merge in `master` | Evidenza |
+|---|---|---|---|
+| M0 | Da certificare | Non eseguito | Roadmap e audit preparati; baseline e gate ancora da verificare. |
+| M1 | Non iniziata | Non eseguito | TL00a aperto. |
+| M2 | Non iniziata | Non eseguito | TL01–TL03 aperti. |
+| M3 | Non iniziata | Non eseguito | TL04–TL05 aperti. |
+| M4 | Non iniziata | Non eseguito | TL06 aperto. |
+| M5 | Non iniziata | Non eseguito | TL07–TL11 aperti. |
+| M6 | Non iniziata | Non eseguito | TL12–TL13 aperti. |
+
+La tabella indica lo stato verificato della pianificazione, non un presunto avanzamento del codice. Aggiornare milestone, esiti e SHA **soltanto dopo** aver eseguito e registrato le verifiche corrispondenti.
+
+
+## 11. Matrice di validazione
 
 ### Single-layer
 - Build, Actions autorizzate, test di unità, conversioni e gruppi Lie.
@@ -345,7 +403,7 @@ Tutti i blocchi seguenti sono **DA INIZIARE**. Ogni blocco è un intervento sepa
 - Fallimento di una cella/gruppo: nessun commit parziale dei due layer, del substrato o della geometria.
 - Verifiche di temporanei, contiguità, scalabilità OpenMP e bilanci anche in scenari combinati.
 
-## 11. Vincoli scientifici e questioni da chiudere nei rispettivi blocchi
+## 12. Vincoli scientifici e questioni da chiudere nei rispettivi blocchi
 
 1. Definire esattamente le variabili L2 inattive e le loro semantiche per input, trasporto e restart.
 2. Specificare il percorso esteso e la rappresentazione delle grandezze termodinamiche nella quadratura accoppiata, senza modificare il motore `nonconservative_2d`.
@@ -357,17 +415,17 @@ Tutti i blocchi seguenti sono **DA INIZIARE**. Ogni blocco è un intervento sepa
 8. Verificare l'ordine dei gruppi Lie (in particolare gruppo 0) e il limite di stabilità per eventuali termini interlayer rigidi.
 9. Confermare le opzioni scientifiche specifiche del manoscritto per lofting, co-lift, porosità e deposizione prima della validazione finale.
 
-## 12. Protocollo operativo
+## 13. Protocollo operativo
 
-- Ogni blocco ha un commit o una PR circoscritta, con test/esiti documentati e riferimento al baseline.
+- Ogni blocco è verificato sul branch di sviluppo; le PR verso `master` avvengono **alle milestone M0–M6** con gate comuni e specifici superati, test/esiti documentati e riferimento al baseline.
 - `master` è il riferimento single-layer: lo sviluppo two-layer avviene su un branch dedicato; la protezione effettiva del branch e il tag del baseline vengono verificati in TL00.
 - Nessun cambiamento di formula fisica è introdotto soltanto per adattare il layout. Gli aggiustamenti scientifici richiedono giustificazione e validazione autonoma.
 - Le ottimizzazioni non pertinenti al two-layer e il precedente workstream di ulteriore refactoring dello stato restano fuori ambito.
 - La compilazione da sola non chiude un gate scientifico; i benchmark e il confronto degli output hanno valore separato.
-- Il progresso di TL00–TL13 viene riportato sinteticamente nella roadmap generale, mantenendo questo file come specifica tecnica consolidata.
+- Il progresso di TL00–TL13 e delle milestone M0–M6 viene riportato sinteticamente nella roadmap generale, mantenendo questo file come specifica tecnica consolidata.
 - Le evidenze e i rischi emersi dall'ispezione statica del sorgente sono catalogati nel [rapporto di audit del codice e della roadmap](TWO_LAYER_CODE_AUDIT.md). L'audit non equivale a una compilazione o all'esecuzione dei benchmark.
 
-## 13. Riferimenti
+## 14. Riferimenti
 
 - Manoscritto scientifico: *IMEX_SfloW2D_v3: A two-layer shallow-water model for pyroclastic density currents with pore-pressure transport, polydisperse settling and shear-driven elutriation*, in particolare sezioni 2.1–2.2, 2.5–2.7, 3–4.
 - [Roadmap generale del progetto](IMEX_SfloW2D_Development_Roadmap.md).
