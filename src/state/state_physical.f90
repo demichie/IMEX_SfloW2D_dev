@@ -8,7 +8,7 @@ MODULE state_physical
     USE parameters_2d, ONLY : idx_h, idx_T, idx_solid_first, idx_solid_last
     USE parameters_2d, ONLY : idx_add_gas_first, idx_add_gas_last, idx_u, idx_v
     USE parameters_2d, ONLY : idx_stoch, idx_pore
-    USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag, liquid_flag
+    USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag, liquid_flag, lava_flag
     USE parameters_2d, ONLY : slope_correction_flag, curvature_term_flag
     USE parameters_2d, ONLY : eps_sing, eps_sing4, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE constitutive_parameters_2d, ONLY : rho_a_amb, sp_heat_a, sp_heat_l, grav, T_ambient
