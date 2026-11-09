@@ -56,7 +56,10 @@ MODULE lie_source_executor_2d
         REAL(wp), ALLOCATABLE :: injection_mass(:),injection_solids(:),pre_buoyancy_mass(:)
         REAL(wp), ALLOCATABLE :: pre_buoyancy_solids(:),buoyancy_reduced_gravity(:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
-        REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
+        REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:)
+        ! Previous step's nonzero bed-rate coordinates: avoid a full-grid reset.
+        INTEGER, ALLOCATABLE :: bed_dirty_j(:),bed_dirty_k(:)
+        INTEGER :: bed_dirty_count=0
     END TYPE lie_source_executor_type
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
@@ -163,8 +166,9 @@ CONTAINS
             .AND. executor%has_newton_group) ALLOCATE(executor%newton_iterations(ncells,SIZE(executor%groups)))
         IF (executor%has_bed_group) THEN
             ALLOCATE(executor%bed_rate_cell(comp_cells_x,comp_cells_y))
-            ALLOCATE(executor%bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
-            ALLOCATE(executor%bed_candidate(comp_interfaces_x,comp_interfaces_y))
+            ALLOCATE(executor%bed_dirty_j(ncells),executor%bed_dirty_k(ncells))
+            executor%bed_rate_cell=0.0_wp
+            executor%bed_dirty_count=0
         END IF
         IF (.NOT.profiling_initialized) THEN
             env_value=''
@@ -210,8 +214,9 @@ CONTAINS
         IF (ALLOCATED(executor%buoyancy_reduced_gravity)) DEALLOCATE(executor%buoyancy_reduced_gravity)
         IF (ALLOCATED(executor%newton_iterations)) DEALLOCATE(executor%newton_iterations)
         IF (ALLOCATED(executor%bed_rate_cell)) DEALLOCATE(executor%bed_rate_cell)
-        IF (ALLOCATED(executor%bed_rate_vertex)) DEALLOCATE(executor%bed_rate_vertex)
-        IF (ALLOCATED(executor%bed_candidate)) DEALLOCATE(executor%bed_candidate)
+        IF (ALLOCATED(executor%bed_dirty_j)) DEALLOCATE(executor%bed_dirty_j)
+        IF (ALLOCATED(executor%bed_dirty_k)) DEALLOCATE(executor%bed_dirty_k)
+        executor%bed_dirty_count=0
         executor%has_exchange_group=.FALSE.
         executor%has_bed_group=.FALSE.
         executor%has_newton_group=.FALSE.
@@ -308,7 +313,16 @@ CONTAINS
                 group_profile(group_index)%calls=group_profile(group_index)%calls+1
             END DO
         END IF
-        IF (executor%has_bed_group) executor%bed_rate_cell=0.0_wp
+        IF (executor%has_bed_group) THEN
+            ! Only last step's nonzero rates can be stale; other cells remain zero.
+            !$OMP PARALLEL DO PRIVATE(j,k)
+            DO cell=1,executor%bed_dirty_count
+                j=executor%bed_dirty_j(cell); k=executor%bed_dirty_k(cell)
+                executor%bed_rate_cell(j,k)=0.0_wp
+            END DO
+            !$OMP END PARALLEL DO
+            executor%bed_dirty_count=0
+        END IF
         IF (executor%diagnostics_enabled) THEN
             executor%injection_mass(1:domain%solve_cells)=0.0_wp
             executor%injection_solids(1:domain%solve_cells)=0.0_wp
@@ -855,6 +869,9 @@ CONTAINS
             DO cell=1,domain%solve_cells
                 j=domain%j_cent(cell); k=domain%k_cent(cell)
                 IF (executor%bed_rate_cell(j,k)==0.0_wp) CYCLE
+                executor%bed_dirty_count=executor%bed_dirty_count+1
+                executor%bed_dirty_j(executor%bed_dirty_count)=j
+                executor%bed_dirty_k(executor%bed_dirty_count)=k
                 changed_jmin=MIN(changed_jmin,j); changed_jmax=MAX(changed_jmax,j)
                 changed_kmin=MIN(changed_kmin,k); changed_kmax=MAX(changed_kmax,k)
             END DO
