@@ -1240,21 +1240,32 @@ CONTAINS
         IF (LEN_TRIM(source_input_error)>0) ERROR STOP TRIM(source_input_error)
 
         ! ------- READ gas_transport_parameters NAMELIST --------------------------
+        ! Lava is a liquid carrier, not a transported gas. Nevertheless the
+        ! atmosphere is used for ambient-density and thermodynamic references.
+        ! Supply its standard defaults when the gas namelist is absent for lava.
+        ! An explicitly supplied gas namelist remains valid for compatibility
+        ! and may override these ambient reference values.
+        IF (lava_flag) THEN
+            sp_heat_a=998.0_wp
+            sp_gas_const_a=287.051_wp
+            kin_visc_a=1.48E-5_wp
+            pres=101300.0_wp
+            T_ambient=300.0_wp
+        END IF
 
         READ (input_unit, gas_transport_parameters, IOSTAT=ios)
 
         IF (ios .NE. 0) THEN
-
-        WRITE (*, *) 'IOSTAT=', ios
-        WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
-        WRITE (*, *) 'Please check the input file'
-        STOP
-
-        ELSE
-
-        REWIND (input_unit)
-
+            ! No gas-transport block is needed in a lava-only input.
+            ! Other configurations still require the original namelist.
+            IF (.NOT.(lava_flag .AND. IS_IOSTAT_END(ios))) THEN
+                WRITE (*, *) 'IOSTAT=', ios
+                WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
+                WRITE (*, *) 'Please check the input file'
+                STOP
+            END IF
         END IF
+        REWIND (input_unit)
 
         IF (sp_heat_a .EQ. -1.0_wp) THEN
 
