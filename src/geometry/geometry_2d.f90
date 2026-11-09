@@ -22,7 +22,7 @@ MODULE geometry_2d
 
     PUBLIC :: begin_geometry_transaction, commit_geometry_transaction
     PUBLIC :: rollback_geometry_transaction
-    PUBLIC :: project_cell_field_to_vertices,assign_topography_vertices
+    PUBLIC :: project_cell_field_to_vertices,assign_topography_vertices,apply_local_bed_rate
 
     ! Saved authoritative fields for a recoverable Lie step. Derived geometry is
     ! reconstructed on rollback, so later groups still see intermediate bed updates.
@@ -1452,6 +1452,158 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> \note Reads B_vertex and writes B_face_x, B_face_y and B_cent without smoothing the
     !>       authoritative bed.
     !******************************************************************************
+
+    !> Apply a sparse cell-centred bed rate without rebuilding the entire grid.
+    !> The caller owns the Lie geometry transaction and restores it on failure.
+    !> The changed-cell box is expanded by the Q1 and five-point LS stencils.
+    SUBROUTINE apply_local_bed_rate(cell_rate,dt,jmin,jmax,kmin,kmax,accepted)
+        REAL(wp), INTENT(IN) :: cell_rate(comp_cells_x,comp_cells_y),dt
+        INTEGER, INTENT(IN) :: jmin,jmax,kmin,kmax
+        LOGICAL, INTENT(OUT) :: accepted
+        INTEGER :: j,k,jf,jl,kf,kl,nadj,sj,sk,kj,kk
+        INTEGER :: cj0,cj1,ck0,ck1,dj0,dj1,dk0,dk1
+        REAL(wp) :: delta,firstx,firsty,secondx,secondy,mixed
+        REAL(wp), PARAMETER :: c1(5)=[-2.0_wp,-1.0_wp,0.0_wp,1.0_wp,2.0_wp]
+        REAL(wp), PARAMETER :: c2(5)=[2.0_wp,-1.0_wp,-2.0_wp,-1.0_wp,2.0_wp]
+
+        accepted=.FALSE.
+        IF (.NOT.geometry_transaction_active) ERROR STOP 'local bed update requires Lie transaction'
+        IF (jmin>jmax .OR. kmin>kmax) THEN
+            accepted=.TRUE.
+            RETURN
+        END IF
+        IF (.NOT.ALL(ieee_is_finite(cell_rate(jmin:jmax,kmin:kmax)))) RETURN
+
+        ! Each vertex is owned by one iteration: no scatter, atomics or races.
+        !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(jf,jl,kf,kl,nadj,delta)
+        DO k=kmin,kmax+1
+            DO j=jmin,jmax+1
+                jf=MAX(1,j-1); jl=MIN(comp_cells_x,j)
+                kf=MAX(1,k-1); kl=MIN(comp_cells_y,k)
+                nadj=(jl-jf+1)*(kl-kf+1)
+                delta=SUM(cell_rate(jf:jl,kf:kl))/REAL(nadj,wp)
+                B_vertex(j,k)=B_vertex(j,k)+dt*delta
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+
+        ! Recompute the Q1 elevations that depend on touched vertices.
+        cj0=MAX(1,jmin-1); cj1=MIN(comp_cells_x,jmax+1)
+        ck0=MAX(1,kmin-1); ck1=MIN(comp_cells_y,kmax+1)
+        !$OMP PARALLEL DO COLLAPSE(2)
+        DO k=ck0,ck1
+            DO j=cj0,cj1
+                B_cent(j,k)=0.25_wp*(B_vertex(j,k)+B_vertex(j+1,k)+ &
+                    B_vertex(j,k+1)+B_vertex(j+1,k+1))
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO COLLAPSE(2)
+        DO k=ck0,ck1
+            DO j=jmin,jmax+1
+                B_face_x(j,k)=0.5_wp*(B_vertex(j,k)+B_vertex(j,k+1))
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO COLLAPSE(2)
+        DO k=kmin,kmax+1
+            DO j=cj0,cj1
+                B_face_y(j,k)=0.5_wp*(B_vertex(j,k)+B_vertex(j+1,k))
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+
+        ! Short and 1D grids use the established special stencils.
+        IF (comp_cells_x<5 .OR. comp_cells_y<5) THEN
+            CALL topography_reconstruction
+            accepted=topography_geometry_is_finite()
+            RETURN
+        END IF
+
+        ! A changed Q1 cell can affect LS derivatives two cells away.
+        ! Boundary halo values are copies of the nearest interior stencil;
+        ! clamp source indices exactly as copy_derivative_halo_x/y do.
+        dj0=MAX(1,cj0-2); dj1=MIN(comp_cells_x,cj1+2)
+        dk0=MAX(1,ck0-2); dk1=MIN(comp_cells_y,ck1+2)
+        !$OMP PARALLEL DO COLLAPSE(2) &
+        !$OMP& PRIVATE(sj,sk,kj,kk,firstx,firsty,secondx,secondy,mixed)
+        DO k=dk0,dk1
+            DO j=dj0,dj1
+                sj=MAX(3,MIN(comp_cells_x-2,j))
+                sk=MAX(3,MIN(comp_cells_y-2,k))
+                firstx=0.0_wp; secondx=0.0_wp
+                firsty=0.0_wp; secondy=0.0_wp; mixed=0.0_wp
+                DO kj=1,5
+                    firstx=firstx+c1(kj)*B_cent(sj+kj-3,sk)
+                    secondx=secondx+c2(kj)*B_cent(sj+kj-3,sk)
+                END DO
+                DO kk=1,5
+                    firsty=firsty+c1(kk)*B_cent(sj,sk+kk-3)
+                    secondy=secondy+c2(kk)*B_cent(sj,sk+kk-3)
+                END DO
+                DO kk=1,5
+                    DO kj=1,5
+                        mixed=mixed+c1(kj)*c1(kk)*B_cent(sj+kj-3,sk+kk-3)
+                    END DO
+                END DO
+                B_prime_x_geom(j,k)=firstx/(10.0_wp*dx)
+                B_prime_y_geom(j,k)=firsty/(10.0_wp*dy)
+                B_second_xx_geom(j,k)=secondx/(7.0_wp*dx**2)
+                B_second_yy_geom(j,k)=secondy/(7.0_wp*dy**2)
+                B_second_xy_geom(j,k)=mixed/((10.0_wp*dx)*(10.0_wp*dy))
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+
+        IF (slope_correction_flag) THEN
+            !$OMP PARALLEL DO COLLAPSE(2)
+            DO k=dk0,dk1
+                DO j=dj0,dj1
+                    grav_coeff(j,k)=1.0_wp/(1.0_wp+B_prime_x_geom(j,k)**2+ &
+                        B_prime_y_geom(j,k)**2)
+                END DO
+            END DO
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(jf,jl)
+            DO k=dk0,dk1
+                DO j=dj0,MIN(comp_interfaces_x,dj1+1)
+                    jf=MAX(1,j-1); jl=MIN(comp_cells_x,j)
+                    IF (jf==jl) THEN
+                        grav_coeff_stag_x(j,k)=grav_coeff(jf,k)
+                    ELSE
+                        grav_coeff_stag_x(j,k)=0.5_wp*(grav_coeff(jf,k)+grav_coeff(jl,k))
+                    END IF
+                END DO
+            END DO
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(kf,kl)
+            DO k=dk0,MIN(comp_interfaces_y,dk1+1)
+                DO j=dj0,dj1
+                    kf=MAX(1,k-1); kl=MIN(comp_cells_y,k)
+                    IF (kf==kl) THEN
+                        grav_coeff_stag_y(j,k)=grav_coeff(j,kf)
+                    ELSE
+                        grav_coeff_stag_y(j,k)=0.5_wp*(grav_coeff(j,kf)+grav_coeff(j,kl))
+                    END IF
+                END DO
+            END DO
+            !$OMP END PARALLEL DO
+        END IF
+
+        ! Verify all changed fields, not just the nodal bed. No global scan.
+        accepted=ALL(ieee_is_finite(B_vertex(jmin:jmax+1,kmin:kmax+1))) .AND. &
+            ALL(ieee_is_finite(B_cent(cj0:cj1,ck0:ck1))) .AND. &
+            ALL(ieee_is_finite(B_face_x(jmin:jmax+1,ck0:ck1))) .AND. &
+            ALL(ieee_is_finite(B_face_y(cj0:cj1,kmin:kmax+1))) .AND. &
+            ALL(ieee_is_finite(B_prime_x_geom(dj0:dj1,dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(B_prime_y_geom(dj0:dj1,dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(B_second_xx_geom(dj0:dj1,dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(B_second_yy_geom(dj0:dj1,dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(B_second_xy_geom(dj0:dj1,dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(grav_coeff(dj0:dj1,dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(grav_coeff_stag_x(dj0:MIN(comp_interfaces_x,dj1+1),dk0:dk1))) .AND. &
+            ALL(ieee_is_finite(grav_coeff_stag_y(dj0:dj1,dk0:MIN(comp_interfaces_y,dk1+1))))
+    END SUBROUTINE apply_local_bed_rate
 
     SUBROUTINE derive_topography_from_vertices
 

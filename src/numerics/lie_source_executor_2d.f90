@@ -244,7 +244,7 @@ CONTAINS
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
         step_start_time,q_original,qp_original,step_failed,failure_message)
         USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, B_second_xy_geom,                    &
-            B_second_yy_geom, grav_coeff, project_cell_field_to_vertices, assign_topography_vertices, B_vertex,        &
+            B_second_yy_geom, grav_coeff, apply_local_bed_rate, B_vertex,        &
             B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
             dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
@@ -278,6 +278,7 @@ CONTAINS
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),source_time,noise
         LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
+        INTEGER :: changed_jmin,changed_jmax,changed_kmin,changed_kmax
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
         REAL(wp) :: red_grav,rho_mix
@@ -847,13 +848,18 @@ CONTAINS
         ! Geometry is the same for every source group in the step. Project
         ! all mass-exchange bed rates only once, after the cell sweep.
         IF (executor%has_bed_group) THEN
-            CALL project_cell_field_to_vertices(executor%bed_rate_cell,executor%bed_rate_vertex)
-            executor%bed_candidate=B_vertex+time_step*executor%bed_rate_vertex
-            IF (executor%diagnostics_enabled .OR. executor%reject_active) THEN
-                WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',executor%bed_group_id,                             &
-                    ' max_abs_delta=',MAXVAL(ABS(executor%bed_candidate-B_vertex))
-            END IF
-            CALL assign_topography_vertices(executor%bed_candidate,bed_accepted)
+            ! The physical kernel already computed cell rates on the compact solve list.
+            ! Collect their support; only the stencil neighbourhood needs refreshing.
+            changed_jmin=comp_cells_x+1; changed_jmax=0
+            changed_kmin=comp_cells_y+1; changed_kmax=0
+            DO cell=1,domain%solve_cells
+                j=domain%j_cent(cell); k=domain%k_cent(cell)
+                IF (executor%bed_rate_cell(j,k)==0.0_wp) CYCLE
+                changed_jmin=MIN(changed_jmin,j); changed_jmax=MAX(changed_jmax,j)
+                changed_kmin=MIN(changed_kmin,k); changed_kmax=MAX(changed_kmax,k)
+            END DO
+            CALL apply_local_bed_rate(executor%bed_rate_cell,time_step,changed_jmin,changed_jmax, &
+                changed_kmin,changed_kmax,bed_accepted)
             IF (.NOT.bed_accepted) THEN
                 CALL reject_cell('D19: invalid refreshed geometry')
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
