@@ -27,6 +27,10 @@ MODULE geometry_2d
     ! Saved authoritative fields for a recoverable Lie step. Derived geometry is
     ! reconstructed on rollback, so later groups still see intermediate bed updates.
     LOGICAL, PRIVATE :: geometry_transaction_active=.FALSE.
+    LOGICAL, PRIVATE :: geometry_transaction_sparse=.FALSE.,geometry_sparse_patch_saved=.FALSE.
+    INTEGER, PRIVATE :: patch_j0,patch_j1,patch_k0,patch_k1
+    INTEGER, PRIVATE :: patch_cj0,patch_cj1,patch_ck0,patch_ck1
+    INTEGER, PRIVATE :: patch_dj0,patch_dj1,patch_dk0,patch_dk1
     REAL(wp), ALLOCATABLE, PRIVATE :: lie_bed_before(:,:)
     REAL(wp), ALLOCATABLE, PRIVATE :: lie_cent_before(:,:),lie_face_x_before(:,:),lie_face_y_before(:,:)
     REAL(wp), ALLOCATABLE, PRIVATE :: lie_slope_x_before(:,:),lie_slope_y_before(:,:)
@@ -1475,6 +1479,21 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         END IF
         IF (.NOT.ALL(ieee_is_finite(cell_rate(jmin:jmax,kmin:kmax)))) RETURN
 
+        cj0=MAX(1,jmin-1); cj1=MIN(comp_cells_x,jmax+1)
+        ck0=MAX(1,kmin-1); ck1=MIN(comp_cells_y,kmax+1)
+        dj0=MAX(1,cj0-2); dj1=MIN(comp_cells_x,cj1+2)
+        dk0=MAX(1,ck0-2); dk1=MIN(comp_cells_y,ck1+2)
+        IF (dj0<=3) dj0=1
+        IF (dj1>=comp_cells_x-2) dj1=comp_cells_x
+        IF (dk0<=3) dk0=1
+        IF (dk1>=comp_cells_y-2) dk1=comp_cells_y
+        ! Short 2D and 1D grids use a global derivative reconstruction.
+        IF (comp_cells_x<5 .OR. comp_cells_y<5) THEN
+            dj0=1; dj1=comp_cells_x; dk0=1; dk1=comp_cells_y
+        END IF
+        IF (geometry_transaction_sparse) CALL capture_local_geometry( &
+            jmin,jmax,kmin,kmax,cj0,cj1,ck0,ck1,dj0,dj1,dk0,dk1)
+
         ! Each vertex is owned by one iteration: no scatter, atomics or races.
         !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(jf,jl,kf,kl,nadj,delta)
         DO k=kmin,kmax+1
@@ -1682,11 +1701,19 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !******************************************************************************
 
     !> Snapshot authoritative topography and derived geometry before a transaction.
-    SUBROUTINE begin_geometry_transaction
+    SUBROUTINE begin_geometry_transaction(sparse)
+        LOGICAL, OPTIONAL, INTENT(IN) :: sparse
         IF (geometry_transaction_active)                                                                               &
             ERROR STOP 'nested geometry transaction'
         IF (.NOT.ALLOCATED(B_vertex))                                                                                  &
             ERROR STOP 'geometry transaction started before initialization'
+        geometry_transaction_sparse=.FALSE.
+        IF (PRESENT(sparse)) geometry_transaction_sparse=sparse
+        geometry_sparse_patch_saved=.FALSE.
+        IF (geometry_transaction_sparse) THEN
+            geometry_transaction_active=.TRUE.
+            RETURN
+        END IF
         lie_bed_before=B_vertex
         lie_cent_before=B_cent
         lie_face_x_before=B_face_x
@@ -1702,6 +1729,29 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         geometry_transaction_active=.TRUE.
     END SUBROUTINE begin_geometry_transaction
 
+    !> Preserve only the fields potentially changed by the local Q1/LS update.
+    !> Fields are captured before the first write, once per Lie transaction.
+    SUBROUTINE capture_local_geometry(j0,j1,k0,k1,cj0,cj1,ck0,ck1,dj0,dj1,dk0,dk1)
+        INTEGER, INTENT(IN) :: j0,j1,k0,k1,cj0,cj1,ck0,ck1,dj0,dj1,dk0,dk1
+        IF (geometry_sparse_patch_saved) ERROR STOP 'nested local geometry update'
+        patch_j0=j0; patch_j1=j1; patch_k0=k0; patch_k1=k1
+        patch_cj0=cj0; patch_cj1=cj1; patch_ck0=ck0; patch_ck1=ck1
+        patch_dj0=dj0; patch_dj1=dj1; patch_dk0=dk0; patch_dk1=dk1
+        lie_bed_before=B_vertex(j0:j1+1,k0:k1+1)
+        lie_cent_before=B_cent(cj0:cj1,ck0:ck1)
+        lie_face_x_before=B_face_x(j0:j1+1,ck0:ck1)
+        lie_face_y_before=B_face_y(cj0:cj1,k0:k1+1)
+        lie_slope_x_before=B_prime_x_geom(dj0:dj1,dk0:dk1)
+        lie_slope_y_before=B_prime_y_geom(dj0:dj1,dk0:dk1)
+        lie_curvature_xx_before=B_second_xx_geom(dj0:dj1,dk0:dk1)
+        lie_curvature_yy_before=B_second_yy_geom(dj0:dj1,dk0:dk1)
+        lie_curvature_xy_before=B_second_xy_geom(dj0:dj1,dk0:dk1)
+        lie_gravity_before=grav_coeff(dj0:dj1,dk0:dk1)
+        lie_gravity_x_before=grav_coeff_stag_x(dj0:MIN(comp_interfaces_x,dj1+1),dk0:dk1)
+        lie_gravity_y_before=grav_coeff_stag_y(dj0:dj1,dk0:MIN(comp_interfaces_y,dk1+1))
+        geometry_sparse_patch_saved=.TRUE.
+    END SUBROUTINE capture_local_geometry
+
     !> Accept geometric changes and discard the pre-transaction snapshot.
     SUBROUTINE commit_geometry_transaction
         IF (.NOT.geometry_transaction_active)                                                                          &
@@ -1712,6 +1762,26 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> Restore the original bed and derived geometric fields on rejection.
     SUBROUTINE rollback_geometry_transaction
         IF (.NOT.geometry_transaction_active) RETURN
+        IF (geometry_transaction_sparse) THEN
+            IF (geometry_sparse_patch_saved) THEN
+                B_vertex(patch_j0:patch_j1+1,patch_k0:patch_k1+1)=lie_bed_before
+                B_cent(patch_cj0:patch_cj1,patch_ck0:patch_ck1)=lie_cent_before
+                B_face_x(patch_j0:patch_j1+1,patch_ck0:patch_ck1)=lie_face_x_before
+                B_face_y(patch_cj0:patch_cj1,patch_k0:patch_k1+1)=lie_face_y_before
+                B_prime_x_geom(patch_dj0:patch_dj1,patch_dk0:patch_dk1)=lie_slope_x_before
+                B_prime_y_geom(patch_dj0:patch_dj1,patch_dk0:patch_dk1)=lie_slope_y_before
+                B_second_xx_geom(patch_dj0:patch_dj1,patch_dk0:patch_dk1)=lie_curvature_xx_before
+                B_second_yy_geom(patch_dj0:patch_dj1,patch_dk0:patch_dk1)=lie_curvature_yy_before
+                B_second_xy_geom(patch_dj0:patch_dj1,patch_dk0:patch_dk1)=lie_curvature_xy_before
+                grav_coeff(patch_dj0:patch_dj1,patch_dk0:patch_dk1)=lie_gravity_before
+                grav_coeff_stag_x(patch_dj0:MIN(comp_interfaces_x,patch_dj1+1), &
+                    patch_dk0:patch_dk1)=lie_gravity_x_before
+                grav_coeff_stag_y(patch_dj0:patch_dj1, &
+                    patch_dk0:MIN(comp_interfaces_y,patch_dk1+1))=lie_gravity_y_before
+            END IF
+            CALL clear_geometry_transaction
+            RETURN
+        END IF
         B_vertex=lie_bed_before
         ! Restore the exact pre-step caches: reconstruction itself may have failed.
         B_cent=lie_cent_before
@@ -1742,6 +1812,8 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         IF (ALLOCATED(lie_gravity_x_before)) DEALLOCATE(lie_gravity_x_before)
         IF (ALLOCATED(lie_gravity_y_before)) DEALLOCATE(lie_gravity_y_before)
         geometry_transaction_active=.FALSE.
+        geometry_transaction_sparse=.FALSE.
+        geometry_sparse_patch_saved=.FALSE.
     END SUBROUTINE clear_geometry_transaction
 
     SUBROUTINE refresh_topography_geometry

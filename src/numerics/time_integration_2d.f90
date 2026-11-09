@@ -271,7 +271,7 @@ CONTAINS
         needs_substrate_snapshot=this%lie_executor%has_exchange_group
         needs_geometry_snapshot=this%lie_executor%has_bed_group
         IF (needs_substrate_snapshot) CALL state%snapshot_substrate(this%substrate_before)
-        IF (needs_geometry_snapshot) CALL begin_geometry_transaction
+        IF (needs_geometry_snapshot) CALL begin_geometry_transaction(sparse=.TRUE.)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_substrate_snapshot=this%profile_substrate_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
