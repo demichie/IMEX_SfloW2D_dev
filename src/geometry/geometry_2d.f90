@@ -1457,6 +1457,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> The caller owns the Lie geometry transaction and restores it on failure.
     !> The changed-cell box is expanded by the Q1 and five-point LS stencils.
     SUBROUTINE apply_local_bed_rate(cell_rate,dt,jmin,jmax,kmin,kmax,accepted)
+        USE parameters_2d, ONLY : slope_correction_flag
         REAL(wp), INTENT(IN) :: cell_rate(comp_cells_x,comp_cells_y),dt
         INTEGER, INTENT(IN) :: jmin,jmax,kmin,kmax
         LOGICAL, INTENT(OUT) :: accepted
@@ -1525,6 +1526,12 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         ! clamp source indices exactly as copy_derivative_halo_x/y do.
         dj0=MAX(1,cj0-2); dj1=MIN(comp_cells_x,cj1+2)
         dk0=MAX(1,ck0-2); dk1=MIN(comp_cells_y,ck1+2)
+        ! Boundary extrapolation can extend an affected interior derivative to
+        ! both halo rows/columns. Include those copies in the local workset.
+        IF (dj0<=3) dj0=1
+        IF (dj1>=comp_cells_x-2) dj1=comp_cells_x
+        IF (dk0<=3) dk0=1
+        IF (dk1>=comp_cells_y-2) dk1=comp_cells_y
         !$OMP PARALLEL DO COLLAPSE(2) &
         !$OMP& PRIVATE(sj,sk,kj,kk,firstx,firsty,secondx,secondy,mixed)
         DO k=dk0,dk1
