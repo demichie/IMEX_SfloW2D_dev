@@ -404,6 +404,8 @@ MODULE inpout_2d
         eps_stop, alphas_threshold
 
     NAMELIST /liquid_transport_parameters/ sp_heat_l, rho_l, kin_visc_l
+    ! Lava reuses the physical density and heat capacity, not a fixed viscosity.
+    NAMELIST /lava_transport_parameters/ sp_heat_l, rho_l
 
     NAMELIST /vulnerability_table_parameters/ thickness_levels0, dyn_pres_levels0
 
@@ -1567,17 +1569,26 @@ CONTAINS
 
         END IF
 
-        ! ------- READ liquid_transport_parameters NAMELIST -------------------------
+        ! ------- READ phase-specific carrier transport parameters ------------------
 
-        IF (liquid_flag) THEN
+        IF (liquid_flag .OR. lava_flag) THEN
 
-        READ (input_unit, liquid_transport_parameters, IOSTAT=ios)
+        IF (lava_flag) THEN
+            READ (input_unit, lava_transport_parameters, IOSTAT=ios)
+        ELSE
+            READ (input_unit, liquid_transport_parameters, IOSTAT=ios)
+        END IF
 
         IF (ios .NE. 0) THEN
 
             WRITE (*, *) 'IOSTAT=', ios
-            WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-            WRITE (*, liquid_transport_parameters)
+            IF (lava_flag) THEN
+                WRITE (*, *) 'ERROR: problem with namelist LAVA_TRANSPORT_PARAMETERS'
+                WRITE (*, lava_transport_parameters)
+            ELSE
+                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                WRITE (*, liquid_transport_parameters)
+            END IF
             WRITE (*, *) 'Please check the input file'
             STOP
 
@@ -1587,7 +1598,7 @@ CONTAINS
 
         END IF
 
-        IF (sp_heat_l .EQ. -1.0_wp) THEN
+        IF (sp_heat_l .LE. 0.0_wp) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
             WRITE (*, *) 'SP_HEAT_L =', sp_heat_l
@@ -1596,7 +1607,7 @@ CONTAINS
 
         END IF
 
-        IF (rho_l .EQ. -1.0_wp) THEN
+        IF (rho_l .LE. 0.0_wp) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
             WRITE (*, *) 'RHO_L =', rho_l
@@ -1621,7 +1632,7 @@ CONTAINS
         READ (input_unit, rheology_parameters, IOSTAT=ios)
         REWIND (input_unit)
 
-        IF (.NOT. gas_flag) THEN
+        IF (liquid_flag) THEN
 
             IF (kin_visc_l .EQ. -1.0_wp) THEN
 
@@ -1671,6 +1682,8 @@ CONTAINS
         END IF
 
         END IF
+
+        IF (lava_flag .AND. verbose_level .GE. 0) WRITE (*, *) 'CARRIER PHASE: lava'
 
         ! ------- READ solid_transport_parameters NAMELIST --------------------------
 
@@ -4945,6 +4958,7 @@ CONTAINS
         WRITE (backup_unit, gas_transport_parameters)
 
         IF (liquid_flag) WRITE (backup_unit, liquid_transport_parameters)
+        IF (lava_flag) WRITE (backup_unit, lava_transport_parameters)
 
         IF (radial_source_flag) WRITE (backup_unit, radial_source_parameters)
 

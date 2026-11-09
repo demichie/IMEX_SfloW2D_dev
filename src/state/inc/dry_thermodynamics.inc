@@ -5,7 +5,7 @@
     state%inv_rhom=1.0_wp/rho_a_amb
     state%rho_c=rho_a_amb
     state%inv_rho_c=1.0_wp/rho_a_amb
-    IF (liquid_flag) THEN
+    IF (liquid_flag .OR. lava_flag) THEN
         state%cp_m=sp_heat_l
         state%cp_c=sp_heat_l
     ELSE

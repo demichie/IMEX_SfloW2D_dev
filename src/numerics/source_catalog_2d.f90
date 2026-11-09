@@ -100,7 +100,7 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
             source_term_type('bottom_fissural_injection',.TRUE.,.FALSE.,.FALSE.,                                       &
                 default_method=SOURCE_METHOD_EXPLICIT,                                                                 &
-                    allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
+                    allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.TRUE.),                                     &
             source_term_type('radial_injection',.TRUE.,.FALSE.,.FALSE.,                                                &
                     default_method=SOURCE_METHOD_EXPLICIT,                                                             &
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
