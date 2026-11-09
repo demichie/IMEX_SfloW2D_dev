@@ -561,6 +561,14 @@ CONTAINS
                             CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok)
                             IF (.NOT.conversion_ok) THEN
                                 cell_error=8
+                                IF (executor%diagnostics_enabled) THEN
+                                    cell_group=executor%groups(group_index)%id
+                                    cell_mass=q_candidate(idx_totMassEqn)
+                                    cell_components=SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
+                                    executor%failure_reference(:,cell)=q_local(1:n_eqns)
+                                    executor%failure_rate(:,cell)=total_rate
+                                    executor%failure_candidate(:,cell)=q_candidate(1:n_eqns)
+                                END IF
                                 EXIT group_loop
                             END IF
                         ELSE
@@ -816,6 +824,22 @@ CONTAINS
                 failure_reason='D19: invalid candidate substrate inventory'
             CASE(8)
                 failure_reason='D19: explicit candidate conversion failed'
+                IF (executor%diagnostics_enabled) THEN
+                    j=domain%j_cent(first_failure)
+                    k=domain%k_cent(first_failure)
+                    WRITE(*,'(A,2(I0,1X),A,I0)') 'D19_CONVERSION cell=',j,k, &
+                        'group=',executor%failure_group(first_failure)
+                    WRITE(*,'(A,ES24.16)') 'D19_CONVERSION dt=',time_step
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_CONVERSION recipient=', &
+                        executor%failure_reference(:,first_failure)
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_CONVERSION scaled_rate=', &
+                        executor%failure_rate(:,first_failure)
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_CONVERSION candidate=', &
+                        executor%failure_candidate(:,first_failure)
+                    WRITE(*,'(A,ES24.16,A,ES24.16)') 'D19_CONVERSION mass=', &
+                        executor%failure_candidate(idx_totMassEqn,first_failure), &
+                        ' energy=',executor%failure_candidate(idx_engyEqn,first_failure)
+                END IF
             CASE(10)
                 failure_reason='D19: analytic source returned non-finite rate'
             CASE(12)
