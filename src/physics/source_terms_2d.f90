@@ -239,7 +239,15 @@ CONTAINS
         IF (limiter>=0.0_wp .AND. limiter<=1.0_wp) THEN
             DO i=1,256
                 candidate=q_reference+dt*(limiter*rate)
-                IF (conservative_mass_admissible(candidate)) EXIT
+                ! A wet conservative state requires strictly positive energy.
+                ! Complete carrier depletion can round the energy to exactly
+                ! zero while leaving a representable wet mass (Etna lava D19).
+                ! Back off the *coupled rate*, never clip q or invent energy.
+                IF (conservative_mass_admissible(candidate)) THEN
+                    IF (q_reference(idx_engyEqn)<=0.0_wp .OR. rate(idx_engyEqn)>=0.0_wp) EXIT
+                    IF (candidate(idx_totMassEqn)<=EPSILON(1.0_wp)) EXIT
+                    IF (candidate(idx_engyEqn)>0.0_wp) EXIT
+                END IF
                 IF (limiter<=0.0_wp) EXIT
                 limiter=NEAREST(limiter,-1.0_wp)
             END DO
@@ -247,6 +255,10 @@ CONTAINS
         END IF
         valid=limiter>=0.0_wp .AND. limiter<=1.0_wp
         IF (valid) valid=conservative_mass_admissible(candidate)
+        IF (valid .AND. q_reference(idx_engyEqn)>0.0_wp .AND. rate(idx_engyEqn)<0.0_wp) THEN
+            IF (candidate(idx_totMassEqn)>EPSILON(1.0_wp)) &
+                valid=candidate(idx_engyEqn)>0.0_wp
+        END IF
     END SUBROUTINE limit_explicit_source_rates
 
     !> Return the conservative equivalent rate of the exact source substep.

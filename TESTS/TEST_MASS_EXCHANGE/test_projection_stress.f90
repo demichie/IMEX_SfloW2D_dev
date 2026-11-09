@@ -39,6 +39,7 @@ PROGRAM test_projection_stress
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
   CALL check_limiter_representability
+  CALL check_lava_energy_depletion
   CALL check_taal_saturated_species_budget
   CALL check_late_group_recipient_budget
   CALL check_injection_before_settling_budget
@@ -119,6 +120,41 @@ CONTAINS
             ERROR STOP 'Deposition limiter left negative solid mass'
     END DO
   END SUBROUTINE check_limiter_representability
+
+  ! Etna lava group 4, cell (791,494), t=4440.8249 s:
+  ! the original mass budget is nonnegative but energy rounds to zero
+  ! with a wet residue of 2*EPSILON. The coupled withdrawal limiter must
+  ! leave a reconstructable wet state, not adjust q after the update.
+  SUBROUTINE check_lava_energy_depletion
+    REAL(wp) :: recipient(nq),rates(nq),candidate(nq),scale,dt
+    REAL(wp) :: raw_candidate(nq)
+    LOGICAL :: valid,converted
+    REAL(wp) :: qp_local(nq)
+
+    recipient=0.0_wp
+    rates=0.0_wp
+    dt=7.3281621641375327E-01_wp
+    recipient(idx_totMassEqn)=1.9043435144233587E+00_wp
+    recipient(idx_engyEqn)=2.1038749547555055E+06_wp
+    rates(idx_totMassEqn)=-2.5986645379421467E+00_wp
+    rates(idx_engyEqn)=-2.8709448667108133E+06_wp
+    raw_candidate=recipient+dt*rates
+    IF (raw_candidate(idx_totMassEqn)<=EPSILON(1.0_wp) .OR. &
+        raw_candidate(idx_engyEqn)/=0.0_wp) &
+        ERROR STOP 'Etna lava conversion regression witness no longer reproduces'
+
+    CALL limit_explicit_source_rates(recipient,[REAL(wp)::],dt,rates, &
+        [REAL(wp)::],scale,valid)
+    IF (.NOT.valid) ERROR STOP 'Etna lava energy limiter rejected candidate'
+    candidate=recipient+dt*(scale*rates)
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+        ERROR STOP 'Etna lava energy limiter violates conservative mass bounds'
+    IF (candidate(idx_totMassEqn)>EPSILON(1.0_wp) .AND. &
+        candidate(idx_engyEqn)<=0.0_wp) &
+        ERROR STOP 'Etna lava limiter left wet state without positive energy'
+    ! Also check the unchanged zero-transfer limit: no fictitious heat added.
+    IF (scale<0.0_wp .OR. scale>1.0_wp) ERROR STOP 'Invalid lava rate scale'
+  END SUBROUTINE check_lava_energy_depletion
 
   !> Exact conservative witness from EXAMPLE_TAAL group 4, cell (224,379).
   !> The unbuffered active species bound rounded to a negative 1.43E-20.
