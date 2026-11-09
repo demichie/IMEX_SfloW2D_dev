@@ -452,7 +452,7 @@ CONTAINS
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
     ALLOCATE(grav_coeff(nx,ny),grav_coeff_stag_x(nx+1,ny),grav_coeff_stag_y(nx,ny+1))
     ALLOCATE(state%deposit(nx,ny,ns),state%erosion(nx,ny,ns), &
-         state%erodible(ns,nx,ny),state%lava_deposit(nx,ny))
+         state%erodible(ns,nx,ny),state%deposit_tot(nx,ny))
     ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
     state%deposit_tot=0.0_wp;state%erosion_tot=0.0_wp
     ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
@@ -469,7 +469,7 @@ CONTAINS
     LOGICAL, INTENT(IN) :: wet_dry
     INTEGER :: a,b,l
     REAL(wp) :: x,y,carrier_mass
-    state%deposit=0.0_wp; state%erosion=0.0_wp; state%erodible=0.0_wp; state%lava_deposit=0.0_wp
+    state%deposit=0.0_wp; state%erosion=0.0_wp; state%erodible=0.0_wp; state%deposit_tot=0.0_wp
     B_zone=0; cell_source_fractions=0.0_wp
     qp=0.0_wp; qp(4,:,:)=T_ambient
     l=0
@@ -601,7 +601,7 @@ CONTAINS
     q_before=q;qp_before=qp
     bed_before=B_vertex
     deposited_before=state%deposit;eroded_before=state%erosion
-    erodible_before=state%erodible;lava_before=state%lava_deposit
+    erodible_before=state%erodible;lava_before=state%deposit_tot
     centers_before=B_cent;slope_before=B_prime_x_geom
     q_trial=q_before;qp_trial=qp_before
     ! Cell 2 is rejected after cell 1 has been considered for transfer.
@@ -626,7 +626,7 @@ CONTAINS
     IF (ANY(B_vertex/=bed_before) .OR. ANY(B_cent/=centers_before) .OR. &
          ANY(B_prime_x_geom/=slope_before)) ERROR STOP 'Lie bed rollback mismatch'
     IF (ANY(state%deposit/=deposited_before) .OR. ANY(state%erosion/=eroded_before) .OR. &
-         ANY(state%erodible/=erodible_before) .OR. ANY(state%lava_deposit/=lava_before)) &
+         ANY(state%erodible/=erodible_before) .OR. ANY(state%deposit_tot/=lava_before)) &
          ERROR STOP 'Lie inventory rollback mismatch'
     CALL finalize_lie_source_executor(executor)
     CALL registry%finalize()
@@ -805,7 +805,7 @@ CONTAINS
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
     DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_zone,cell_source_fractions)
     DEALLOCATE(cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y)
-    DEALLOCATE(state%deposit,state%erosion,state%erodible,state%lava_deposit, &
+    DEALLOCATE(state%deposit,state%erosion,state%erodible,state%deposit_tot, &
          state%deposit_tot,state%erosion_tot)
   END SUBROUTINE release_grid
 END PROGRAM test_projection_stress

@@ -305,7 +305,6 @@ CONTAINS
                 IF (.NOT.ALL(state%deposit==this%substrate_before%deposit) .OR.                                             &
                     .NOT.ALL(state%erosion==this%substrate_before%erosion) .OR.                                             &
                     .NOT.ALL(state%erodible==this%substrate_before%erodible) .OR.                                           &
-                    .NOT.ALL(state%lava_deposit==this%substrate_before%lava_deposit) .OR.                                   &
                     .NOT.ALL(state%deposit_tot==this%substrate_before%deposit_tot) .OR.                                     &
                     .NOT.ALL(state%erosion_tot==this%substrate_before%erosion_tot))                                         &
                     CALL fatal_error('D20 rollback: physical inventories not restored')
@@ -375,7 +374,6 @@ CONTAINS
         IF (ALLOCATED(this%substrate_before%deposit)) DEALLOCATE(this%substrate_before%deposit)
         IF (ALLOCATED(this%substrate_before%erosion)) DEALLOCATE(this%substrate_before%erosion)
         IF (ALLOCATED(this%substrate_before%erodible)) DEALLOCATE(this%substrate_before%erodible)
-        IF (ALLOCATED(this%substrate_before%lava_deposit)) DEALLOCATE(this%substrate_before%lava_deposit)
         IF (ALLOCATED(this%substrate_before%deposit_tot)) DEALLOCATE(this%substrate_before%deposit_tot)
         IF (ALLOCATED(this%substrate_before%erosion_tot)) DEALLOCATE(this%substrate_before%erosion_tot)
     END SUBROUTINE finalize_time_integration

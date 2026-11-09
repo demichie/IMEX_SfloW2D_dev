@@ -2,7 +2,7 @@
 
 **Riferimento:** 7 novembre 2026  
 **Ambito:** architettura di produzione e piano di implementazione per `N_LAYERS=1` e `N_LAYERS=2`.  
-**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. I blocchi TL00–TL13 e i gate M0–M6 sono aperti.  
+**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. TL00a dispone di una prima implementazione sul branch, in attesa di build, regressioni e verifica di restart/NetCDF. I gate M0–M6 restano aperti.  
 **Tracciamento:** [Roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) per lo stato complessivo del progetto; questo documento è la specifica tecnica del percorso two-layer.
 
 ## 1. Obiettivo e configurazioni del modello
@@ -59,7 +59,7 @@ Le chiusure e i parametri reologici possono differire fra L1 e L2; si riutilizza
 
 - **Flusso granulare:** `deposit(:,:,:)` conserva l'inventario volumetrico delle classi solide; lo spessore totale del deposito è derivato mediante la porosità del substrato, `deposit_tot = SUM(deposit,DIM=3)/(1-erodible_porosity)`, secondo la convenzione esistente.
 - **Flusso di lava:** `deposit_tot(:,:)` rappresenta direttamente lo spessore della lava immobilizzata, senza conversione mediante la porosità granulare.
-- **`lava_deposit(:,:)`**, presente nel codice corrente, è ridondante rispetto alla rappresentazione canonica dello spessore e viene eliminato solo dopo un audit completo di dipendenze e conservazione: Lie, snapshot/rollback, NetCDF, restart, diagnostiche e topografia.
+- **`lava_deposit(:,:)`** non è più un inventario autonomo nell'implementazione TL00a sul branch; gli usi sono migrati a \`deposit_tot\`. La verifica di conservazione, rollback, NetCDF, restart, diagnostiche e topografia costituisce un gate ancora aperto.
 - **`erosion` / `erosion_tot`:** mantengono la semantica distinta dell'erosione del substrato. L'eventuale evoluzione della quota topografica non coincide automaticamente con lo spessore cumulativo del deposito: evitare doppio conteggio.
 
 Restano **distinte le due leggi fisiche**: deposizione granulare per sedimentazione e immobilizzazione della lava per rate prescritto o dipendente da temperatura/viscosità. Entrambe producono gli opportuni trasferimenti di massa ed energia e l'aggiornamento geometrico mediante il coordinamento esistente. La variabile comune è lo **spessore risultante**, non la legge di trasferimento. `deposit_tot` ha un proprietario e una convenzione coerenti in tutta la simulazione, inclusi rollback e output.
@@ -70,7 +70,7 @@ La razionalizzazione del deposito è un blocco autonomo di compatibilità single
 
 \`deposit_tot\` è lo **spessore cumulativo positivo di materiale immobilizzato** rispetto allo stato iniziale, non il cambiamento netto di quota topografica e non l'inventario erodibile. È un campo del substrato privo dell'indice layer. L'erosione ha il suo inventario e la propria semantica; l'eventuale incorporazione del deposito nell'erodibile deve seguire \`erodible_deposit_flag\` e le convenzioni attuali.
 
-Nel codice attuale \`state_fields:refresh_substrate_totals\` azzera \`deposit_tot\` quando \`n_solid=0\`, oppure lo ricostruisce **solo** da \`deposit\`. Il Lie accumula \`lava_deposit\` separatamente e chiama il refresh a fine gruppo di scambio; il restart v7 salva \`lava_deposit\` e richiama il refresh dopo il caricamento. Per ottenere il comportamento canonico sono quindi indispensabili **due rami fisici esclusivi e verificabili**:
+Nell'implementazione TL00a \`state_fields:refresh_substrate_totals\` mantiene \`deposit_tot\` come inventario autorevole quando \`lava_flag=T\`, anche con \`n_solid=0\`; nel ramo granulare lo deriva da \`deposit\`. Il Lie incrementa direttamente il candidato \`deposit_tot\`. Il record finale del restart v7 conserva la posizione e il significato binario storico, ma per lava viene letto/scritto mediante \`deposit_tot\`. Questa compatibilità deve essere convalidata con un round-trip eseguito. Per ottenere il comportamento canonico sono quindi indispensabili **due rami fisici esclusivi e verificabili**:
 
 \`\`\`text
 granular carrier: deposit_tot = SUM(deposit_volumes)/(1-erodible_porosity)
@@ -299,7 +299,7 @@ I test I/O sono effettuati sia senza scambi sia con scambi e modifica del terren
 
 ## 9. Roadmap operativa
 
-Tutti i blocchi seguenti sono **DA INIZIARE**. Ogni blocco è un intervento separato e verificabile; i primi gate proteggono il single-layer funzionante.
+I blocchi TL00–TL13 descrivono il percorso completo. Su `feature/two-layer` sono presenti le modifiche al catalogo lava, l'input `LAVA_TRANSPORT_PARAMETERS` e l'implementazione di TL00a; la certificazione dei test e i gate di milestone restano aperti. Ogni blocco è un intervento separato e verificabile; i primi gate proteggono il single-layer funzionante.
 
 | ID | Obiettivo tecnico | Criteri di accettazione |
 |---|---|---|
@@ -369,7 +369,7 @@ Se un gate fallisce, la milestone **non** è raggiunta: il lavoro rimane sul bra
 | Milestone | Stato | Merge in `master` | Evidenza |
 |---|---|---|---|
 | M0 | Da certificare | Non eseguito | Roadmap e audit preparati; baseline e gate ancora da verificare. |
-| M1 | Non iniziata | Non eseguito | TL00a aperto. |
+| M1 | In verifica | Non eseguito | Codice TL00a presente sul branch; manca la certificazione dei test e del gate M0. |
 | M2 | Non iniziata | Non eseguito | TL01–TL03 aperti. |
 | M3 | Non iniziata | Non eseguito | TL04–TL05 aperti. |
 | M4 | Non iniziata | Non eseguito | TL06 aperto. |

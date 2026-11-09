@@ -60,27 +60,23 @@ PROGRAM test_workspace_lifecycle
   ALLOCATE(state%deposit(comp_cells_x,comp_cells_y,1))
   ALLOCATE(state%erosion(comp_cells_x,comp_cells_y,1))
   ALLOCATE(state%erodible(1,comp_cells_x,comp_cells_y))
-  ALLOCATE(state%lava_deposit(comp_cells_x,comp_cells_y))
   ALLOCATE(state%deposit_tot(comp_cells_x,comp_cells_y))
   ALLOCATE(state%erosion_tot(comp_cells_x,comp_cells_y))
   state%deposit=1.0_wp
   state%erosion=2.0_wp
   state%erodible=3.0_wp
-  state%lava_deposit=4.0_wp
   state%deposit_tot=5.0_wp
   state%erosion_tot=6.0_wp
   CALL state%snapshot_substrate(substrate_before)
   state%deposit=-11.0_wp
   state%erosion=-12.0_wp
   state%erodible=-13.0_wp
-  state%lava_deposit=-14.0_wp
   state%deposit_tot=-15.0_wp
   state%erosion_tot=-16.0_wp
   CALL state%restore_substrate(substrate_before)
   CALL assert_true('rollback restores deposition', ALL(state%deposit==1.0_wp))
   CALL assert_true('rollback restores erosion', ALL(state%erosion==2.0_wp))
   CALL assert_true('rollback restores erodible inventory', ALL(state%erodible==3.0_wp))
-  CALL assert_true('rollback restores lava', ALL(state%lava_deposit==4.0_wp))
   CALL assert_true('rollback restores deposit totals', ALL(state%deposit_tot==5.0_wp))
   CALL assert_true('rollback restores erosion totals', ALL(state%erosion_tot==6.0_wp))
 

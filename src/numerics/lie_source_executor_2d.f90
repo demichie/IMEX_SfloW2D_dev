@@ -413,7 +413,7 @@ CONTAINS
                 deposit_local=state%deposit(j,k,1:n_solid)
                 erosion_local=state%erosion(j,k,1:n_solid)
                 erodible_local=state%erodible(1:n_solid,j,k)
-                lava_local=state%lava_deposit(j,k)
+                lava_local=state%deposit_tot(j,k)
             END IF
             ! Capture cell-local geometry and stochastic forcing for all groups.
             cell_context%Bprime_x=B_prime_x_geom(j,k)
@@ -692,7 +692,7 @@ CONTAINS
                     cell_updated=ANY(deposit_local/=state%deposit(j,k,1:n_solid)) .OR.                              &
                         ANY(erosion_local/=state%erosion(j,k,1:n_solid)) .OR.                                        &
                         ANY(erodible_local/=state%erodible(1:n_solid,j,k)) .OR.                                      &
-                        lava_local/=state%lava_deposit(j,k)
+                        lava_local/=state%deposit_tot(j,k)
                 END IF
                 IF (executor%has_bed_group .AND. .NOT.cell_updated)                                                  &
                     cell_updated=executor%bed_rate_cell(j,k)/=0.0_wp
@@ -715,7 +715,7 @@ CONTAINS
                     state%deposit(j,k,1:n_solid)=deposit_local
                     state%erosion(j,k,1:n_solid)=erosion_local
                     state%erodible(1:n_solid,j,k)=erodible_local
-                    state%lava_deposit(j,k)=lava_local
+                    state%deposit_tot(j,k)=lava_local
                 END IF
             END IF
             IF (cell_error/=0) THEN

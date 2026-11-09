@@ -327,6 +327,7 @@ MODULE inpout_2d
     INTEGER             :: pDynMax_varid     !> ID for max of dynamic pressure
     INTEGER             :: modVelMax_varid   !> ID for max of velicity magnitude
     INTEGER, ALLOCATABLE :: deposit_varid(:)  !> ID for solid deposit
+    INTEGER             :: deposit_tot_varid !> ID for cumulative deposit thickness
     INTEGER, ALLOCATABLE :: erosion_varid(:)  !> ID for solid erosion
     INTEGER             :: Ri2D_varid        !> ID for Richardson number
     INTEGER             :: rho_m2D_varid     !> ID for flow density
@@ -6403,7 +6404,7 @@ CONTAINS
 
         CLOSE (output_esri_unit)
 
-        IF (settling_flag) THEN
+        IF (settling_flag .OR. lava_flag) THEN
 
         !Save solid classes deposit
         DO i_solid = 1, n_solid
@@ -6444,7 +6445,7 @@ CONTAINS
 
         END DO
 
-        ! Save total deposit (solid+continous phase associated with porosity)
+        ! Save canonical cumulative deposit thickness: granular or lava.
         output_esri_file = snapshot_file_path(                                                                         &
             TRIM(run_name)//'_depTot_'//idx_string//'.asc')
 
@@ -7426,6 +7427,11 @@ CONTAINS
         CALL check(nf90_inq_varid(ncid, 'red grav', red_grav2D_varid))
         CALL check(nf90_inq_varid(ncid, 'mu eff', muEff_varid))
         CALL check(nf90_inq_varid(ncid, 'erodible', erodible_varid))
+        status = nf90_inq_varid(ncid, 'deposit_tot', deposit_tot_varid)
+        IF (status == nf90_enotvar) THEN
+            CALL fatal_error('Cannot append to legacy NetCDF without deposit_tot; use a new output file')
+        END IF
+        CALL check(status)
         CALL check(nf90_inq_varid(ncid, 'shear_velocity', shearVel_varid))
 
         DO i = 1, n_solid
@@ -7588,6 +7594,11 @@ CONTAINS
         CALL check(nf90_def_var(ncid, 'mu eff', nf90_double, dimids, muEff_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, muEff_varid, 'units', ''))
         CALL check(nf90_put_att(ncid, muEff_varid, 'long_name', 'effective friction coefficient'))
+
+        CALL check(nf90_def_var(ncid, 'deposit_tot', nf90_double, dimids, deposit_tot_varid, &
+            deflate_level=5, shuffle=.true.))
+        CALL check(nf90_put_att(ncid, deposit_tot_varid, 'units', 'meters'))
+        CALL check(nf90_put_att(ncid, deposit_tot_varid, 'long_name', 'cumulative deposited thickness'))
 
         CALL check(nf90_def_var(ncid, 'erodible', nf90_double, dimids, erodible_varid, deflate_level=5, shuffle=.true.))
         CALL check(nf90_put_att(ncid, erodible_varid, 'units', 'meters'))
@@ -7925,6 +7936,7 @@ END IF
 
         CALL check(nf90_put_var(ncid, muEff_varid, muEff, start=start, count=count))
         CALL check(nf90_put_var(ncid, erodible_varid, erodible2D, start=start, count=count))
+        CALL check(nf90_put_var(ncid, deposit_tot_varid, state%deposit_tot, start=start, count=count))
         CALL check(nf90_put_var(ncid, shearVel_varid, shearVel, start=start, count=count))
 
         DO i = 1, n_solid
@@ -8100,7 +8112,12 @@ END IF
             runtime%runout%last_distance, runtime%runout%maximum_distance,                                             &
             runtime%runout%runout_row, runtime%runout%mass_center_row
         CALL check_restart_io(ierr, io_message, 'writing runout history to', filename)
-        WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%lava_deposit
+        ! Preserve the v7 final record: lava thickness in a lava run, zeros otherwise.
+        IF (lava_flag) THEN
+            WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit_tot
+        ELSE
+            WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) 0.0_wp*state%deposit_tot
+        END IF
         CALL check_restart_io(ierr, io_message, 'writing lava deposit to', filename)
 
         CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
@@ -8299,7 +8316,8 @@ END IF
             runtime%runout%last_distance, runtime%runout%maximum_distance,                                             &
             runtime%runout%runout_row, runtime%runout%mass_center_row
         CALL check_restart_io(ierr, io_message, 'reading runout history from', filename)
-        READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%lava_deposit
+        ! Legacy v7 lava_deposit occupies this record; map to canonical deposit_tot.
+        READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit_tot
         CALL check_restart_io(ierr, io_message, 'reading lava deposit from', filename)
         CALL state%refresh_substrate_totals()
         IF (output_runout_flag .AND. .NOT. runtime%runout%initialized)                                                 &

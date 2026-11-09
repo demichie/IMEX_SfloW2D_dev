@@ -20,7 +20,7 @@ MODULE state_fields
 
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
-    USE parameters_2d, ONLY : wp,n_solid
+    USE parameters_2d, ONLY : wp,n_solid,lava_flag
     USE parameters_2d, ONLY : n_thickness_levels, n_dyn_pres_levels
 
     IMPLICIT NONE
@@ -35,8 +35,6 @@ MODULE state_fields
     TYPE :: substrate_snapshot_type
         !> Per-solid deposited, eroded and erodible inventories in grid cells.
         REAL(wp), ALLOCATABLE :: deposit(:,:,:),erosion(:,:,:),erodible(:,:,:)
-        !> Cellwise lava-deposit inventory.
-        REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
         !> Total deposited and eroded thickness fields for rollback.
         REAL(wp), ALLOCATABLE :: deposit_tot(:,:),erosion_tot(:,:)
     END TYPE substrate_snapshot_type
@@ -55,7 +53,7 @@ MODULE state_fields
         !> Physical substrate inventories owned by the same simulation state as q and qp.
         REAL(wp), ALLOCATABLE :: deposit(:,:,:),deposit_tot(:,:)
         REAL(wp), ALLOCATABLE :: erosion(:,:,:),erosion_tot(:,:)
-        REAL(wp), ALLOCATABLE :: erodible(:,:,:),lava_deposit(:,:)
+        REAL(wp), ALLOCATABLE :: erodible(:,:,:)
 
         !> Map of positive thickness
         LOGICAL, ALLOCATABLE :: hpos(:,:)
@@ -112,13 +110,11 @@ CONTAINS
         ALLOCATE(this%deposit(comp_cells_x,comp_cells_y,n_solid))
         ALLOCATE(this%erosion(comp_cells_x,comp_cells_y,n_solid))
         ALLOCATE(this%erodible(n_solid,comp_cells_x,comp_cells_y))
-        ALLOCATE(this%lava_deposit(comp_cells_x,comp_cells_y))
         ALLOCATE(this%deposit_tot(comp_cells_x,comp_cells_y))
         ALLOCATE(this%erosion_tot(comp_cells_x,comp_cells_y))
         this%deposit=0.0_wp
         this%erosion=0.0_wp
         this%erodible=0.0_wp
-        this%lava_deposit=0.0_wp
         this%deposit_tot=0.0_wp
         this%erosion_tot=0.0_wp
         this%q = 0.0_wp
@@ -158,7 +154,7 @@ CONTAINS
 
 
         DEALLOCATE(this%deposit,this%deposit_tot,this%erosion,this%erosion_tot,                                        &
-            this%erodible,this%lava_deposit)
+            this%erodible)
         DEALLOCATE( this%qp )
 
     END SUBROUTINE finalize_state
@@ -186,7 +182,6 @@ CONTAINS
         snapshot%deposit=this%deposit
         snapshot%erosion=this%erosion
         snapshot%erodible=this%erodible
-        snapshot%lava_deposit=this%lava_deposit
         snapshot%deposit_tot=this%deposit_tot
         snapshot%erosion_tot=this%erosion_tot
     END SUBROUTINE snapshot_substrate
@@ -201,18 +196,23 @@ CONTAINS
         this%deposit=snapshot%deposit
         this%erosion=snapshot%erosion
         this%erodible=snapshot%erodible
-        this%lava_deposit=snapshot%lava_deposit
         this%deposit_tot=snapshot%deposit_tot
         this%erosion_tot=snapshot%erosion_tot
     END SUBROUTINE restore_substrate
 
-    !> @brief Recompute deposited and eroded thickness from solid inventories.
-    !> @details No solids produces zero totals; an invalid substrate porosity is fatal.
+    !> @brief Refresh substrate totals without replacing the authoritative lava deposit.
+    !> @details For lava deposit_tot is accumulated immobilized thickness; for
+    !>          granular flows it is derived from class inventories and porosity.
     !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
     !> inventories.
     SUBROUTINE refresh_substrate_totals(this)
         CLASS(state_type), INTENT(INOUT) :: this
-        ! No solids: there is no solid bed layer to convert into thickness.
+        ! Lava deposit_tot is authoritative; never reset it or use granular porosity.
+        IF (lava_flag) THEN
+            this%erosion_tot=0.0_wp
+            RETURN
+        END IF
+        ! No granular solids: there is no solid bed layer to convert into thickness.
         IF (n_solid==0) THEN
             this%deposit_tot=0.0_wp
             this%erosion_tot=0.0_wp
