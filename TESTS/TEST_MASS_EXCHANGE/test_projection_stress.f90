@@ -128,8 +128,7 @@ CONTAINS
   SUBROUTINE check_lava_energy_depletion
     REAL(wp) :: recipient(nq),rates(nq),candidate(nq),scale,dt
     REAL(wp) :: raw_candidate(nq)
-    LOGICAL :: valid,converted
-    REAL(wp) :: qp_local(nq)
+    LOGICAL :: valid
 
     recipient=0.0_wp
     rates=0.0_wp
