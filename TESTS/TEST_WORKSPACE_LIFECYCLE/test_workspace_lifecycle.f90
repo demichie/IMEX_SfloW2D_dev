@@ -3,7 +3,7 @@ PROGRAM test_workspace_lifecycle
   USE parameters_2d, ONLY : wp, n_vars, n_eqns, verbose_level,             &
        radial_source_flag, lateral_source_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, n_fissures, slope_correction_flag,      &
-       curvature_term_flag, liquid_vaporization_flag
+       curvature_term_flag, liquid_vaporization_flag, lava_flag, n_solid
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, x0, y0,   &
        topography_profile, nodata_topo, init_grid, B_vertex,                &
        sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x, &
@@ -12,6 +12,7 @@ PROGRAM test_workspace_lifecycle
        commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
   USE state_fields, ONLY : state_type, substrate_snapshot_type
+  USE constitutive_parameters_2d, ONLY : erodible_porosity
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   IMPLICIT NONE
@@ -79,6 +80,21 @@ PROGRAM test_workspace_lifecycle
   CALL assert_true('rollback restores erodible inventory', ALL(state%erodible==3.0_wp))
   CALL assert_true('rollback restores deposit totals', ALL(state%deposit_tot==5.0_wp))
   CALL assert_true('rollback restores erosion totals', ALL(state%erosion_tot==6.0_wp))
+
+  ! Canonical lava deposit must survive a refresh even with no solid classes,
+  ! without consulting the (deliberately invalid) granular porosity.
+  lava_flag=.TRUE.
+  n_solid=0
+  erodible_porosity=1.0_wp
+  state%deposit_tot=2.5_wp
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('lava deposit survives n_solid=0 refresh', ALL(state%deposit_tot==2.5_wp))
+  CALL assert_true('lava has no granular erosion total', ALL(state%erosion_tot==0.0_wp))
+  lava_flag=.FALSE.
+  n_solid=1
+  erodible_porosity=0.25_wp
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('granular deposit uses porosity', ALL(ABS(state%deposit_tot-4.0_wp/3.0_wp)<1.0E-12_wp))
 
   ! Exercise the production geometry transaction: all fields must recover
   ! exactly, including cached centre/face elevation and derived coefficients.

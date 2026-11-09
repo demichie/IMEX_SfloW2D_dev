@@ -7699,8 +7699,13 @@ CONTAINS
         rho_m2D = 0.0_wp
         red_grav2D = 0.0_wp
         muEff = 0.0_wp
-        erodible2D = SUM(state%erodible(1:n_solid, :, :), DIM=1) /                                                     &
-                        (1.0_wp - erodible_porosity)
+        ! Granular porosity is not meaningful for the separate lava carrier.
+        IF (.NOT.lava_flag .AND. n_solid>0) THEN
+            erodible2D = SUM(state%erodible(1:n_solid, :, :), DIM=1) /                                                 &
+                            (1.0_wp - erodible_porosity)
+        ELSE
+            erodible2D = 0.0_wp
+        END IF
         shearVel = 0.0_wp
         Rouse = 0.0_wp
         inertialNumber = 0.0_wp
