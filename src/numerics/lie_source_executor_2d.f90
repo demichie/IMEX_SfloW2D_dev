@@ -751,6 +751,20 @@ CONTAINS
         END DO cell_loop
         !$OMP END DO
         !$OMP END PARALLEL
+        ! Keep dirty bed rates even on a rejected source sweep; retry must clear them.
+        IF (executor%has_bed_group) THEN
+            changed_jmin=comp_cells_x+1; changed_jmax=0
+            changed_kmin=comp_cells_y+1; changed_kmax=0
+            DO cell=1,domain%solve_cells
+                j=domain%j_cent(cell); k=domain%k_cent(cell)
+                IF (executor%bed_rate_cell(j,k)==0.0_wp) CYCLE
+                executor%bed_dirty_count=executor%bed_dirty_count+1
+                executor%bed_dirty_j(executor%bed_dirty_count)=j
+                executor%bed_dirty_k(executor%bed_dirty_count)=k
+                changed_jmin=MIN(changed_jmin,j); changed_jmax=MAX(changed_jmax,j)
+                changed_kmin=MIN(changed_kmin,k); changed_kmax=MAX(changed_kmax,k)
+            END DO
+        END IF
         IF (profiling_enabled) THEN
             DO group_index=1,SIZE(executor%groups)
                 group_profile(group_index)%elapsed=group_profile(group_index)%elapsed+SUM(thread_group(group_index,:))
@@ -862,19 +876,7 @@ CONTAINS
         ! Geometry is the same for every source group in the step. Project
         ! all mass-exchange bed rates only once, after the cell sweep.
         IF (executor%has_bed_group) THEN
-            ! The physical kernel already computed cell rates on the compact solve list.
-            ! Collect their support; only the stencil neighbourhood needs refreshing.
-            changed_jmin=comp_cells_x+1; changed_jmax=0
-            changed_kmin=comp_cells_y+1; changed_kmax=0
-            DO cell=1,domain%solve_cells
-                j=domain%j_cent(cell); k=domain%k_cent(cell)
-                IF (executor%bed_rate_cell(j,k)==0.0_wp) CYCLE
-                executor%bed_dirty_count=executor%bed_dirty_count+1
-                executor%bed_dirty_j(executor%bed_dirty_count)=j
-                executor%bed_dirty_k(executor%bed_dirty_count)=k
-                changed_jmin=MIN(changed_jmin,j); changed_jmax=MAX(changed_jmax,j)
-                changed_kmin=MIN(changed_kmin,k); changed_kmax=MAX(changed_kmax,k)
-            END DO
+            ! Worklist and bounds were collected after the cell sweep.
             CALL apply_local_bed_rate(executor%bed_rate_cell,time_step,changed_jmin,changed_jmax, &
                 changed_kmin,changed_kmax,bed_accepted)
             IF (.NOT.bed_accepted) THEN
