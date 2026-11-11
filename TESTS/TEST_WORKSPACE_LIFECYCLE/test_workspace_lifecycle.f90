@@ -90,6 +90,32 @@ PROGRAM test_workspace_lifecycle
   CALL state%refresh_substrate_totals()
   CALL assert_true('lava deposit survives n_solid=0 refresh', ALL(state%deposit_tot==2.5_wp))
   CALL assert_true('lava has no granular erosion total', ALL(state%erosion_tot==0.0_wp))
+  ! The canonical lava inventory must also be restored after a rejected
+  ! timestep, independently of the granular class inventory and its totals.
+  ! Reuse the same snapshot to check allocation-safe repeated transactions.
+  CALL state%snapshot_substrate(substrate_before)
+  state%deposit_tot(2,3)=9.75_wp
+  state%deposit(2,3,1)=17.0_wp
+  state%erosion_tot(2,3)=8.0_wp
+  CALL state%restore_substrate(substrate_before)
+  CALL assert_true('lava rollback restores canonical thickness', &
+       ALL(state%deposit_tot==2.5_wp))
+  CALL assert_true('lava rollback restores class inventory', &
+       ALL(state%deposit==1.0_wp))
+  CALL assert_true('lava rollback restores erosion total', &
+       ALL(state%erosion_tot==0.0_wp))
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('lava rollback survives subsequent refresh', &
+       ALL(state%deposit_tot==2.5_wp))
+  ! Switching back to a zero-class granular carrier must clear the
+  ! aggregate instead of interpreting the lava thickness as sediment.
+  lava_flag=.FALSE.
+  n_solid=0
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('granular zero-class refresh clears thickness', &
+       ALL(state%deposit_tot==0.0_wp))
+  CALL assert_true('granular zero-class refresh clears erosion', &
+       ALL(state%erosion_tot==0.0_wp))
   lava_flag=.FALSE.
   n_solid=1
   erodible_porosity=0.25_wp

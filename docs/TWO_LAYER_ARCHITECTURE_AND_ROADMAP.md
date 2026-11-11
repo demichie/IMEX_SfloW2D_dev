@@ -2,7 +2,7 @@
 
 **Riferimento:** 7 novembre 2026  
 **Ambito:** architettura di produzione e piano di implementazione per `N_LAYERS=1` e `N_LAYERS=2`.  
-**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. TL00a dispone di una prima implementazione sul branch, in attesa di build, regressioni e verifica di restart/NetCDF. I gate M0–M6 restano aperti.  
+**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. La regressione `TEST_WORKSPACE_LIFECYCLE` copre inoltre il rollback del deposito lava con `n_solid=0`, il refresh successivo e il reset del totale granulare senza classi; l'esecuzione del test resta da verificare. TL00a dispone di una prima implementazione sul branch, in attesa di build, regressioni e verifica di restart/NetCDF. I gate M0–M6 restano aperti.  
 **Tracciamento:** [Roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) per lo stato complessivo del progetto; questo documento è la specifica tecnica del percorso two-layer.
 
 ## 1. Obiettivo e configurazioni del modello
@@ -305,6 +305,8 @@ I blocchi TL00–TL13 descrivono il percorso completo. Su `feature/two-layer` so
 |---|---|---|
 | **TL00 — baseline e audit** | Identificare commit single-layer validato, fissare tag annotato; definire branch di sviluppo separato e verificarne la protezione; inventario di rank-3, globali di fisica e configurazione, variabili di deposito, NetCDF/legacy/restart v7, geometria, domain worklist, sorgenti e test. Catalogare formule/opzioni del manoscritto, test baseline e costi. | Riferimento immutabile, mappa dipendenze e test riproducibili. La protezione di `master` e lo stato del branch sono verificati, non presunti. |
 | **TL00a — deposito canonico** | Rendere `deposit_tot` lo spessore unico per granulari **oppure** lava, con derivazione granulare e incremento lavico esplicitamente distinti; eliminare `lava_deposit` come inventario autonomo dopo migrazione degli usi; allineare rate fisici, rollback, topografia, I/O e restart v7. | Deposito/erosione e geometria invariati fisicamente; EXAMPLE_ETNA_LAVA e casi granulari confrontati anche con `n_solid=0`, topografia on/off e restart v7; nessun azzeramento del deposito lavico, doppio conteggio o uso della porosità granulare nel ramo lava. |
+
+**Avanzamento TL00a:** estesa la regressione statica `TEST_WORKSPACE_LIFECYCLE` per verificare snapshot/rollback del deposito lavico autorevole con `n_solid=0`, refresh dopo rollback e azzeramento del totale in granulare con `n_solid=0`. Il test non è stato ancora eseguito: G1 rimane aperto, così come le verifiche di restart v7, NetCDF e gli esempi completi. La migrazione rank-4 TL01/TL02 non è iniziata.
 | **TL01 — layout rank-4, un layer** | Introdurre il secondo indice layer nei campi fluidi globali e nei metadati, lasciando ammesso soltanto `N_LAYERS=1`; preservare i kernel cell-local. | Build e test di stato/convertitori, nessuna modifica intenzionale delle formule. |
 | **TL02 — migrazione consumer globali** | Adeguare Lie, workspace, spatial, ricostruzione, BC/IC, driver, output, NetCDF, restart, diagnosi, snapshot e test. | EXAMPLES, restart round-trip, bounds, OpenMP e formati documentati. |
 | **TL03 — gate single-layer** | Confrontare evoluzioni, campi, budget, performance, memoria, rami wet/dry, buoyancy, rollback e risultati finali con il baseline taggato. | Nessuna regressione inspiegata; bitwise quando realisticamente ottenibile. Nessuna abilitazione two-layer prima della chiusura del gate. |
