@@ -337,7 +337,7 @@ CONTAINS
             j=domain%j_cent(l)
             k=domain%k_cent(l)
             state%q(:,1,j,k)=this%q_trial(:,j,k)
-            state%q(:,1,:,:)p(:,1,j,k)=this%qp_trial(:,j,k)
+            state%qp(:,1,j,k)=this%qp_trial(:,j,k)
         END DO
         !$OMP END PARALLEL DO
         ! The source executor refreshed substrate aggregates after its cell sweep.

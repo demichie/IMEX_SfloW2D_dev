@@ -165,7 +165,7 @@ CONTAINS
                 j = domain%j_cent(l)
                 k = domain%k_cent(l)
 
-                state%q(:,1,:,:)p(idx_stoch,1,j,k) = this%Z(j,k)
+                state%qp(idx_stoch,1,j,k) = this%Z(j,k)
                 state%q(idx_stoch,1,j,k) = state%q(idx_totMassEqn,1,j,k) *                                                 &
                     this%Z(j,k)
 
@@ -371,10 +371,10 @@ CONTAINS
                 ! Legacy/direct callers retain their published-state contract.
                 WHERE (state%q(idx_totMassEqn,1,:,:) > EPSILON(1.0_wp))
                     state%q(idx_stoch,1,:,:)=state%q(idx_totMassEqn,1,:,:)*this%Z
-                    state%q(:,1,:,:)p(idx_stoch,1,:,:)=this%Z
+                    state%qp(idx_stoch,1,:,:)=this%Z
                 ELSEWHERE
                     state%q(idx_stoch,1,:,:)=0.0_wp
-                    state%q(:,1,:,:)p(idx_stoch,1,:,:)=0.0_wp
+                    state%qp(idx_stoch,1,:,:)=0.0_wp
                 END WHERE
             END IF
         END IF
@@ -418,7 +418,7 @@ CONTAINS
     IF (state%q(idx_totMassEqn,1,j,k) > EPSILON(1.0_wp)) THEN
         ! qp already stores the physical velocities associated with q. Reusing
         ! them avoids repeating the full thermodynamic conversion in every cell.
-        VelocitySquared = state%q(:,1,:,:)p(idx_u,1,j,k)**2 + state%q(:,1,:,:)p(idx_v,1,j,k)**2
+        VelocitySquared = state%qp(idx_u,1,j,k)**2 + state%qp(idx_v,1,j,k)**2
     ELSE
         VelocitySquared = 0.0_wp
 

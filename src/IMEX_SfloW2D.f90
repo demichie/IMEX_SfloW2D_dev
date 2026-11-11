@@ -313,20 +313,20 @@ PROGRAM IMEX_SfloW2D
         IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
             CALL conservative_to_primitive(simulation%state%q(1:n_vars,1,j,k), &
-                simulation%state%q(:,1,:,:)p(1:n_vars,1,j,k),accepted=conversion_ok,p_dyn=p_dyn)
+                simulation%state%qp(1:n_vars,1,j,k),accepted=conversion_ok,p_dyn=p_dyn)
             IF (.NOT.conversion_ok) conversion_failed=.TRUE.
 
             IF ( .NOT. is_binary_restart )                                                                             &
-                    simulation%state%hmax(j,k) = simulation%state%q(:,1,:,:)p(idx_h,1,j,k)
+                    simulation%state%hmax(j,k) = simulation%state%qp(idx_h,1,j,k)
 
-            r_u = simulation%state%q(:,1,:,:)p(idx_u,1,j,k)
-            r_v = simulation%state%q(:,1,:,:)p(idx_v,1,j,k)
+            r_u = simulation%state%qp(idx_u,1,j,k)
+            r_v = simulation%state%qp(idx_v,1,j,k)
 
             mod_vel2 = r_u**2 + r_v**2
             mod_vel = SQRT( mod_vel2 )
 
             IF ( ( .NOT. is_binary_restart ) .AND.                                                                     &
-                    ( simulation%state%q(:,1,:,:)p(idx_h,1,j,k) .GT. 0.001_wp ) ) THEN
+                    ( simulation%state%qp(idx_h,1,j,k) .GT. 0.001_wp ) ) THEN
 
                 simulation%state%pdynmax(j,k) = p_dyn
                 simulation%state%mod_vel_max(j,k) = mod_vel
@@ -340,7 +340,7 @@ PROGRAM IMEX_SfloW2D
                 DO i_thk_lev=1,n_thickness_levels
 
                     thickness_exceeds =                                                                                &
-                            ( simulation%state%q(:,1,:,:)p(idx_h,1,j,k) .GE.                                                      &
+                            ( simulation%state%qp(idx_h,1,j,k) .GE.                                                      &
                             thickness_levels(i_thk_lev) )
 
                     DO i_pdyn_lev=1,n_dyn_pres_levels
@@ -362,8 +362,8 @@ PROGRAM IMEX_SfloW2D
 
         ELSE
 
-            simulation%state%q(:,1,:,:)p(1:n_vars,1,j,k) = 0.0_wp
-            simulation%state%q(:,1,:,:)p(idx_T,1,j,k) = T_ambient
+            simulation%state%qp(1:n_vars,1,j,k) = 0.0_wp
+            simulation%state%qp(idx_T,1,j,k) = T_ambient
 
             IF ( .NOT. is_binary_restart ) THEN
                 simulation%state%hmax(j,k) = 0.0_wp
@@ -409,7 +409,7 @@ PROGRAM IMEX_SfloW2D
         &ES11.3E3,A11,ES11.3E3)")                                                                                      &
             't =',simulation%runtime%t,'dt =',simulation%runtime%dt,                                                   &
             ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,1,:,:)) ,                                             &
-            ' volume = ',dx*dy*SUM(simulation%state%q(:,1,:,:)p(idx_h,1,:,:)) ,                                                   &
+            ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,1,:,:)) ,                                                   &
             ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,1,:,:).GT.1.D-5) ,                                  &
             ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,1,:,:)),                                           &
             ' runout = ',simulation%runtime%runout%last_distance
@@ -505,18 +505,18 @@ PROGRAM IMEX_SfloW2D
             IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
                 p_dyn=dynamic_pressure_from_synchronized_state(                                                     &
-                    simulation%state%q(idx_totMassEqn,1,j,k),simulation%state%q(:,1,:,:)p(:,1,j,k))
+                    simulation%state%q(idx_totMassEqn,1,j,k),simulation%state%qp(:,1,j,k))
 
                 simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),                                           &
-                        simulation%state%q(:,1,:,:)p(idx_h,1,j,k))
+                        simulation%state%qp(idx_h,1,j,k))
 
-                r_u = simulation%state%q(:,1,:,:)p(idx_u,1,j,k)
-                r_v = simulation%state%q(:,1,:,:)p(idx_v,1,j,k)
+                r_u = simulation%state%qp(idx_u,1,j,k)
+                r_v = simulation%state%qp(idx_v,1,j,k)
 
                 mod_vel2 = r_u**2 + r_v**2
                 mod_vel = SQRT( mod_vel2 )
 
-                IF ( simulation%state%q(:,1,:,:)p(idx_h,1,j,k) .GT. 0.001_wp ) THEN
+                IF ( simulation%state%qp(idx_h,1,j,k) .GT. 0.001_wp ) THEN
 
                     simulation%state%pdynmax(j,k) =                                                                    &
                             MAX(simulation%state%pdynmax(j,k), p_dyn)
@@ -530,7 +530,7 @@ PROGRAM IMEX_SfloW2D
                 DO i_thk_lev=1,n_thickness_levels
 
                     thickness_exceeds =                                                                                &
-                            ( simulation%state%q(:,1,:,:)p(idx_h,1,j,k) .GE.                                                      &
+                            ( simulation%state%qp(idx_h,1,j,k) .GE.                                                      &
                             thickness_levels(i_thk_lev) )
 
                     DO i_pdyn_lev=1,n_dyn_pres_levels
@@ -551,8 +551,8 @@ PROGRAM IMEX_SfloW2D
 
             ELSE
 
-                simulation%state%q(:,1,:,:)p(1:n_vars,1,j,k) = 0.0_wp
-                simulation%state%q(:,1,:,:)p(idx_T,1,j,k) = T_ambient
+                simulation%state%qp(1:n_vars,1,j,k) = 0.0_wp
+                simulation%state%qp(idx_T,1,j,k) = T_ambient
 
             END IF
 
@@ -567,7 +567,7 @@ PROGRAM IMEX_SfloW2D
             &ES11.3E3,A11,ES11.3E3)")                                                                                  &
                 't =',simulation%runtime%t,'dt =',simulation%runtime%dt,                                               &
                 ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,1,:,:)) ,                                         &
-                ' volume = ',dx*dy*SUM(simulation%state%q(:,1,:,:)p(idx_h,1,:,:)) ,                                               &
+                ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,1,:,:)) ,                                               &
                 ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,1,:,:).GT.1.D-7) ,                              &
                 ' solid mass = ',dx*dy*SUM(                                                                            &
                 simulation%state%q(5:4+n_solid,1,:,:)),                                                                  &

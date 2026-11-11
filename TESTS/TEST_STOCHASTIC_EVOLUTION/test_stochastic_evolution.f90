@@ -82,8 +82,8 @@ PROGRAM test_stochastic_evolution
        expected_sigma)
 
   state%q(1,1,1,1) = 1.0_wp
-  state%q(:,1,:,:)p(idx_u,1,1,1) = 3.0_wp
-  state%q(:,1,:,:)p(idx_v,1,1,1) = 4.0_wp
+  state%qp(idx_u,1,1,1) = 3.0_wp
+  state%qp(idx_v,1,1,1) = 4.0_wp
   rheology_model='froude'
   CALL assert_close('sigma uses squared physical speed',                  &
        getSigmaNoise(state,1,1), expected_sigma)

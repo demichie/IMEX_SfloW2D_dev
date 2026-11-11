@@ -35,8 +35,8 @@ PROGRAM test_state_initialization
   CALL assert_true('primitive state size', &
        SIZE(state%qp(:,1,:,:),1) == model_layout%n_physical_variables)
   CALL assert_true('physical state', &
-       ALL(state%q(:,1,:,:)p(1:3,1,:,:) .EQ. 0.0_wp) .AND. &
-       ALL(state%q(:,1,:,:)p(model_layout%idx_energy,1,:,:) .EQ. T_ambient))
+       ALL(state%qp(1:3,1,:,:) .EQ. 0.0_wp) .AND. &
+       ALL(state%qp(model_layout%idx_energy,1,:,:) .EQ. T_ambient))
   CALL assert_true('positive-thickness masks',                             &
        .NOT. ANY(state%hpos) .AND. .NOT. ANY(state%hpos_old))
   CALL assert_true('maximum diagnostics',                                 &
