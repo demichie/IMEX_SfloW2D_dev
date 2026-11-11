@@ -136,7 +136,7 @@ CONTAINS
         ELSE
             ! This full halo buffer exists only for direct/non-CFL callers.
             ! Preserve their original reconstruction-stencil semantics.
-            IF (.NOT.ALLOCATED(this%qp_before(:,1,:,:)))                                                                     &
+            IF (.NOT.ALLOCATED(this%qp_before))                                                                     &
                 ALLOCATE(this%qp_before(n_vars,n_layers,comp_cells_x,comp_cells_y))
             this%qp_before(:,1,:,:)=state%qp(:,1,:,:)
             qp_pre=>this%qp_before(:,1,:,:)
@@ -366,10 +366,10 @@ CONTAINS
         CALL finalize_lie_source_executor(this%lie_executor)
         IF (ALLOCATED(this%stochastic_Z_before)) DEALLOCATE(this%stochastic_Z_before)
         IF (ALLOCATED(this%stochastic_effective_before)) DEALLOCATE(this%stochastic_effective_before)
-        IF (ALLOCATED(this%spatial_rate(:,1,:,:))) DEALLOCATE(this%spatial_rate(:,1,:,:))
-        IF (ALLOCATED(this%qp_before(:,1,:,:))) DEALLOCATE(this%qp_before(:,1,:,:))
-        IF (ALLOCATED(this%q_trial(:,1,:,:))) DEALLOCATE(this%q_trial(:,1,:,:))
-        IF (ALLOCATED(this%qp_trial(:,1,:,:))) DEALLOCATE(this%qp_trial(:,1,:,:))
+        IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
+        IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
+        IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
+        IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
         IF (ALLOCATED(this%cell_status)) DEALLOCATE(this%cell_status)
         IF (ALLOCATED(this%substrate_before%deposit)) DEALLOCATE(this%substrate_before%deposit)
         IF (ALLOCATED(this%substrate_before%erosion)) DEALLOCATE(this%substrate_before%erosion)
