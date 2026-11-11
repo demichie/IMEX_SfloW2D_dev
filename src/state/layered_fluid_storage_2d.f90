@@ -4,15 +4,15 @@
 !>          This type is not yet owned by state_type; integration into
 !>          production state and all consumers belongs to TL01/TL02.
 MODULE layered_fluid_storage_2d
-    USE, INTRINSIC :: iso_fortran_env, ONLY : real64
+    USE parameters_2d, ONLY : wp
     USE model_layout_2d, ONLY : model_layout_type
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: layered_fluid_storage_type
 
     TYPE :: layered_fluid_storage_type
-        REAL(real64), ALLOCATABLE :: q(:,:,:,:)
-        REAL(real64), ALLOCATABLE :: qp(:,:,:,:)
+        REAL(wp), ALLOCATABLE :: q(:,:,:,:)
+        REAL(wp), ALLOCATABLE :: qp(:,:,:,:)
     CONTAINS
         PROCEDURE :: initialize => initialize_layered_fluid_storage
         PROCEDURE :: finalize => finalize_layered_fluid_storage
@@ -31,8 +31,8 @@ CONTAINS
         CALL this%finalize()
         ALLOCATE(this%q(layout%n_variables,layout%n_layers,nx,ny))
         ALLOCATE(this%qp(layout%n_physical_variables,layout%n_layers,nx,ny))
-        this%q=0.0_real64
-        this%qp=0.0_real64
+        this%q=0.0_wp
+        this%qp=0.0_wp
     END SUBROUTINE initialize_layered_fluid_storage
 
     SUBROUTINE finalize_layered_fluid_storage(this)

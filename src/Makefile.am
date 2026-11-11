@@ -146,7 +146,7 @@ numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
 state/state_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-state/layered_fluid_storage_2d.$(OBJEXT): core/model_layout_2d.$(OBJEXT)
+state/layered_fluid_storage_2d.$(OBJEXT): core/model_layout_2d.$(OBJEXT) core/parameters_2d.$(OBJEXT)
 state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.
 state/state_mixture.$(OBJEXT): state/state_composition.$(OBJEXT) \
