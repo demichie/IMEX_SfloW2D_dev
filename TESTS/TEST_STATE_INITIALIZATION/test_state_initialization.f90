@@ -28,6 +28,18 @@ PROGRAM test_state_initialization
   CALL state%initialize(model_layout)
   CALL domain%initialize
 
+  CALL assert_true('rank-four q extent', &
+       ALL(SHAPE(state%q)==[4,1,comp_cells_x,comp_cells_y]))
+  CALL assert_true('rank-four qp extent', &
+       ALL(SHAPE(state%qp)==[4,1,comp_cells_x,comp_cells_y]))
+  CALL assert_true('q cell section contiguous', IS_CONTIGUOUS(state%q(:,1,2,2)))
+  CALL assert_true('qp cell section contiguous', IS_CONTIGUOUS(state%qp(:,1,2,2)))
+  state%q(:,1,2,2)=[1.0_wp,2.0_wp,3.0_wp,4.0_wp]
+  CALL assert_true('rank-four cell-local write', &
+       ALL(state%q(:,1,2,2)==[1.0_wp,2.0_wp,3.0_wp,4.0_wp]))
+  CALL assert_true('rank-four neighbor isolation', &
+       ALL(state%q(:,1,3,2)==0.0_wp))
+  state%q(:,1,2,2)=0.0_wp
   CALL assert_true('conservative state', ALL(state%q(:,1,:,:) .EQ. 0.0_wp))
   ! The primitive state is dimensioned by the model layout; there are no
   ! appended auxiliary velocities. In this four-variable fixture, h/u/v
