@@ -2,8 +2,8 @@
 !> @brief Describe immutable structural component indices for one configured model.
 !>
 !> The layout snapshots variable counts and component indices before solver
-!> workspaces are allocated. State arrays remain three-dimensional in this
-!> phase; the explicit layer count prepares the later rank migration.
+!> workspaces are allocated. State arrays are now rank four (component,layer,x,y); two-layer
+!> execution remains explicitly disabled until the full solver is ready.
 !********************************************************************************
 
 MODULE model_layout_2d
