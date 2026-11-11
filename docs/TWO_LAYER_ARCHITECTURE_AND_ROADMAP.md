@@ -2,7 +2,7 @@
 
 **Riferimento:** 7 novembre 2026  
 **Ambito:** architettura di produzione e piano di implementazione per `N_LAYERS=1` e `N_LAYERS=2`.  
-**Stato implementativo (11 novembre 2026):** `N_LAYERS=2` non è ancora abilitato. Sul branch di sviluppo `state_type%q/qp` e i workspace fluidi di Lie sono migrati a rank-4 con uso esplicito del layer 1 nei consumer principali, senza wrapper; il solver rimane funzionalmente single-layer fino alla compilazione e regressione della migrazione. Il deposito unico lavico è stato verificato dall'utente sul desktop prima della migrazione rank-4; le verifiche di CI e I/O successive non sono ancora disponibili. I gate di accettazione TL01–TL03 rimangono aperti.  
+**Stato implementativo (11 novembre 2026):** `N_LAYERS=2` non è ancora abilitato. Sul branch di sviluppo `state_type%q/qp` e i workspace fluidi di Lie sono migrati a rank-4 con uso esplicito del layer 1 nei consumer principali, senza wrapper; il solver rimane funzionalmente single-layer: la build CI optimized/debug del commit `155a0b6` è riuscita, mentre le regressioni funzionali rimangono da eseguire. Il deposito unico lavico è stato verificato dall'utente sul desktop prima della migrazione rank-4; la compilazione CI successiva alla migrazione è superata; verifiche I/O e regressioni di esecuzione rimangono aperte. I gate di accettazione TL01–TL03 rimangono aperti.  
 **Tracciamento:** [Roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) per lo stato complessivo del progetto; questo documento è la specifica tecnica del percorso two-layer.
 
 ## 1. Obiettivo e configurazioni del modello
@@ -308,9 +308,9 @@ Questa tabella separa le modifiche presenti nel branch dalle verifiche effettiva
 |---|---|---|
 | TL00 — baseline e audit | **Parziale** | Audit statico in `TWO_LAYER_CODE_AUDIT.md`; base `master` identificata come `5a377839`. Tag immutabile, baseline riproducibile e protezione branch ancora da certificare. |
 | TL00a — deposito canonico | **Implementato; verificato dall'utente sul desktop** | La funzionalità del deposito unico per lava è stata confermata dall'utente. Restano non documentati i risultati specifici della matrice completa G1 (restart v7, NetCDF, topografia on/off, casi granulari). |
-| TL01 — stato fluido rank-4 | **In lavorazione** | `state%q/qp` a rank-4 e indice layer esplicito; serve compilazione e test dei contratti di contiguità e layout. |
-| TL02 — migrazione consumer | **In lavorazione** | Driver, Lie, inizializzazione, stochastic, input/output e test toccati; primo build debug fallito per `SIZE(state%qp(:,1,:,:),4)` in `inpout_2d.f90`. Correzione presente nel commit indicato sotto, da verificare in CI; audit consumer, NetCDF, restart e OpenMP da completare. |
-| TL03 — regressione single-layer | **Non iniziato** | Attende build debug/optimized e regression test TL01/TL02. |
+| TL01 — stato fluido rank-4 | **In lavorazione** | `state%q/qp` a rank-4 e indice layer esplicito; build optimized/debug **superata** su `155a0b6` (Action #42990883485). Test di contiguità, layout e regressioni ancora da verificare. |
+| TL02 — migrazione consumer | **In lavorazione** | Driver, Lie, inizializzazione, stochastic, input/output e test toccati; primo build fallito per `SIZE(state%qp(:,1,:,:),4)` in `inpout_2d.f90`; corretto in `155a0b6`, con build optimized/debug **superata** (Action #42990883485). Audit consumer, NetCDF, restart e OpenMP ancora da completare. |
+| TL03 — regressione single-layer | **Pronto per verifica; test non avviati** | Build optimized/debug superata. Eseguire test, EXAMPLE_TAAL, EXAMPLE_ETNA, EXAMPLE_ETNA_LAVA, restart e controlli NetCDF/parallelismo. |
 | TL04–TL13 — modello two-layer | **Non iniziati** | Attendere completamento dei gate single-layer previsti dalla roadmap. |
 
 **Registro commit rilevanti (ordine cronologico):**
@@ -322,9 +322,9 @@ Questa tabella separa le modifiche presenti nel branch dalle verifiche effettiva
 | `f6d75e0`, `dbb0af9` | Preparazione contenitore rank-4 indipendente e allineamento precisione | Preparazione, poi sostituita dalla migrazione diretta. |
 | `5653681`, `c448432`, `6c4ea8e`, `1452259` | Migrazione diretta dello stato e consumer, correzioni e test del layout | Committati, prima verifica di compilazione ancora incompleta. |
 | `36dba58`, `813622f`, `c4171db` | Migrazione dei workspace Lie, correzione allocatable e allineamento roadmap | Committati, build da verificare. |
-| **Commit successivo a `c4171db`** | **Correzione del rango intrinseco SIZE in output NetCDF** | **In questo aggiornamento; richiede nuovo build CI.** |
+| `155a0b6` | Correzione del rango intrinseco `SIZE` nell'output NetCDF | **Build optimized/debug superata**, [Action #42990883485](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42990883485). |
 
-**Dettaglio build:** il compilatore ha segnalato 12 istruzioni `ALLOCATE` in `src/io/inpout_2d.f90`, alle linee 7686–7696 e 7824, che usavano `SIZE(state%qp(:,1,:,:),3/4)`. Poiché la sezione è rank-3, il parametro `DIM=4` è invalido. Gli accessi sono ora `SIZE(state%qp,3)` e `SIZE(state%qp,4)`, riferiti all'array originale rank-4, senza wrapper e senza copie. Non sono stati eseguiti compilazione e test da questa sessione.
+**Dettaglio build:** il compilatore ha segnalato 12 istruzioni `ALLOCATE` in `src/io/inpout_2d.f90`, alle linee 7686–7696 e 7824, che usavano `SIZE(state%qp(:,1,:,:),3/4)`. Poiché la sezione è rank-3, il parametro `DIM=4` è invalido. Gli accessi sono ora `SIZE(state%qp,3)` e `SIZE(state%qp,4)`, riferiti all'array originale rank-4, senza wrapper e senza copie. La build optimized/debug è stata eseguita su GitHub e risulta completata con successo sul commit `155a0b6` il giorno 11 novembre 2026 ([Action #42990883485](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/42990883485)); i test di regressione e le simulazioni non risultano ancora verificati in questo registro.
 
 ## 9. Roadmap operativa
 
