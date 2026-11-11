@@ -49,7 +49,7 @@ CONTAINS
 
         WRITE(*,*) 'Initialization with zero thickness flow'
         ! The conservative dry state is exactly zero; no qp conversion is needed.
-        state%q=0.0_wp
+        state%q(:,1,:,:)=0.0_wp
     END SUBROUTINE init_empty
 
     !******************************************************************************
@@ -141,12 +141,12 @@ CONTAINS
                     qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas                                       &
                         +n_stoch_vars+n_pore_vars) = 1.0_wp
 
-                    CALL primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    CALL primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,1,j,k),converted)
                     IF (.NOT.converted) CALL fatal_error('Invalid collapsing-volume initial composition')
 
                 ELSE
 
-                    CALL primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    CALL primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,1,j,k),converted)
                     IF (.NOT.converted) CALL fatal_error('Invalid dry initial composition')
 
                 END IF

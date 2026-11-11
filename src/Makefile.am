@@ -25,7 +25,6 @@ IMEX_SfloW2D_SOURCES = \
                 geometry/geometry_2d.f90 \
                 state/state_types.f90 \
                 state/state_composition.f90 \
-                state/layered_fluid_storage_2d.f90 \
                 state/state_fields.f90 \
                 state/state_mixture.f90 \
                 state/state_conversions.f90 \
@@ -146,7 +145,6 @@ numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
 state/state_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-state/layered_fluid_storage_2d.$(OBJEXT): core/model_layout_2d.$(OBJEXT) core/parameters_2d.$(OBJEXT)
 state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.
 state/state_mixture.$(OBJEXT): state/state_composition.$(OBJEXT) \

@@ -297,6 +297,9 @@ L'I/O corrente è prevalentemente single-layer e risiede in \`src/io/inpout_2d.f
 
 I test I/O sono effettuati sia senza scambi sia con scambi e modifica del terreno; un restart alla stessa istantanea deve riprodurre una continuazione identica entro il contratto di riproducibilità dichiarato.
 
+
+**Avanzamento TL01/TL02 (migrazione diretta):** `state_type%q` e `state_type%qp` utilizzano ora il layout `(component,layer,x,y)`; i chiamanti single-layer in driver, Lie, inizializzazione, stochastic e I/O accedono esplicitamente a `layer=1`. Il reader/writer del restart v7 continua a trasferire la sola sezione `(:,1,:,:)`, per mantenere il formato single-layer. Non sono introdotti wrapper né copie compatibili rank-3; il contenitore preparatorio `layered_fluid_storage_2d` viene rimosso. Restano da eseguire compilazione, test e audit degli altri consumer e dei workspace globali: TL01/TL02 e G2 non sono dichiarati completati.
+
 ## 9. Roadmap operativa
 
 I blocchi TL00–TL13 descrivono il percorso completo. Su `feature/two-layer` sono presenti le modifiche al catalogo lava, l'input `LAVA_TRANSPORT_PARAMETERS` e l'implementazione di TL00a; la certificazione dei test e i gate di milestone restano aperti. Ogni blocco è un intervento separato e verificabile; i primi gate proteggono il single-layer funzionante.

@@ -40,15 +40,15 @@ MODULE state_fields
     END TYPE substrate_snapshot_type
 
     !> \brief Owned cell states and diagnostics for one simulation.
-    !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
+    !> \details Fluid arrays use (component,layer,x-cell,y-cell); diagnostic maps use
     !>          (x-cell,y-cell). The model layout fixes component counts and indices.
     TYPE, PUBLIC :: state_type
 
         !> Conservative variables: M=rho_m*h, M*u, M*v, M*cp*T, then transported masses.
-        REAL(wp), ALLOCATABLE :: q(:,:,:)
+        REAL(wp), ALLOCATABLE :: q(:,:,:,:)
 
         !> Primitive variables: h, u, v, T, then transported mass fractions and scalars.
-        REAL(wp), ALLOCATABLE :: qp(:,:,:)
+        REAL(wp), ALLOCATABLE :: qp(:,:,:,:)
 
         !> Physical substrate inventories owned by the same simulation state as q and qp.
         REAL(wp), ALLOCATABLE :: deposit(:,:,:),deposit_tot(:,:)
@@ -99,12 +99,12 @@ CONTAINS
 
         END IF
 
-        ALLOCATE( this%q(model_layout%n_variables,comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%q(model_layout%n_variables,model_layout%n_layers,comp_cells_x,comp_cells_y) )
 
         ALLOCATE( this%hpos(comp_cells_x,comp_cells_y),                                                                &
             this%hpos_old(comp_cells_x,comp_cells_y) )
 
-        ALLOCATE( this%qp(model_layout%n_physical_variables,comp_cells_x,                                              &
+        ALLOCATE( this%qp(model_layout%n_physical_variables,model_layout%n_layers,comp_cells_x,                     &
             comp_cells_y) )
 
         ALLOCATE(this%deposit(comp_cells_x,comp_cells_y,n_solid))
@@ -119,7 +119,7 @@ CONTAINS
         this%erosion_tot=0.0_wp
         this%q = 0.0_wp
         this%qp = 0.0_wp
-        this%qp(model_layout%idx_energy,1:comp_cells_x,1:comp_cells_y) = T_ambient
+        this%qp(model_layout%idx_energy,1:model_layout%n_layers,1:comp_cells_x,1:comp_cells_y) = T_ambient
 
         ALLOCATE( this%hmax(comp_cells_x,comp_cells_y) )
         ALLOCATE( this%pdynmax(comp_cells_x,comp_cells_y) )

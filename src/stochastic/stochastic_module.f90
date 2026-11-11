@@ -165,8 +165,8 @@ CONTAINS
                 j = domain%j_cent(l)
                 k = domain%k_cent(l)
 
-                state%qp(idx_stoch,j,k) = this%Z(j,k)
-                state%q(idx_stoch,j,k) = state%q(idx_totMassEqn,j,k) *                                                 &
+                state%q(:,1,:,:)p(idx_stoch,1,j,k) = this%Z(j,k)
+                state%q(idx_stoch,1,j,k) = state%q(idx_totMassEqn,1,j,k) *                                                 &
                     this%Z(j,k)
 
             END DO
@@ -334,8 +334,8 @@ CONTAINS
         IF (stoch_transport_flag) THEN
             ! The transported conservative scalar determines Z in wet cells.
             ! Outside the active solve set its published state is authoritative.
-            WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
-                this%Z=state%q(idx_stoch,:,:)/state%q(idx_totMassEqn,:,:)
+            WHERE (state%q(idx_totMassEqn,1,:,:) > EPSILON(1.0_wp))
+                this%Z=state%q(idx_stoch,1,:,:)/state%q(idx_totMassEqn,1,:,:)
             END WHERE
             IF (use_trial) THEN
                 DO l=1,domain%solve_cells
@@ -369,12 +369,12 @@ CONTAINS
                 END DO
             ELSE
                 ! Legacy/direct callers retain their published-state contract.
-                WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
-                    state%q(idx_stoch,:,:)=state%q(idx_totMassEqn,:,:)*this%Z
-                    state%qp(idx_stoch,:,:)=this%Z
+                WHERE (state%q(idx_totMassEqn,1,:,:) > EPSILON(1.0_wp))
+                    state%q(idx_stoch,1,:,:)=state%q(idx_totMassEqn,1,:,:)*this%Z
+                    state%q(:,1,:,:)p(idx_stoch,1,:,:)=this%Z
                 ELSEWHERE
-                    state%q(idx_stoch,:,:)=0.0_wp
-                    state%qp(idx_stoch,:,:)=0.0_wp
+                    state%q(idx_stoch,1,:,:)=0.0_wp
+                    state%q(:,1,:,:)p(idx_stoch,1,:,:)=0.0_wp
                 END WHERE
             END IF
         END IF
@@ -415,10 +415,10 @@ CONTAINS
     CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
 
-    IF (state%q(idx_totMassEqn,j,k) > EPSILON(1.0_wp)) THEN
+    IF (state%q(idx_totMassEqn,1,j,k) > EPSILON(1.0_wp)) THEN
         ! qp already stores the physical velocities associated with q. Reusing
         ! them avoids repeating the full thermodynamic conversion in every cell.
-        VelocitySquared = state%qp(idx_u,j,k)**2 + state%qp(idx_v,j,k)**2
+        VelocitySquared = state%q(:,1,:,:)p(idx_u,1,j,k)**2 + state%q(:,1,:,:)p(idx_v,1,j,k)**2
     ELSE
         VelocitySquared = 0.0_wp
 
@@ -436,7 +436,7 @@ END FUNCTION VelocitySquared
     REAL(wp) FUNCTION getSigmaNoise(state,j,k)
         CLASS(state_type), INTENT(IN) :: state
         INTEGER, INTENT(IN) :: j,k
-        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,j,k),VelocitySquared(state,j,k))
+        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,1,j,k),VelocitySquared(state,j,k))
     END FUNCTION getSigmaNoise
 
     !> OU forcing intensity for one selected conservative/primitive candidate.

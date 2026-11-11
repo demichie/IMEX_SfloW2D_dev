@@ -28,15 +28,15 @@ PROGRAM test_state_initialization
   CALL state%initialize(model_layout)
   CALL domain%initialize
 
-  CALL assert_true('conservative state', ALL(state%q .EQ. 0.0_wp))
+  CALL assert_true('conservative state', ALL(state%q(:,1,:,:) .EQ. 0.0_wp))
   ! The primitive state is dimensioned by the model layout; there are no
   ! appended auxiliary velocities. In this four-variable fixture, h/u/v
   ! begin at zero and temperature alone starts at the ambient value.
   CALL assert_true('primitive state size', &
-       SIZE(state%qp,1) == model_layout%n_physical_variables)
+       SIZE(state%qp(:,1,:,:),1) == model_layout%n_physical_variables)
   CALL assert_true('physical state', &
-       ALL(state%qp(1:3,:,:) .EQ. 0.0_wp) .AND. &
-       ALL(state%qp(model_layout%idx_energy,:,:) .EQ. T_ambient))
+       ALL(state%q(:,1,:,:)p(1:3,1,:,:) .EQ. 0.0_wp) .AND. &
+       ALL(state%q(:,1,:,:)p(model_layout%idx_energy,1,:,:) .EQ. T_ambient))
   CALL assert_true('positive-thickness masks',                             &
        .NOT. ANY(state%hpos) .AND. .NOT. ANY(state%hpos_old))
   CALL assert_true('maximum diagnostics',                                 &

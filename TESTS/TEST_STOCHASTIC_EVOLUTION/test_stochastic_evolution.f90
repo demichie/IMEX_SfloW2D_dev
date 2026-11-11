@@ -49,10 +49,10 @@ PROGRAM test_stochastic_evolution
   CALL state%initialize(model_layout)
   CALL stochastic%initialize
 
-  state%q = 0.0_wp
-  state%qp = 0.0_wp
-  state%q(1,1,1) = 2.0_wp
-  state%q(idx_stoch,1,1) = 6.0_wp
+  state%q(:,1,:,:) = 0.0_wp
+  state%qp(:,1,:,:) = 0.0_wp
+  state%q(1,1,1,1) = 2.0_wp
+  state%q(idx_stoch,1,1,1) = 6.0_wp
   stochastic%Z = 4.0_wp
 
   CALL stochastic%prepare_timestep(state, 0.5_wp)
@@ -62,9 +62,9 @@ PROGRAM test_stochastic_evolution
   CALL assert_close('dry cell retains and evolves local OU state',         &
        stochastic%Z(2,1), 3.0_wp)
   CALL assert_close('transport variable receives updated raw OU state',    &
-       state%q(idx_stoch,1,1), 4.5_wp)
+       state%q(idx_stoch,1,1,1), 4.5_wp)
   CALL assert_close('dry transport variable remains zero',                 &
-       state%q(idx_stoch,2,1), 0.0_wp)
+       state%q(idx_stoch,1,2,1), 0.0_wp)
   CALL assert_close('nonlinear map is applied only to friction field',     &
        stochastic%effective_Z(1,1), 2.25_wp**2)
 
@@ -81,14 +81,14 @@ PROGRAM test_stochastic_evolution
   CALL assert_close('sigma at activation velocity', expFormNoise(25.0_wp), &
        expected_sigma)
 
-  state%q(1,1,1) = 1.0_wp
-  state%qp(idx_u,1,1) = 3.0_wp
-  state%qp(idx_v,1,1) = 4.0_wp
+  state%q(1,1,1,1) = 1.0_wp
+  state%q(:,1,:,:)p(idx_u,1,1,1) = 3.0_wp
+  state%q(:,1,:,:)p(idx_v,1,1,1) = 4.0_wp
   rheology_model='froude'
   CALL assert_close('sigma uses squared physical speed',                  &
        getSigmaNoise(state,1,1), expected_sigma)
 
-  state%q(1,2,1) = 0.0_wp
+  state%q(1,1,2,1) = 0.0_wp
   CALL assert_close('dry cells use sigma_max', getSigmaNoise(state,2,1),   &
        std_max)
 

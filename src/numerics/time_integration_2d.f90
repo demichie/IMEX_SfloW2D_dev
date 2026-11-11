@@ -113,8 +113,8 @@ CONTAINS
         check_injected_rollback=this%lie_executor%reject_active
 
         IF (check_injected_rollback) THEN
-            q_authoritative=state%q
-            qp_authoritative=state%qp
+            q_authoritative=state%q(:,1,:,:)
+            qp_authoritative=state%qp(:,1,:,:)
             bed_before=B_vertex
             bed_cent_before=B_cent
             bed_face_x_before=B_face_x
@@ -132,13 +132,13 @@ CONTAINS
         reuse_cfl_traces=.FALSE.
         IF (PRESENT(pre_spatial_primitives_ready)) reuse_cfl_traces=pre_spatial_primitives_ready
         IF (reuse_cfl_traces) THEN
-            qp_pre=>state%qp
+            qp_pre=>state%qp(:,1,:,:)
         ELSE
             ! This full halo buffer exists only for direct/non-CFL callers.
             ! Preserve their original reconstruction-stencil semantics.
             IF (.NOT.ALLOCATED(this%qp_before))                                                                     &
                 ALLOCATE(this%qp_before(n_vars,comp_cells_x,comp_cells_y))
-            this%qp_before=state%qp
+            this%qp_before=state%qp(:,1,:,:)
             qp_pre=>this%qp_before
         END IF
         IF (.NOT.reuse_cfl_traces) THEN
@@ -149,8 +149,8 @@ CONTAINS
             j=domain%j_reconstruction(l)
             k=domain%k_reconstruction(l)
 
-            IF (state%q(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL conservative_to_primitive(state%q(:,j,k),this%qp_before(:,j,k),                              &
+            IF (state%q(idx_totMassEqn,1,j,k)>0.0_wp) THEN
+                CALL conservative_to_primitive(state%q(:,1,j,k),this%qp_before(:,j,k),                              &
                     accepted=conversion_ok)
                 IF (.NOT.conversion_ok) this%cell_status(l)=1
             ELSE
@@ -175,8 +175,8 @@ CONTAINS
             j=domain%j_cent(l)
             k=domain%k_cent(l)
             ! Fuse candidate initialization and conservative update in one sweep.
-            this%q_trial(1:n_eqns,j,k)=state%q(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
-            IF (n_vars>n_eqns) this%q_trial(n_eqns+1:n_vars,j,k)=state%q(n_eqns+1:n_vars,j,k)
+            this%q_trial(1:n_eqns,j,k)=state%q(1:n_eqns,1,j,k)-dt*this%spatial_rate(:,j,k)
+            IF (n_vars>n_eqns) this%q_trial(n_eqns+1:n_vars,j,k)=state%q(n_eqns+1:n_vars,1,j,k)
             ! Spatial admissibility check. Do not limit or clip its conservative rate.
             IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) THEN
                 this%cell_status(l)=1
@@ -196,7 +196,7 @@ CONTAINS
                 ! The numerical primitive of an unchanged conservative state
                 ! was already prepared for the spatial operator (CFL or
                 ! explicit halo preflight). Reuse the same state version.
-                IF (ALL(this%q_trial(:,j,k)==state%q(:,j,k))) THEN
+                IF (ALL(this%q_trial(:,j,k)==state%q(:,1,j,k))) THEN
                     this%qp_trial(:,j,k)=qp_pre(:,j,k)
                 ELSE
                     CALL conservative_to_primitive(this%q_trial(:,j,k),this%qp_trial(:,j,k),                        &
@@ -222,18 +222,18 @@ CONTAINS
                 'LIE_SPATIAL_FAILURE cell(j,k)=',j,k,' t=',t,' dt=',dt
             WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',this%cell_status(first_failure)
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
-                'LIE_SPATIAL_FAILURE mass_before=',state%q(idx_totMassEqn,j,k), &
+                'LIE_SPATIAL_FAILURE mass_before=',state%q(idx_totMassEqn,1,j,k), &
                 ' mass_after=',this%q_trial(idx_totMassEqn,j,k)
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
                 'LIE_SPATIAL_FAILURE components_before=', &
-                SUM(state%q(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
-                SUM(state%q(idx_add_gas_first:idx_add_gas_last,j,k)), &
+                SUM(state%q(idx_solidEqn_first:idx_solidEqn_last,1,j,k))+ &
+                SUM(state%q(idx_add_gas_first:idx_add_gas_last,1,j,k)), &
                 ' components_after=', &
                 SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
                 SUM(this%q_trial(idx_add_gas_first:idx_add_gas_last,j,k))
             DO eq=1,n_eqns
                 WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
-                    ' before/rate/after=',state%q(eq,j,k), &
+                    ' before/rate/after=',state%q(eq,1,j,k), &
                     this%spatial_rate(eq,j,k),this%q_trial(eq,j,k)
                 CALL spatial_operator%diagnose_cell(j,k,eq)
             END DO
@@ -278,7 +278,7 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
-            stochastic%effective_Z,t,state%q,qp_pre,source_step_failed,source_failure)
+            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -299,8 +299,8 @@ CONTAINS
                     CALL fatal_error('D20 rollback: failpoint did not trigger')
                 IF (.NOT.had_bed_change)                                                                               &
                     CALL fatal_error('D20 rollback: failpoint had no prior bed change')
-                IF (.NOT.ALL(state%q==q_authoritative) .OR.                                                           &
-                    .NOT.ALL(state%qp==qp_authoritative))                                                             &
+                IF (.NOT.ALL(state%q(:,1,:,:)==q_authoritative) .OR.                                                           &
+                    .NOT.ALL(state%qp(:,1,:,:)==qp_authoritative))                                                             &
                     CALL fatal_error('D20 rollback: published fluid state changed')
                 IF (.NOT.ALL(state%deposit==this%substrate_before%deposit) .OR.                                             &
                     .NOT.ALL(state%erosion==this%substrate_before%erosion) .OR.                                             &
@@ -336,8 +336,8 @@ CONTAINS
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
-            state%q(:,j,k)=this%q_trial(:,j,k)
-            state%qp(:,j,k)=this%qp_trial(:,j,k)
+            state%q(:,1,j,k)=this%q_trial(:,j,k)
+            state%q(:,1,:,:)p(:,1,j,k)=this%qp_trial(:,j,k)
         END DO
         !$OMP END PARALLEL DO
         ! The source executor refreshed substrate aggregates after its cell sweep.
