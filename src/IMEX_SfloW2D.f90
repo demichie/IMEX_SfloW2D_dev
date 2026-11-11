@@ -439,7 +439,7 @@ PROGRAM IMEX_SfloW2D
         CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
 
         CALL simulation%spatial_operator%compute_timestep(                                                             &
-                simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t,                                         &
+                simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
                 simulation%runtime%dt, simulation%domain,                                                              &
                 boundary_source_enabled=boundary_source_enabled)
 
