@@ -17,9 +17,12 @@ MODULE simulation_2d
     USE diagnostics_2d, ONLY : fatal_error
 
     USE model_layout_2d, ONLY : model_layout_type
+    USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
+        LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
 
     USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
-            n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag,                                         &
+            n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, lava_flag, &
+            rheology_flag, rheology_model, stochastic_flag,                                         &
             configure_canonical_state_indices
 
 
@@ -64,6 +67,7 @@ MODULE simulation_2d
 
         TYPE(runtime_state_type) :: runtime
         TYPE(model_layout_type) :: model_layout
+        TYPE(layer_physics_type), ALLOCATABLE :: layer_physics(:) !< Validated before worker allocation.
         TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
         TYPE(state_type) :: state
         TYPE(domain_type) :: domain
@@ -93,6 +97,7 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
 
         CHARACTER(LEN=256) :: source_error
+        INTEGER :: carrier_phase
 
         ! Canonical state indices must be available before any initial-condition
         ! conversion, including collapsing-volume initialization.
@@ -100,6 +105,17 @@ CONTAINS
 
         CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,                                          &
             n_add_gas, n_stoch_vars, n_pore_vars )
+
+        ! Freeze the configured per-layer phase/rheology selection before
+        ! source, state and OpenMP workspaces are initialized. The production
+        ! single-layer path still uses existing physics globals unchanged.
+        IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
+        ALLOCATE(this%layer_physics(this%model_layout%n_layers))
+        carrier_phase=LAYER_PHASE_GAS
+        IF (liquid_flag) carrier_phase=LAYER_PHASE_LIQUID
+        IF (lava_flag) carrier_phase=LAYER_PHASE_LAVA
+        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_model,source_error)
+        IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL initialize_configured_sources(this%source_registry,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
@@ -175,6 +191,7 @@ CONTAINS
 
 
         CALL this%source_registry%finalize()
+        IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
         CALL this%model_layout%finalize
         CALL this%stochastic%finalize
 

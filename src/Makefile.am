@@ -19,6 +19,7 @@ IMEX_SfloW2D_SOURCES = \
                 core/constitutive_parameters_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
+                core/layer_physics_2d.f90 \
                 numerics/source_registry_2d.f90 \
                 core/runtime_2d.f90 \
                 core/complexify.f90 \
@@ -144,6 +145,8 @@ numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
+core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): core/layer_physics_2d.$(OBJEXT)
 state/state_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.
