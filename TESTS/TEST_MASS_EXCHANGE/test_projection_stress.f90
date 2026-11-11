@@ -488,7 +488,7 @@ CONTAINS
     ALLOCATE(grav_coeff(nx,ny),grav_coeff_stag_x(nx+1,ny),grav_coeff_stag_y(nx,ny+1))
     ALLOCATE(state%deposit(nx,ny,ns),state%erosion(nx,ny,ns), &
          state%erodible(ns,nx,ny),state%deposit_tot(nx,ny))
-    ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
+    ALLOCATE(state%erosion_tot(nx,ny))
     state%deposit_tot=0.0_wp;state%erosion_tot=0.0_wp
     ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
     ALLOCATE(cell_fissure_fractions(nx,ny,n_fissures))
