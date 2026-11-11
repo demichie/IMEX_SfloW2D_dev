@@ -7683,17 +7683,17 @@ CONTAINS
         WRITE (*, *) 'Writing ', TRIM(nc_filename)
 
 
-        ALLOCATE (Ri2D(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (rho_m2D(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (red_grav2D(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (muEff(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (erodible2D(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (shearVel(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (Rouse(n_solid, SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (inertialNumber(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (alphas2D(n_solid,SIZE(state%qp(:,1,:,:), 3),SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (alphag2D(n_add_gas,SIZE(state%qp(:,1,:,:), 3),SIZE(state%qp(:,1,:,:), 4)))
-        ALLOCATE (vertical_velocity(SIZE(state%qp(:,1,:,:), 3),SIZE(state%qp(:,1,:,:), 4)))
+        ALLOCATE (Ri2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (rho_m2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (red_grav2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (muEff(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (erodible2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (shearVel(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (Rouse(n_solid, SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (inertialNumber(SIZE(state%qp, 3), SIZE(state%qp, 4)))
+        ALLOCATE (alphas2D(n_solid,SIZE(state%qp, 3),SIZE(state%qp, 4)))
+        ALLOCATE (alphag2D(n_add_gas,SIZE(state%qp, 3),SIZE(state%qp, 4)))
+        ALLOCATE (vertical_velocity(SIZE(state%qp, 3),SIZE(state%qp, 4)))
 
         Ri2D = 0.0_wp
         rho_m2D = 0.0_wp
@@ -7821,7 +7821,7 @@ END IF
 
         END DO
 
-        ALLOCATE (temp_array(SIZE(state%qp(:,1,:,:), 3), SIZE(state%qp(:,1,:,:), 4)))
+        ALLOCATE (temp_array(SIZE(state%qp, 3), SIZE(state%qp, 4)))
 
         temp_array = 0.0_wp   ! inizializza a zero
 
