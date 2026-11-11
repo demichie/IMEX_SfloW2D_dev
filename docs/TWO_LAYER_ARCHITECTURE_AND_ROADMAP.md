@@ -2,7 +2,7 @@
 
 **Riferimento:** 7 novembre 2026  
 **Ambito:** architettura di produzione e piano di implementazione per `N_LAYERS=1` e `N_LAYERS=2`.  
-**Stato implementativo:** il codice in produzione è single-layer; la modalità two-layer non è ancora implementata. La regressione `TEST_WORKSPACE_LIFECYCLE` copre inoltre il rollback del deposito lava con `n_solid=0`, il refresh successivo e il reset del totale granulare senza classi; l'esecuzione del test resta da verificare. TL00a dispone di una prima implementazione sul branch, in attesa di build, regressioni e verifica di restart/NetCDF. I gate M0–M6 restano aperti.  
+**Stato implementativo:** `N_LAYERS=2` non è ancora abilitato. Sul branch di sviluppo `state_type%q/qp` e i workspace fluidi di Lie sono migrati a rank-4 con uso esplicito del layer 1 nei consumer principali, senza wrapper; il solver rimane funzionalmente single-layer fino alla compilazione e regressione della migrazione. Il deposito unico lavico è stato verificato dall'utente sul desktop prima della migrazione rank-4; le verifiche di CI e I/O successive non sono ancora disponibili. I gate di accettazione TL01–TL03 rimangono aperti.  
 **Tracciamento:** [Roadmap generale](IMEX_SfloW2D_Development_Roadmap.md) per lo stato complessivo del progetto; questo documento è la specifica tecnica del percorso two-layer.
 
 ## 1. Obiettivo e configurazioni del modello
@@ -19,8 +19,8 @@ Non è previsto un framework a un numero arbitrario di layer, né una riscrittur
 | Componente | Architettura corrente |
 |---|---|
 | `src/core/model_layout_2d.f90` | Metadati comprendenti `n_layers`; `supported_layer_count` ammette ancora soltanto un layer. |
-| `src/state/state_fields.f90` | Stato del flusso `q`, `qp` attualmente a rango 3; inventari del substrato, diagnostiche e snapshot posseduti dallo stato. |
-| `src/numerics/time_integration_2d.f90` | Integrazione Lie di primo ordine; unico ciclo temporale e rollback di stato, substrato e geometria. |
+| `src/state/state_fields.f90` | Stato del flusso `q`, `qp` migrato a rango 4 sul branch, con `N_LAYERS=1`; inventari del substrato, diagnostiche e snapshot posseduti dallo stato. |
+| `src/numerics/time_integration_2d.f90` | Integrazione Lie di primo ordine; trial e residuo spaziale rank-4, esecuzione del layer 1 attraverso sezioni cell-local, unico ciclo temporale e rollback di stato, substrato e geometria. |
 | `src/numerics/source_catalog_2d.f90`, `source_registry_2d.f90`, `lie_source_executor_2d.f90` | Catalogo delle sorgenti e relativi metodi; gruppi Lie ordinati; scratch locali per worker, controlli e transazioni. |
 | `src/physics/source_terms_2d.f90` e `src/physics/mass_exchange/` | Kernel fisici cell-local, sorgenti conservative, deposizione, erosione, entrainment e coordinamento degli inventari. |
 | `src/spatial/nonconservative_2d.f90` | Motore **già generale** per integrali di percorso: callback dell'integrando, stato esteso e tangente al percorso; Gauss a 1, 2 o 3 punti; percorso personalizzabile. |
@@ -298,7 +298,7 @@ L'I/O corrente è prevalentemente single-layer e risiede in \`src/io/inpout_2d.f
 I test I/O sono effettuati sia senza scambi sia con scambi e modifica del terreno; un restart alla stessa istantanea deve riprodurre una continuazione identica entro il contratto di riproducibilità dichiarato.
 
 
-**Avanzamento TL01/TL02 (migrazione diretta):** `state_type%q` e `state_type%qp` utilizzano ora il layout `(component,layer,x,y)`; i chiamanti single-layer in driver, Lie, inizializzazione, stochastic e I/O accedono esplicitamente a `layer=1`. Il reader/writer del restart v7 continua a trasferire la sola sezione `(:,1,:,:)`, per mantenere il formato single-layer. Non sono introdotti wrapper né copie compatibili rank-3; il contenitore preparatorio `layered_fluid_storage_2d` viene rimosso. Restano da eseguire compilazione, test e audit degli altri consumer e dei workspace globali: TL01/TL02 e G2 non sono dichiarati completati.
+**Avanzamento TL01/TL02 (migrazione diretta):** `state_type%q`, `state_type%qp`, i trial di Lie e il residuo spaziale utilizzano ora il layout `(component,layer,x,y)`; i chiamanti single-layer in driver, Lie, inizializzazione, stochastic e I/O accedono esplicitamente a `layer=1`. Il reader/writer del restart v7 continua a trasferire la sola sezione `(:,1,:,:)`, per mantenere il formato single-layer. Non sono introdotti wrapper né copie compatibili rank-3; il contenitore preparatorio `layered_fluid_storage_2d` viene rimosso. Restano da eseguire compilazione, test e audit degli altri consumer e dei workspace globali: TL01/TL02 e G2 non sono dichiarati completati.
 
 ## 9. Roadmap operativa
 
@@ -311,7 +311,6 @@ I blocchi TL00–TL13 descrivono il percorso completo. Su `feature/two-layer` so
 
 **Avanzamento TL00a:** estesa la regressione statica `TEST_WORKSPACE_LIFECYCLE` per verificare snapshot/rollback del deposito lavico autorevole con `n_solid=0`, refresh dopo rollback e azzeramento del totale in granulare con `n_solid=0`. **Verifica dell'utente (desktop, 11 novembre 2026):** il deposito unico, utilizzato anche per la lava, risulta funzionante nelle prove effettuate localmente. I comandi, gli esiti dei singoli test e le evidenze di restart v7, NetCDF ed esempi completi non sono stati forniti; non sono quindi certificati in questa roadmap. G1 resta aperto fino alla raccolta di tali evidenze. La migrazione rank-4 TL01/TL02 non è iniziata.
 | **TL01 — layout rank-4, un layer** | Introdurre il secondo indice layer nei campi fluidi globali e nei metadati, lasciando ammesso soltanto `N_LAYERS=1`; preservare i kernel cell-local. | Build e test di stato/convertitori, nessuna modifica intenzionale delle formule. |
-**Avanzamento TL01 (preparazione):** introdotto `layered_fluid_storage_2d` come contenitore isolato rank-4 `(component,layer,x,y)` con allocazione dal `model_layout`, sezioni cell-local contigue e test dedicato. `state_type%q/qp` restano rank-3 fino alla migrazione coordinata dei consumer TL02; `N_LAYERS=2` continua a essere rifiutato. Non considerare TL01 completato finché il contenitore non sostituisce gli array di produzione e i test integrati non sono superati.
 | **TL02 — migrazione consumer globali** | Adeguare Lie, workspace, spatial, ricostruzione, BC/IC, driver, output, NetCDF, restart, diagnosi, snapshot e test. | EXAMPLES, restart round-trip, bounds, OpenMP e formati documentati. |
 | **TL03 — gate single-layer** | Confrontare evoluzioni, campi, budget, performance, memoria, rami wet/dry, buoyancy, rollback e risultati finali con il baseline taggato. | Nessuna regressione inspiegata; bitwise quando realisticamente ottenibile. Nessuna abilitazione two-layer prima della chiusura del gate. |
 | **TL04 — stato two-layer inerte** | Slot L1/L2, variabili inattive, **contesti fisici read-only per layer** (nessun cambio di globali dentro OpenMP), proprietà specie comuni, input/validazione delle due reologie, registry con univocità per `(identità,scope)`, dry state, IC/BC e output, senza accoppiamento. | Round-trip e validità per wet/wet, wet/dry, dry/wet, dry/dry. |
