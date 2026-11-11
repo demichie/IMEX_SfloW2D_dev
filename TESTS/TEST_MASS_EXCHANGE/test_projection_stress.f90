@@ -840,7 +840,7 @@ CONTAINS
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
     DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_zone,cell_source_fractions)
     DEALLOCATE(cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y)
-    DEALLOCATE(state%deposit,state%erosion,state%erodible,state%deposit_tot, &
+    DEALLOCATE(state%deposit,state%erosion,state%erodible, &
          state%deposit_tot,state%erosion_tot)
   END SUBROUTINE release_grid
 END PROGRAM test_projection_stress
