@@ -109,7 +109,41 @@ Il modello two-layer usa una configurazione **immutabile per layer** risolta in 
 
 Le interfacce cell-local ricevono la configurazione del proprio layer come dato **read-only** oppure usano un contesto esplicitamente posseduto dalla simulazione. È vietato selezionare L1/L2 cambiando temporaneamente parametri globali in un loop OpenMP, perché provocherebbe race e cambierebbe la semantica del single-layer. Non si duplicano moduli di reologia; si rendono passabili i parametri effettivamente diversi. La migrazione dei parametri viene pianificata per dipendenze reali, senza convertire indiscriminatamente tutte le costanti del modello.
 
-\`N_LAYERS=1\` mantiene la sintassi, i default e i gruppi attuali. \`N_LAYERS=2\` dispone di input per L1, L2 e coppia (settling, elutriazione, drag, pressure coupling, lofting), con controllo di completezza dei dati, proprietà per specie e combinazioni fisiche consentite. La modalità two-layer riguarda una corrente densa e una nube diluita nello **stesso scenario gas/solidi**: il fatto che il codice supporti anche lava monolayer non autorizza combinazioni lava+granulare tra layer.
+La sintassi legacy dei file di input non va conservata: il single-layer userà anch'esso la nuova namelist L1 quando il parser verrà migrato. \`N_LAYERS=2\` dispone di input per L1, L2 e coppia (settling, elutriazione, drag, pressure coupling, lofting), con controllo di completezza dei dati, proprietà per specie e combinazioni fisiche consentite. La modalità two-layer riguarda una corrente densa e una nube diluita nello **stesso scenario gas/solidi**: il fatto che il codice supporti anche lava monolayer non autorizza combinazioni lava+granulare tra layer.
+
+### Contratto input: tipi derivati nelle NAMELIST (decisione 11 novembre 2026)
+
+**Scelta vincolante per l'implementazione TL04:** definire una sola volta tutti i coefficienti e i metadati reologici nel tipo derivato `rheology_config_type`; usare direttamente una variabile di tale tipo in ciascuna namelist, senza ripetere l'elenco dei componenti:
+
+```fortran
+TYPE(rheology_config_type) :: rheology_l1, rheology_l2
+NAMELIST /rheology_l1_parameters/ rheology_l1
+NAMELIST /rheology_l2_parameters/ rheology_l2
+```
+
+Esempio del **nuovo formato da implementare**, non ancora supportato dal parser:
+
+```fortran
+&RHEOLOGY_L1_PARAMETERS
+  RHEOLOGY_L1%RHEOLOGY_MODEL = 'voellmy',
+  RHEOLOGY_L1%MU = 0.3,
+  RHEOLOGY_L1%XI = 300.0,
+  RHEOLOGY_L1%RHEOLOGY_METHOD = 'NEWTON',
+  RHEOLOGY_L1%RHEOLOGY_GROUP = 1,
+/
+&RHEOLOGY_L2_PARAMETERS
+  RHEOLOGY_L2%RHEOLOGY_MODEL = 'froude',
+  RHEOLOGY_L2%MU_0 = 0.1,
+  RHEOLOGY_L2%MU_INF = 0.5,
+  RHEOLOGY_L2%FR_0 = 1.0,
+  RHEOLOGY_L2%RHEOLOGY_METHOD = 'ANALYTIC',
+  RHEOLOGY_L2%RHEOLOGY_GROUP = 2,
+/
+```
+
+I coefficienti sono puramente illustrativi. Con `N_LAYERS=1` si usa soltanto `RHEOLOGY_L1_PARAMETERS`; con `N_LAYERS=2` si usano L1 e L2. **Nessuna namelist reologica legacy `RHEOLOGY_PARAMETERS` né terzo schema parallelo:** non è richiesta la retrocompatibilità sintattica degli input, e quando si sostituirà il parser si aggiorneranno contestualmente esempi, test e documentazione. La configurazione letta è indipendente per layer; viene validata una sola volta attraverso routine comuni e poi convertita in un contesto fisico per-layer, senza mutare i globali dei coefficienti nei loop OpenMP. Per le altre famiglie di parametri adottare tipi derivati nelle namelist quando si effettua la rispettiva migrazione, non prima.
+
+**Stato:** decisione registrata; lettura basata su tipi derivati non ancora implementata. La conservazione da verificare è quella del comportamento numerico single-layer, non della sintassi dei file storici.
 
 ## 5. Termini non conservativi e discretizzazione HP-PCCU
 
@@ -311,7 +345,7 @@ Questa tabella separa le modifiche presenti nel branch dalle verifiche effettiva
 | TL01 — stato fluido rank-4 | **In lavorazione** | `state%q/qp` a rank-4 e indice layer esplicito; build optimized/debug **superata** su `155a0b6` (Action #42990883485). Test di contiguità, layout e regressioni ancora da verificare. |
 | TL02 — migrazione consumer | **In lavorazione** | Driver, Lie, inizializzazione, stochastic, input/output e test toccati; primo build fallito per `SIZE(state%qp(:,1,:,:),4)` in `inpout_2d.f90`; corretto in `155a0b6`, con build optimized/debug **superata** (Action #42990883485). Audit consumer, NetCDF, restart e OpenMP ancora da completare. |
 | TL03 — regressione single-layer | **In lavorazione; regressioni CI e esempi desktop superati** | [Action #43024081071](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43024081071) **success** su `a7227c6`; l'utente conferma che gli esempi sul desktop sono OK dopo la migrazione. Restano da documentare esatti casi e condizioni, restart binario, NetCDF, OpenMP e confronto col baseline; G2/G3 aperti. |
-| TL04 — contesti fisici e stato inerte | **In lavorazione** | Primo blocco: tipo `layer_physics_type` con fase, selezione reologia validata e identificativo canonico, istanze possedute dal `simulation_context_type` e test di configurazione indipendente. I coefficienti fisici, scope del registry, variabili inattive, IC/BC/output e attivazione dei due layer restano da implementare; `N_LAYERS=2` continua a essere rifiutato. Build e test del nuovo blocco non ancora verificati. |
+| TL04 — contesti fisici e stato inerte | **In lavorazione** | Input deciso: tipo derivato in NAMELIST L1/L2, anche single-layer usa L1, niente formato legacy; parser/input ancora da migrare. Primo blocco: tipo `layer_physics_type` con fase, selezione reologia validata e identificativo canonico, istanze possedute dal `simulation_context_type` e test di configurazione indipendente. I coefficienti fisici, scope del registry, variabili inattive, IC/BC/output e attivazione dei due layer restano da implementare; `N_LAYERS=2` continua a essere rifiutato. Build e test del nuovo blocco non ancora verificati. |
 | TL05–TL13 — accoppiamento e validazione | **Non iniziati** | Restano subordinati ai gate previsti e al completamento di TL04. |
 
 **Quarto tentativo CI (11 novembre 2026):** [Cell physics and numerical regressions #43024081071](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43024081071) sul commit `a7227c6`: **success**. La correzione del ciclo begin/commit/rollback del test è stata verificata dalla CI; si chiude il sottogate delle regressioni di fisica e numerica. Non equivale alla chiusura di TL03, che richiede ancora esempi integrati e I/O/restart.
@@ -321,6 +355,8 @@ Questa tabella separa le modifiche presenti nel branch dalle verifiche effettiva
 **Secondo tentativo CI (11 novembre 2026):** la [regressione #43019726403](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43019726403) sul commit `9f1de1e` supera la compilazione di `TEST_MASS_EXCHANGE`, ma il controllo runtime Fortran fallisce in `allocate_grid` (linea 491): `state%deposit_tot` era allocato sia nella precedente `ALLOCATE` (linea 489) sia nella successiva. Il duplicato è stato rimosso mantenendo un solo `ALLOCATE` e la corrispondente singola `DEALLOCATE` in `release_grid`. **La verifica CI della correzione è ancora aperta.**
 
 **Risultato CI successivo al build:** [Cell physics and numerical regressions #43018138981](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43018138981), commit `78bd1bd`: **failed** durante la compilazione di `TEST_MASS_EXCHANGE/test_projection_stress.f90`; `state%deposit_tot` è elencato due volte nella `DEALLOCATE` di `release_grid`. La correzione elimina soltanto il duplicato, senza cambiare fisica o layout. Il rerun del test è necessario per avanzare G2/TL03.
+
+**Decisione sul parser TL04 (11 novembre 2026):** adottare tipi derivati direttamente nelle namelist per evitare elenchi duplicati; convertire tutti gli input esistenti quando sarà necessario, senza compatibilità legacy. Non implementato in questo commit.
 
 **Avvio TL04 (11 novembre 2026):** introdotta una configurazione per-layer separata, con campi privati e lettura tramite query, validazione della fase e della reologia attraverso il catalogo esistente, senza modifica dei globali durante OpenMP. Il contesto di simulazione possiede la configurazione del layer singolo e la inizializza prima dei workspace. Non si considera ancora completata la parte di *parametri fisici* per layer: vanno trasferiti esplicitamente i coefficienti e aggiornati i kernel prima di abilitare due layer, senza cambiare globali tra chiamate. Aggiunto il test `TEST_LAYER_PHYSICS` al gruppo `state` della Action di regressione, da eseguire. Il codice è stato committato ma **non** compilato localmente, perché il repository remoto non è accessibile dalla macchina di compilazione di questa sessione.
 
