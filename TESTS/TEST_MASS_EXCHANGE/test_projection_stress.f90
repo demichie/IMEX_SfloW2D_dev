@@ -566,15 +566,20 @@ CONTAINS
     deposited_before=state%deposit;eroded_before=state%erosion
     bed_before=B_vertex;available_before=state%erodible
     CALL initialize_lie_source_executor(executor,registry)
+    ! The standalone executor test owns the same sparse geometry
+    ! transaction as the production Lie timestep driver.
+    CALL begin_geometry_transaction(sparse=.TRUE.)
     CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message)
     IF (failed) THEN
+       CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
        WRITE(error_unit,'(A,I0,A,I0)') 'Lie exchange workset=',domain%solve_cells,', group=',groups(1)%id
        FLUSH(error_unit)
        ERROR STOP 'Lie exchange transaction rejected'
     END IF
+    CALL commit_geometry_transaction
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
     solid_delta=SUM(q(5:6,:,:)-q_before(5:6,:,:))
     inventory_delta=SUM(state%erosion-eroded_before)
