@@ -14,8 +14,9 @@
 !********************************************************************************
 
 MODULE stochastic_module
-    USE parameters_2d, ONLY : idx_totMassEqn, wp, rheology_model, idx_stoch, idx_u, idx_v
+    USE parameters_2d, ONLY : idx_totMassEqn, wp, idx_stoch, idx_u, idx_v
     USE parameters_2d, ONLY : idx_h
+    USE rheology_parameters_2d, ONLY : rheology_l1
 
     USE domain_2d, ONLY: domain_type
     USE state_fields, ONLY: state_type
@@ -445,7 +446,7 @@ END FUNCTION VelocitySquared
         REAL(wp), INTENT(IN) :: mass,velocity_squared
         IF (mass<=EPSILON(1.0_wp)) THEN
             getSigmaNoise_from_values=std_max
-        ELSEIF (TRIM(rheology_model)=='froude' .OR. TRIM(rheology_model)=='lucas') THEN
+        ELSEIF (TRIM(rheology_l1%rheology_model)=='froude' .OR. TRIM(rheology_l1%rheology_model)=='lucas') THEN
             getSigmaNoise_from_values=expFormNoise(velocity_squared)
         ELSE
             getSigmaNoise_from_values=std_max

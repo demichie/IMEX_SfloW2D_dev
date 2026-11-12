@@ -524,7 +524,9 @@ physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(O
 physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+stochastic/stochastic_module.$(OBJEXT): physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT)
 

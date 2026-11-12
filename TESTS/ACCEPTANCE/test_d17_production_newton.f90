@@ -2,6 +2,7 @@
 PROGRAM test_d17_production_newton
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE rheology_parameters_2d, ONLY : rheology_l1
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, &
@@ -19,7 +20,7 @@ PROGRAM test_d17_production_newton
   idx_solidEqn_first=5;idx_solidEqn_last=4
   idx_add_gas_first=5;idx_add_gas_last=4
   idx_pore=0;idx_poreEqn=0;idx_stoch=0;idx_u=2;idx_v=3
-  rheology_flag=.TRUE.;rheology_model='newmodel'
+  rheology_flag=.TRUE.;rheology_l1%rheology_model='newmodel'
   pore_pressure_flag=.FALSE.;thermal_cooling_flag=.FALSE.
   slope_correction_flag=.FALSE.;curvature_term_flag=.FALSE.
   stochastic_flag=.FALSE.;stoch_transport_flag=.FALSE.

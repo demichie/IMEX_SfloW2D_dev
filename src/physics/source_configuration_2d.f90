@@ -9,12 +9,13 @@ MODULE source_configuration_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_input_2d
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
-    USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model,                                               &
+    USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                               &
             thermal_cooling_flag,                                                                                      &
             pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag,                                        &
             bottom_fissural_source_flag, radial_source_flag,                                                           &
             liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag,                                                &
             idx_pore
+    USE rheology_parameters_2d, ONLY : rheology_l1
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,                                               &
             coeff_porosity, entrainment_flag
     IMPLICIT NONE
@@ -46,10 +47,11 @@ CONTAINS
         END IF
 
         IF (rheology_flag) THEN
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0)                                                &
-                active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND.                                          &
-                TRIM(rheology_model)/='none') THEN
+        IF (LEN_TRIM(canonical_rheology_source_name(rheology_l1%rheology_model))>0)                                    &
+                active_names=[CHARACTER(LEN=64) :: active_names,                                                    &
+                    canonical_rheology_source_name(rheology_l1%rheology_model)]
+        IF (LEN_TRIM(canonical_rheology_source_name(rheology_l1%rheology_model))==0 .AND.                              &
+                TRIM(rheology_l1%rheology_model)/='none') THEN
             error='D17: unsupported configured rheology'; RETURN
 
         END IF
@@ -128,8 +130,8 @@ CONTAINS
                 'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
                 'rheology_froude','rheology_lucas','rheology_mui',                                                     &
                 'rheology_mui_voellmy','rheology_newmodel')
-            requested_method=rheology_method
-            id=rheology_group
+            requested_method=rheology_l1%rheology_method
+            id=rheology_l1%rheology_group
         CASE('thermal_cooling')
             requested_method=thermal_method
             id=thermal_group

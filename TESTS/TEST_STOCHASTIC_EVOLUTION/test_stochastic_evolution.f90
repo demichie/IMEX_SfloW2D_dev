@@ -6,8 +6,9 @@ PROGRAM test_stochastic_evolution
   USE parameters_2d, ONLY : wp, idx_stoch, length_spatial_corr,             &
        n_add_gas, n_dyn_pres_levels, n_eqns, n_pore_vars, n_solid,         &
        n_stoch_vars, n_thickness_levels, n_vars, configure_canonical_state_indices, &
-       rheology_model, stochastic_flag, stoch_transport_flag, idx_u, idx_v
-  USE state_fields, ONLY : state_type
+       stochastic_flag, stoch_transport_flag, idx_u, idx_v
+  USE rheology_parameters_2d, ONLY : rheology_l1
+   USE state_fields, ONLY : state_type
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise,     &
        noise_pow_val, std_max, std_min, std_slope_factor, tau_stochastic, &
        convolve_2d, expFormNoise, getSigmaNoise
@@ -37,7 +38,7 @@ PROGRAM test_stochastic_evolution
 
   stochastic_flag = .TRUE.
   stoch_transport_flag = .TRUE.
-  rheology_model='none'
+  rheology_l1%rheology_model='none'
   length_spatial_corr = 0.0_wp
   tau_stochastic = 2.0_wp
   std_max = 0.0_wp
@@ -84,7 +85,7 @@ PROGRAM test_stochastic_evolution
   state%q(1,1,1,1) = 1.0_wp
   state%qp(idx_u,1,1,1) = 3.0_wp
   state%qp(idx_v,1,1,1) = 4.0_wp
-  rheology_model='froude'
+  rheology_l1%rheology_model='froude'
   CALL assert_close('sigma uses squared physical speed',                  &
        getSigmaNoise(state,1,1), expected_sigma)
 

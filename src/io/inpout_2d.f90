@@ -68,7 +68,6 @@
     ! -- Variables for the namelist NUMERIC_PARAMETERS
     USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff
     USE source_input_2d, ONLY: read_mass_exchange_parameters, write_mass_exchange_parameters,                          &
-            rheology_method, rheology_group,                                                                           &
             thermal_method, thermal_group,                                                                             &
             pore_pressure_method, pore_pressure_group,                                                                 &
             bottom_circular_method, bottom_circular_group,                                                             &
@@ -110,7 +109,7 @@
             emme, atm_heat_transf_coeff, thermal_conductivity, T_env, T_ground, c_p
 
     ! -- Variables for the namelist RHEOLOGY_PARAMETERS
-    USE parameters_2d, ONLY: rheology_model, thermal_cooling_flag
+    USE parameters_2d, ONLY: thermal_cooling_flag
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
     USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2
@@ -486,7 +485,6 @@
         rheology_l1=rheology_config_type()
         rheology_l2=rheology_config_type()
         ! Reset physical-source preferences before any namelist is parsed.
-        rheology_method=''; rheology_group=1
         thermal_method=''; thermal_group=2
         pore_pressure_method=''; pore_pressure_group=3
         bottom_circular_method=''; bottom_circular_group=0
@@ -585,7 +583,6 @@
         c_p = 1200.0_wp
 
         !-- Rheology coefficients are initialized once in rheology_config_type.
-        rheology_model = 'none'
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
         x0_runout = -1
         y0_runout = -1
@@ -853,7 +850,6 @@
         pore_bcN%flag = -1
 
 
-        rheology_model = 'none'
         rho_s = -1.0_wp
         sphericity_s = 1.0_wp
         initial_erodible_thickness = -1.0_wp
@@ -1551,14 +1547,11 @@
             ! Check the actual layer configuration immediately after NAMELIST input,
             ! before source scheduling and model-specific coefficient validation.
             ! A missing model must not silently fall through as the default 'none'.
-            IF (TRIM(rheology_l1%rheology_model)=='none') THEN
+            IF (TRIM(rheology_l1%rheology_l1%rheology_model)=='none') THEN
                 CALL fatal_error('RHEOLOGY_FLAG is true but no L1 rheology model was read')
             END IF
             REWIND(input_unit)
             ! Scheduling metadata is consumed before rheology coefficient checks.
-            rheology_model=rheology_l1%rheology_model
-            rheology_method=rheology_l1%rheology_method
-            rheology_group=rheology_l1%rheology_group
         END IF
 
 
@@ -1626,8 +1619,8 @@
 
                 IF (kin_visc_l .EQ. -1.0_wp) THEN
 
-                    IF ((TRIM(rheology_model) .NE. 'lahar') .AND.                                                      &
-                        (TRIM(rheology_model) .NE. 'lava')) THEN
+                    IF ((TRIM(rheology_l1%rheology_model) .NE. 'lahar') .AND.                                          &
+                        (TRIM(rheology_l1%rheology_model) .NE. 'lava')) THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
                         WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
@@ -1638,7 +1631,7 @@
 
                 ELSE
 
-                    IF (TRIM(rheology_model) .EQ. 'lahar') THEN
+                    IF (TRIM(rheology_l1%rheology_model) .EQ. 'lahar') THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
                         WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
@@ -1648,7 +1641,7 @@
 
                     END IF
 
-                    IF (TRIM(rheology_model) .EQ. 'lava') THEN
+                    IF (TRIM(rheology_l1%rheology_model) .EQ. 'lava') THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
                         WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
@@ -2245,10 +2238,10 @@
         ! The first D18 executable mode is an entirely explicit STAGE partition.
         ! Reject mixed requests instead of silently retaining implicit evaluation.
         IF (LEN_TRIM(source_input_error)==0) THEN
-            IF ((LEN_TRIM(rheology_method)>0 .AND.                                                                     &
-                TRIM(rheology_method)/='EXPLICIT' .AND.                                                                &
-                TRIM(rheology_method)/='NEWTON' .AND.                                                                  &
-                TRIM(rheology_method)/='ANALYTIC') .OR.                                                                &
+            IF ((LEN_TRIM(rheology_l1%rheology_method)>0 .AND.                                                         &
+                TRIM(rheology_l1%rheology_method)/='EXPLICIT' .AND.                                                    &
+                TRIM(rheology_l1%rheology_method)/='NEWTON' .AND.                                                      &
+                TRIM(rheology_l1%rheology_method)/='ANALYTIC') .OR.                                                    &
                 (LEN_TRIM(thermal_method)>0 .AND.                                                                      &
                 TRIM(thermal_method)/='EXPLICIT' .AND.                                                                 &
                 TRIM(thermal_method)/='NEWTON' .AND.                                                                   &
@@ -2258,7 +2251,7 @@
                 TRIM(pore_pressure_method)/='NEWTON' .AND.                                                             &
                 TRIM(pore_pressure_method)/='ANALYTIC'))                                                               &
                 source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
-            IF (rheology_group<0 .OR. thermal_group<0 .OR. pore_pressure_group<0)                                      &
+            IF (rheology_l1%rheology_group<0 .OR. thermal_group<0 .OR. pore_pressure_group<0)                          &
                 source_input_error='D18 physical GROUP must be nonnegative'
 
         END IF
@@ -3501,8 +3494,6 @@
                 END IF
 
             END ASSOCIATE
-            ! The legacy metadata is consumed by the existing single-layer scheduler.
-            rheology_model=rheology_l1%rheology_model
         END IF
 
         ! ------- READ temperature_parameters NAMELIST ------------------------------
@@ -3511,7 +3502,7 @@
         ! an explicit input later in the source kernel.
         T_env = 300.0_wp
         ! Preserve historical behavior when the optional flag is absent.
-        thermal_cooling_flag = TRIM(rheology_model) == 'lava'
+        thermal_cooling_flag = TRIM(rheology_l1%rheology_model) == 'lava'
         READ (input_unit, temperature_parameters, IOSTAT=ios)
 
         IF (ios .NE. 0) THEN
@@ -4780,12 +4771,12 @@
             ! when no activation velocity is specified.
             WRITE (*, *) 'Setting stochastic intensity parameters...'
 
-            if (TRIM(rheology_model) .EQ. 'froude') THEN
+            if (TRIM(rheology_l1%rheology_model) .EQ. 'froude') THEN
                 std_min = 0.0_wp !std_max * (rheology_l1%mu_0/rheology_l1%mu_inf) ! mu_0 < mu_inf in mu(Fr)
                 IF (noise_activation_velocity <= 0.0_wp)                                                               &
                         noise_activation_velocity = rheology_l1%Fr_0
                 std_slope_factor = noise_activation_velocity**2
-            ELSEIF (TRIM(rheology_model) .EQ. 'lucas') THEN
+            ELSEIF (TRIM(rheology_l1%rheology_model) .EQ. 'lucas') THEN
                 std_min = std_max*(rheology_l1%mu_inf/rheology_l1%mu_0) ! mu_0 > mu_inf in mu(U)
                 IF (noise_activation_velocity <= 0.0_wp)                                                               &
                         noise_activation_velocity = rheology_l1%U_w
@@ -4793,8 +4784,8 @@
 
             END IF
 
-            IF (((TRIM(rheology_model) == 'froude') .OR.                                                               &
-                    (TRIM(rheology_model) == 'lucas')) .AND.                                                           &
+            IF (((TRIM(rheology_l1%rheology_model) == 'froude') .OR.                                                   &
+                    (TRIM(rheology_l1%rheology_model) == 'lucas')) .AND.                                               &
                     (noise_activation_velocity <= 0.0_wp)) THEN
                 CALL fatal_error('noise_activation_velocity must be > 0')
 
@@ -7787,14 +7778,14 @@
 
                 mod_hor_vel = SQRT(r_u**2 + r_v**2)
 
-                IF (rheology_flag .AND. TRIM(rheology_model) .EQ. 'voellmy') THEN
+                IF (rheology_flag .AND. TRIM(rheology_l1%rheology_model) .EQ. 'voellmy') THEN
                     exc_pore_pres = 0.0_wp
                     IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore,1, j, k)
                     muEff(j, k) = rheology_l1%mu*MAX(0.0_wp, 1.0_wp - MAX(0.0_wp, exc_pore_pres) /                     &
                                                 (r_rho_m*r_h*r_red_grav))
                 ELSE IF (rheology_flag .AND.                                                                           &
-                            (TRIM(rheology_model) .EQ. 'mui' .OR.                                                      &
-                            TRIM(rheology_model) .EQ. 'mui_voellmy')) THEN
+                            (TRIM(rheology_l1%rheology_model) .EQ. 'mui' .OR.                                          &
+                            TRIM(rheology_l1%rheology_model) .EQ. 'mui_voellmy')) THEN
 
                     IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN
                         muEff(j, k) = rheology_l1%mu_s

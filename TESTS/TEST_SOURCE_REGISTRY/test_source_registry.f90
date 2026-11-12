@@ -2,6 +2,7 @@ PROGRAM test_source_registry
   USE source_catalog_2d
   USE source_registry_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE rheology_parameters_2d, ONLY : rheology_l1
   USE source_input_2d
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,entrainment_flag
@@ -13,7 +14,7 @@ PROGRAM test_source_registry
   n_eqns=4; n_vars=4
   idx_totMassEqn=1;idx_uEqn=2;idx_vEqn=3;idx_engyEqn=4
   idx_pore=0;idx_poreEqn=0
-  rheology_flag=.TRUE.;rheology_model='voellmy'
+  rheology_flag=.TRUE.;rheology_l1%rheology_model='voellmy'
   thermal_cooling_flag=.TRUE.;pore_pressure_flag=.FALSE.
   curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
   bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
@@ -21,8 +22,8 @@ PROGRAM test_source_registry
   lava_flag=.FALSE.;gas_flag=.FALSE.;liquid_flag=.TRUE.
   settling_flag=.FALSE.;entrainment_flag=.FALSE.
   IF (ALLOCATED(erosion_coeff)) DEALLOCATE(erosion_coeff)
-  rheology_method='NEWTON';thermal_method='NEWTON'
-  rheology_group=1;thermal_group=1
+  rheology_l1%rheology_method='NEWTON';thermal_method='NEWTON'
+  rheology_l1%rheology_group=1;thermal_group=1
   ! Keep the automatically active liquid-loss source in explicit GROUP 0.
   ! This fixture tests only coupling/separation of the Newton source groups.
   mass_exchange_method='EXPLICIT';mass_exchange_group=0
@@ -74,7 +75,7 @@ PROGRAM test_source_registry
   CALL registry%finalize()
   ! Historical Etna lava uses a liquid carrier with the lava rheology.
   ! Cooling and bottom fissural injection must remain valid in this phase.
-  rheology_model='lava'
+  rheology_l1%rheology_model='lava'
   thermal_method='NEWTON'
   thermal_group=1
   bottom_fissural_source_flag=.TRUE.

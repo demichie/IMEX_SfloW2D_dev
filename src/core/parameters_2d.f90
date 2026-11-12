@@ -68,10 +68,6 @@ MODULE parameters_2d
     !> .
     LOGICAL :: rheology_flag
 
-    !> Canonical input name for the selected rheology (none, voellmy, plastic,
-    !> lava, lahar, empirical, quadratic, froude, lucas, mui, or mui_voellmy).
-    CHARACTER(LEN=32) :: rheology_model = 'none'
-
     ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
     LOGICAL :: thermal_cooling_flag = .FALSE.
 

@@ -238,7 +238,7 @@ CONTAINS
     n_vars=5; n_eqns=5; n_solid=1; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
     kt_trace_reconstruction = 'froude_blend'
     CALL configure_canonical_state_indices()
-    liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.; rheology_model='none'
+    liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.

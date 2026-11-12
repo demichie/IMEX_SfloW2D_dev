@@ -292,7 +292,7 @@ CONTAINS
     kt_trace_reconstruction = 'froude_blend'
     n_vars=nq; n_eqns=nq
     CALL configure_canonical_state_indices()
-    gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.; rheology_model='none'
+    gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
     sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; topo_change_flag=.TRUE.
