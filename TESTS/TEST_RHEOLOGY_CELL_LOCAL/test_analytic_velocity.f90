@@ -124,7 +124,7 @@ PROGRAM test_analytic_velocity
   CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
   linear_drag = 3.0_wp*quadratic_config%nu_ref/flow_depth**2 *                               &
-       EXP(-visc_par*(temperature-T_ref))
+       EXP(-quadratic_config%visc_par*(temperature-quadratic_config%T_ref))
   yield_drag = quadratic_config%tau0/(mixture_density*flow_depth*speed_ratio)
   expected_speed = MAX(0.0_wp, (SQRT(SUM(velocity_before**2)) +             &
        yield_drag/linear_drag)*EXP(-linear_drag*integration_step) -         &
@@ -297,7 +297,6 @@ PROGRAM test_analytic_velocity
 
   quadratic_config%mu = 0.3_wp
   quadratic_config%xi = 500.0_wp
-  quadratic_config%xi = xi
     BLOCK
     TYPE(physical_state_real) :: rs
     rs%h = flow_depth

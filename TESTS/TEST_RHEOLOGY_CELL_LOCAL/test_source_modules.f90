@@ -53,10 +53,11 @@ PROGRAM test_source_modules
        0.1_wp, 1.0_wp, 0.5_wp, 1.0_wp, 1.0_wp)
   CALL assert_close(actual, 0.02_wp, 'hindered-settling deposition dispatch')
 
-  alpha1_coeff = 1.0_wp
-  beta1 = 2.0_wp
+  config%alpha1_coeff = 1.0_wp
+  config%beta1 = 2.0_wp
   expected_viscosity = eval_lahar_fluid_viscosity(config,293.15_wp, 0.3_wp)
-  CALL eval_settling_fluid_properties('lahar', 293.15_wp,         &
+  config%rheology_model='lahar'
+  CALL eval_settling_fluid_properties(config, 293.15_wp,         &
        0.3_wp, 1800.0_wp, 1000.0_wp, 1.0E-6_wp, carrier_density,            &
        inverse_kinematic_viscosity)
   CALL assert_close(carrier_density, 1800.0_wp, 'lahar settling density')
@@ -84,7 +85,8 @@ PROGRAM test_source_modules
         ERROR STOP 1
      END IF
   END DO
-  CALL eval_settling_fluid_properties('none', 293.15_wp,           &
+  config%rheology_model='none'
+  CALL eval_settling_fluid_properties(config, 293.15_wp,           &
        0.3_wp, 1800.0_wp, 1000.0_wp, 2.0E-6_wp, carrier_density,            &
        inverse_kinematic_viscosity)
   CALL assert_close(carrier_density, 1000.0_wp, 'carrier settling density')

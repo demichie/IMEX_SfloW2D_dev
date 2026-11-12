@@ -43,7 +43,6 @@ PROGRAM test_shared_implicit_kernels
     grav=9.81_wp
     inv_grav=1.0_wp/grav
     quadratic_config%xi =100.0_wp
-    quadratic_config%xi=xi
     quadratic_config%I_0 =0.3_wp
     quadratic_config%mu_s =0.35_wp
     quadratic_config%mu_2 =0.6_wp
