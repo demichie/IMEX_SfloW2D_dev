@@ -1,92 +1,52 @@
-# IMEX-SfloW2D — Audit tecnico di fattibilità two-layer
+# IMEX-SfloW2D — Audit tecnico del branch two-layer
 
-**Data di riferimento:** 7 novembre 2026  
-**Base ispezionata:** `master` al commit `5a3778398c9ffc0452bc54c680d1583a1d5667d9` e roadmap consolidata nella PR #6.  
-**Metodo:** audit statico dei sorgenti e delle interfacce connesse, dei test e dei workflow, confrontati con la specifica del manoscritto. **Non sono stati compilati né eseguiti benchmark o test dinamici in questo audit.**  
-**Specifica operativa:** [Architettura e roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
+**Verifica statica:** 12 novembre 2026. **Repository:** `demichie/IMEX_SfloW2D_dev`; branch `feature/two-layer`; HEAD ispezionato `410ad99e5c7d3071df4d4cd0cd2d8161c8ea13d1`. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md). Questo documento registra **solo riscontri correnti e lacune**, non una cronologia delle vecchie architetture.
 
-## Esito
+## Evidenze verificate
 
-La proposta è **realizzabile come estensione dell'architettura attuale**, preservando il motore path-conservative e l'integratore Lie globale. Non è un'aggiunta limitata all'indice layer: richiede estensione esplicita della configurazione fisica per layer, del registro Lie, della ricostruzione accoppiata, delle leggi fisiche di L1/L2 e dei formati di output/restart. La roadmap identifica i gate che devono precedere ogni attivazione di `N_LAYERS=2`.
+- Il confronto GitHub `master...feature/two-layer` mostra **98 commit avanti, zero indietro** all'HEAD ispezionato. Non è stato effettuato alcun merge in `master` nell'ambito di questo audit.
+- [Build optimized/debug #43264995583](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43264995583) e [Cell physics/numerical regressions #43265344609](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43265344609): entrambi **completed/success** su **`410ad99e`**.
+- L'audit ha ispezionato HEAD e commit del branch, inclusi `0e44f407` (rimozione globali residui), `410ad99e` (parser corretto), `48c6969` (alias L1), `13bd2bd` (lava/lahar), `5be747c` (lava/deposito), `80d12b0` (mu(I)), `6caffa9` (Froude/Lucas), `d4f434c` (Voellmy), `ee4d0a6` (snapshot contesto).
+- Nessuna compilazione/esecuzione è stata lanciata da questo audit; gli esiti CI sono evidenze **esterne** limitate ai job eseguiti.
 
-La fattibilità riguarda la **struttura del software**. Stabilità, iperbolicità e riproduzione dei benchmark non sono dimostrate dall'audit statico e restano condizioni scientifiche bloccanti.
+## Mappa corrente delle dipendenze
 
-## A. Risultati dell'ispezione dei sorgenti
-
-| ID | Priorità | Riscontro verificato | Conseguenza e criterio di soluzione |
-|---|---|---|---|
-| **A01** | Alta | `src/core/model_layout_2d.f90` contiene `n_layers` ma `supported_layer_count` e `src/io/inpout_2d.f90` rifiutano valori diversi da 1. Gli stati sono rank-3; i workspace in `time_integration_2d`, `lie_source_executor_2d`, ricostruzione e operatori sono anch'essi monolayer. | Migrazione completa rank-4 di dati e consumer, con gate single-layer prima di abilitare L2. Non basta cambiare il controllo input. |
-| **A02** | **Critica — contratto deposito** | `src/state/state_fields.f90:refresh_substrate_totals` assegna zero a `deposit_tot` quando `n_solid==0` e lo ricalcola solo dagli inventari granulari. La lava usa `lava_deposit` indipendente; `lie_source_executor_2d` lo aggiorna e chiama il refresh del totale. | `deposit_tot` canonico necessita dispatch esclusivo granulare/lava, differente modalità di accumulo, rimozione della duplicazione dei candidati e test con `n_solid=0`. Non è sufficiente sommare due campi. |
-| **A03** | Alta | `lie_source_executor_2d` accumula `bed_rate_cell` da `dB_dt`, proietta il campo una volta su `B_vertex` e aggiorna la geometria prima del refresh dei totali. Lo stato possiede snapshot degli inventari. | Distinguere inventario cumulativo, rate topografico e terreno erodibile; preservare proiezione/commit e rollback atomici. |
-| **A04** | **Critica — configurazione layer** | `src/core/parameters_2d.f90` espone `rheology_model` e flag di fase globali; le leggi costitutive hanno molti parametri globali. `source_configuration_2d` costruisce una sola lista di sorgenti e `source_registry_2d` rifiuta più di una reologia, sorgenti duplicate e mass-exchange in gruppi distinti. | Contratti e contesti fisici read-only per layer, input L1/L2/coppia, unicità per identità+scope; passaggio dei parametri ai kernel senza modificare globali dentro OpenMP. |
-| **A05** | Alta | `src/spatial/nonconservative_2d.f90` integra già callback generiche dell'integrando su un percorso esteso con quadratura Gauss 1/2/3 e path callback opzionale. `pccu_2d` usa la stessa API. | **Nessuna modifica alla API del motore**; nuove callback fisiche e assemblaggio accoppiato. |
-| **A06** | **Critica — geometria dei path** | `pccu_2d:eval_hydrostatic_path` accetta uno stato esteso `(h,Gamma,eta,G)`; la ricostruzione attuale è quella di una superficie `eta=B+h`. | Nel two-layer utilizzare `eta_1=B+h1` e `eta_tot=B+h1+h2`, una geometria condivisa delle tracce e percorsi faccia/cella accoppiati. Verificare topografia, clamp, wet/dry e identità della somma. |
-| **A07** | **Critica — CFL** | `src/physics/equation_terms_2d.f90:eval_local_speeds_direction` usa `u ± sqrt(G*gprime*h)` del layer isolato; `spatial_operator_2d` prende massimi di tali velocità dalle facce. | Il bound per i modi interlayer non segue automaticamente. Derivare e verificare un bound giustificato e comportamento in perdita di iperbolicità; gate prima dei benchmark coupled. |
-| **A08** | Alta | `mass_exchange_deposition_2d` implementa sedimentazione per classi, con concentrazione massima e esponente hindered prefissati nel kernel, e seppellimento del carrier mediante `coeff_porosity`. Il manoscritto two-layer introduce packing L1, gas burial, modalità `d32` e condizione di stress efficace. | Riutilizzare velocità terminali e calcolo delle specie, **ma implementare e testare** le chiusure basali specifiche del manoscritto. Nessun presupposto di equivalenza fisica a codice invariato. |
-| **A09** | Alta | `source_catalog_2d`, `source_registry_2d` e `lie_source_executor_2d` descrivono le sorgenti come un'unica sequenza globale di un solo stato; il gruppo 0 legge lo snapshot pre-spatial. | Introdurre scope L1/L2/INTERLAYER, rate di trasferimento unico, controllo simultaneo e rispetto del gruppo 0. Evitare a priori Newton accoppiato generalizzato. |
-| **A10** | Alta | `src/io/inpout_2d.f90` usa NetCDF `(x,y,time)` senza layer, restart binario v7 senza `n_layers` nell'header, e salva `lava_deposit` in una registrazione finale separata; rifiuta versioni non correnti. | Definire schema two-layer, output single-layer compatibile, versioning e reader v7 esplicito o rifiuto dichiarato. Test di continuazione con deposito e topografia. |
-| **A11** | Alta | `src/physics/source_configuration_2d.f90` valida la mutua esclusione fra `gas_flag`, `liquid_flag`, `lava_flag`. | Il two-layer L1/L2 non deve essere interpretato come combinazione di due flag di fase continua incompatibili. Condivisione delle specie e differenza delle reologie richiedono un contratto nuovo di configurazione senza infrangere le regole monolayer. |
-| **A12** | Media | `src/physics/mass_exchange/mass_exchange_entrainment_2d.f90` è già presente e coordinato da `mass_exchange_2d`. | Riuso per atmosfera→L2 con gating della copertura L1, senza duplicare formule; contabilizzare in modo distinto l'eventuale loss/lofting. |
-| **A13** | Media | I test esistenti includono `TEST_NONCONSERVATIVE_PATH`, `TEST_HYDROSTATIC_PATH`, `TEST_PCCU`, `TEST_MASS_EXCHANGE`, `TEST_SOURCE_REGISTRY`, `TEST_BINARY_RESTART` e test di stato/geometry. I workflow principali `build-only`, `physics-regressions` e `solver-validation` sono a esecuzione manuale. | Riutilizzarli per il baseline e aggiungere test coupled specifici. Non attribuire certificazione a workflow non eseguiti. |
-
-## B. Interfacce e responsabilità da rendere esplicite
-
-### B1. Stato / accesso per layer
-
-- Il dato globale fluido ha layout `(component,layer,x,y)`; topografia, stato di deposito ed erodibile restano condivisi.
-- Le API locali monolayer mantengono vettori contigui. `q`, `qp`, stato trial, temporanei, bounds, I/O e test vengono migrati coerentemente.
-- `model_layout%n_physical_variables` e `n_variables` sono distinti per nome ma **attualmente uguali per contratto**. Qualunque divergenza futura richiede test e conversioni adeguate, non un'assunzione tacita.
-- L1 e L2 condividono indici di variabili; slot non validi nel layer non attivo devono essere mascherati in tutte le trasformazioni e nel sistema sorgente.
-- Il dominio attivo per cella deve considerare `wet(L1) OR wet(L2)`; ogni sweep per layer seleziona il sottoinsieme valido e conserva la ricostruzione/halo necessari a entrambi. Non ignorare celle `dry L1 / wet L2`.
-
-### B2. Sorgenti / stato fisico
-
-- Separare chiusure di legge `physics` e commit numerico `Lie`.
-- Context immutable per layer, con parametri reologici e termici differenziabili; non cambiare globali durante l'iterazione OpenMP.
-- Permettere ripetizione della stessa identità sorgente in layer differenti; applicare i vincoli sull'inventario alle risorse **effettivamente condivise**.
-- Assegnare al gruppo INTERLAYER uno snapshot coerente di entrambi, `Gamma` unico signed, conservazione di classi, massa, momento e energia termica; processi esterni separati, compreso il gas packing approssimato.
-- Stato pre-spatial e ordine speciale del gruppo 0: testare sia iniezione in celle inizialmente asciutte sia scambi successivi.
-- Gate di buoyancy per L2 indipendente dalla rimozione di L1; eseguire i controlli prima di scartare componenti del donatore in modo da non perdere inventari.
-
-### B3. Ricostruzione / HP-PCCU
-
-- Geometria comune e tre quote `B`, `eta_1`, `eta_tot`; tracce wet/dry per layer coerenti.
-- Coppia non conservativa `-G*h1*d(K2*h2)` / `-K2*h2*d(G*h1)` nello stesso percorso esteso; clamp applicato secondo il manoscritto.
-- Somma in assenza di clamp uguale a `-[G*h1*K2*h2]_L^R`; testare integrando e **operatore intero** (flusso, pressione propria, topografia, path, residuo per cella). La riduzione single-layer richiede proprietà, velocità e appropriate chiusure coincidenti.
-- Separare il residuo previsto su letto curvo dall'errore numerico dello schema.
-- CFL con modi barotropici/baroclinici o bound verificato, con gestione di stati non iperbolici e shear.
-
-### B4. Deposito / evoluzione del terreno
-
-- Il deposito lavico è un accumulo diretto di spessore; quello granulare deriva dalle classi solide e dalla porosità valida.
-- Non utilizzare `n_solid==0` come segnale di deposito nullo in lava.
-- Il rate geom. `dB_dt` non deve ricostruire una seconda volta l'inventario. Validazione delle proiezioni sulle quote nodali e della differenza tra deposito cumulativo ed erosione.
-- Ramo `topo_change_flag=.FALSE.`: mantenere l'inventario indipendentemente dalla modifica della topografia.
-- Restart v7 e output legacy devono essere controllati in fase di razionalizzazione, prima della migrazione rank-4.
-
-### B5. Chiusure scientifiche necessarie
-
-- Settling L2→L1: trasferimento con `u_Gamma`, thin-plug blend, amp cap, donor temperature; packing gas distinto. No deposito terreno.
-- L1→terreno: basal settling con `ALPHA_PACKING_L1`, gas burial, `SETTLING_D32_FLAG_L1`, `DEP_EFF_STRESS_FLAG_L1` secondo i casi scientifici dichiarati.
-- Elutriazione: Rouse, Shields, shear-power, linear legacy, co-lift, cold-start ed inventory cap; specie e gas del donatore.
-- Entramento atmosferico L2, buoyant lofting e opzioni di partizione co-ignimbrite. Testare il materiale che esce dal dominio e quello che resta mobile in L1.
-- Drag interfaciale Chézy: puro scambio di momento; dissipazione energetica distinta.
-
-## C. Test e gate minimi
-
-| Gate | Procedura | Esito richiesto |
+| ID | Rilevazione sul codice attuale | Lavoro aperto / vincolo |
 |---|---|---|
-| **G0 — baseline** | Tag del commit che ha superato build + esempi completi, prova restart; raccolta tempi/memoria e campi finali. | Evidenza riproducibile; nessuna attribuzione di test non eseguiti. |
-| **G1 — deposito** | Granulare e lava, `n_solid=0`, rate di massa/energia, `deposit_tot`, `dB_dt`, erosion, topografia on/off, restart v7. | Non regressione delle leggi; nessun azzeramento lava e nessun doppio conteggio. |
-| **G2 — rank-4 mono** | Test layout, conversions, source groups, geometry, spatial, output, restart, OpenMP e EXAMPLES. | Equivalenza dei risultati e footprint performance entro tolleranze dichiarate. |
-| **G3 — per-layer config** | Due reologie con parametri differenti e nomi sorgente duplicati ma scope diverso; OpenMP race check; configurazione monolayer legacy. | Configurazione deterministica e indipendente dal numero di thread. |
-| **G4 — HP-PCCU** | Path pair antisimmmetrico nel budget, riduzione idrostatica totale con topografia, flat/inclined/curved, dry/wet, clamp e CFL. | Identità discretizzate testate; residuo curvo interpretato; stabilità accettabile. |
-| **G5 — Lie pair** | Scambio fittizio di specie/momento/termica e rollback forzato durante modifica del terreno; test gruppo 0. | Trasferimenti conservativi strettamente interni e commit atomico. |
-| **G6 — chiusure** | Settling, consolidazione L1, elutriazione, drag, co-lift, lofting, pressione interstiziale e combinazioni. | Bilanci numerici e contratti fisici confrontati al manoscritto. |
-| **G7 — produzione** | Benchmark integrati, long run, restart, profiling OpenMP, regressione single-layer. | Approvazione scientifica prima di abilitare `N_LAYERS=2`. |
+| **A01 — Layout** | `src/core/model_layout_2d.f90:supported_layer_count` ritorna `n_layers==1`; `src/state/state_fields.f90` alloca `q/qp` rank-4. `src/numerics/time_integration_2d.f90` alloca trial rank-4 ma seleziona `(:,1,:,:)` in chiamate Lie e commit. | Test di layout e funzioni L2 isolate; non attivare `N_LAYERS=2` per eludere i gate. |
+| **A02 — Config reologica** | `rheology_parameters_2d.f90` definisce unico `rheology_config_type`, `rheology_l1/l2`; `inpout_2d.f90` usa `TYPE(...),POINTER :: rheology => rheology_l1` per legacy; dispatcher reologico e mass exchange ricevono config esplicita; `parameters_2d` non ha più globale `rheology_model`; `source_input_2d` non ha più `rheology_method/group`. | `source_terms_2d` utilizza ancora `rheology_l1` come selezione single-layer, da rendere layer-aware con la migrazione del chiamante; non reintrodurre bridge globali. |
+| **A03 — Contesto fisico** | `simulation_2d.f90` possiede `layer_physics(:)`, inizializza L1 e congela per valore la config in `layer_physics_2d.f90`. | Contesti termici L1/L2 e chiusure; snapshot isolati, read-only e OpenMP-safe. |
+| **A04 — Namelist termica** | `inpout_2d.f90` definisce ancora `TEMPERATURE_PARAMETERS` con scalari globali (`thermal_cooling_flag`, emissività, conduzione, `exp_area_fract`, `c_p`, `enne`, `emme`, `T_env`, method/group). | Tipo derivato `thermal_config_type` e input legacy/L1/L2; audit proprietà e test. |
+| **A05 — Temperatura atmosferica** | `T_env` è dichiarata in `constitutive_parameters_2d.f90`, default 300 K e uso in `source_terms_2d`; `T_ambient` è presente in GAS, INITIAL e RESTART, e nell'inizializzazione degli stati. | Conservare **solo `T_ambient` letta obbligatoriamente da GAS**, anche `gas_flag=F`; eliminare `T_env` e le altre sorgenti d'input. Delta fisico esplicitamente autorizzato ma da misurare. |
+| **A06 — Termica fisica** | `thermal_cooling_rate.inc`: `rate=-radiative*(T**4-ambient**4)-convective*(T-ambient)`; kernel REAL/COMPLEX e analitico ricevono `ambient` esplicito. | Usare `T_ambient`; non introdurre legge di terreno o termica interlayer; verificare tutti i trattamenti e il default lava. |
+| **A07 — Contatti** | Non esiste ancora modulo condiviso `layer_contacts_2d` nel tree; il Lie non conosce scope. | Nuovo modulo `src/physics/layer_contacts_2d.f90` puro e cell-local, contatti atmosfera/terreno/coppia da spessori candidati e wet/dry canonico; niente logica fisica nel Lie; non modificare gating single-layer. |
+| **A08 — Registro/integrazione Lie** | `source_registry_2d.f90:source_group_type` contiene id, method, source_names, equation_ids, cache; nessun `scope`. `lie_source_executor_2d.f90:execute_lie_source_groups` riceve array rank-3 di L1 ed esegue gruppi cell-outer. | Scope L1/L2/INTERLAYER, coppia candidati e trasferimento unico, rollback atomico; kernel monolayer ricevono solo q/qp e rate del layer bersaglio. |
+| **A09 — HP-PCCU/path** | `nonconservative_2d.f90` è generico; `pccu_2d`, `hyperbolic_2d` hanno ancora fisica single-layer. | Path pressione accoppiata con `B,eta_1,eta_tot`, integrando completo, clamp, identità somma, CFL coupled e iperbolicità. |
+| **A10 — Deposito e substrato** | `deposit_tot` canonico e ramo lava/granulare distinti; scratch e transazioni del Lie aggiornati. | Prove end-to-end (lava `n_solid=0`, erosione, topografia, restart v7, NetCDF) ancora non certificate dall'evidenza disponibile. |
+| **A11 — Specie e processi** | `constitutive_parameters_2d.f90` contiene proprietà intrinseche e parametri globali di chiusure; `source_input_2d.f90` conserva method/group globali per termica, pore pressure e mass exchange. | Distinguere SHARED, L1, L2, INTERLAYER; nessuna duplicazione delle proprietà delle specie; chiusure del manoscritto da implementare con valida ownership. |
+| **A12 — I/O** | NetCDF single-layer `(x,y,time)`, restart v7 con accesso L1 e substrato condiviso, formati legacy. | Versione two-layer, schema del layer, continuazione e test round-trip; preservare produzione mono. |
+| **A13 — Workflow** | Due workflow success sull'HEAD audit; i test di unità e regressione esistenti coprono una parte della fisica e della numerica. | Non attribuire esiti a EXAMPLES completi, restart/NetCDF, OpenMP o benchmark che non risultano eseguiti. |
 
-## D. Limiti di questa verifica
+## Catena di dipendenze da rispettare
 
-L'ispezione permette di confermare le dipendenze e i vincoli architetturali, ma **non** dimostra bitwise equivalence, conservazione discreta, well-balancing, correttezza del bound CFL, scaling OpenMP o raggiungimento dei benchmark. Queste proprietà richiedono build ed esecuzioni. La roadmap evita quindi di dichiarare completati i gate.
+1. **Configurazione:** parser `inpout_2d.f90`, `constitutive_parameters_2d.f90`, `source_input_2d.f90`, `layer_physics_2d.f90`, `simulation_2d.f90`; reset, validazione, nomi legacy, esempi, generatori, restart e diagnostiche.
+2. **Kernel:** `source_terms_2d.f90`, `thermal_laws_2d.f90`, `thermal_cooling_2d.f90`, `thermal_cooling_rate.inc`, REAL/COMPLEX/analitico e Newton; configurazioni esplicite senza globali fisici condivisi mutabili.
+3. **Lie:** `source_configuration_2d.f90`, `source_catalog_2d.f90`, `source_registry_2d.f90`, `lie_source_executor_2d.f90`, `time_integration_2d.f90`, workspace/scratch per worker, gruppo 0, rollback e OpenMP. Il Lie resta privo di decisioni fisiche sui contatti.
+4. **Contatti:** preparazione nel livello `physics` a partire dalla coppia di stati candidati cell-local; kernel monolayer con stato/rate monolayer, coppie soltanto negli operatori INTERLAYER. Contatto ≠ abilitazione: cold-start L2 ammesso.
+5. **Spaziale:** `nonconservative_2d.f90`, `pccu_2d.f90`, `hyperbolic_2d.f90`, `reconstruction_2d.f90`, `spatial_operator_2d.f90`; trace wet/dry e bound CFL.
+6. **Build/tests:** `src/Makefile.am` ha dipendenze esplicite; aggiungere la dipendenza di ogni nuovo modulo ai consumer; aggiornare test unitari, test input, esempi, generatori e suite CI con ogni migrazione coerente.
 
-**Valutazione:** fattibilità strutturale **positiva con prerequisiti espliciti**; nessun ostacolo che richieda riscrivere il motore `nonconservative_2d` o abbandonare il Lie globale. Le priorità architetturali più importanti sono la semantica canonica del deposito, i contesti immutabili per layer, la ricostruzione della geometria accoppiata e la CFL del sistema two-layer.
+## Gate e limiti della verifica
+
+| Gate | Evidenza disponibile | Stato |
+|---|---|---|
+| G0 baseline/tag | Audit storico di baseline, nessuna certificazione completa verificata oggi | **Aperto** |
+| G1 deposito | Implementazione e test mirati, round-trip/full matrix non dimostrati | **Aperto** |
+| G2 rank-4 single-layer | Build optimized/debug e regressioni fisiche/numeriche **success** su `410ad99e` | **Parziale: aperto** |
+| G3 configurazioni L1/L2 | Reologia migrata e CI success; termica/contatti/registri L2 mancanti | **Parziale: aperto** |
+| G4 spazio | No coupled production | **Aperto** |
+| G5 Lie coppia | No scope, no candidate pair production | **Aperto** |
+| G6 chiusure | Da implementare | **Aperto** |
+| G7 produzione | No full coupled benchmark | **Aperto** |
+
+**Esito:** la preparazione strutturale (rank-4 e configurazione reologica) è reale e verificata parzialmente; **non** dimostra il two-layer. Non sono stati modificati codici fisici o risultati per questo audit. Qualunque nuovo commit richiede le sue prove. Il piano di lavoro aggiornato e le milestone si trovano **solo** nella roadmap collegata.
