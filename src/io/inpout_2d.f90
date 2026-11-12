@@ -584,11 +584,8 @@
         T_ground = 1200.0_wp
         c_p = 1200.0_wp
 
-        !-- Inizialization of the Variables for the namelist RHEOLOGY_PARAMETERS
+        !-- Rheology coefficients are initialized once in rheology_config_type.
         rheology_model = 'none'
-        nu_ref = 0.0_wp
-        visc_par = 0.0_wp
-        tau0 = 0.0_wp
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
         x0_runout = -1
         y0_runout = -1
