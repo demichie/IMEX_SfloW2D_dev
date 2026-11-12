@@ -1,5 +1,8 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
+**TL04 — μ(I) e μ(I)-Voellmy (12 novembre 2026; VALIDAZIONE PENDENTE):** entrambi i modelli ricevono direttamente `rheology_config_type` nei rate espliciti, semi-impliciti, impliciti REAL/COMPLEX e analitici; il dispatcher e i test diretti usano la medesima configurazione. Rimossi definitivamente i globali `xi`, `mu_s`, `mu_2`, `I_0`, `muI_inf` e i relativi reset e copie nel parser; diagnostiche `muEff` sui campi L1. Conservato l'include condiviso Voellmy. Nessuna formula fisica duplicata; build e regressioni da verificare sul commit.
+
+
 **TL04 — Lucas config e rimozione globali condivisi (12 novembre 2026; DA VERIFICARE):** Lucas riceve `config` in tutti i trattamenti. Eliminati `mu_0`, `mu_inf`, `Fr_0`, `U_w` globali da `rheology_parameters_2d`, insieme a reset e sincronizzazione nel parser; i calcoli stocastici utilizzano `rheology_l1%...`. Test analitici aggiornati. La migrazione delle leggi restanti e la verifica build restano aperte.
 
 
