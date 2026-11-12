@@ -18,6 +18,7 @@ IMEX_SfloW2D_SOURCES = \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
+                physics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
                 core/layer_physics_2d.f90 \
@@ -124,6 +125,7 @@ physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
 physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
+physics/layer_contacts_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state/state_types.$(OBJEXT)

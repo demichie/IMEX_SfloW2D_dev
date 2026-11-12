@@ -1,5 +1,6 @@
 PROGRAM test_source_registry
   USE source_catalog_2d
+  USE layer_contacts_2d, ONLY : layer_contacts_type, evaluate_layer_contacts
   USE source_registry_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE rheology_parameters_2d, ONLY : rheology_l1
@@ -11,10 +12,12 @@ PROGRAM test_source_registry
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,entrainment_flag
   IMPLICIT NONE
+  TYPE(layer_contacts_type) :: contact_result
   TYPE(source_registry_type) :: registry
   TYPE(source_group_type), ALLOCATABLE :: groups(:)
   CHARACTER(LEN=256) :: error
   INTEGER :: i,idx
+  LOGICAL :: contact_valid
   REAL(wp) :: thermal_rate_l1,thermal_rate_l2
   COMPLEX(wp) :: thermal_rate_complex
   n_eqns=4; n_vars=4
@@ -62,6 +65,30 @@ PROGRAM test_source_registry
   thermal_l2%T_ground=310.0_wp
   CALL require(.NOT.thermal_ground_temperatures_match(thermal_l1,thermal_l2), &
        'two-layer ground mismatch is detected')
+  ! TL04-C: independently test all depth-averaged column contacts.
+  CALL check_contacts([1.0_wp,2.0_wp],[.FALSE.,.TRUE.],[.TRUE.,.FALSE.],.TRUE., &
+       'wet L1 and wet L2')
+  CALL check_contacts([1.0_wp,0.0_wp],[.TRUE.,.FALSE.],[.TRUE.,.FALSE.],.FALSE., &
+       'wet L1 and dry L2')
+  CALL check_contacts([0.0_wp,2.0_wp],[.FALSE.,.TRUE.],[.FALSE.,.TRUE.],.FALSE., &
+       'dry L1 and wet L2')
+  CALL check_contacts([0.0_wp,0.0_wp],[.FALSE.,.FALSE.],[.FALSE.,.FALSE.],.FALSE., &
+       'both layers dry')
+  CALL check_contacts([1.0_wp],[.TRUE.,.FALSE.],[.TRUE.,.FALSE.],.FALSE., &
+       'single layer wet')
+  CALL check_contacts([0.0_wp],[.FALSE.,.FALSE.],[.FALSE.,.FALSE.],.FALSE., &
+       'single layer dry')
+  CALL check_contacts([dry_thickness_tolerance,2.0_wp],[.FALSE.,.TRUE.], &
+       [.FALSE.,.TRUE.],.FALSE.,'canonical dry tolerance boundary')
+  CALL check_contacts([2.0_wp*dry_thickness_tolerance],[.TRUE.,.FALSE.], &
+       [.TRUE.,.FALSE.],.FALSE.,'canonical wet tolerance boundary')
+  CALL evaluate_layer_contacts([-1.0_wp,1.0_wp],contact_result,contact_valid)
+  CALL require(.NOT.contact_valid,'negative thickness rejected')
+  CALL require(.NOT.ANY(contact_result%terrain_exposed) .AND. &
+       .NOT.ANY(contact_result%atmosphere_exposed) .AND. &
+       .NOT.contact_result%interlayer_contact,'invalid column has no contacts')
+  CALL evaluate_layer_contacts([1.0_wp,2.0_wp,3.0_wp],contact_result,contact_valid)
+  CALL require(.NOT.contact_valid,'unsupported layer count rejected')
   CALL require(source_catalog_names_unique(),'unique catalog names')
   CALL require(canonical_rheology_catalog_unique(),'unique rheology names')
   CALL require(ALL(source_newton_affected_equations('rheology_voellmy')==[2,3]), &
@@ -126,6 +153,28 @@ PROGRAM test_source_registry
   CALL registry%finalize()
   PRINT *, 'PASS Lie registry complete Newton footprints, ordering and methods'
 CONTAINS
+  !> @brief Check the complete physical column-contact contract.
+  !> @param[in] thickness Candidate layer thicknesses in metres.
+  !> @param[in] atmosphere Expected atmosphere exposure for L1/L2.
+  !> @param[in] terrain Expected ground exposure for L1/L2.
+  !> @param[in] interface_contact Expected wet L1/L2 interface contact.
+  !> @param[in] description Regression case name.
+  SUBROUTINE check_contacts(thickness,atmosphere,terrain,interface_contact,description)
+    REAL(wp), INTENT(IN) :: thickness(:)
+    LOGICAL, INTENT(IN) :: atmosphere(2),terrain(2),interface_contact
+    CHARACTER(LEN=*), INTENT(IN) :: description
+    TYPE(layer_contacts_type) :: contacts
+    LOGICAL :: valid
+    CALL evaluate_layer_contacts(thickness,contacts,valid)
+    CALL require(valid,'valid contact column: '//description)
+    CALL require(ALL(contacts%atmosphere_exposed .EQV. atmosphere), &
+         'atmosphere contact: '//description)
+    CALL require(ALL(contacts%terrain_exposed .EQV. terrain), &
+         'terrain contact: '//description)
+    CALL require(contacts%interlayer_contact .EQV. interface_contact, &
+         'interlayer contact: '//description)
+  END SUBROUTINE check_contacts
+
   SUBROUTINE require(ok,message)
     LOGICAL,INTENT(IN) :: ok
     CHARACTER(*),INTENT(IN) :: message

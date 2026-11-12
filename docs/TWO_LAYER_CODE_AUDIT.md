@@ -1,11 +1,11 @@
 # IMEX-SfloW2D — Audit tecnico del branch two-layer
 
-**Verifica statica:** 12 novembre 2026. **Repository:** `demichie/IMEX_SfloW2D_dev`; branch `feature/two-layer`; baseline CI termica confermata `b9e29e7814421cbd07a4eaa757ea065b8738e1f7`; TL04-T3 preparata, test ancora da eseguire sul nuovo commit. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md). Questo documento registra riscontri correnti e lacune, non una cronologia delle vecchie architetture.
+**Verifica statica:** 12 novembre 2026; `feature/two-layer`; TL04-T3 compilata su `ba28e844` e regressioni superate su `0ded80c9`. TL04-C contatti implementata, nuova CI da eseguire. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
 
 ## Evidenze verificate
 
 - Le modifiche termiche sono state preparate esclusivamente su `feature/two-layer`; nessun merge in `master` è autorizzato o effettuato in questa fase.
-- [Build optimized/debug #43295920602](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43295920602) e [Cell physics/numerical regressions #43296214969](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43296214969): entrambi **completed/success** su **`b9e29e78`**; nessuna CI del nuovo TL04-T3 è ancora certificata.
+- [Build optimized/debug #43300723463](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43300723463) success su `ba28e844` e [regressioni #43301029364](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43301029364) success su `0ded80c9`; nessuna CI ancora verificata per TL04-C.
 - L'audit attuale copre dichiarazioni e ownership termica, parser, dispatcher dei kernel, `source_terms_2d`, Newton REAL/COMPLEX, Lie, test diretti, Makefile e documentazione; la reologia resta fuori dall'intervento TL04-T3.
 - Nessuna compilazione/esecuzione è stata lanciata da questo audit; gli esiti CI sono evidenze **esterne** limitate ai job eseguiti.
 
@@ -18,14 +18,14 @@
 | **A03 — Contesto fisico** | `simulation_2d.f90` possiede `layer_physics(:)`, inizializza L1 e congela per valore la config in `layer_physics_2d.f90`. | Contesti termici L1/L2 e chiusure; snapshot isolati, read-only e OpenMP-safe. |
 | **A04 — Namelist termica** | `thermal_config_type` contiene i coefficienti e `T_ground`; `thermal_l1/l2` sono istanze canoniche e il legacy `thermal => thermal_l1` ne è un alias. Parser single-layer verificato in CI su `b9e29e78`; validazione L1/L2 del terreno predisposta, ma produzione L2 disabilitata. | Ricertificare sul commit TL04-T3 input, esempi e comportamento fisico senza mutare namelist o soglie. |
 | **A05 — Temperatura atmosferica** | `T_ambient` è l'unica temperatura atmosferica letta dalla namelist GAS; `T_env` non esiste più nella produzione. TL04-T1 è stata verificata in CI. | Restano verifiche integrate del delta termico autorizzato e degli esempi, in particolare lava. |
-| **A06 — Termica fisica** | `thermal_cooling_rate.inc` è invariato; coefficienti radiativo/convettivo ricavati con funzioni pure da `thermal_l1`, senza copie globali, e atmosfera da `T_ambient`; REAL/COMPLEX/analitico conservati. | Nessuna nuova legge terreno/interlayer; verificare equivalenza single-layer e percorsi di input lava prima di chiudere il gate. |
-| **A07 — Contatti** | Non esiste ancora modulo condiviso `layer_contacts_2d` nel tree; il Lie non conosce scope. | Nuovo modulo `src/physics/layer_contacts_2d.f90` puro e cell-local, contatti atmosfera/terreno/coppia da spessori candidati e wet/dry canonico; niente logica fisica nel Lie; non modificare gating single-layer. |
+| **A06 — Termica fisica** | TL04-T3 usa configurazione read-only dal coordinamento single-layer fino al dispatcher termico, senza duplicazioni di coefficienti; cooling REAL/COMPLEX/analitico invariato nelle formule. | Validare esempi integrati lava/dry e futuro scope L2. |
+| **A07 — Contatti** | `src/physics/layer_contacts_2d.f90` introduce classificazione pura cell-local su 1/2 spessori candidati, usando `dry_thickness_tolerance`; test integrati in `TEST_SOURCE_REGISTRY` per tutti i casi e input invalidi. Il Lie non importa il modulo. | Certificare in CI, integrare solo nei futuri operatori TL07/TL11; non modificare il gating single-layer. |
 | **A08 — Registro/integrazione Lie** | `source_registry_2d.f90:source_group_type` contiene id, method, source_names, equation_ids, cache; nessun `scope`. `lie_source_executor_2d.f90:execute_lie_source_groups` riceve array rank-3 di L1 ed esegue gruppi cell-outer. | Scope L1/L2/INTERLAYER, coppia candidati e trasferimento unico, rollback atomico; kernel monolayer ricevono solo q/qp e rate del layer bersaglio. |
 | **A09 — HP-PCCU/path** | `nonconservative_2d.f90` è generico; `pccu_2d`, `hyperbolic_2d` hanno ancora fisica single-layer. | Path pressione accoppiata con `B,eta_1,eta_tot`, integrando completo, clamp, identità somma, CFL coupled e iperbolicità. |
 | **A10 — Deposito e substrato** | `deposit_tot` canonico e ramo lava/granulare distinti; scratch e transazioni del Lie aggiornati. | Prove end-to-end (lava `n_solid=0`, erosione, topografia, restart v7, NetCDF) ancora non certificate dall'evidenza disponibile. |
 | **A11 — Specie e processi** | `constitutive_parameters_2d.f90` contiene proprietà intrinseche e parametri globali di altre chiusure; `source_input_2d.f90` conserva metadati di pore pressure e mass exchange, **non** quelli termici ora in `thermal_config_type`. | Distinguere SHARED, L1, L2, INTERLAYER; nessuna duplicazione delle proprietà delle specie; chiusure del manoscritto da implementare con valida ownership. |
 | **A12 — I/O** | NetCDF single-layer `(x,y,time)`, restart v7 con accesso L1 e substrato condiviso, formati legacy. | Versione two-layer, schema del layer, continuazione e test round-trip; preservare produzione mono. |
-| **A13 — Workflow** | Due workflow success sulla baseline `b9e29e78`; T3 non ha ancora evidenza di compilazione/regressione. | Non attribuire esiti a EXAMPLES completi, restart/NetCDF, OpenMP o benchmark che non risultano eseguiti. |
+| **A13 — Workflow** | Build TL04-T3 su `ba28e844` e regressioni su `0ded80c9` superate; TL04-C non ancora verificata. | Build optimized/debug e regressioni sul nuovo commit, full EXAMPLES e OpenMP ancora da verificare. |
 
 ## Catena di dipendenze da rispettare
 
@@ -43,7 +43,7 @@
 | G0 baseline/tag | Audit storico di baseline, nessuna certificazione completa verificata oggi | **Aperto** |
 | G1 deposito | Implementazione e test mirati, round-trip/full matrix non dimostrati | **Aperto** |
 | G2 rank-4 single-layer | Build optimized/debug e regressioni fisiche/numeriche **success** su `b9e29e78`; full EXAMPLES e restart ancora da certificare | **Parziale: aperto** |
-| G3 configurazioni L1/L2 | Reologia, TL04-T1/T2 verificate in CI; migrazione `T_ground` da certificare, contatti e T3 ancora aperti | **Parziale: aperto** |
+| G3 configurazioni L1/L2 | Reologia e termica con CI precedente; nuovi contatti fisici implementati e test da eseguire, altri scope e chiusure aperti | **Parziale: aperto** |
 | G4 spazio | No coupled production | **Aperto** |
 | G5 Lie coppia | No scope, no candidate pair production | **Aperto** |
 | G6 chiusure | Da implementare | **Aperto** |
