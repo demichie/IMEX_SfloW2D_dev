@@ -113,7 +113,7 @@
     USE parameters_2d, ONLY: rheology_model, thermal_cooling_flag
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
-    USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2, T_ref
+    USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2
     ! -- Functions used in the rheology calculations
     USE state_mixture, ONLY : sauter_diameter, average_density_solids,                                                 &
         evaluate_mixture, evaluate_mixture_from_volume, primitive_to_volume_fractions
@@ -588,7 +588,6 @@
         !-- Inizialization of the Variables for the namelist RHEOLOGY_PARAMETERS
         rheology_model = 'none'
         nu_ref = 0.0_wp
-        T_ref = 0.0_wp
         visc_par = 0.0_wp
         tau0 = 0.0_wp
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
@@ -859,7 +858,6 @@
 
 
         rheology_model = 'none'
-        T_ref = -1
         rho_s = -1.0_wp
         sphericity_s = 1.0_wp
         initial_erodible_thickness = -1.0_wp
@@ -1562,7 +1560,6 @@
                 CALL fatal_error('RHEOLOGY_FLAG is true but no L1 rheology model was read')
             END IF
             REWIND(input_unit)
-            rheology=rheology_l1
             ! Scheduling metadata is consumed before rheology coefficient checks.
             rheology_model=rheology_l1%rheology_model
             rheology_method=rheology_l1%rheology_method
@@ -3513,8 +3510,6 @@
             ! module coefficient storage. This is removed when their interfaces
             ! accept immutable per-layer configurations; do not duplicate laws.
             rheology_model=rheology_l1%rheology_model
-            T_ref=rheology_l1%T_ref
-            rheology=rheology_l1
         END IF
 
         ! ------- READ temperature_parameters NAMELIST ------------------------------

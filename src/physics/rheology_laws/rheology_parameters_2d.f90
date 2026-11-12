@@ -41,6 +41,5 @@ MODULE rheology_parameters_2d
 
 
 
-        REAL(wp) :: T_ref
 
 END MODULE rheology_parameters_2d
