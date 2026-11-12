@@ -120,7 +120,7 @@ CONTAINS
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, state%h, speed_ratio, speed_before, 'plastic')
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
-        CALL solve_exact_velocity_flow(EXACT_FLOW_CONSTANT, [config%tau/(state%h*speed_ratio)], dt, speed_before,             &
+        CALL solve_exact_velocity_flow(EXACT_FLOW_CONSTANT, [config%tau/(state%h*speed_ratio)], dt, speed_before,      &
             speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE eval_rheology_plastic_analytic

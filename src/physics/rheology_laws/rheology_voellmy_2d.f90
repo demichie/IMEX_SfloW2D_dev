@@ -53,7 +53,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_voellmy_explicit(config, state, grav_coeff, use_pore_pressure, use_stochastic,                &
+    SUBROUTINE eval_rheology_voellmy_explicit(config, state, grav_coeff, use_pore_pressure, use_stochastic,            &
             stochastic_value, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -98,7 +98,7 @@ CONTAINS
         rate_y = 0.0_wp
         IF (state%mod_vel .LE. 0.0_wp) RETURN
 
-        friction_stress = config%mu * rhom *                                                                                  &
+        friction_stress = config%mu * rhom *                                                                           &
                     (red_grav + state%curvature_acceleration) * h                                                      &
                     * SQRT(grav_coeff)
         friction_stress = MAX(0.0_wp, friction_stress)
@@ -160,7 +160,7 @@ CONTAINS
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE eval_rheology_voellmy_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,          &
+    SUBROUTINE eval_rheology_voellmy_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,      &
             use_pore_pressure, use_stochastic_xi, stochastic_xi_value, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -208,7 +208,7 @@ CONTAINS
 
         END IF
 
-        coulomb_stress = config%mu * rhom * (red_grav +                                                                       &
+        coulomb_stress = config%mu * rhom * (red_grav +                                                                &
                     curvature_acceleration) * h * SQRT(grav_coeff)
         coulomb_stress = MAX(0.0_wp, coulomb_stress)
         IF (use_pore_pressure) coulomb_stress = MAX(0.0_wp, coulomb_stress -                                           &
