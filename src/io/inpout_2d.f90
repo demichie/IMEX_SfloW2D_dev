@@ -115,7 +115,7 @@
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
     USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2,                                 &
             mu_s, mu_2, I_0, muI_inf,                                                                                  &
-            mu_0, mu_inf, Fr_0, U_w, xi, T_ref
+            xi, T_ref
     USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     ! -- Functions used in the rheology calculations
@@ -4848,12 +4848,12 @@
             if (TRIM(rheology_model) .EQ. 'froude') THEN
                 std_min = 0.0_wp !std_max * (rheology_l1%mu_0/rheology_l1%mu_inf) ! mu_0 < mu_inf in mu(Fr)
                 IF (noise_activation_velocity <= 0.0_wp)                                                               &
-                        noise_activation_velocity = Fr_0
+                        noise_activation_velocity = rheology_l1%Fr_0
                 std_slope_factor = noise_activation_velocity**2
             ELSEIF (TRIM(rheology_model) .EQ. 'lucas') THEN
                 std_min = std_max*(rheology_l1%mu_inf/rheology_l1%mu_0) ! mu_0 > mu_inf in mu(U)
                 IF (noise_activation_velocity <= 0.0_wp)                                                               &
-                        noise_activation_velocity = U_w
+                        noise_activation_velocity = rheology_l1%U_w
                 std_slope_factor = noise_activation_velocity**2
 
             END IF

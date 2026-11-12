@@ -13,6 +13,8 @@ PROGRAM test_rheology_froude
 
   IMPLICIT NONE
 
+  TYPE(rheology_config_type) :: rheo_config
+
   REAL(wp) :: qp(6), source(6), expected(6)
   COMPLEX(wp) :: complex_source(6)
   TYPE(physical_state_real) :: local_state
