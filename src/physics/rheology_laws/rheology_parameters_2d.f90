@@ -13,6 +13,28 @@ MODULE rheology_parameters_2d
 
     PRIVATE
 
+    ! Canonical input configuration for each material layer. Every rheology
+    ! coefficient is declared once here, not once per NAMELIST. The old
+    ! scalar module variables below remain temporarily until their call sites
+    ! have been migrated to read the appropriate layer configuration directly.
+    PUBLIC :: rheology_config_type
+    TYPE :: rheology_config_type
+        CHARACTER(LEN=32) :: rheology_model='none'
+        CHARACTER(LEN=16) :: rheology_method=''
+        INTEGER :: rheology_group=1
+        REAL(wp) :: mu=-1.0_wp, xi=-1.0_wp, tau=-1.0_wp
+        REAL(wp) :: nu_ref=-1.0_wp, visc_par=-1.0_wp
+        REAL(wp) :: T_ref=-1.0_wp, tau0=-1.0_wp
+        REAL(wp) :: alpha2=-1.0_wp, beta2=-1.0_wp
+        REAL(wp) :: alpha1_ref=-1.0_wp, beta1=-1.0_wp
+        REAL(wp) :: Kappa=-1.0_wp, n_td=-1.0_wp
+        REAL(wp) :: friction_factor=-1.0_wp
+        REAL(wp) :: mu_0=-1.0_wp, mu_inf=-1.0_wp
+        REAL(wp) :: Fr_0=-1.0_wp, U_w=-1.0_wp
+        REAL(wp) :: mu_s=-1.0_wp, mu_2=-1.0_wp
+        REAL(wp) :: I_0=-1.0_wp, muI_inf=-1.0_wp
+    END TYPE rheology_config_type
+
     PUBLIC :: I_0, mu_2, mu_s, muI_inf
     PUBLIC :: mu_0, mu_inf, Fr_0, U_w
     PUBLIC :: xi, T_ref
