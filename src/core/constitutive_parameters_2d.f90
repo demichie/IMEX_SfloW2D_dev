@@ -20,7 +20,7 @@ MODULE constitutive_parameters_2d
     PUBLIC :: grav, inv_grav
     PUBLIC :: A_drag, B_drag, collective_settling_flag
     PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
-    PUBLIC :: SBconst, T_ground
+    PUBLIC :: SBconst
     PUBLIC :: rho_c_sub, rho_a_amb
     PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
     PUBLIC :: sp_heat_g, sp_gas_const_g
@@ -55,8 +55,6 @@ MODULE constitutive_parameters_2d
     !> Stefan-Boltzmann constant [W m-2 K-4].
     REAL(wp), PARAMETER :: SBconst = 5.67E-8_wp
 
-    !> Shared terrain temperature (K); no conduction law is active.
-    REAL(wp) :: T_ground
 
     !> Specific gas constant of gas mixture (units: J kg-1 K-1)
 

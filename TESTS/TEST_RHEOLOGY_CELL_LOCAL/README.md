@@ -124,6 +124,7 @@ overwrite only inside their supplied output directory. Lava uses `h_x`; other
 cases use `froude_blend`.
 
 The parser verifies legacy TEMPERATURE_PARAMETERS and the equivalent L1 spelling,
+including the qualified T_GROUND component, and rejects the retired unqualified T_GROUND entry.
 rejects duplicate or missing temperature namelists and rejects L2 input in single-layer mode.
 The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
 and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection

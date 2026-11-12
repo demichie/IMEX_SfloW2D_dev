@@ -1,5 +1,6 @@
 !> \brief Canonical per-layer thermal configuration and derived cooling coefficients.
-!> \details Material coefficients have one owner per layer; terrain and atmosphere are shared.
+!> \details Layer configurations also contain the common ground temperature.
+!>          Both configurations must agree when two layers are enabled; atmosphere stays shared.
 MODULE thermal_parameters_2d
     USE parameters_2d, ONLY : wp
     USE constitutive_parameters_2d, ONLY : SBconst
@@ -7,6 +8,7 @@ MODULE thermal_parameters_2d
     PRIVATE
     PUBLIC :: thermal_config_type, thermal_l1, thermal_l2
     PUBLIC :: thermal_radiative_coefficient, thermal_convective_coefficient
+    PUBLIC :: thermal_ground_temperatures_match
 
     TYPE :: thermal_config_type
         LOGICAL :: thermal_cooling_flag=.FALSE.
@@ -19,6 +21,8 @@ MODULE thermal_parameters_2d
         REAL(wp) :: c_p=-1.0_wp
         REAL(wp) :: enne=-1.0_wp
         REAL(wp) :: emme=-1.0_wp
+        !> Ground temperature (K), equal between L1 and L2 for two-layer runs.
+        REAL(wp) :: T_ground=-1.0_wp
     END TYPE thermal_config_type
 
     TYPE(thermal_config_type), TARGET :: thermal_l1
@@ -35,4 +39,10 @@ CONTAINS
         TYPE(thermal_config_type), INTENT(IN) :: config
         coefficient=config%atm_heat_transf_coeff*config%exp_area_fract
     END FUNCTION thermal_convective_coefficient
+    !> \brief Test the shared ground-temperature invariant of a two-layer configuration.
+    !> \details Exact equality is required: the two namelists describe one physical terrain.
+    PURE LOGICAL FUNCTION thermal_ground_temperatures_match(config_l1,config_l2) RESULT(matches)
+        TYPE(thermal_config_type), INTENT(IN) :: config_l1,config_l2
+        matches=config_l1%T_ground==config_l2%T_ground
+    END FUNCTION thermal_ground_temperatures_match
 END MODULE thermal_parameters_2d

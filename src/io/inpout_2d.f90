@@ -104,9 +104,8 @@
                                     h_collapse, alphas_collapse, alphag_collapse
 
     ! -- Variables for the namelist TEMPERATURE_PARAMETERS
-    USE constitutive_parameters_2d, ONLY: T_ground
     USE thermal_parameters_2d, ONLY : thermal_config_type, thermal_l1, thermal_l2,                                     &
-            thermal_radiative_coefficient
+            thermal_radiative_coefficient, thermal_ground_temperatures_match
 
     ! -- Variables for the namelist RHEOLOGY_PARAMETERS
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
@@ -387,8 +386,8 @@
         r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
 
     ! Legacy and L1 namelists share the same coefficient object.
-    NAMELIST /temperature_parameters/ thermal, T_ground
-    NAMELIST /temperature_l1_parameters/ thermal_l1, T_ground
+    NAMELIST /temperature_parameters/ thermal
+    NAMELIST /temperature_l1_parameters/ thermal_l1
     NAMELIST /temperature_l2_parameters/ thermal_l2
 
     ! One canonical coefficient list lives in rheology_config_type.
@@ -572,7 +571,7 @@
         inv_grav = 1.0_wp/grav
 
         ! The material thermal properties are initialized in thermal_l1/l2.
-        T_ground = 1200.0_wp
+        thermal_l1%T_ground = 1200.0_wp
 
         !-- Rheology coefficients are initialized once in rheology_config_type.
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
@@ -847,7 +846,7 @@
         initial_erodible_thickness = -1.0_wp
         erodible_deposit_flag = .FALSE.
 
-        T_ground = -1.0_wp
+        thermal_l1%T_ground = -1.0_wp
 
         grav = -1.0_wp
 
@@ -3490,9 +3489,15 @@
             IF (INDEX(thermal_line,'&TEMPERATURE_L2_PARAMETERS')==1) n_thermal_l2=n_thermal_l2+1
         END DO
         REWIND(input_unit)
-        IF (n_thermal_l2/=0) CALL fatal_error('TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2')
-        IF (n_thermal_legacy+n_thermal_l1/=1)                                                                   &
-            CALL fatal_error('Provide exactly one TEMPERATURE_PARAMETERS or TEMPERATURE_L1_PARAMETERS')
+        IF (n_layers==1) THEN
+            IF (n_thermal_l2/=0) CALL fatal_error('TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2')
+            IF (n_thermal_legacy+n_thermal_l1/=1)                                                               &
+                CALL fatal_error('Provide exactly one TEMPERATURE_PARAMETERS or TEMPERATURE_L1_PARAMETERS')
+        ELSE IF (n_layers==2) THEN
+            ! This path is not enabled until the two-layer solver passes its gates.
+            IF (n_thermal_legacy/=0 .OR. n_thermal_l1/=1 .OR. n_thermal_l2/=1)                                 &
+                CALL fatal_error('N_LAYERS=2 requires TEMPERATURE_L1_PARAMETERS and TEMPERATURE_L2_PARAMETERS')
+        END IF
         ! Preserve the existing automatic cooling activation for lava.
         thermal_l1%thermal_cooling_flag=TRIM(rheology_l1%rheology_model)=='lava'
         IF (n_thermal_legacy==1) THEN
@@ -3503,6 +3508,13 @@
             IF (ios/=0) CALL fatal_error('ERROR: problem with namelist TEMPERATURE_L1_PARAMETERS')
         END IF
         REWIND(input_unit)
+        IF (n_layers==2) THEN
+            READ(input_unit,NML=temperature_l2_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('ERROR: problem with namelist TEMPERATURE_L2_PARAMETERS')
+            IF (.NOT. thermal_ground_temperatures_match(thermal_l1,thermal_l2))                                  &
+                CALL fatal_error('L1 and L2 T_GROUND must be identical')
+            REWIND(input_unit)
+        END IF
         IF (thermal_l1%thermal_cooling_flag) THEN
             WRITE (*, *) 'Cooling ambient temperature (K) =', T_ambient
             WRITE (*, *) 'radiative_term_coeff', thermal_radiative_coefficient(thermal_l1)

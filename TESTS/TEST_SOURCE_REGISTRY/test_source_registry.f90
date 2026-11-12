@@ -4,7 +4,8 @@ PROGRAM test_source_registry
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE thermal_parameters_2d, ONLY : thermal_l1, thermal_l2,                                              &
-          thermal_radiative_coefficient, thermal_convective_coefficient
+          thermal_radiative_coefficient, thermal_convective_coefficient,                                      &
+          thermal_ground_temperatures_match
   USE source_input_2d
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,entrainment_flag
@@ -43,6 +44,13 @@ PROGRAM test_source_registry
        'L1 convective coefficient matches prior algebra')
   CALL require(thermal_convective_coefficient(thermal_l2)==0.5_wp, &
        'L2 convective coefficient is independent')
+  thermal_l1%T_ground=300.0_wp
+  thermal_l2%T_ground=300.0_wp
+  CALL require(thermal_ground_temperatures_match(thermal_l1,thermal_l2), &
+       'two-layer ground temperature is consistent')
+  thermal_l2%T_ground=310.0_wp
+  CALL require(.NOT.thermal_ground_temperatures_match(thermal_l1,thermal_l2), &
+       'two-layer ground mismatch is detected')
   CALL require(source_catalog_names_unique(),'unique catalog names')
   CALL require(canonical_rheology_catalog_unique(),'unique rheology names')
   CALL require(ALL(source_newton_affected_equations('rheology_voellmy')==[2,3]), &

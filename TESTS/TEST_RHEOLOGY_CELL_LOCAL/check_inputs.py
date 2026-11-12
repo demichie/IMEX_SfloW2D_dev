@@ -46,7 +46,7 @@ def main():
     for name in ('ambient-default','ambient-set','ambient-zero','ambient-nan','ambient-inf','ambient-missing'):
         cases.append((name,3,'nu_ref=.02, tau0=20, visc_par=.003, T_ref=900',
                       name in ('ambient-zero','ambient-nan','ambient-inf','ambient-missing')))
-    for name in ('thermal-l1','thermal-duplicate','thermal-l2','thermal-missing'):
+    for name in ('thermal-l1','thermal-duplicate','thermal-l2','thermal-missing','thermal-ground-bare'):
         cases.append((name,3,'nu_ref=.02, tau0=20, visc_par=.003, T_ref=900',
                       name!='thermal-l1'))
     records=[]
@@ -65,7 +65,8 @@ def main():
             text=text.replace("'froude_blend'","'h_x'")
             text=text.replace('&TEMPERATURE_PARAMETERS\n /',
                 '&TEMPERATURE_PARAMETERS\n THERMAL%EMISSIVITY=.8, '
-                'THERMAL%ATM_HEAT_TRANSF_COEFF=4, THERMAL%EXP_AREA_FRACT=.5,\n /')
+                'THERMAL%ATM_HEAT_TRANSF_COEFF=4, THERMAL%EXP_AREA_FRACT=.5, '
+                'THERMAL%T_GROUND=300,\n /')
             if name=='thermal-l1':
                 text=text.replace('&TEMPERATURE_PARAMETERS\n', '&TEMPERATURE_L1_PARAMETERS\n')
                 text=text.replace('THERMAL%', 'THERMAL_L1%')
@@ -75,6 +76,8 @@ def main():
                 text+='\n&TEMPERATURE_L2_PARAMETERS\n THERMAL_L2%EMISSIVITY=.5,\n/\n'
             elif name=='thermal-missing':
                 text=re.sub(r'&TEMPERATURE_PARAMETERS\n[^&]*?\n /', '', text, count=1)
+            elif name=='thermal-ground-bare':
+                text=text.replace('THERMAL%T_GROUND=300,', 'T_GROUND=300,')
             ambient={'ambient-set':'350','ambient-zero':'0',
                      'ambient-nan':'NaN','ambient-inf':'Infinity'}.get(name)
             if ambient is not None:
@@ -101,7 +104,8 @@ def main():
         elif name.startswith('thermal-'):
             rejected=any(token in log for token in (
                 'Provide exactly one TEMPERATURE_PARAMETERS',
-                'TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2'))
+                'TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2',
+                'ERROR: problem with namelist TEMPERATURE_PARAMETERS'))
         else:
             rejected=any(token in log for token in (
                 'ERROR: problem with namelist RHEOLOGY_PARAMETERS',
