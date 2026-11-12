@@ -1,7 +1,8 @@
 PROGRAM test_source_modules
 
   USE parameters_2d, ONLY : wp
-  USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
+  USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
+  USE rheology_parameters_2d, ONLY : rheology_config_type
   USE mass_exchange_vaporization_2d, ONLY : eval_vaporization_mass_rate, &
        eval_vaporization_energy_rate
   USE mass_exchange_deposition_2d, ONLY : eval_hindered_settling_deposition_rate, &
@@ -28,6 +29,7 @@ PROGRAM test_source_modules
   REAL(wp) :: solid_erosion_rate(2), continuous_erosion_rate
   REAL(wp) :: carrier_density, inverse_kinematic_viscosity, expected_viscosity
   INTEGER :: i
+  TYPE(rheology_config_type) :: config
 
   solid_density = [2500.0_wp, 2700.0_wp]
   solid_heat_capacity = [800.0_wp, 900.0_wp]
@@ -53,7 +55,7 @@ PROGRAM test_source_modules
 
   alpha1_coeff = 1.0_wp
   beta1 = 2.0_wp
-  expected_viscosity = eval_lahar_fluid_viscosity(293.15_wp, 0.3_wp)
+  expected_viscosity = eval_lahar_fluid_viscosity(config,293.15_wp, 0.3_wp)
   CALL eval_settling_fluid_properties('lahar', 293.15_wp,         &
        0.3_wp, 1800.0_wp, 1000.0_wp, 1.0E-6_wp, carrier_density,            &
        inverse_kinematic_viscosity)
@@ -64,16 +66,16 @@ PROGRAM test_source_modules
   temperature_perturbation=1.0E-20_wp
   finite_difference_step=1.0E-4_wp
   DO i=1,SIZE(temperature_points)
-     expected_viscosity=eval_lahar_fluid_viscosity(temperature_points(i),0.3_wp)
-     complex_actual=eval_lahar_fluid_viscosity( &
+     expected_viscosity=eval_lahar_fluid_viscosity(config,temperature_points(i),0.3_wp)
+     complex_actual=eval_lahar_fluid_viscosity(config, &
           CMPLX(temperature_points(i),temperature_perturbation,wp), &
           CMPLX(0.3_wp,0.0_wp,wp))
      CALL assert_close(REAL(complex_actual,wp),expected_viscosity, &
           'lahar real/complex viscosity value')
      complex_derivative=AIMAG(complex_actual)/temperature_perturbation
      finite_difference_derivative=( &
-          eval_lahar_fluid_viscosity(temperature_points(i)+finite_difference_step,0.3_wp)- &
-          eval_lahar_fluid_viscosity(temperature_points(i)-finite_difference_step,0.3_wp))/ &
+          eval_lahar_fluid_viscosity(config,temperature_points(i)+finite_difference_step,0.3_wp)- &
+          eval_lahar_fluid_viscosity(config,temperature_points(i)-finite_difference_step,0.3_wp))/ &
           (2.0_wp*finite_difference_step)
      IF (ABS(complex_derivative-finite_difference_derivative) .GT. &
           1.0E-6_wp*MAX(1.0_wp,ABS(finite_difference_derivative))) THEN

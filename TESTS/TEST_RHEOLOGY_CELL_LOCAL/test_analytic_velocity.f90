@@ -2,7 +2,7 @@ PROGRAM test_analytic_velocity
 
   USE parameters_2d, ONLY : wp, n_solid
   USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
-  USE rheology_parameters_2d, ONLY : rheology_config_type, T_ref
+  USE rheology_parameters_2d, ONLY : rheology_config_type
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &
        EXACT_FLOW_CONSTANT, EXACT_FLOW_LINEAR, EXACT_FLOW_AFFINE,              &
@@ -16,11 +16,10 @@ PROGRAM test_analytic_velocity
   USE state_types, ONLY : physical_state_real, physical_state_complex
   USE rheology_plastic_2d, ONLY : eval_rheology_plastic_implicit,  &
        eval_rheology_plastic_analytic
-  USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
+  USE rheology_lava_2d, ONLY : &
        eval_rheology_lava_implicit, eval_rheology_lava_semi_implicit, &
        eval_rheology_lava_analytic
-  USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa,   &
-       n_td, n_td2, eval_rheology_lahar_implicit,                       &
+  USE rheology_lahar_2d, ONLY : eval_rheology_lahar_implicit, &
        eval_rheology_lahar_semi_implicit,                               &
        eval_rheology_lahar_analytic
   USE rheology_empirical_2d, ONLY : eval_rheology_empirical_implicit,   &
@@ -109,10 +108,10 @@ PROGRAM test_analytic_velocity
        mixture_density*flow_depth, [REAL(complex_source_x,wp),              &
        REAL(complex_source_y,wp)], 'plastic')
 
-  nu_ref = 0.2_wp
-  visc_par = 0.01_wp
-  tau0 = 100.0_wp
-  T_ref = 300.0_wp
+  quadratic_config%nu_ref = 0.2_wp
+  quadratic_config%visc_par = 0.01_wp
+  quadratic_config%tau0 = 100.0_wp
+  quadratic_config%T_ref = 300.0_wp
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
@@ -120,13 +119,13 @@ PROGRAM test_analytic_velocity
     ps%rho_m=mixture_density
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL eval_rheology_lava_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_lava_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
-  linear_drag = 3.0_wp*nu_ref/flow_depth**2 *                               &
+  linear_drag = 3.0_wp*quadratic_config%nu_ref/flow_depth**2 *                               &
        EXP(-visc_par*(temperature-T_ref))
-  yield_drag = tau0/(mixture_density*flow_depth*speed_ratio)
+  yield_drag = quadratic_config%tau0/(mixture_density*flow_depth*speed_ratio)
   expected_speed = MAX(0.0_wp, (SQRT(SUM(velocity_before**2)) +             &
        yield_drag/linear_drag)*EXP(-linear_drag*integration_step) -         &
        yield_drag/linear_drag)
@@ -143,7 +142,7 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_lava_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_lava_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
     TYPE(physical_state_real) :: ps
@@ -152,20 +151,20 @@ PROGRAM test_analytic_velocity
     ps%mod_vel=speed_after
     ps%mod_vel2=ps%mod_vel**2
     ps%mod_vel_hor=horizontal_speed
-    CALL eval_rheology_lava_semi_implicit(ps, source_x, source_y)
+    CALL eval_rheology_lava_semi_implicit(quadratic_config,ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, source, 'lava')
 
-  alpha2 = 100.0_wp
-  beta2 = 2.0_wp
-  alpha1_coeff = 1.0_wp
-  beta1 = 2.0_wp
-  Kappa = 1.0_wp
-  n_td = 0.1_wp
-  n_td2 = 0.01_wp
+  quadratic_config%alpha2 = 100.0_wp
+  quadratic_config%beta2 = 2.0_wp
+  quadratic_config%alpha1_coeff = 1.0_wp
+  quadratic_config%beta1 = 2.0_wp
+  quadratic_config%Kappa = 1.0_wp
+  quadratic_config%n_td = 0.1_wp
+  quadratic_config%n_td = SQRT(0.01_wp)
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
@@ -174,7 +173,7 @@ PROGRAM test_analytic_velocity
     ps%v=velocity_before(2)
     ps%rho_m=mixture_density
     ps%alphas=solid_fraction
-    CALL eval_rheology_lahar_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_lahar_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_lahar', .FALSE., 0.0_wp,          &
        .FALSE., 0.0_wp, velocity_after, 'lahar dispatch')
@@ -192,7 +191,7 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_lahar_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_lahar_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
     TYPE(physical_state_real) :: ps
@@ -204,7 +203,7 @@ PROGRAM test_analytic_velocity
     ps%mod_vel=speed_after
     ps%mod_vel2=ps%mod_vel**2
     ps%mod_vel_hor=horizontal_speed
-    CALL eval_rheology_lahar_semi_implicit(ps, source_x, source_y)
+    CALL eval_rheology_lahar_semi_implicit(quadratic_config,ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
