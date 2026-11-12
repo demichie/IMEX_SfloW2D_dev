@@ -1686,7 +1686,7 @@ CONTAINS
 
                 IF (kin_visc_l .EQ. -1.0_wp) THEN
 
-                    IF ((TRIM(rheology_model) .NE. 'lahar') .AND.                                                          &
+                    IF ((TRIM(rheology_model) .NE. 'lahar') .AND.                                                      &
                         (TRIM(rheology_model) .NE. 'lava')) THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
