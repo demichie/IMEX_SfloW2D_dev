@@ -116,7 +116,7 @@ select `froude_blend`. No production tableau or rheology selector is changed.
 `check_inputs.py` uses a fresh source-mass fixture and the real solver parser.
 It distinguishes input rejection text from the process exit code: plain Fortran
 STOP can return zero. Valid control runs must reach the end of a short run.
-The 32 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
+The 33 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
 name handling, rejection of unknown names and legacy numeric IDs, missing/
 zero/negative denominators, valid zero Coulomb coefficients, nonfinite
 coefficients and ambient cooling configuration. Generated fixtures allow
@@ -126,9 +126,11 @@ cases use `froude_blend`.
 The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
 and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection
 validates IEEE binary32/64 inputs under `-Ofast` without NaN comparisons.
-Cooling uses the configured positive finite `T_env`, defaulting to 300 K when
-omitted. The test reads its startup diagnostic because the historical backup
-writer omits the temperature namelist.
+Cooling uses the explicitly supplied finite positive `T_ambient` from
+`GAS_TRANSPORT_PARAMETERS` (including lava and liquid-only configurations).
+The parser rejects missing, zero, NaN and infinite ambient temperatures.
+The test reads its startup diagnostic because the historical backup writer
+omits the temperature namelist.
 
 ## Acceptance boundary
 

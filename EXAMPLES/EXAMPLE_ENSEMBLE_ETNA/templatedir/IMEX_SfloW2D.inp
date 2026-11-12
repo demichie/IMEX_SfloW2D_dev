@@ -30,7 +30,6 @@
 &RESTART_PARAMETERS
  RESTART_FILES ="./DEM/init_volume.asc" ,
  T_INIT = 373.D0 ,
- T_AMBIENT = 300.D0 ,
  SED_VOL_PERC = 50.0  ,
  u_init = ENSEMBLE_vx,
  v_init = ENSEMBLE_vy,

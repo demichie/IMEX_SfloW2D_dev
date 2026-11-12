@@ -20,7 +20,7 @@ MODULE constitutive_parameters_2d
     PUBLIC :: grav, inv_grav
     PUBLIC :: A_drag, B_drag, collective_settling_flag
     PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
-    PUBLIC :: T_env, emme, c_p
+    PUBLIC :: emme, c_p
     PUBLIC :: convective_term_coeff, atm_heat_transf_coeff, exp_area_fract
     PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
     PUBLIC :: thermal_conductivity
@@ -56,7 +56,6 @@ MODULE constitutive_parameters_2d
     CHARACTER(LEN=8) :: f_inhibit_mode = 'OFF'  ! options: 'OFF','STATIC','DYNAMIC'
 
     !> evironment temperature [K]
-    REAL(wp) :: T_env
 
     !> velocity boundary layer fraction of total thickness
     REAL(wp) :: emme

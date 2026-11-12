@@ -179,7 +179,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL02 — migrazione consumer** | **Implementato per L1, audit integrato aperto** | Verificare tutte le dipendenze di state, spatial, Lie, stochastic, input/output, test, OpenMP; eliminare wrapper obsoleti. |
 | **TL03 — gate single-layer** | **CI parziale superata, gate G2 aperto** | Full EXAMPLES, bilanci, wet/dry, I/O/restart, OpenMP, profiling/memoria e confronto baseline; registrare eventuale delta termico autorizzato separatamente. |
 | **TL04-R — configurazione reologica** | **Implementata e CI superata** | Tipo canonico, parser legacy/L1, parametri espliciti nei kernel; completare le dipendenze dal contesto per L2 quando attivato. |
-| **TL04-T — configurazione termica** | **Da implementare** | Audit proprietà e consumer; tipo canonico L1/L2; legacy alias L1; `T_ambient` unica da GAS; eliminare `T_env`; test input, REAL/COMPLEX, analitico, lava e dry. |
+| **TL04-T — configurazione termica** | **T1 implementata nel branch; CI e T2/T3 aperti** | Audit proprietà e consumer; tipo canonico L1/L2; legacy alias L1; `T_ambient` unica da GAS; eliminare `T_env`; test input, REAL/COMPLEX, analitico, lava e dry. |
 | **TL04-C — altre configurazioni e contatti** | **Da implementare** | Ownership SHARED/L1/L2/INTERLAYER; migrazione per processi necessari, `layer_contacts_2d` puro e testato **inerte**; contesti read-only; IC/BC e slot inattivi; nessuna fisica nel Lie. |
 | **TL05 — HP-PCCU indipendente per slot** | **Da implementare** | Trasporto/ricostruzione per L1 e L2 isolati e wet/dry combinati, `eta_1`/`eta_tot`; recupero single-layer quando assente una corrente. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
@@ -214,7 +214,7 @@ Le milestone sono **punti di proposta di merge**, non autorizzazioni automatiche
 | **G0** | Baseline taggato, esempi riproducibili, confronti, condizioni OpenMP e prestazioni | Non certificato. |
 | **G1** | `deposit_tot` granulare/lava, `n_solid=0`, rollback, erosione, topografia e restart v7 | Codice e alcuni test esistenti; matrice integrata non certificata. |
 | **G2** | Rank-4 L1, IC/BC, lie, spatial, NUMERICS, full EXAMPLES, NetCDF, restart, OpenMP | CI build/regressioni su `410ad99e` **success**; resto non certificato. |
-| **G3** | Reologia/termica distinte L1/L2, input legacy, T_ambient unica, contatti quattro casi + mono, no thread races | Reologia isolata in CI; termica e contatti da implementare. |
+| **G3** | Reologia/termica distinte L1/L2, input legacy, T_ambient unica, contatti quattro casi + mono, no thread races | Reologia verificata in CI; migrazione T_ambient/T_env T1 in attesa di CI; termica per-layer e contatti aperti. |
 | **G4** | Idrostatica con path e topografia, coppia, residuo curvo, clamp, wet/dry, CFL | Da implementare. |
 | **G5** | Sorgenti L1/L2 indipendenti, coppia `Gamma`, limiti e rollback atomico, gruppo 0 | Da implementare. |
 | **G6** | Settling, elutriazione cold-start, drag, consolidazione, entrainment, lofting, termica e budget | Da implementare. |

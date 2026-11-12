@@ -106,7 +106,7 @@
 
     ! -- Variables for the namelist TEMPERATURE_PARAMETERS
     USE constitutive_parameters_2d, ONLY: emissivity, exp_area_fract, enne,                                            &
-            emme, atm_heat_transf_coeff, thermal_conductivity, T_env, T_ground, c_p
+            emme, atm_heat_transf_coeff, thermal_conductivity, T_ground, c_p
 
     ! -- Variables for the namelist RHEOLOGY_PARAMETERS
     USE parameters_2d, ONLY: thermal_cooling_flag
@@ -344,7 +344,7 @@
         interactive_debug_flag
 
     NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time,                                        &
-        T_init, T_ambient, u_init, v_init, sed_vol_perc
+        T_init, u_init, v_init, sed_vol_perc
 
     NAMELIST /newrun_parameters/ n_solid, topography_file, x0, y0,                                                     &
         comp_cells_x, comp_cells_y, cell_size, rheology_flag,                                                          &
@@ -355,7 +355,7 @@
         stochastic_flag, n_layers,                                                                                     &
         pore_pressure_flag, sea_mass_removal_flag
 
-    NAMELIST /initial_conditions/ T_init, T_ambient
+    NAMELIST /initial_conditions/ T_init
 
     NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta,               &
         reconstr_coeff
@@ -387,8 +387,8 @@
         r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
 
     NAMELIST /temperature_parameters/ thermal_cooling_flag, emissivity, atm_heat_transf_coeff,                         &
-        thermal_conductivity, exp_area_fract, c_p, enne, emme, T_env,                                                  &
-        T_ground, thermal_method, thermal_group
+        thermal_conductivity, exp_area_fract, c_p, enne, emme, T_ground,                                           &
+        thermal_method, thermal_group
 
     ! One canonical coefficient list lives in rheology_config_type.
     ! Both NAMELIST spellings refer to the same L1 coefficient object.
@@ -522,7 +522,6 @@
         restart_file = ''
         release_time(:) = 0.0_wp
         T_init = 0.0_wp
-        T_ambient = 0.0_wp
         u_init = 0.0_wp
         v_init = 0.0_wp
 
@@ -577,7 +576,6 @@
         thermal_conductivity = 0.0_wp       ! no conduction to ground
         enne = 4.0_wp
         emme = 12.0_wp
-        T_env = 300.0_wp
         thermal_cooling_flag = .FALSE.
         T_ground = 1200.0_wp
         c_p = 1200.0_wp
@@ -861,7 +859,6 @@
         thermal_conductivity = -1.0_wp
         enne = -1.0_wp
         emme = -1.0_wp
-        T_env = -1.0_wp
         T_ground = -1.0_wp
         c_p = -1.0_wp
 
@@ -1009,8 +1006,7 @@
     !>       Invalid model combinations terminate before solver initialization.
     !>       Rheology coefficients must be finite; xi, Fr_0 and U_w are strictly
     !>       positive denominators while zero Coulomb coefficients are allowed.
-    !>       Omitted ambient cooling temperature defaults to 300 K; model 3
-    !>       honors an explicitly supplied positive T_env.
+    !>       Ambient temperature is supplied exclusively by GAS_TRANSPORT_PARAMETERS.
     !******************************************************************************
 
     SUBROUTINE read_param
@@ -1201,6 +1197,11 @@
 
         END IF
 
+        IF (.NOT. finite_input_value(T_ambient) .OR. T_ambient .LE. 0.0_wp) THEN
+            WRITE (*, *) 'ERROR: invalid T_AMBIENT in GAS_TRANSPORT_PARAMETERS; require finite positive T_AMBIENT.'
+            STOP
+        END IF
+
         IF (sp_heat_a .EQ. -1.0_wp) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
@@ -1358,15 +1359,6 @@
         ELSE
 
             inv_pres = 1.0_wp/pres
-
-        END IF
-
-        IF (T_ambient .EQ. -1.0_wp) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
-            WRITE (*, *) 'T_ambient =', T_ambient
-            WRITE (*, *) 'Please check the input file'
-            STOP
 
         END IF
 
@@ -2199,12 +2191,11 @@
 
                     REWIND (input_unit)
 
-                    IF (T_init*T_ambient .EQ. 0.0_wp) THEN
+                    IF (T_init .EQ. 0.0_wp) THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist RESTART_PARAMETERS'
                         WRITE (*, *) 'T_init=', T_init
-                        WRITE (*, *) 'T_ambient=', T_ambient
-                        WRITE (*, *) 'Add the variables to the namelist RESTART_PARAMETERS'
+                        WRITE (*, *) 'Add T_init to the namelist RESTART_PARAMETERS'
                         STOP
 
                     END IF
@@ -3498,9 +3489,6 @@
 
         ! ------- READ temperature_parameters NAMELIST ------------------------------
 
-        ! Preserve the historical 300 K ambient when omitted, without overwriting
-        ! an explicit input later in the source kernel.
-        T_env = 300.0_wp
         ! Preserve historical behavior when the optional flag is absent.
         thermal_cooling_flag = TRIM(rheology_l1%rheology_model) == 'lava'
         READ (input_unit, temperature_parameters, IOSTAT=ios)
@@ -3518,19 +3506,7 @@
 
             IF (thermal_cooling_flag) THEN
 
-                IF (.NOT. finite_input_value(T_env)) THEN
-                    WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require finite T_ENV.'
-                    STOP
-
-                END IF
-
-                IF (T_env .LE. 0.0_wp) THEN
-                    WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require T_ENV > 0.'
-                    STOP
-
-                END IF
-
-                WRITE (*, *) 'Cooling ambient temperature (K) =', T_env
+                WRITE (*, *) 'Cooling ambient temperature (K) =', T_ambient
 
                 radiative_term_coeff = SBconst*emissivity*exp_area_fract
                 WRITE (*, *) 'radiative_term_coeff', radiative_term_coeff

@@ -382,7 +382,7 @@ CONTAINS
             heat_capacity=q_before(4)/temperature_before
             CALL eval_thermal_analytic(['thermal_cooling'],temperature_before,interval,                               &
                     heat_capacity,radiative_term_coeff,convective_term_coeff,                                          &
-                    T_env,temperature_after)
+                    T_ambient,temperature_after)
             q_after(4)=heat_capacity*temperature_after
             status=0
 
@@ -465,7 +465,7 @@ CONTAINS
                 RETURN
             END IF
             CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
-                radiative_term_coeff,convective_term_coeff,T_env,rate(4))
+                radiative_term_coeff,convective_term_coeff,T_ambient,rate(4))
             RETURN
         END IF
         physical_state=>local_state
@@ -486,7 +486,7 @@ CONTAINS
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit_real(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                radiative_term_coeff,convective_term_coeff,T_env,rate(4))
+                radiative_term_coeff,convective_term_coeff,T_ambient,rate(4))
         END IF
     END SUBROUTINE eval_source_implicit_real
 
@@ -516,7 +516,7 @@ CONTAINS
                 RETURN
             END IF
             CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
-                radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
+                radiative_term_coeff,convective_term_coeff,T_ambient,c_nh_term_impl(4))
             RETURN
         END IF
 
@@ -538,7 +538,7 @@ CONTAINS
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
+                radiative_term_coeff,convective_term_coeff,T_ambient,c_nh_term_impl(4))
         END IF
     END SUBROUTINE eval_source_implicit
 
@@ -662,7 +662,7 @@ CONTAINS
 
             IF (group%thermal_active) THEN
                 CALL eval_thermal_explicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                   &
-                    radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
+                    radiative_term_coeff,convective_term_coeff,T_ambient,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
 
             END IF

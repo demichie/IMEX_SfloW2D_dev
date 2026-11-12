@@ -43,9 +43,9 @@ def main():
         ('infinite-quadratic',6,'friction_factor=Infinity',True),
         ('nan-mui',11,'mu_s=.4, mu_2=.7, I_0=.3, muI_inf=NaN',True),
         ('nan-mui-voellmy',12,'mu_s=.4, mu_2=.7, I_0=.3, muI_inf=.005, xi=NaN',True)])
-    for name in ('ambient-default','ambient-set','ambient-zero','ambient-nan','ambient-inf'):
+    for name in ('ambient-default','ambient-set','ambient-zero','ambient-nan','ambient-inf','ambient-missing'):
         cases.append((name,3,'nu_ref=.02, tau0=20, visc_par=.003, T_ref=900',
-                      name in ('ambient-zero','ambient-nan','ambient-inf')))
+                      name in ('ambient-zero','ambient-nan','ambient-inf','ambient-missing')))
     records=[]
     model_names={0:'none',1:'voellmy',2:'plastic',3:'lava',4:'lahar',
                  5:'empirical',6:'quadratic',9:'froude',10:'lucas',
@@ -60,11 +60,14 @@ def main():
         text=template
         if model==3:
             text=text.replace("'froude_blend'","'h_x'")
-            ambient={'ambient-default':'','ambient-set':'T_ENV=350,',
-                     'ambient-zero':'T_ENV=0,','ambient-nan':'T_ENV=NaN,',
-                     'ambient-inf':'T_ENV=Infinity,'}.get(name,'')
             text=text.replace('&TEMPERATURE_PARAMETERS\n /',
-                '&TEMPERATURE_PARAMETERS\n EMISSIVITY=.8, ATM_HEAT_TRANSF_COEFF=4, EXP_AREA_FRACT=.5, '+ambient+'\n /')
+                '&TEMPERATURE_PARAMETERS\n EMISSIVITY=.8, ATM_HEAT_TRANSF_COEFF=4, EXP_AREA_FRACT=.5,\n /')
+            ambient={'ambient-set':'350','ambient-zero':'0',
+                     'ambient-nan':'NaN','ambient-inf':'Infinity'}.get(name)
+            if ambient is not None:
+                text=text.replace('T_AMBIENT = 300.0D0,',f'T_AMBIENT = {ambient},')
+            elif name=='ambient-missing':
+                text=text.replace('T_AMBIENT = 300.0D0,','')
         if name=='legacy-numeric-id':
             model_assignment='RHEOLOGY%RHEOLOGY_MODEL=6'
         else:
@@ -81,7 +84,7 @@ def main():
                 env={**os.environ,'OMP_NUM_THREADS':'1','OMP_DYNAMIC':'FALSE'},timeout=30)
         log=(work/'run.log').read_text()
         if name.startswith('ambient-'):
-            rejected='ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS' in log
+            rejected='ERROR: invalid T_AMBIENT in GAS_TRANSPORT_PARAMETERS' in log
         else:
             rejected=any(token in log for token in (
                 'ERROR: problem with namelist RHEOLOGY_PARAMETERS',
