@@ -2,7 +2,7 @@ PROGRAM test_analytic_velocity
 
   USE parameters_2d, ONLY : wp, n_solid
   USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
-  USE rheology_parameters_2d, ONLY : rheology_config_type, I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
+  USE rheology_parameters_2d, ONLY : rheology_config_type, I_0, mu_2, mu_s, muI_inf, &
        Fr_0, U_w, xi, T_ref
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &
@@ -425,13 +425,13 @@ CALL eval_rheology_froude_semi_implicit(quadratic_config,rheo_state, &
   quadratic_config%mu_0 = 0.5_wp
   quadratic_config%mu_inf = 0.2_wp
 
-  U_w = 2.0_wp
+  quadratic_config%U_w = 2.0_wp
   rheo_state%h=flow_depth
   rheo_state%u=velocity_before(1)
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_lucas_analytic(quadratic_config,integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Lucas dispatch')
@@ -444,7 +444,7 @@ CALL eval_rheology_froude_semi_implicit(quadratic_config,rheo_state, &
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_lucas_semi_implicit(rheo_state, &
+CALL eval_rheology_lucas_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .FALSE., &
              stochastic_value, &
@@ -459,7 +459,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_lucas_analytic(quadratic_config,integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .TRUE., stochastic_value, velocity_after, 'Lucas stochastic dispatch')
@@ -472,7 +472,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_lucas_semi_implicit(rheo_state, &
+CALL eval_rheology_lucas_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .TRUE., &
              stochastic_value, &

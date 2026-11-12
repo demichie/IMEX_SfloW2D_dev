@@ -597,10 +597,7 @@
         T_ref = 0.0_wp
         visc_par = 0.0_wp
         tau0 = 0.0_wp
-        mu_0 = -1.0_wp
-        mu_inf = -1.0_wp
-        Fr_0 = -1.0_wp
-        U_w = -1.0_wp
+
         mu_s = -1.0_wp
         mu_2 = -1.0_wp
         I_0 = -1.0_wp
@@ -879,10 +876,7 @@
         visc_par = -1
         T_ref = -1
         tau0 = -1
-        mu_0 = -1
-        mu_inf = -1
-        Fr_0 = -1
-        U_w = -1
+
         mu_s = -1
         mu_2 = -1
         I_0 = -1
@@ -935,10 +929,7 @@
 
         !- Variables for the namelist RHEOLOGY_PARAMETERS
         xi = -1.0_wp
-        mu_0 = -1.0_wp
-        mu_inf = -1.0_wp
-        Fr_0 = -1.0_wp
-        U_w = -1.0_wp
+
         mu_s = -1.0_wp
         mu_2 = -1.0_wp
         I_0 = -1.0_wp
@@ -3571,10 +3562,7 @@
             Kappa=rheology_l1%Kappa
             n_td=rheology_l1%n_td
             tau0=rheology_l1%tau0
-            mu_0=rheology_l1%mu_0
-            mu_inf=rheology_l1%mu_inf
-            Fr_0=rheology_l1%Fr_0
-            U_w=rheology_l1%U_w
+
             mu_s=rheology_l1%mu_s
             mu_2=rheology_l1%mu_2
             I_0=rheology_l1%I_0
@@ -4858,12 +4846,12 @@
             WRITE (*, *) 'Setting stochastic intensity parameters...'
 
             if (TRIM(rheology_model) .EQ. 'froude') THEN
-                std_min = 0.0_wp !std_max * (mu_0/mu_inf) ! mu_0 < mu_inf in mu(Fr)
+                std_min = 0.0_wp !std_max * (rheology_l1%mu_0/rheology_l1%mu_inf) ! mu_0 < mu_inf in mu(Fr)
                 IF (noise_activation_velocity <= 0.0_wp)                                                               &
                         noise_activation_velocity = Fr_0
                 std_slope_factor = noise_activation_velocity**2
             ELSEIF (TRIM(rheology_model) .EQ. 'lucas') THEN
-                std_min = std_max*(mu_inf/mu_0) ! mu_0 > mu_inf in mu(U)
+                std_min = std_max*(rheology_l1%mu_inf/rheology_l1%mu_0) ! mu_0 > mu_inf in mu(U)
                 IF (noise_activation_velocity <= 0.0_wp)                                                               &
                         noise_activation_velocity = U_w
                 std_slope_factor = noise_activation_velocity**2

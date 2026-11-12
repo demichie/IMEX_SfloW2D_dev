@@ -1,5 +1,8 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
+**TL04 — Lucas config e rimozione globali condivisi (12 novembre 2026; DA VERIFICARE):** Lucas riceve `config` in tutti i trattamenti. Eliminati `mu_0`, `mu_inf`, `Fr_0`, `U_w` globali da `rheology_parameters_2d`, insieme a reset e sincronizzazione nel parser; i calcoli stocastici utilizzano `rheology_l1%...`. Test analitici aggiornati. La migrazione delle leggi restanti e la verifica build restano aperte.
+
+
 **TL04 — Froude config (12 novembre 2026; DA VERIFICARE):** le quattro interfacce della legge Froude ricevono direttamente `rheology_config_type`, i rate e l'analitico usano esclusivamente i suoi coefficienti, ed il dispatcher e i test diretti sono aggiornati. I globali condivisi con Lucas restano da eliminare nel passo successivo; questa voce non certifica build o regressioni.
 
 

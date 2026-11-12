@@ -129,7 +129,7 @@ CONTAINS
             CASE(RHEOLOGY_ID_FROUDE)
                 CALL eval_rheology_froude_explicit(config,state, grav_coeff, use_stochastic, stochastic_value, process_rate)
             CASE(RHEOLOGY_ID_LUCAS)
-                CALL eval_rheology_lucas_explicit(state, grav_coeff, use_stochastic, stochastic_value, process_rate)
+                CALL eval_rheology_lucas_explicit(config,state, grav_coeff, use_stochastic, stochastic_value, process_rate)
             CASE(RHEOLOGY_ID_MUI)
                 CALL eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, process_rate)
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
@@ -190,7 +190,7 @@ CONTAINS
                 CALL eval_rheology_froude_semi_implicit(config,state, grav_coeff, use_stochastic, stochastic_value,           &
                     process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_LUCAS)
-                CALL eval_rheology_lucas_semi_implicit(state, grav_coeff, use_stochastic, stochastic_value,            &
+                CALL eval_rheology_lucas_semi_implicit(config,state, grav_coeff, use_stochastic, stochastic_value,            &
                     process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_MUI)
                 CALL eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),            &
@@ -377,7 +377,7 @@ CONTAINS
             CALL eval_rheology_froude_analytic(config,dt, state, speed_ratio, grav_coeff, curvature_acceleration,             &
                 use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_lucas')
-            CALL eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
+            CALL eval_rheology_lucas_analytic(config,dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
                 use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_mui')
             CALL eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,                &

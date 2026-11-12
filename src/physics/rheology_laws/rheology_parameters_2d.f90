@@ -41,7 +41,6 @@ MODULE rheology_parameters_2d
     TYPE(rheology_config_type) :: rheology_l1, rheology_l2
 
     PUBLIC :: I_0, mu_2, mu_s, muI_inf
-    PUBLIC :: mu_0, mu_inf, Fr_0, U_w
     PUBLIC :: xi, T_ref
 
         REAL(wp) :: I_0
@@ -49,10 +48,6 @@ MODULE rheology_parameters_2d
         REAL(wp) :: mu_s
         REAL(wp) :: muI_inf
 
-        REAL(wp) :: mu_0
-        REAL(wp) :: mu_inf
-        REAL(wp) :: Fr_0
-        REAL(wp) :: U_w
 
         REAL(wp) :: xi
         REAL(wp) :: T_ref
