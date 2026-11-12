@@ -114,8 +114,6 @@
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
     USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2, T_ref
-    USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
-    USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     ! -- Functions used in the rheology calculations
     USE state_mixture, ONLY : sauter_diameter, average_density_solids,                                                 &
         evaluate_mixture, evaluate_mixture_from_volume, primitive_to_volume_fractions
@@ -302,7 +300,6 @@
 
     TYPE(rheology_config_type) :: rheology
 
-    REAL(wp) :: alpha1_ref
 
     REAL(wp) :: thickness_levels0(10)
     REAL(wp) :: dyn_pres_levels0(10)
@@ -862,16 +859,7 @@
 
 
         rheology_model = 'none'
-        nu_ref = -1
-        visc_par = -1
         T_ref = -1
-        tau0 = -1
-        alpha2 = -1.0_wp
-        beta2 = -1.0_wp
-        alpha1_ref = -1.0_wp
-        beta1 = -1.0_wp
-        Kappa = -1.0_wp
-        n_td = -1.0_wp
         rho_s = -1.0_wp
         sphericity_s = 1.0_wp
         initial_erodible_thickness = -1.0_wp
@@ -1047,7 +1035,6 @@
         USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
 
 
-        USE rheology_lahar_2d, ONLY: n_td2
         USE constitutive_parameters_2d, ONLY: coeff_porosity,                                                          &
                 radiative_term_coeff, SBconst, convective_term_coeff
 
@@ -3336,18 +3323,18 @@
                             expA = 1301.0_wp/(998.333_wp + 8.1855_wp*(Tc - 20.0_wp)                                    &
                                                     + 0.00585_wp*(Tc - 20.0_wp)**2) - 1.30223_wp
 
-                            alpha1_coeff = alpha1_ref/(1.0E-3_wp*10.0_wp**expA)
+                            rheology_l1%alpha1_coeff = alpha1_ref/(1.0E-3_wp*10.0_wp**expA)
 
                         ELSE
 
                             expB = (1.3272_wp*(20.0_wp - Tc) - 0.001053_wp*                                            &
                                         (Tc - 20.0_wp)**2)/(Tc + 105.0_wp)
 
-                            alpha1_coeff = alpha1_ref/(1.002E-3_wp*10.0_wp**expB)
+                            rheology_l1%alpha1_coeff = alpha1_ref/(1.002E-3_wp*10.0_wp**expB)
 
                         END IF
 
-                        WRITE (*, *) 'alpha1 coefficient:', alpha1_coeff
+                        WRITE (*, *) 'alpha1 coefficient:', rheology_l1%alpha1_coeff
 
                     END IF
 
@@ -3377,9 +3364,6 @@
                         STOP
 
                     ELSE
-
-                        n_td2 = n_td**2
-
                     END IF
 
                 ELSEIF (TRIM(rheology_model) .EQ. 'empirical') THEN
@@ -3529,15 +3513,7 @@
             ! module coefficient storage. This is removed when their interfaces
             ! accept immutable per-layer configurations; do not duplicate laws.
             rheology_model=rheology_l1%rheology_model
-            nu_ref=rheology_l1%nu_ref
-            visc_par=rheology_l1%visc_par
             T_ref=rheology_l1%T_ref
-            alpha2=rheology_l1%alpha2
-            beta2=rheology_l1%beta2
-            beta1=rheology_l1%beta1
-            Kappa=rheology_l1%Kappa
-            n_td=rheology_l1%n_td
-            tau0=rheology_l1%tau0
             rheology=rheology_l1
         END IF
 
