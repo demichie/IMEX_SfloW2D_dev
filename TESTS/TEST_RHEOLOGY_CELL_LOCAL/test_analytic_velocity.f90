@@ -279,6 +279,24 @@ PROGRAM test_analytic_velocity
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
        REAL(complex_source_y,wp)], 'quadratic')
 
+  ! Two independent layer configurations must not exchange the drag coefficient.
+  ! Test the same physical state and interval to isolate the law parameter.
+  BLOCK
+    TYPE(rheology_config_type) :: config_a, config_b
+    TYPE(physical_state_real) :: ps
+    REAL(wp) :: velocity_a(2), velocity_b(2)
+    config_a=quadratic_config
+    config_b=quadratic_config
+    config_b%friction_factor=3.0_wp*config_a%friction_factor
+    ps%h=flow_depth
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL eval_rheology_quadratic_analytic(config_a,integration_step,ps,speed_ratio,velocity_a)
+    CALL eval_rheology_quadratic_analytic(config_b,integration_step,ps,speed_ratio,velocity_b)
+    IF (SUM(velocity_b**2)>=SUM(velocity_a**2)) ERROR STOP 'Quadratic L2 drag isolation'
+    CALL assert_close(config_a%friction_factor,friction_factor,'Quadratic L1 coefficient unchanged')
+  END BLOCK
+
   voellmy_mu = 0.3_wp
   xi = 500.0_wp
     BLOCK
