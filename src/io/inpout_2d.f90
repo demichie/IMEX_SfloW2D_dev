@@ -113,7 +113,7 @@ MODULE inpout_2d
     USE parameters_2d, ONLY: rheology_model, thermal_cooling_flag
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
-    USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,                                                       &
+    USE rheology_parameters_2d, ONLY : rheology_config_type, mu_s, mu_2, I_0, muI_inf,                                                       &
             mu_0, mu_inf, Fr_0, U_w, xi, T_ref
     USE rheology_voellmy_2d, ONLY: mu
     USE rheology_plastic_2d, ONLY: tau
@@ -304,6 +304,8 @@ MODULE inpout_2d
     REAL(wp) :: initial_erodible_thickness
 
 
+    TYPE(rheology_config_type) :: rheology, rheology_l1, rheology_l2
+
     REAL(wp) :: alpha1_ref
 
     REAL(wp) :: thickness_levels0(10)
@@ -396,10 +398,11 @@ MODULE inpout_2d
         thermal_conductivity, exp_area_fract, c_p, enne, emme, T_env,                                                  &
         T_ground, thermal_method, thermal_group
 
-    NAMELIST /rheology_parameters/ rheology_model, mu, xi, tau, nu_ref,                                                &
-        visc_par, T_ref, alpha2, beta2, alpha1_ref, beta1, Kappa, n_td,                                                &
-        friction_factor, tau0, mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, muI_inf,                                      &
-        rheology_method, rheology_group
+    ! One canonical coefficient list lives in rheology_config_type.
+    ! The legacy single-layer name reads 'rheology' and normalizes to L1.
+    NAMELIST /rheology_parameters/ rheology
+    NAMELIST /rheology_l1_parameters/ rheology_l1
+    NAMELIST /rheology_l2_parameters/ rheology_l2
 
     NAMELIST /runout_parameters/ x0_runout, y0_runout, dt_runout,                                                      &
         eps_stop, alphas_threshold
@@ -486,6 +489,10 @@ CONTAINS
         LOGICAL :: lexist
         INTEGER :: ios
 
+        ! Reset all three NAMELIST objects between runs.
+        rheology=rheology_config_type()
+        rheology_l1=rheology_config_type()
+        rheology_l2=rheology_config_type()
         ! Reset physical-source preferences before any namelist is parsed.
         rheology_method=''; rheology_group=1
         thermal_method=''; thermal_group=2
@@ -1112,7 +1119,7 @@ CONTAINS
 
         CHARACTER(LEN=15) :: chara
 
-        INTEGER :: ios
+        INTEGER :: ios, rheology_legacy_ios, rheology_l1_ios
         CHARACTER(LEN=256) :: source_input_error
 
         REAL(wp) :: expA, expB, Tc
@@ -1630,8 +1637,23 @@ CONTAINS
 
         END IF
 
-        READ (input_unit, rheology_parameters, IOSTAT=ios)
-        REWIND (input_unit)
+        ! Namelist input is captured once, before viscosity checks and Lie
+        ! method validation. The two names are alternatives in single-layer.
+        REWIND(input_unit)
+        READ(input_unit,NML=rheology_parameters,IOSTAT=rheology_legacy_ios)
+        REWIND(input_unit)
+        READ(input_unit,NML=rheology_l1_parameters,IOSTAT=rheology_l1_ios)
+        REWIND(input_unit)
+        IF (rheology_flag) THEN
+            IF ((rheology_legacy_ios==0) .EQV. (rheology_l1_ios==0)) &
+                CALL fatal_error('Provide exactly one RHEOLOGY_PARAMETERS or RHEOLOGY_L1_PARAMETERS')
+            IF (rheology_legacy_ios==0) rheology_l1=rheology
+            rheology=rheology_l1
+            ! Scheduling metadata is consumed before rheology coefficient checks.
+            rheology_model=rheology_l1%rheology_model
+            rheology_method=rheology_l1%rheology_method
+            rheology_group=rheology_l1%rheology_group
+        END IF
 
         IF (liquid_flag) THEN
 
@@ -3056,23 +3078,30 @@ CONTAINS
 
         IF (rheology_flag) THEN
 
-        REWIND (input_unit)
-        READ (input_unit, rheology_parameters, IOSTAT=ios)
-
-        IF (ios .NE. 0) THEN
-
-            WRITE (*, *) 'IOSTAT=', ios
-            WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
-            WRITE (*, *) 'RHEOLOGY_MODEL must be a quoted name; numeric IDs are no longer accepted.'
-            WRITE (*, *) "Use a supported name such as 'quadratic'."
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-        ELSE
-
-            REWIND (input_unit)
-
-        END IF
+        ASSOCIATE( &
+            rheology_model => rheology_l1%rheology_model, &
+            mu => rheology_l1%mu, &
+            xi => rheology_l1%xi, &
+            tau => rheology_l1%tau, &
+            nu_ref => rheology_l1%nu_ref, &
+            visc_par => rheology_l1%visc_par, &
+            T_ref => rheology_l1%T_ref, &
+            alpha2 => rheology_l1%alpha2, &
+            beta2 => rheology_l1%beta2, &
+            alpha1_ref => rheology_l1%alpha1_ref, &
+            beta1 => rheology_l1%beta1, &
+            Kappa => rheology_l1%Kappa, &
+            n_td => rheology_l1%n_td, &
+            friction_factor => rheology_l1%friction_factor, &
+            tau0 => rheology_l1%tau0, &
+            mu_0 => rheology_l1%mu_0, &
+            mu_inf => rheology_l1%mu_inf, &
+            Fr_0 => rheology_l1%Fr_0, &
+            U_w => rheology_l1%U_w, &
+            mu_s => rheology_l1%mu_s, &
+            mu_2 => rheology_l1%mu_2, &
+            I_0 => rheology_l1%I_0, &
+            muI_inf => rheology_l1%muI_inf)
 
         BLOCK
             INTEGER :: i, code
@@ -3502,6 +3531,33 @@ CONTAINS
 
         END IF
 
+        END ASSOCIATE
+        ! Temporary single-layer bridge: existing physical kernels still use
+        ! module coefficient storage. This is removed when their interfaces
+        ! accept immutable per-layer configurations; do not duplicate laws.
+        rheology_model=rheology_l1%rheology_model
+        mu=rheology_l1%mu
+        xi=rheology_l1%xi
+        tau=rheology_l1%tau
+        nu_ref=rheology_l1%nu_ref
+        visc_par=rheology_l1%visc_par
+        T_ref=rheology_l1%T_ref
+        alpha2=rheology_l1%alpha2
+        beta2=rheology_l1%beta2
+        beta1=rheology_l1%beta1
+        Kappa=rheology_l1%Kappa
+        n_td=rheology_l1%n_td
+        friction_factor=rheology_l1%friction_factor
+        tau0=rheology_l1%tau0
+        mu_0=rheology_l1%mu_0
+        mu_inf=rheology_l1%mu_inf
+        Fr_0=rheology_l1%Fr_0
+        U_w=rheology_l1%U_w
+        mu_s=rheology_l1%mu_s
+        mu_2=rheology_l1%mu_2
+        I_0=rheology_l1%I_0
+        muI_inf=rheology_l1%muI_inf
+        rheology=rheology_l1
         END IF
 
         ! ------- READ temperature_parameters NAMELIST ------------------------------
