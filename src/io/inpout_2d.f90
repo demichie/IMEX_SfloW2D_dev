@@ -935,7 +935,6 @@ CONTAINS
 
         !- Variables for the namelist RHEOLOGY_PARAMETERS
         xi = -1.0_wp
-        mu = -1.0_wp
         mu_0 = -1.0_wp
         mu_inf = -1.0_wp
         Fr_0 = -1.0_wp
@@ -7857,7 +7856,7 @@ END IF
             IF (rheology_flag .AND. TRIM(rheology_model) .EQ. 'voellmy') THEN
                 exc_pore_pres = 0.0_wp
                 IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore,1, j, k)
-                muEff(j, k) = mu*MAX(0.0_wp, 1.0_wp - MAX(0.0_wp, exc_pore_pres) /                                     &
+                muEff(j, k) = rheology_l1%mu*MAX(0.0_wp, 1.0_wp - MAX(0.0_wp, exc_pore_pres) /                                     &
                                             (r_rho_m*r_h*r_red_grav))
             ELSE IF (rheology_flag .AND.                                                                               &
                         (TRIM(rheology_model) .EQ. 'mui' .OR.                                                          &

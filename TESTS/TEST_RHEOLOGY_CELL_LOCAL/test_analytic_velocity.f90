@@ -81,7 +81,7 @@ PROGRAM test_analytic_velocity
   IF (.NOT. root_found) ERROR STOP 'Cubic one-real-root selection failed'
   CALL assert_close(root, 2.0_wp, 'cubic single real root')
 
-  tau = 1.0_wp
+  quadratic_config%tau = 1.0_wp
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h = flow_depth
@@ -297,8 +297,9 @@ PROGRAM test_analytic_velocity
     CALL assert_close(config_a%friction_factor,friction_factor,'Quadratic L1 coefficient unchanged')
   END BLOCK
 
-  voellmy_mu = 0.3_wp
+  quadratic_config%mu = 0.3_wp
   xi = 500.0_wp
+  quadratic_config%xi = xi
     BLOCK
     TYPE(physical_state_real) :: rs
     rs%h = flow_depth
