@@ -1,5 +1,8 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
+**TL04 — correzione include turbolento Voellmy (12 novembre 2026):** `rheology_voellmy_turbulent.inc` e' condiviso fra Voellmy e mu(I)-Voellmy. Dopo la migrazione del primo modello, l'include faceva riferimento a `config%xi` anche nel secondo, il cui contratto non lo dichiara ancora, causando errore di compilazione. L'include ora usa lo scalare locale `xi_parameter` valorizzato dal chiamante (`config%xi` per Voellmy, `xi` per mu(I)-Voellmy). Nessuna nuova variabile globale o formula duplicata; resta da migrare mu(I)-Voellmy e rimuovere gli ultimi accessi globali. Build e regressioni da verificare.
+
+
 **TL04 — Voellmy senza stato globale (12 novembre 2026):** Voellmy legge `config%mu` e `config%xi`; rimosso `mu` globale dal modulo e dal parser, con `.inc` condiviso REAL/COMPLEX conservato. Aggiornati dispatcher e test diretti. `xi` globale resta utilizzato dalle leggi non migrate. Build e regressioni pendenti.
 
 

@@ -170,11 +170,12 @@ CONTAINS
     SUBROUTINE eval_rheology_mui_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
-        REAL(wp) :: xi_effective
+        REAL(wp) :: xi_effective, xi_parameter
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: turbulent_stress
 
+        xi_parameter=xi
         INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_mui_voellmy_implicit
 
@@ -184,8 +185,9 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
-        REAL(wp) :: xi_effective,turbulent_stress
+        REAL(wp) :: xi_effective, xi_parameter, turbulent_stress
 
+        xi_parameter=xi
         INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_mui_voellmy_implicit_real
 

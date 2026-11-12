@@ -125,11 +125,12 @@ CONTAINS
         TYPE(rheology_config_type), INTENT(IN) :: config
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
-        REAL(wp) :: xi_effective
+        REAL(wp) :: xi_effective, xi_parameter
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: turbulent_stress
 
+        xi_parameter=config%xi
         INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_voellmy_implicit
 
@@ -140,8 +141,9 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
-        REAL(wp) :: xi_effective,turbulent_stress
+        REAL(wp) :: xi_effective, xi_parameter, turbulent_stress
 
+        xi_parameter=config%xi
         INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_voellmy_implicit_real
 
