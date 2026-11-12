@@ -1,6 +1,6 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Piano di riferimento:** 12 novembre 2026. **Branch:** `feature/two-layer`. **Baseline CI verificata:** `4e9a591a` (build e regressioni). **TL04-C:** contatti verificati; collegamento termico ai contesti per-layer implementato, nuova CI da eseguire.
+**Piano di riferimento:** 12 novembre 2026. **Branch:** `feature/two-layer`. **Baseline CI verificata:** `bef39b1c` (build e regressioni). **TL04-C:** contatti e riferimento termico per-layer verificati; configurazioni non termiche e scope ancora aperti.
 **Stato:** codice di produzione ancora **single-layer**; `N_LAYERS=2` resta disabilitato. La presente roadmap è il **solo piano vigente**: specifica, stato verificato, attività, gate e milestone. La cronologia dettagliata è nei commit Git, non in versioni alternative del piano.
 **Documenti collegati:** [audit tecnico corrente](TWO_LAYER_CODE_AUDIT.md), [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md), manoscritto *IMEX_SfloW2D_v3*.
 
@@ -29,7 +29,7 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Spaziale | `nonconservative_2d` è un integratore di percorso generico già utilizzato da HP-PCCU. | Tracce accoppiate, pressione interlayer, CFL coupled, wet/dry e iperbolicità. |
 | I/O | NetCDF single-layer `(x,y,time)`, reader/writer restart v7 con sola sezione L1, file legacy/probe/runout. | Schema/versione per due layer, restituzione completa e compatibilità dimostrata. |
 
-**Evidenza CI:** su `4e9a591a` [Build optimized/debug #43302860661](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43302860661) e [Cell physics/numerical regressions #43303227647](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43303227647) risultano **success**. Il collegamento termico nei contesti TL04-C richiede nuova CI sul proprio commit. I workflow non certificano full EXAMPLES, NetCDF/restart, OpenMP o un solver two-layer.
+**Evidenza CI:** su `bef39b1c` [Build optimized/debug #43306145842](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43306145842) e [Cell physics/numerical regressions #43306324027](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43306324027) risultano **success**. Questi workflow non certificano full EXAMPLES, NetCDF/restart, OpenMP o un solver two-layer. I workflow non certificano full EXAMPLES, NetCDF/restart, OpenMP o un solver two-layer.
 
 ## 3. Dati, proprietà e configurazioni autorevoli
 
@@ -180,7 +180,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL03 — gate single-layer** | **CI parziale superata, gate G2 aperto** | Full EXAMPLES, bilanci, wet/dry, I/O/restart, OpenMP, profiling/memoria e confronto baseline; registrare eventuale delta termico autorizzato separatamente. |
 | **TL04-R — configurazione reologica** | **Implementata e CI superata** | Tipo canonico, parser legacy/L1, parametri espliciti nei kernel; completare le dipendenze dal contesto per L2 quando attivato. |
 | **TL04-T — configurazione termica** | **T1/T2 e T_ground verificate; T3 compilata e regressioni superate** | Configurazione canonica L1/L2, input legacy e propagazione read-only attraverso source assembler, NEWTON REAL/COMPLEX e metodo analitico. Restano esempi integrati, confronto single-layer e scope L2. |
-| **TL04-C — altre configurazioni e contatti** | **Contatti verificati in CI; riferimento termico per layer implementato, nuova CI aperta; fase complessiva parziale** | Contatti puri, descriptor L1 che referenzia il thermal canonico senza duplicarlo, percorso read-only fino all'integratore; test L1/L2 dedicati aggiornati. Restano ownership delle altre chiusure, IC/BC, slot inattivi e scope. |
+| **TL04-C — altre configurazioni e contatti** | **Contatti e riferimento termico per layer verificati in CI; fase complessiva parziale** | Contatti puri, descriptor L1 che referenzia il thermal canonico senza duplicarlo, percorso read-only fino all'integratore; test L1/L2 dedicati aggiornati. Restano ownership delle altre chiusure, IC/BC, slot inattivi e scope. |
 | **TL05 — HP-PCCU indipendente per slot** | **Da implementare** | Trasporto/ricostruzione per L1 e L2 isolati e wet/dry combinati, `eta_1`/`eta_tot`; recupero single-layer quando assente una corrente. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
 | **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local, rate monolayer isolati, `Gamma` di coppia, commit/rollback atomico, gruppo 0 e OpenMP; gate G5. |
