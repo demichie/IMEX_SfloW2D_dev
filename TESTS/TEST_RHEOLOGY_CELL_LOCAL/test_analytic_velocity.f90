@@ -10,7 +10,7 @@ PROGRAM test_analytic_velocity
        EXACT_FLOW_QUADRATIC, EXACT_FLOW_QUADRATIC_POLYNOMIAL,                  &
        EXACT_FLOW_FROUDE, EXACT_FLOW_LUCAS, EXACT_FLOW_MUI,                    &
        EXACT_FLOW_MUI_VOELLMY
-  USE rheology_voellmy_2d, ONLY : voellmy_mu => mu,                          &
+  USE rheology_voellmy_2d, ONLY :                          &
        eval_rheology_voellmy_implicit,                                  &
        eval_rheology_voellmy_semi_implicit,                             &
        eval_rheology_voellmy_analytic
@@ -307,7 +307,7 @@ PROGRAM test_analytic_velocity
     rs%rho_m = mixture_density
     rs%red_grav = reduced_gravity
     rs%exc_pore_pres = 0.0_wp
-    CALL eval_rheology_voellmy_analytic(integration_step, rs, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_voellmy_analytic(quadratic_config,integration_step, rs, speed_ratio, gravity_coefficient, &
          0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_voellmy', .FALSE., 0.0_wp,        &
@@ -322,7 +322,7 @@ PROGRAM test_analytic_velocity
     cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=CMPLX(speed_after**2,0.0_wp,wp)
-    CALL eval_rheology_voellmy_implicit(cs, .FALSE., 0.0_wp, &
+    CALL eval_rheology_voellmy_implicit(quadratic_config,cs, .FALSE., 0.0_wp, &
          complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
@@ -334,7 +334,7 @@ PROGRAM test_analytic_velocity
     rs%red_grav=reduced_gravity
     rs%exc_pore_pres=0.0_wp
     rs%mod_vel=speed_after
-    CALL eval_rheology_voellmy_semi_implicit(rs, gravity_coefficient, .FALSE., source_x, source_y)
+    CALL eval_rheology_voellmy_semi_implicit(quadratic_config,rs, gravity_coefficient, .FALSE., source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]

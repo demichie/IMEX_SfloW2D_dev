@@ -1,5 +1,8 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
+**TL04 — Voellmy senza stato globale (12 novembre 2026):** Voellmy legge `config%mu` e `config%xi`; rimosso `mu` globale dal modulo e dal parser, con `.inc` condiviso REAL/COMPLEX conservato. Aggiornati dispatcher e test diretti. `xi` globale resta utilizzato dalle leggi non migrate. Build e regressioni pendenti.
+
+
 **TL04 — plastic senza stato globale (12 novembre 2026):** la legge plastic riceve `rheology_config_type` in tutti i trattamenti, incluso il kernel condiviso REAL/COMPLEX e il passo analitico. Rimossi `tau` globale da modulo e parser; aggiornati dispatcher e test diretti. Nessuna formula modificata. Build e regressioni da eseguire; le altre leggi restano da migrare.
 
 

@@ -5,11 +5,11 @@ rate_y=0.0_wp
 IF (ABS(state%mod_vel)==0.0_wp) RETURN
 
 IF (use_stochastic_xi) THEN
-    xi_effective=xi+stochastic_value
+    xi_effective=config%xi+stochastic_value
     IF (xi_effective<1.0_wp) xi_effective=1.0_wp
     IF (xi_effective>1.0E5_wp) xi_effective=1.0E5_wp
 ELSE
-    xi_effective=xi
+    xi_effective=config%xi
 END IF
 
 turbulent_stress=state%rho_m*state%red_grav/xi_effective*state%mod_vel2

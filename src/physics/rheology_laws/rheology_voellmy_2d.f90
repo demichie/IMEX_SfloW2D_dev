@@ -26,7 +26,7 @@ MODULE rheology_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE rheology_parameters_2d, ONLY : xi
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_QUADRATIC_POLYNOMIAL
@@ -37,8 +37,6 @@ MODULE rheology_voellmy_2d
     PUBLIC :: eval_rheology_voellmy_implicit
     PUBLIC :: eval_rheology_voellmy_implicit_real
     PUBLIC :: eval_rheology_voellmy_analytic
-    PUBLIC :: mu
-    REAL(wp) :: mu
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (complex for the implicit contribution).
@@ -55,8 +53,9 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,                   &
+    SUBROUTINE eval_rheology_voellmy_explicit(config, state, grav_coeff, use_pore_pressure, use_stochastic,                &
             stochastic_value, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -64,8 +63,8 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx,sy,ix,iy
 
-        CALL eval_rheology_voellmy_semi_implicit(state,grav_coeff,use_pore_pressure,sx,sy)
-        CALL eval_rheology_voellmy_implicit_real(state,use_stochastic,stochastic_value,ix,iy)
+        CALL eval_rheology_voellmy_semi_implicit(config,state,grav_coeff,use_pore_pressure,sx,sy)
+        CALL eval_rheology_voellmy_implicit_real(config,state,use_stochastic,stochastic_value,ix,iy)
         rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_voellmy_explicit
 
@@ -79,7 +78,8 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
+    SUBROUTINE eval_rheology_voellmy_semi_implicit(config, state, grav_coeff, use_pore_pressure, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
@@ -98,12 +98,12 @@ CONTAINS
         rate_y = 0.0_wp
         IF (state%mod_vel .LE. 0.0_wp) RETURN
 
-        friction_stress = mu * rhom *                                                                                  &
+        friction_stress = config%mu * rhom *                                                                                  &
                     (red_grav + state%curvature_acceleration) * h                                                      &
                     * SQRT(grav_coeff)
         friction_stress = MAX(0.0_wp, friction_stress)
         IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress                                           &
-                    - mu * SQRT(grav_coeff) * exc_pore_pres)
+                    - config%mu * SQRT(grav_coeff) * exc_pore_pres)
         rate_x = -friction_stress * u / state%mod_vel
         rate_y = -friction_stress * v / state%mod_vel
 
@@ -121,7 +121,8 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_voellmy_implicit(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp) :: xi_effective
@@ -133,7 +134,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_voellmy_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    SUBROUTINE eval_rheology_voellmy_implicit_real(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_voellmy_implicit_real(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -158,8 +160,9 @@ CONTAINS
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
+    SUBROUTINE eval_rheology_voellmy_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,          &
             use_pore_pressure, use_stochastic_xi, stochastic_xi_value, velocity_after)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration
@@ -194,22 +197,22 @@ CONTAINS
 
         END IF
 
-        xi_effective = xi
+        xi_effective = config%xi
 
         IF (use_stochastic_xi) THEN
-            xi_effective = xi + stochastic_xi_value
+            xi_effective = config%xi + stochastic_xi_value
             xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
 
         ELSEIF (xi_effective .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive config%xi in Voellmy analytic solver')
 
         END IF
 
-        coulomb_stress = mu * rhom * (red_grav +                                                                       &
+        coulomb_stress = config%mu * rhom * (red_grav +                                                                       &
                     curvature_acceleration) * h * SQRT(grav_coeff)
         coulomb_stress = MAX(0.0_wp, coulomb_stress)
         IF (use_pore_pressure) coulomb_stress = MAX(0.0_wp, coulomb_stress -                                           &
-                    mu * SQRT(grav_coeff) * exc_pore_pres)
+                    config%mu * SQRT(grav_coeff) * exc_pore_pres)
         constant_drag = coulomb_stress / (rhom * h * speed_ratio)
         quadratic_drag = red_grav * speed_ratio / (xi_effective*h)
         CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                                                &

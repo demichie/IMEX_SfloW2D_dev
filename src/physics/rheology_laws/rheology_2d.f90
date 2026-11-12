@@ -112,7 +112,7 @@ CONTAINS
         process_rate=0.0_wp
         SELECT CASE(model_id)
             CASE(RHEOLOGY_ID_VOELLMY)
-                CALL eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,              &
+                CALL eval_rheology_voellmy_explicit(config,state, grav_coeff, use_pore_pressure, use_stochastic,              &
                     stochastic_value, process_rate)
             CASE(RHEOLOGY_ID_PLASTIC)
                 CALL eval_rheology_plastic_explicit(config,state, process_rate)
@@ -180,7 +180,7 @@ CONTAINS
         process_rate=0.0_wp
         SELECT CASE(model_id)
             CASE(RHEOLOGY_ID_VOELLMY)
-                CALL eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),        &
+                CALL eval_rheology_voellmy_semi_implicit(config,state, grav_coeff, use_pore_pressure, process_rate(1),        &
                     process_rate(2))
             CASE(RHEOLOGY_ID_LAVA)
                 CALL eval_rheology_lava_semi_implicit(state, process_rate(1), process_rate(2))
@@ -245,7 +245,7 @@ CONTAINS
         process_rate=CMPLX(0.0_wp,0.0_wp,wp)
         SELECT CASE(model_id)
             CASE(RHEOLOGY_ID_VOELLMY)
-                CALL eval_rheology_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),          &
+                CALL eval_rheology_voellmy_implicit(config,state, use_stochastic, stochastic_value, process_rate(1),          &
                     process_rate(2))
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
                 CALL eval_rheology_mui_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),      &
@@ -283,7 +283,7 @@ CONTAINS
         rate=0.0_wp
         SELECT CASE(model_id)
         CASE(RHEOLOGY_ID_VOELLMY)
-            CALL eval_rheology_voellmy_implicit_real(state,use_stochastic,stochastic_value,rate(1),rate(2))
+            CALL eval_rheology_voellmy_implicit_real(config,state,use_stochastic,stochastic_value,rate(1),rate(2))
         CASE(RHEOLOGY_ID_MUI_VOELLMY)
             CALL eval_rheology_mui_voellmy_implicit_real(state,use_stochastic,stochastic_value,rate(1),rate(2))
         CASE(RHEOLOGY_ID_PLASTIC)
@@ -361,7 +361,7 @@ CONTAINS
         CASE ('none')
             CONTINUE
         CASE ('rheology_voellmy')
-            CALL eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,&
+            CALL eval_rheology_voellmy_analytic(config,dt, state, speed_ratio, grav_coeff, curvature_acceleration,&
                 use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_plastic')
             CALL eval_rheology_plastic_analytic(config,dt, state, speed_ratio, velocity_after)

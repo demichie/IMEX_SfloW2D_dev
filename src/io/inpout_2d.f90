@@ -116,7 +116,6 @@ MODULE inpout_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2, &
             mu_s, mu_2, I_0, muI_inf,                                 &
             mu_0, mu_inf, Fr_0, U_w, xi, T_ref
-    USE rheology_voellmy_2d, ONLY: mu
     USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     ! -- Functions used in the rheology calculations
@@ -594,7 +593,6 @@ CONTAINS
         !-- Inizialization of the Variables for the namelist RHEOLOGY_PARAMETERS
         rheology_model = 'none'
         nu_ref = 0.0_wp
-        mu = -1.0_wp
         xi = -1.0_wp
         T_ref = 0.0_wp
         visc_par = 0.0_wp
@@ -876,7 +874,6 @@ CONTAINS
 
 
         rheology_model = 'none'
-        mu = -1
         xi = -1
         nu_ref = -1
         visc_par = -1
@@ -3561,7 +3558,6 @@ CONTAINS
         ! module coefficient storage. This is removed when their interfaces
         ! accept immutable per-layer configurations; do not duplicate laws.
         rheology_model=rheology_l1%rheology_model
-        mu=rheology_l1%mu
         xi=rheology_l1%xi
         nu_ref=rheology_l1%nu_ref
         visc_par=rheology_l1%visc_par
