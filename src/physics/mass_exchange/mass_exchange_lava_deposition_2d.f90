@@ -6,6 +6,7 @@ MODULE mass_exchange_lava_deposition_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
     IMPLICIT NONE
@@ -29,14 +30,15 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_lava_deposition_explicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_explicit(config,state,dt,r)
+            TYPE(rheology_config_type), INTENT(IN) :: config
 
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
-            CALL eval_lava_deposition_volume_kernel(state%h, state%T, dt, r%carrier_deposition_rate)
+            CALL eval_lava_deposition_volume_kernel(config,state%h, state%T, dt, r%carrier_deposition_rate)
             r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
             r%energy_rate=sp_heat_l*state%T*r%mixture_mass_rate
             r%lava_deposit_rate=r%carrier_deposition_rate
@@ -125,7 +127,8 @@ CONTAINS
         !> @param[in] temperature Material temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] rate Requested immobilization thickness rate [m/s].
-    SUBROUTINE eval_lava_deposition_volume_kernel(depth,temperature,dt,rate)
+    SUBROUTINE eval_lava_deposition_volume_kernel(config,depth,temperature,dt,rate)
+            TYPE(rheology_config_type), INTENT(IN) :: config
 
             REAL(wp), INTENT(IN) :: depth,temperature,dt
             REAL(wp), INTENT(OUT) :: rate
@@ -134,7 +137,7 @@ CONTAINS
             IF (depth<=0.0_wp) RETURN
             IF (dt<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
             rate=MIN(depth/dt,eval_lava_deposition_rate(temperature,                                                   &
-                        lava_kinematic_viscosity(temperature)))
+                        lava_kinematic_viscosity(config,temperature)))
     END SUBROUTINE eval_lava_deposition_volume_kernel
 
 END MODULE mass_exchange_lava_deposition_2d
