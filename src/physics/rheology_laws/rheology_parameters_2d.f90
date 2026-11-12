@@ -14,9 +14,7 @@ MODULE rheology_parameters_2d
     PRIVATE
 
     ! Canonical input configuration for each material layer. Every rheology
-    ! coefficient is declared once here, not once per NAMELIST. The old
-    ! scalar module variables below remain temporarily until their call sites
-    ! have been migrated to read the appropriate layer configuration directly.
+    ! coefficient is declared once here, not once per NAMELIST.
     PUBLIC :: rheology_config_type
     PUBLIC :: rheology_l1, rheology_l2
     TYPE :: rheology_config_type
@@ -40,16 +38,9 @@ MODULE rheology_parameters_2d
     ! the simulation context. The parser owns their initialization and validation.
     TYPE(rheology_config_type) :: rheology_l1, rheology_l2
 
-    PUBLIC :: I_0, mu_2, mu_s, muI_inf
-    PUBLIC :: xi, T_ref
-
-        REAL(wp) :: I_0
-        REAL(wp) :: mu_2
-        REAL(wp) :: mu_s
-        REAL(wp) :: muI_inf
 
 
-        REAL(wp) :: xi
+
         REAL(wp) :: T_ref
 
 END MODULE rheology_parameters_2d

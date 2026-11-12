@@ -113,9 +113,7 @@
     USE parameters_2d, ONLY: rheology_model, thermal_cooling_flag
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
-    USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2,                                 &
-            mu_s, mu_2, I_0, muI_inf,                                                                                  &
-            xi, T_ref
+    USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2, T_ref
     USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     ! -- Functions used in the rheology calculations
@@ -593,16 +591,9 @@
         !-- Inizialization of the Variables for the namelist RHEOLOGY_PARAMETERS
         rheology_model = 'none'
         nu_ref = 0.0_wp
-        xi = -1.0_wp
         T_ref = 0.0_wp
         visc_par = 0.0_wp
         tau0 = 0.0_wp
-
-        mu_s = -1.0_wp
-        mu_2 = -1.0_wp
-        I_0 = -1.0_wp
-        muI_inf = -1.0_wp
-
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
         x0_runout = -1
         y0_runout = -1
@@ -871,17 +862,10 @@
 
 
         rheology_model = 'none'
-        xi = -1
         nu_ref = -1
         visc_par = -1
         T_ref = -1
         tau0 = -1
-
-        mu_s = -1
-        mu_2 = -1
-        I_0 = -1
-        muI_inf = -1
-
         alpha2 = -1.0_wp
         beta2 = -1.0_wp
         alpha1_ref = -1.0_wp
@@ -928,13 +912,6 @@
         vonK = 0.4_wp
 
         !- Variables for the namelist RHEOLOGY_PARAMETERS
-        xi = -1.0_wp
-
-        mu_s = -1.0_wp
-        mu_2 = -1.0_wp
-        I_0 = -1.0_wp
-        muI_inf = -1.0_wp
-
         !- Variables for the namelist GAS_TRANSPORT_PARAMETERS
         sp_heat_a = -1.0_wp
         sp_gas_const_a = -1.0_wp
@@ -3552,7 +3529,6 @@
             ! module coefficient storage. This is removed when their interfaces
             ! accept immutable per-layer configurations; do not duplicate laws.
             rheology_model=rheology_l1%rheology_model
-            xi=rheology_l1%xi
             nu_ref=rheology_l1%nu_ref
             visc_par=rheology_l1%visc_par
             T_ref=rheology_l1%T_ref
@@ -3562,11 +3538,6 @@
             Kappa=rheology_l1%Kappa
             n_td=rheology_l1%n_td
             tau0=rheology_l1%tau0
-
-            mu_s=rheology_l1%mu_s
-            mu_2=rheology_l1%mu_2
-            I_0=rheology_l1%I_0
-            muI_inf=rheology_l1%muI_inf
             rheology=rheology_l1
         END IF
 
@@ -7862,7 +7833,7 @@
                             TRIM(rheology_model) .EQ. 'mui_voellmy')) THEN
 
                     IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN
-                        muEff(j, k) = mu_s
+                        muEff(j, k) = rheology_l1%mu_s
                     ELSE
                         exc_pore_pres = 0.0_wp
                         IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore,1, j, k)
@@ -7882,9 +7853,9 @@
                                                         vert_stress_eff*SQRT(grav_coeff))
                         inertialNumber(j, k) = diam_characteristic*shear_rate /                                        &
                                                         SQRT(eff_normal_stress/rho_particle)
-                        muEff(j, k) = (mu_s*I_0 + mu_2*inertialNumber(j, k) +                                          &
-                                            muI_inf*inertialNumber(j, k)**2) /                                         &
-                                            (I_0 + inertialNumber(j, k))
+                        muEff(j, k) = (rheology_l1%mu_s*rheology_l1%I_0 + rheology_l1%mu_2*inertialNumber(j, k) +                                          &
+                                            rheology_l1%muI_inf*inertialNumber(j, k)**2) /                                         &
+                                            (rheology_l1%I_0 + inertialNumber(j, k))
 
                     END IF
 
