@@ -3099,9 +3099,15 @@ CONTAINS
 
         END IF
 
-        ! ------- READ rheology_parameters NAMELIST ---------------------------------
+        ! ------- VALIDATE layer rheology configuration -----------------------------
 
         IF (rheology_flag) THEN
+
+        ! This configuration was checked immediately after NAMELIST input.
+        ! Detect changes before entering the normalization/validation scope.
+        IF (TRIM(rheology_l1%rheology_model)=='none') THEN
+            CALL fatal_error('L1 rheology model changed to none before rheology validation')
+        END IF
 
         ASSOCIATE( &
             rheology_model => rheology_l1%rheology_model, &
@@ -3131,6 +3137,10 @@ CONTAINS
         BLOCK
             INTEGER :: i, code
             CHARACTER(LEN=LEN(rheology_model)) :: normalized
+
+            IF (TRIM(rheology_model)=='none') THEN
+                CALL fatal_error('L1 rheology model changed to none on entering ASSOCIATE')
+            END IF
             normalized=ADJUSTL(rheology_model)
 
             DO i=1,LEN_TRIM(normalized)
@@ -3141,6 +3151,10 @@ CONTAINS
             END DO
 
             rheology_model=TRIM(normalized)
+
+            IF (TRIM(rheology_model)=='none') THEN
+                CALL fatal_error('L1 rheology model changed to none during normalization')
+            END IF
 
         END BLOCK
 
