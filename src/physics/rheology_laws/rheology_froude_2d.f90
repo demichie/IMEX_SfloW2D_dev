@@ -69,7 +69,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_froude_semi_implicit(config, state, grav_coeff, &
+    SUBROUTINE eval_rheology_froude_semi_implicit(config, state, grav_coeff,                                           &
         stochastic, stochastic_value, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -168,7 +168,7 @@ CONTAINS
         IF (stochastic .AND. state%h .GT. 0.01_wp) shift = stochastic_value
         froude_value_slope = speed_ratio / SQRT(state%red_grav*state%h)
         froude_slope = froude_value_slope / config%Fr_0
-        CALL solve_exact_velocity_flow(EXACT_FLOW_FROUDE, [base_drag, froude_slope, &
+        CALL solve_exact_velocity_flow(EXACT_FLOW_FROUDE, [base_drag, froude_slope,                                    &
             shift/config%Fr_0, config%mu_0, config%mu_inf], dt,                                                        &
             speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
