@@ -200,9 +200,9 @@ CONTAINS
         yield_strength = config%alpha2 * (EXP(config%beta2 * alphas_tot) - 1.0_wp)
         constant_drag = yield_strength / (state%rho_m *                                                                &
                     MAX(state%h, 1.0E-20_wp))
-        linear_drag = config%Kappa * fluid_viscosity * speed_ratio /                                                          &
+        linear_drag = config%Kappa * fluid_viscosity * speed_ratio /                                                   &
                     (8.0_wp * state%rho_m * effective_depth**2)
-        quadratic_drag = grav * (config%n_td**2) * speed_ratio**2 *                                                               &
+        quadratic_drag = grav * (config%n_td**2) * speed_ratio**2 *                                                    &
                     effective_depth**neg_four_thirds
         CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                                                &
             [constant_drag, linear_drag, quadratic_drag], dt, speed_before, speed_after)
@@ -214,7 +214,7 @@ CONTAINS
     !> \details Apply the piecewise temperature correlation and the exponential
     !> solid-concentration
     !> factor; the complex overload preserves complex-step derivatives.
-    FUNCTION eval_lahar_fluid_viscosity_real(config,T, alphas_tot)                                                            &
+    FUNCTION eval_lahar_fluid_viscosity_real(config,T, alphas_tot)                                                     &
             RESULT(fluid_viscosity)
 
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -232,7 +232,7 @@ CONTAINS
     !> \details Apply the piecewise temperature correlation and the exponential
     !> solid-concentration
     !> factor; the complex overload preserves complex-step derivatives.
-    FUNCTION eval_lahar_fluid_viscosity_complex(config,T, alphas_tot)                                                         &
+    FUNCTION eval_lahar_fluid_viscosity_complex(config,T, alphas_tot)                                                  &
             RESULT(fluid_viscosity)
 
         TYPE(rheology_config_type), INTENT(IN) :: config

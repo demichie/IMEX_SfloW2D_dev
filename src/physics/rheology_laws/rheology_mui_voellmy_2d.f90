@@ -183,7 +183,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_mui_voellmy_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    SUBROUTINE eval_rheology_mui_voellmy_implicit_real(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_mui_voellmy_implicit_real(config, state, use_stochastic_xi,                               &
+        stochastic_value, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic_xi

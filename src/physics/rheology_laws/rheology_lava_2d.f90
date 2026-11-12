@@ -109,7 +109,7 @@ CONTAINS
         END IF
 
         effective_depth = MAX(state%h, h_threshold)
-        gamma = 3.0_wp * config%nu_ref / effective_depth *                                                                    &
+        gamma = 3.0_wp * config%nu_ref / effective_depth *                                                             &
                     EXP(-config%visc_par * (state%T - config%T_ref))
         linear_drag = gamma / state%h
         yield_drag = config%tau0 / (state%rho_m * state%h * speed_ratio)

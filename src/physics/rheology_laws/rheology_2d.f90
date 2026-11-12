@@ -199,7 +199,8 @@ CONTAINS
                 CALL eval_rheology_mui_semi_implicit(config,state, grav_coeff, use_pore_pressure, process_rate(1),     &
                     process_rate(2))
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
-                CALL eval_rheology_mui_voellmy_semi_implicit(config,state, grav_coeff, use_pore_pressure, process_rate(1),    &
+                CALL eval_rheology_mui_voellmy_semi_implicit(config,state, grav_coeff,                                 &
+                    use_pore_pressure, process_rate(1),                                                                &
                     process_rate(2))
             CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_EMPIRICAL,                                           &
                     RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_NEWMODEL)
@@ -251,7 +252,8 @@ CONTAINS
                 CALL eval_rheology_voellmy_implicit(config,state, use_stochastic, stochastic_value, process_rate(1),   &
                     process_rate(2))
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
-                CALL eval_rheology_mui_voellmy_implicit(config,state, use_stochastic, stochastic_value, process_rate(1),      &
+                CALL eval_rheology_mui_voellmy_implicit(config,state, use_stochastic,                                  &
+                    stochastic_value, process_rate(1),                                                                 &
                     process_rate(2))
             CASE(RHEOLOGY_ID_PLASTIC)
                 CALL eval_rheology_plastic_implicit(config,state, process_rate(1), process_rate(2))
