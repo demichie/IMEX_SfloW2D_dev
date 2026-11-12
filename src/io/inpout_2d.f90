@@ -1577,66 +1577,7 @@ CONTAINS
 
         END IF
 
-        ! ------- READ phase-specific carrier transport parameters ------------------
-
-        IF (liquid_flag .OR. lava_flag) THEN
-
-        IF (lava_flag) THEN
-            READ (input_unit, lava_transport_parameters, IOSTAT=ios)
-        ELSE
-            READ (input_unit, liquid_transport_parameters, IOSTAT=ios)
-        END IF
-
-        IF (ios .NE. 0) THEN
-
-            WRITE (*, *) 'IOSTAT=', ios
-            IF (lava_flag) THEN
-                WRITE (*, *) 'ERROR: problem with namelist LAVA_TRANSPORT_PARAMETERS'
-                WRITE (*, lava_transport_parameters)
-            ELSE
-                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-                WRITE (*, liquid_transport_parameters)
-            END IF
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-        ELSE
-
-            REWIND (input_unit)
-
-        END IF
-
-        IF (sp_heat_l .LE. 0.0_wp) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-            WRITE (*, *) 'SP_HEAT_L =', sp_heat_l
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-        END IF
-
-        IF (rho_l .LE. 0.0_wp) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-            WRITE (*, *) 'RHO_L =', rho_l
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-        ELSE
-
-            inv_rho_l = 1.0_wp/rho_l
-
-        END IF
-
-        IF (loss_rate .LT. 0.0_wp) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-            WRITE (*, *) 'LOSS_RATE =', loss_rate
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-        END IF
-
+        ! Layer rheology must be read for gas, liquid and lava carriers.
         ! Select the input form once and reject duplicates before reading.
         ! This also detects malformed namelists (IOSTAT alone cannot distinguish
         ! an absent group from an invalid group).
@@ -1656,7 +1597,7 @@ CONTAINS
         REWIND(input_unit)
         IF (n_rheology_l2/=0) CALL fatal_error('RHEOLOGY_L2_PARAMETERS requires N_LAYERS=2')
         IF (rheology_flag) THEN
-            IF (n_rheology_legacy+n_rheology_l1/=1) &
+            IF (n_rheology_legacy+n_rheology_l1/=1)                                                                    &
                 CALL fatal_error('Provide exactly one RHEOLOGY_PARAMETERS or RHEOLOGY_L1_PARAMETERS')
             IF (n_rheology_legacy==1) THEN
                 READ(input_unit,NML=rheology_parameters,IOSTAT=ios)
@@ -1680,54 +1621,115 @@ CONTAINS
             rheology_group=rheology_l1%rheology_group
         END IF
 
-        IF (liquid_flag) THEN
 
-            IF (kin_visc_l .EQ. -1.0_wp) THEN
+        ! ------- READ phase-specific carrier transport parameters ------------------
 
-                IF ((TRIM(rheology_model) .NE. 'lahar') .AND.                                                          &
-                    (TRIM(rheology_model) .NE. 'lava')) THEN
+        IF (liquid_flag .OR. lava_flag) THEN
 
-                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
+            IF (lava_flag) THEN
+                READ (input_unit, lava_transport_parameters, IOSTAT=ios)
+            ELSE
+                READ (input_unit, liquid_transport_parameters, IOSTAT=ios)
+            END IF
+
+            IF (ios .NE. 0) THEN
+
+                WRITE (*, *) 'IOSTAT=', ios
+                IF (lava_flag) THEN
+                    WRITE (*, *) 'ERROR: problem with namelist LAVA_TRANSPORT_PARAMETERS'
+                    WRITE (*, lava_transport_parameters)
+                ELSE
+                    WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                    WRITE (*, liquid_transport_parameters)
+                END IF
                 WRITE (*, *) 'Please check the input file'
                 STOP
-
-                END IF
 
             ELSE
 
-                IF (TRIM(rheology_model) .EQ. 'lahar') THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
-                WRITE (*, *) 'Viscosity already is computed by REHOLOGY MODEL=4'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-                END IF
-
-                IF (TRIM(rheology_model) .EQ. 'lava') THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
-                WRITE (*, *) 'Viscosity already is computed by REHOLOGY MODEL=3'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-                END IF
+                REWIND (input_unit)
 
             END IF
 
-            IF (verbose_level .GE. 0) THEN
+            IF (sp_heat_l .LE. 0.0_wp) THEN
 
-                WRITE (*, *) 'CARRIER PHASE: liquid'
-                WRITE (*, *) 'Carrier phase kinematic viscosity:', kin_visc_l
+                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                WRITE (*, *) 'SP_HEAT_L =', sp_heat_l
+                WRITE (*, *) 'Please check the input file'
+                STOP
 
             END IF
 
-            kin_visc_c = kin_visc_l
+            IF (rho_l .LE. 0.0_wp) THEN
 
-        END IF
+                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                WRITE (*, *) 'RHO_L =', rho_l
+                WRITE (*, *) 'Please check the input file'
+                STOP
+
+            ELSE
+
+                inv_rho_l = 1.0_wp/rho_l
+
+            END IF
+
+            IF (loss_rate .LT. 0.0_wp) THEN
+
+                WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                WRITE (*, *) 'LOSS_RATE =', loss_rate
+                WRITE (*, *) 'Please check the input file'
+                STOP
+
+            END IF
+
+            IF (liquid_flag) THEN
+
+                IF (kin_visc_l .EQ. -1.0_wp) THEN
+
+                    IF ((TRIM(rheology_model) .NE. 'lahar') .AND.                                                          &
+                        (TRIM(rheology_model) .NE. 'lava')) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                        WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                ELSE
+
+                    IF (TRIM(rheology_model) .EQ. 'lahar') THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                        WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
+                        WRITE (*, *) 'Viscosity already is computed by REHOLOGY MODEL=4'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                    IF (TRIM(rheology_model) .EQ. 'lava') THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
+                        WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
+                        WRITE (*, *) 'Viscosity already is computed by REHOLOGY MODEL=3'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (verbose_level .GE. 0) THEN
+
+                    WRITE (*, *) 'CARRIER PHASE: liquid'
+                    WRITE (*, *) 'Carrier phase kinematic viscosity:', kin_visc_l
+
+                END IF
+
+                kin_visc_c = kin_visc_l
+
+            END IF
 
         END IF
 
@@ -3103,12 +3105,6 @@ CONTAINS
 
         IF (rheology_flag) THEN
 
-        ! This configuration was checked immediately after NAMELIST input.
-        ! Detect changes before entering the normalization/validation scope.
-        IF (TRIM(rheology_l1%rheology_model)=='none') THEN
-            CALL fatal_error('L1 rheology model changed to none before rheology validation')
-        END IF
-
         ASSOCIATE( &
             rheology_model => rheology_l1%rheology_model, &
             mu => rheology_l1%mu, &
@@ -3138,9 +3134,6 @@ CONTAINS
             INTEGER :: i, code
             CHARACTER(LEN=LEN(rheology_model)) :: normalized
 
-            IF (TRIM(rheology_model)=='none') THEN
-                CALL fatal_error('L1 rheology model changed to none on entering ASSOCIATE')
-            END IF
             normalized=ADJUSTL(rheology_model)
 
             DO i=1,LEN_TRIM(normalized)
@@ -3151,10 +3144,6 @@ CONTAINS
             END DO
 
             rheology_model=TRIM(normalized)
-
-            IF (TRIM(rheology_model)=='none') THEN
-                CALL fatal_error('L1 rheology model changed to none during normalization')
-            END IF
 
         END BLOCK
 
