@@ -18,6 +18,7 @@ MODULE rheology_parameters_2d
     ! scalar module variables below remain temporarily until their call sites
     ! have been migrated to read the appropriate layer configuration directly.
     PUBLIC :: rheology_config_type
+    PUBLIC :: rheology_l1, rheology_l2
     TYPE :: rheology_config_type
         CHARACTER(LEN=32) :: rheology_model='none'
         CHARACTER(LEN=16) :: rheology_method=''
@@ -34,6 +35,10 @@ MODULE rheology_parameters_2d
         REAL(wp) :: mu_s=-1.0_wp, mu_2=-1.0_wp
         REAL(wp) :: I_0=-1.0_wp, muI_inf=-1.0_wp
     END TYPE rheology_config_type
+
+    ! Canonical layer configurations shared between input initialization and
+    ! the simulation context. The parser owns their initialization and validation.
+    TYPE(rheology_config_type) :: rheology_l1, rheology_l2
 
     PUBLIC :: I_0, mu_2, mu_s, muI_inf
     PUBLIC :: mu_0, mu_inf, Fr_0, U_w

@@ -16,7 +16,7 @@ MODULE simulation_2d
     USE source_configuration_2d, ONLY : initialize_configured_sources
     USE diagnostics_2d, ONLY : fatal_error
 
-    USE inpout_2d, ONLY : rheology_l1
+    USE rheology_parameters_2d, ONLY : rheology_l1
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
         LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA

@@ -113,7 +113,8 @@ MODULE inpout_2d
     USE parameters_2d, ONLY: rheology_model, thermal_cooling_flag
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
-    USE rheology_parameters_2d, ONLY : rheology_config_type, mu_s, mu_2, I_0, muI_inf,                                 &
+    USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2, &
+            mu_s, mu_2, I_0, muI_inf,                                 &
             mu_0, mu_inf, Fr_0, U_w, xi, T_ref
     USE rheology_voellmy_2d, ONLY: mu
     USE rheology_plastic_2d, ONLY: tau
@@ -304,7 +305,7 @@ MODULE inpout_2d
     REAL(wp) :: initial_erodible_thickness
 
 
-    TYPE(rheology_config_type) :: rheology, rheology_l1, rheology_l2
+    TYPE(rheology_config_type) :: rheology
 
     REAL(wp) :: alpha1_ref
 
