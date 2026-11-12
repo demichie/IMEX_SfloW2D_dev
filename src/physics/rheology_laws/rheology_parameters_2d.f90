@@ -1,8 +1,8 @@
 !********************************************************************************
-!> \brief Shared input storage for rheology coefficients used by multiple laws.
+!> \brief Canonical per-layer rheology configuration shared by the physical laws.
 !>
-!> This module contains no rheology law terms. Each law has its own module;
-!> these values retain the existing shared namelist names.
+!> Every rheology law receives an explicit read-only configuration argument.
+!> The type contains the sole coefficient storage; no per-law global copies exist.
 !********************************************************************************
 
 MODULE rheology_parameters_2d
@@ -13,8 +13,7 @@ MODULE rheology_parameters_2d
 
     PRIVATE
 
-    ! Canonical input configuration for each material layer. Every rheology
-    ! coefficient is declared once here, not once per NAMELIST.
+    ! One coefficient representation per layer, independent of input naming.
     PUBLIC :: rheology_config_type
     PUBLIC :: rheology_l1, rheology_l2
     TYPE :: rheology_config_type
@@ -38,9 +37,5 @@ MODULE rheology_parameters_2d
     ! the simulation context. The parser owns their initialization and validation.
     TYPE(rheology_config_type), TARGET :: rheology_l1
     TYPE(rheology_config_type) :: rheology_l2
-
-
-
-
 
 END MODULE rheology_parameters_2d
