@@ -1,5 +1,8 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
+**TL04 — plastic senza stato globale (12 novembre 2026):** la legge plastic riceve `rheology_config_type` in tutti i trattamenti, incluso il kernel condiviso REAL/COMPLEX e il passo analitico. Rimossi `tau` globale da modulo e parser; aggiornati dispatcher e test diretti. Nessuna formula modificata. Build e regressioni da eseguire; le altre leggi restano da migrare.
+
+
 **Roadmap operativa unica** · aggiornata al 5 novembre 2026 · Repository `demichie/IMEX_SfloW2D_dev` · Branch `master`.
 
 > Questo è il solo documento operativo da aggiornare con priorità, risultati, lavori aperti e criteri di accettazione. I precedenti tracker D17–D20 e la roadmap storica sono conservati integralmente in `docs/archive/roadmaps/`, ma non sono piani concorrenti. Gli schemi IMEX-RK, le cadenze STAGE/STEP e i percorsi di compatibilità precedenti sono superati dal Lie splitting.

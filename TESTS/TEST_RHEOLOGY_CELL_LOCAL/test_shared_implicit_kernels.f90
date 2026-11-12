@@ -13,7 +13,7 @@ PROGRAM test_shared_implicit_kernels
         eval_rheology_mui_voellmy_semi_implicit, eval_rheology_mui_voellmy_implicit
     USE rheology_lava_2d, ONLY : tau0, nu_ref, visc_par, &
         eval_rheology_lava_explicit, eval_rheology_lava_semi_implicit, eval_rheology_lava_implicit
-    USE rheology_plastic_2d, ONLY : tau, &
+    USE rheology_plastic_2d, ONLY : &
         eval_rheology_plastic_explicit, eval_rheology_plastic_semi_implicit, eval_rheology_plastic_implicit
     USE rheology_quadratic_2d, ONLY : &
         eval_rheology_quadratic_explicit, eval_rheology_quadratic_semi_implicit, eval_rheology_quadratic_implicit
@@ -52,7 +52,7 @@ PROGRAM test_shared_implicit_kernels
     tau0=150.0_wp
     nu_ref=1.0E-4_wp
     visc_par=0.002_wp
-    tau=0.15_wp
+    quadratic_config%tau=0.15_wp
     friction_factor=0.01_wp
     quadratic_config%friction_factor=friction_factor
     alpha2=150.0_wp
@@ -154,8 +154,8 @@ CONTAINS
             CALL eval_rheology_lava_explicit(s,explicit_part)
             CALL eval_rheology_lava_semi_implicit(s,sx,sy)
         CASE(4)
-            CALL eval_rheology_plastic_explicit(s,explicit_part)
-            CALL eval_rheology_plastic_semi_implicit(s,sx,sy)
+            CALL eval_rheology_plastic_explicit(quadratic_config,s,explicit_part)
+            CALL eval_rheology_plastic_semi_implicit(quadratic_config,s,sx,sy)
         CASE(5)
             CALL eval_rheology_quadratic_explicit(quadratic_config,s,explicit_part)
             CALL eval_rheology_quadratic_semi_implicit(quadratic_config,s,sx,sy)
@@ -183,7 +183,7 @@ CONTAINS
         CASE(3)
             CALL eval_rheology_lava_implicit(s,implicit_part(1),implicit_part(2))
         CASE(4)
-            CALL eval_rheology_plastic_implicit(s,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_plastic_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE(5)
             CALL eval_rheology_quadratic_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE(6)

@@ -117,7 +117,6 @@ MODULE inpout_2d
             mu_s, mu_2, I_0, muI_inf,                                 &
             mu_0, mu_inf, Fr_0, U_w, xi, T_ref
     USE rheology_voellmy_2d, ONLY: mu
-    USE rheology_plastic_2d, ONLY: tau
     USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
     ! -- Functions used in the rheology calculations
@@ -597,7 +596,6 @@ CONTAINS
         nu_ref = 0.0_wp
         mu = -1.0_wp
         xi = -1.0_wp
-        tau = 0.0_wp
         T_ref = 0.0_wp
         visc_par = 0.0_wp
         tau0 = 0.0_wp
@@ -880,7 +878,6 @@ CONTAINS
         rheology_model = 'none'
         mu = -1
         xi = -1
-        tau = -1
         nu_ref = -1
         visc_par = -1
         T_ref = -1
@@ -3566,7 +3563,6 @@ CONTAINS
         rheology_model=rheology_l1%rheology_model
         mu=rheology_l1%mu
         xi=rheology_l1%xi
-        tau=rheology_l1%tau
         nu_ref=rheology_l1%nu_ref
         visc_par=rheology_l1%visc_par
         T_ref=rheology_l1%T_ref

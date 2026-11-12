@@ -115,7 +115,7 @@ CONTAINS
                 CALL eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,              &
                     stochastic_value, process_rate)
             CASE(RHEOLOGY_ID_PLASTIC)
-                CALL eval_rheology_plastic_explicit(state, process_rate)
+                CALL eval_rheology_plastic_explicit(config,state, process_rate)
             CASE(RHEOLOGY_ID_LAVA)
                 CALL eval_rheology_lava_explicit(state, process_rate)
             CASE(RHEOLOGY_ID_LAHAR)
@@ -251,7 +251,7 @@ CONTAINS
                 CALL eval_rheology_mui_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),      &
                     process_rate(2))
             CASE(RHEOLOGY_ID_PLASTIC)
-                CALL eval_rheology_plastic_implicit(state, process_rate(1), process_rate(2))
+                CALL eval_rheology_plastic_implicit(config,state, process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_LAVA)
                 CALL eval_rheology_lava_implicit(state, process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_LAHAR)
@@ -287,7 +287,7 @@ CONTAINS
         CASE(RHEOLOGY_ID_MUI_VOELLMY)
             CALL eval_rheology_mui_voellmy_implicit_real(state,use_stochastic,stochastic_value,rate(1),rate(2))
         CASE(RHEOLOGY_ID_PLASTIC)
-            CALL eval_rheology_plastic_implicit_real(state,rate(1),rate(2))
+            CALL eval_rheology_plastic_implicit_real(config,state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_LAVA)
             CALL eval_rheology_lava_implicit_real(state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_LAHAR)
@@ -364,7 +364,7 @@ CONTAINS
             CALL eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,&
                 use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_plastic')
-            CALL eval_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
+            CALL eval_rheology_plastic_analytic(config,dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lava')
             CALL eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lahar')

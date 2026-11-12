@@ -15,7 +15,7 @@ PROGRAM test_analytic_velocity
        eval_rheology_voellmy_semi_implicit,                             &
        eval_rheology_voellmy_analytic
   USE state_types, ONLY : physical_state_real, physical_state_complex
-  USE rheology_plastic_2d, ONLY : tau, eval_rheology_plastic_implicit,  &
+  USE rheology_plastic_2d, ONLY : eval_rheology_plastic_implicit,  &
        eval_rheology_plastic_analytic
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
        eval_rheology_lava_implicit, eval_rheology_lava_semi_implicit, &
@@ -87,12 +87,12 @@ PROGRAM test_analytic_velocity
     ps%h = flow_depth
     ps%u = velocity_before(1)
     ps%v = velocity_before(2)
-    CALL eval_rheology_plastic_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_plastic_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_plastic', .FALSE., 0.0_wp,       &
        .FALSE., 0.0_wp, velocity_after, 'plastic dispatch')
   expected_speed = MAX(0.0_wp, SQRT(SUM(velocity_before**2)) -              &
-       integration_step*tau/(flow_depth*speed_ratio))
+       integration_step*quadratic_config%tau/(flow_depth*speed_ratio))
   CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
        'plastic exact constant-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
@@ -104,7 +104,7 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_plastic_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_plastic_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,     &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),              &
