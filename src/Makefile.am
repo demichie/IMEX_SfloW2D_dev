@@ -128,11 +128,14 @@ physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
