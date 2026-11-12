@@ -23,7 +23,7 @@ MODULE rheology_mui_2d
     USE parameters_2d, ONLY : wp, n_solid
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
-    USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE state_mixture, ONLY : sauter_diameter, average_density_solids
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
@@ -45,7 +45,8 @@ CONTAINS
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, rate)
+    SUBROUTINE eval_rheology_mui_explicit(config, state, grav_coeff, use_pore_pressure, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
 
@@ -54,7 +55,7 @@ CONTAINS
         REAL(wp) :: curvature_accel
         curvature_accel=state%curvature_acceleration
         ! The mu(I) implicit component is identically zero.
-        CALL eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, rate(1), rate(2))
+        CALL eval_rheology_mui_semi_implicit(config,state, grav_coeff, use_pore_pressure, rate(1), rate(2))
     END SUBROUTINE eval_rheology_mui_explicit
 
     !> \param[in] state Shared real or complex physical state.
@@ -69,7 +70,8 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
+    SUBROUTINE eval_rheology_mui_semi_implicit(config, state, grav_coeff, use_pore_pressure, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
@@ -135,8 +137,8 @@ CONTAINS
                     (effective_depth * SQRT(grav_coeff))
         inertial_number = particle_diameter * shear_rate /                                                             &
                     SQRT(effective_normal_stress / particle_density)
-        friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +                                                  &
-                    muI_inf * inertial_number**2) / (I_0 + inertial_number)
+        friction_coefficient = (config%mu_s * config%I_0 + config%mu_2 * inertial_number +                             &
+                    config%muI_inf * inertial_number**2) / (config%I_0 + inertial_number)
         friction_stress = friction_coefficient * effective_normal_stress
         rate_x = rate_x - friction_stress * (u / state%mod_vel)
         rate_y = rate_y - friction_stress * (v / state%mod_vel)
@@ -150,7 +152,8 @@ CONTAINS
     !> supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_implicit(state, rate_x, rate_y)
+    SUBROUTINE eval_rheology_mui_implicit(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
@@ -172,8 +175,9 @@ CONTAINS
     !> s^-2].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,                  &
+    SUBROUTINE eval_rheology_mui_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,          &
         use_pore_pressure, velocity_after)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration
@@ -215,7 +219,7 @@ CONTAINS
 
         END IF
 
-        IF (I_0 .LT. 0.0_wp) THEN
+        IF (config%I_0 .LT. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Negative I_0 in mu(I) analytic solver')
 
         END IF
@@ -234,8 +238,8 @@ CONTAINS
                     SQRT(normal_stress/particle_density))
         basal_factor = normal_stress / (rhom*h*speed_ratio)
         CALL solve_exact_velocity_flow(EXACT_FLOW_MUI,                                                                 &
-                    [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,                                          &
-                    basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope],                                      &
+                    [basal_factor*config%mu_s*config%I_0, basal_factor*config%mu_2*inertial_slope,                     &
+                    basal_factor*config%muI_inf*inertial_slope**2, config%I_0, inertial_slope],                        &
                     dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
 

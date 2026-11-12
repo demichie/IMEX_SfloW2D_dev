@@ -134,9 +134,9 @@ CONTAINS
                 CALL eval_rheology_lucas_explicit(config,state, grav_coeff,                                            &
                     use_stochastic, stochastic_value, process_rate)
             CASE(RHEOLOGY_ID_MUI)
-                CALL eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, process_rate)
+                CALL eval_rheology_mui_explicit(config,state, grav_coeff, use_pore_pressure, process_rate)
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
-                CALL eval_rheology_mui_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,          &
+                CALL eval_rheology_mui_voellmy_explicit(config,state, grav_coeff, use_pore_pressure, use_stochastic,   &
                     stochastic_value, process_rate)
             CASE DEFAULT
                 CALL fatal_error('Invalid rheology name in explicit dispatch')
@@ -196,10 +196,10 @@ CONTAINS
                 CALL eval_rheology_lucas_semi_implicit(config,state, grav_coeff, use_stochastic, stochastic_value,     &
                     process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_MUI)
-                CALL eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),            &
+                CALL eval_rheology_mui_semi_implicit(config,state, grav_coeff, use_pore_pressure, process_rate(1),     &
                     process_rate(2))
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
-                CALL eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, process_rate(1),    &
+                CALL eval_rheology_mui_voellmy_semi_implicit(config,state, grav_coeff, use_pore_pressure, process_rate(1),    &
                     process_rate(2))
             CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_EMPIRICAL,                                           &
                     RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_NEWMODEL)
@@ -251,7 +251,7 @@ CONTAINS
                 CALL eval_rheology_voellmy_implicit(config,state, use_stochastic, stochastic_value, process_rate(1),   &
                     process_rate(2))
             CASE(RHEOLOGY_ID_MUI_VOELLMY)
-                CALL eval_rheology_mui_voellmy_implicit(state, use_stochastic, stochastic_value, process_rate(1),      &
+                CALL eval_rheology_mui_voellmy_implicit(config,state, use_stochastic, stochastic_value, process_rate(1),      &
                     process_rate(2))
             CASE(RHEOLOGY_ID_PLASTIC)
                 CALL eval_rheology_plastic_implicit(config,state, process_rate(1), process_rate(2))
@@ -288,7 +288,7 @@ CONTAINS
         CASE(RHEOLOGY_ID_VOELLMY)
             CALL eval_rheology_voellmy_implicit_real(config,state,use_stochastic,stochastic_value,rate(1),rate(2))
         CASE(RHEOLOGY_ID_MUI_VOELLMY)
-            CALL eval_rheology_mui_voellmy_implicit_real(state,use_stochastic,stochastic_value,rate(1),rate(2))
+            CALL eval_rheology_mui_voellmy_implicit_real(config,state,use_stochastic,stochastic_value,rate(1),rate(2))
         CASE(RHEOLOGY_ID_PLASTIC)
             CALL eval_rheology_plastic_implicit_real(config,state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_LAVA)
@@ -383,10 +383,10 @@ CONTAINS
             CALL eval_rheology_lucas_analytic(config,dt, state, speed_ratio, grav_coeff, curvature_acceleration,       &
                 use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_mui')
-            CALL eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,                &
+            CALL eval_rheology_mui_analytic(config,dt, state, speed_ratio, grav_coeff, curvature_acceleration,         &
                 use_pore_pressure, velocity_after)
         CASE ('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff,                                &
+            CALL eval_rheology_mui_voellmy_analytic(config,dt, state, speed_ratio, grav_coeff,                         &
                 curvature_acceleration, use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE DEFAULT
             model_supported = .FALSE.
