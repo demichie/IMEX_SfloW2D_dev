@@ -16,13 +16,14 @@ MODULE simulation_2d
     USE source_configuration_2d, ONLY : initialize_configured_sources
     USE diagnostics_2d, ONLY : fatal_error
 
+    USE inpout_2d, ONLY : rheology_l1
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
         LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
 
     USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
             n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, lava_flag, &
-            rheology_flag, rheology_model, stochastic_flag,                                         &
+            rheology_flag, stochastic_flag,                                         &
             configure_canonical_state_indices
 
 
@@ -114,7 +115,7 @@ CONTAINS
         carrier_phase=LAYER_PHASE_GAS
         IF (liquid_flag) carrier_phase=LAYER_PHASE_LIQUID
         IF (lava_flag) carrier_phase=LAYER_PHASE_LAVA
-        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_model,source_error)
+        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_l1,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL initialize_configured_sources(this%source_registry,source_error)

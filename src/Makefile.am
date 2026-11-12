@@ -145,8 +145,9 @@ numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
-core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
-core/simulation_2d.$(OBJEXT): core/layer_physics_2d.$(OBJEXT)
+core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): core/layer_physics_2d.$(OBJEXT) io/inpout_2d.$(OBJEXT)
 state/state_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.

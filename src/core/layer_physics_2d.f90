@@ -4,6 +4,7 @@
 !>          module-global phase/rheology parameters inside OpenMP loops.
 !>          Physical coefficients and two-layer activation are later TL04 steps.
 MODULE layer_physics_2d
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
         canonical_rheology_source_name, rheology_source_id, RHEOLOGY_ID_NONE
     IMPLICIT NONE
@@ -18,6 +19,7 @@ MODULE layer_physics_2d
         INTEGER :: carrier_phase=0
         INTEGER :: rheology_id=RHEOLOGY_ID_NONE
         CHARACTER(LEN=64) :: rheology_source=''
+        TYPE(rheology_config_type) :: config
         LOGICAL :: initialized=.FALSE.
     CONTAINS
         PROCEDURE :: initialize => initialize_layer_physics
@@ -26,15 +28,16 @@ MODULE layer_physics_2d
         PROCEDURE :: phase => layer_physics_phase
         PROCEDURE :: selected_rheology => layer_physics_rheology
         PROCEDURE :: selected_rheology_id => layer_physics_rheology_id
+        PROCEDURE :: rheology_configuration => layer_physics_configuration
     END TYPE layer_physics_type
 
 CONTAINS
 
-    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_model,error)
+    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,error)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: phase
         LOGICAL, INTENT(IN) :: rheology_enabled
-        CHARACTER(*), INTENT(IN) :: rheology_model
+        TYPE(rheology_config_type), INTENT(IN) :: rheology_config
         CHARACTER(*), INTENT(OUT) :: error
         CHARACTER(LEN=64) :: source
         TYPE(source_term_type) :: term
@@ -46,8 +49,8 @@ CONTAINS
         END IF
         source=''
         IF (rheology_enabled) THEN
-            IF (TRIM(rheology_model)/='none') THEN
-                source=canonical_rheology_source_name(TRIM(rheology_model))
+            IF (TRIM(rheology_config%rheology_model)/='none') THEN
+                source=canonical_rheology_source_name(TRIM(rheology_config%rheology_model))
                 IF (LEN_TRIM(source)==0) THEN
                     error='TL04: unknown layer rheology'
                     RETURN
@@ -64,6 +67,7 @@ CONTAINS
                 IF (LEN_TRIM(error)>0) RETURN
             END IF
         END IF
+        this%config=rheology_config
         this%carrier_phase=phase
         this%rheology_source=source
         this%rheology_id=RHEOLOGY_ID_NONE
@@ -73,6 +77,7 @@ CONTAINS
 
     SUBROUTINE finalize_layer_physics(this)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
+        this%config=rheology_config_type()
         this%carrier_phase=0
         this%rheology_id=RHEOLOGY_ID_NONE
         this%rheology_source=''
@@ -94,6 +99,13 @@ CONTAINS
         CHARACTER(LEN=64) :: name
         name=this%rheology_source
     END FUNCTION layer_physics_rheology
+
+    ! Return a value snapshot; no caller can mutate the descriptor's stored coefficients.
+    PURE FUNCTION layer_physics_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(rheology_config_type) :: config
+        config=this%config
+    END FUNCTION layer_physics_configuration
 
     PURE INTEGER FUNCTION layer_physics_rheology_id(this)
         CLASS(layer_physics_type), INTENT(IN) :: this
