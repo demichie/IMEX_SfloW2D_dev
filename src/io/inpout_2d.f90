@@ -76,7 +76,7 @@ MODULE inpout_2d
             radial_injection_method, radial_injection_group,                                                           &
             geometry_curvature_method, geometry_curvature_group,                                                       &
             mass_exchange_configuration_present, mass_exchange_method,                                                 &
-            mass_exchange_group
+            mass_exchange_group, uppercase_source_text
 
     ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
     USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -1119,7 +1119,8 @@ CONTAINS
 
         CHARACTER(LEN=15) :: chara
 
-        INTEGER :: ios, rheology_legacy_ios, rheology_l1_ios
+        INTEGER :: ios, n_rheology_legacy, n_rheology_l1, n_rheology_l2
+        CHARACTER(LEN=2048) :: rheology_line
         CHARACTER(LEN=256) :: source_input_error
 
         REAL(wp) :: expA, expB, Tc
@@ -1637,17 +1638,36 @@ CONTAINS
 
         END IF
 
-        ! Namelist input is captured once, before viscosity checks and Lie
-        ! method validation. The two names are alternatives in single-layer.
+        ! Select the input form once and reject duplicates before reading.
+        ! This also detects malformed namelists (IOSTAT alone cannot distinguish
+        ! an absent group from an invalid group).
+        n_rheology_legacy=0
+        n_rheology_l1=0
+        n_rheology_l2=0
         REWIND(input_unit)
-        READ(input_unit,NML=rheology_parameters,IOSTAT=rheology_legacy_ios)
+        DO
+            READ(input_unit,'(A)',IOSTAT=ios) rheology_line
+            IF (ios<0) EXIT
+            IF (ios/=0) CALL fatal_error('Unable to scan rheology namelists')
+            rheology_line=uppercase_source_text(ADJUSTL(rheology_line))
+            IF (INDEX(rheology_line,'&RHEOLOGY_PARAMETERS')==1) n_rheology_legacy=n_rheology_legacy+1
+            IF (INDEX(rheology_line,'&RHEOLOGY_L1_PARAMETERS')==1) n_rheology_l1=n_rheology_l1+1
+            IF (INDEX(rheology_line,'&RHEOLOGY_L2_PARAMETERS')==1) n_rheology_l2=n_rheology_l2+1
+        END DO
         REWIND(input_unit)
-        READ(input_unit,NML=rheology_l1_parameters,IOSTAT=rheology_l1_ios)
-        REWIND(input_unit)
+        IF (n_rheology_l2/=0) CALL fatal_error('RHEOLOGY_L2_PARAMETERS requires N_LAYERS=2')
         IF (rheology_flag) THEN
-            IF ((rheology_legacy_ios==0) .EQV. (rheology_l1_ios==0)) &
+            IF (n_rheology_legacy+n_rheology_l1/=1) &
                 CALL fatal_error('Provide exactly one RHEOLOGY_PARAMETERS or RHEOLOGY_L1_PARAMETERS')
-            IF (rheology_legacy_ios==0) rheology_l1=rheology
+            IF (n_rheology_legacy==1) THEN
+                READ(input_unit,NML=rheology_parameters,IOSTAT=ios)
+                IF (ios/=0) CALL fatal_error('ERROR: problem with namelist RHEOLOGY_PARAMETERS')
+                rheology_l1=rheology
+            ELSE
+                READ(input_unit,NML=rheology_l1_parameters,IOSTAT=ios)
+                IF (ios/=0) CALL fatal_error('ERROR: problem with namelist RHEOLOGY_L1_PARAMETERS')
+            END IF
+            REWIND(input_unit)
             rheology=rheology_l1
             ! Scheduling metadata is consumed before rheology coefficient checks.
             rheology_model=rheology_l1%rheology_model
