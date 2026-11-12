@@ -10,8 +10,8 @@ MODULE mass_exchange_2d
                     pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                                &
                     reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
-        SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                      &
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                           &
+        SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                        &
         SOURCE_ID_EXCHANGE_VAPORIZATION, SOURCE_ID_EXCHANGE_LAVA_DEPOSITION
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     USE state_types, ONLY : physical_state_real, physical_state_complex
@@ -48,7 +48,7 @@ CONTAINS
         !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
-    SUBROUTINE eval_mass_exchange_explicit(config,physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term,     &
+    SUBROUTINE eval_mass_exchange_explicit(config,physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term, &
             scratch)
 
             TYPE(rheology_config_type), INTENT(IN) :: config
@@ -69,7 +69,7 @@ CONTAINS
 
             work=>local_scratch
             IF (PRESENT(scratch)) work=>scratch
-            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                    &
+            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                      &
                 liquid_loss_rates=>work%liquid_loss_rates)
             do_erosion=BTEST(source_mask,SOURCE_ID_EXCHANGE_EROSION-1)
             do_deposition=BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
@@ -104,7 +104,8 @@ CONTAINS
 
                 CALL reset_mass_exchange_rates(deposition_rates)
                 CALL reset_mass_exchange_rates(liquid_loss_rates)
-                IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(config,physical_state,dt,deposition_rates)
+                IF (do_deposition)                                                                                     &
+                    CALL eval_mass_exchange_deposition_explicit(config,physical_state,dt,deposition_rates)
                 IF (do_liquid_loss)                                                                                    &
                         CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
 

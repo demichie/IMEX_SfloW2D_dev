@@ -7824,8 +7824,9 @@
                                                         vert_stress_eff*SQRT(grav_coeff))
                         inertialNumber(j, k) = diam_characteristic*shear_rate /                                        &
                                                         SQRT(eff_normal_stress/rho_particle)
-                        muEff(j, k) = (rheology_l1%mu_s*rheology_l1%I_0 + rheology_l1%mu_2*inertialNumber(j, k) +                                          &
-                                            rheology_l1%muI_inf*inertialNumber(j, k)**2) /                                         &
+                        muEff(j, k) = (rheology_l1%mu_s*rheology_l1%I_0 +                                              &
+                            rheology_l1%mu_2*inertialNumber(j, k) +                                                    &
+                            rheology_l1%muI_inf*inertialNumber(j, k)**2) /                                             &
                                             (rheology_l1%I_0 + inertialNumber(j, k))
 
                     END IF
