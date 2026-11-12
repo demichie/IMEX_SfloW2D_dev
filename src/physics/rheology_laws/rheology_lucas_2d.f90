@@ -52,7 +52,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         ! The implicit component is identically zero for Lucas rheology.
-        CALL eval_rheology_lucas_semi_implicit(config,state, grav_coeff, use_stochastic, stochastic_value, rate(1),           &
+        CALL eval_rheology_lucas_semi_implicit(config,state, grav_coeff, use_stochastic, stochastic_value, rate(1),    &
             rate(2))
     END SUBROUTINE eval_rheology_lucas_explicit
 
@@ -71,7 +71,8 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_lucas_semi_implicit(config, state, grav_coeff, stochastic, stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_lucas_semi_implicit(config, state, grav_coeff, &
+        stochastic, stochastic_value, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -104,7 +105,8 @@ CONTAINS
                             friction_coefficient = config%mu_0
 
                     ELSE
-                            friction_coefficient = config%mu_inf + (config%mu_0-config%mu_inf)/(friction_speed/config%U_w)
+                            friction_coefficient = config%mu_inf + &
+                                (config%mu_0-config%mu_inf)/(friction_speed/config%U_w)
 
                     END IF
 
@@ -151,7 +153,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
-    SUBROUTINE eval_rheology_lucas_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,            &
+    SUBROUTINE eval_rheology_lucas_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,    &
         stochastic_value, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -181,7 +183,8 @@ CONTAINS
         shallow = 0.0_wp
         IF (state%h .LT. 0.1_wp) shallow = 1.0_wp
         CALL solve_exact_velocity_flow(EXACT_FLOW_LUCAS,                                                               &
-            [scale_factor, speed_ratio, shift, config%mu_0, config%mu_inf, config%U_w, shallow], dt, speed_before, speed_after)
+            [scale_factor, speed_ratio, shift, config%mu_0, config%mu_inf, config%U_w, &
+                shallow], dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE eval_rheology_lucas_analytic
 
