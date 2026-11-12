@@ -13,6 +13,7 @@
 MODULE rheology_2d
 
     USE parameters_2d, ONLY : wp
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE state_physical, ONLY : update_physical_state_kinematics
     USE diagnostics_2d, ONLY : fatal_error
@@ -97,8 +98,9 @@ CONTAINS
     END SUBROUTINE limit_rheology_momentum_reversal
 
 
-    SUBROUTINE eval_rheology_explicit(model_id, state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value,  &
+    SUBROUTINE eval_rheology_explicit(config,model_id, state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value,  &
         rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
@@ -121,7 +123,7 @@ CONTAINS
             CASE(RHEOLOGY_ID_EMPIRICAL)
                 CALL eval_rheology_empirical_explicit(state, process_rate)
             CASE(RHEOLOGY_ID_QUADRATIC)
-                CALL eval_rheology_quadratic_explicit(state, process_rate)
+                CALL eval_rheology_quadratic_explicit(config,state, process_rate)
             CASE(RHEOLOGY_ID_NEWMODEL)
                 CALL eval_rheology_newmodel_explicit(state, process_rate)
             CASE(RHEOLOGY_ID_FROUDE)
@@ -141,8 +143,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_explicit
 
 
-    SUBROUTINE eval_rheology_semi_implicit(models, state, grav_coeff, use_pore_pressure, use_stochastic,               &
+    SUBROUTINE eval_rheology_semi_implicit(config,models, state, grav_coeff, use_pore_pressure, use_stochastic,               &
         stochastic_value, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
@@ -156,7 +159,7 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
 
-            CALL eval_rheology_semi_implicit_id(rheology_source_id(models(i)),state,                                   &
+            CALL eval_rheology_semi_implicit_id(config,rheology_source_id(models(i)),state,                                   &
                 grav_coeff,use_pore_pressure,use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
@@ -165,8 +168,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
     !> Frozen Newton semi-implicit dispatch with pre-resolved source identity.
-    SUBROUTINE eval_rheology_semi_implicit_id(model_id,state,grav_coeff,use_pore_pressure,                             &
+    SUBROUTINE eval_rheology_semi_implicit_id(config,model_id,state,grav_coeff,use_pore_pressure,                             &
             use_stochastic,stochastic_value,rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff,stochastic_value
@@ -207,7 +211,8 @@ CONTAINS
 
         ! Newton/complex-step contract: read-only state and coefficients; return rates only.
         ! Never advance shared inventories or geometry while evaluating this dispatch.
-    SUBROUTINE eval_rheology_implicit(models, state, use_stochastic, stochastic_value, rate)
+    SUBROUTINE eval_rheology_implicit(config,models, state, use_stochastic, stochastic_value, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_complex), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic
@@ -220,7 +225,7 @@ CONTAINS
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
 
-            CALL eval_rheology_implicit_id(rheology_source_id(models(i)),state,                                        &
+            CALL eval_rheology_implicit_id(config,rheology_source_id(models(i)),state,                                        &
                 use_stochastic,stochastic_value,process_rate)
 
             rate=rate+process_rate
@@ -229,7 +234,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_implicit
 
     !> Newton complex-rate dispatch with source identity resolved at initialization.
-    SUBROUTINE eval_rheology_implicit_id(model_id,state,use_stochastic,stochastic_value,rate)
+    SUBROUTINE eval_rheology_implicit_id(config,model_id,state,use_stochastic,stochastic_value,rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_complex), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic
@@ -255,7 +261,7 @@ CONTAINS
             CASE(RHEOLOGY_ID_NEWMODEL)
                 CALL eval_rheology_newmodel_implicit(state,process_rate(1),process_rate(2))
             CASE(RHEOLOGY_ID_QUADRATIC)
-                CALL eval_rheology_quadratic_implicit(state, process_rate(1), process_rate(2))
+                CALL eval_rheology_quadratic_implicit(config,state, process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_NONE, RHEOLOGY_ID_FROUDE, RHEOLOGY_ID_LUCAS, RHEOLOGY_ID_MUI)
                 CONTINUE
             CASE DEFAULT
@@ -267,7 +273,8 @@ CONTAINS
 
 
     !> Evaluate the implicit rheology contribution in REAL for Newton residuals.
-    SUBROUTINE eval_rheology_implicit_real_id(model_id,state,use_stochastic,stochastic_value,rate)
+    SUBROUTINE eval_rheology_implicit_real_id(config,model_id,state,use_stochastic,stochastic_value,rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic
@@ -290,7 +297,7 @@ CONTAINS
         CASE(RHEOLOGY_ID_NEWMODEL)
             CALL eval_rheology_newmodel_implicit_real(state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_QUADRATIC)
-            CALL eval_rheology_quadratic_implicit_real(state,rate(1),rate(2))
+            CALL eval_rheology_quadratic_implicit_real(config,state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_FROUDE,RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI)
             CONTINUE
         CASE DEFAULT
@@ -299,8 +306,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_implicit_real_id
 
     !> Integrate analytic rheology without copying state in the single-law Lie case.
-    SUBROUTINE eval_rheology_analytic(models, dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
+    SUBROUTINE eval_rheology_analytic(config,models, dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
         use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported, bx, by, bxx, bxy, byy)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
         REAL(wp), INTENT(IN) :: dt,speed_ratio,grav_coeff,curvature_acceleration,stochastic_value
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -316,7 +324,7 @@ CONTAINS
         IF (SIZE(models)==0) RETURN
 
         IF (SIZE(models)==1) THEN
-            CALL dispatch_analytic_rheology(models(1),dt,state,speed_ratio,grav_coeff,                                 &
+            CALL dispatch_analytic_rheology(config,models(1),dt,state,speed_ratio,grav_coeff,                                 &
                 curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                              &
                 velocity_after,model_supported)
             RETURN
@@ -326,7 +334,7 @@ CONTAINS
         ! Only this uncommon multi-law path copies the physical composition.
         current_state=state
         DO i=1,SIZE(models)
-            CALL dispatch_analytic_rheology(models(i),dt,current_state,speed_ratio,grav_coeff,                         &
+            CALL dispatch_analytic_rheology(config,models(i),dt,current_state,speed_ratio,grav_coeff,                         &
                 curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value,                              &
                 velocity_after,model_supported)
             IF (.NOT.model_supported) RETURN
@@ -337,8 +345,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_analytic
 
     !> Select the model-specific exact velocity flow for one frozen physical state.
-    SUBROUTINE dispatch_analytic_rheology(model,dt,state,speed_ratio,grav_coeff,curvature_acceleration,                &
+    SUBROUTINE dispatch_analytic_rheology(config,model,dt,state,speed_ratio,grav_coeff,curvature_acceleration,                &
         use_pore_pressure,use_stochastic,stochastic_value,velocity_after,model_supported)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: model
         REAL(wp), INTENT(IN) :: dt,speed_ratio,grav_coeff,curvature_acceleration,stochastic_value
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -363,7 +372,7 @@ CONTAINS
         CASE ('rheology_empirical')
             CALL eval_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_quadratic')
-            CALL eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
+            CALL eval_rheology_quadratic_analytic(config,dt, state, speed_ratio, velocity_after)
         CASE ('rheology_froude')
             CALL eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,             &
                 use_stochastic, stochastic_value, velocity_after)

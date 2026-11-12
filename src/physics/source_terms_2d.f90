@@ -18,6 +18,7 @@ MODULE source_terms_2d
             eval_thermal_implicit_real, eval_thermal_analytic, eval_thermal_implicit_temperature
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
+    USE rheology_parameters_2d, ONLY : rheology_l1
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
@@ -346,7 +347,7 @@ CONTAINS
 
             END IF
 
-            CALL eval_rheology_analytic([selected_model_name], interval, physical_state,                               &
+            CALL eval_rheology_analytic(rheology_l1,[selected_model_name], interval, physical_state,                               &
                     speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag,                              &
                     stochastic_flag, context%Zij, velocity_after, supported,                                           &
                     context%Bprime_x, context%Bprime_y, context%Bsecond_xx,                                            &
@@ -435,7 +436,7 @@ CONTAINS
         END IF
         CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                      &
             0.0_wp,0.0_wp,0.0_wp)
-        CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
+        CALL eval_rheology_semi_implicit_id(rheology_l1,group%rheology_id,physical_state,                                          &
             grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
 
@@ -480,7 +481,7 @@ CONTAINS
             RETURN
         END IF
         IF (group%rheology_implicit) THEN
-            CALL eval_rheology_implicit_real_id(group%rheology_id,physical_state, &
+            CALL eval_rheology_implicit_real_id(rheology_l1,group%rheology_id,physical_state, &
                 stochastic_flag,Zij,rate(2:3))
         END IF
         IF (group%thermal_active) THEN
@@ -532,7 +533,7 @@ CONTAINS
             RETURN
         END IF
         IF (group%rheology_implicit) THEN
-            CALL eval_rheology_implicit_id(group%rheology_id,physical_state, &
+            CALL eval_rheology_implicit_id(rheology_l1,group%rheology_id,physical_state, &
                 stochastic_flag,Zij,c_nh_term_impl(2:3))
         END IF
         IF (group%thermal_active) THEN
@@ -652,7 +653,7 @@ CONTAINS
             ! Source rates are evaluated at the same unmodified stage state.
             ! The construction of EXPLICIT stays inside each physical module.
             IF (group%rheology_id>0 .AND. r_h>dry_thickness_tolerance) THEN
-                CALL eval_rheology_explicit(group%rheology_id,physical_state,                                          &
+                CALL eval_rheology_explicit(rheology_l1,group%rheology_id,physical_state,                                          &
                     grav_coeff, pore_pressure_flag,                                                                    &
                     stochastic_flag, stochastic_value, rheology_rate)
                 expl_term(2:3)=expl_term(2:3)+rheology_rate

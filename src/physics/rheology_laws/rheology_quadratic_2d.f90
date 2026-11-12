@@ -14,6 +14,7 @@
 MODULE rheology_quadratic_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 solve_exact_velocity_flow, EXACT_FLOW_QUADRATIC
@@ -24,8 +25,6 @@ MODULE rheology_quadratic_2d
     PUBLIC :: eval_rheology_quadratic_implicit
     PUBLIC :: eval_rheology_quadratic_implicit_real
     PUBLIC :: eval_rheology_quadratic_analytic
-    PUBLIC :: friction_factor
-        REAL(wp) :: friction_factor
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
         !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -39,15 +38,16 @@ CONTAINS
         !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
         !> \param[in] moving True for a moving local state.
         !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_quadratic_explicit(state, rate)
+    SUBROUTINE eval_rheology_quadratic_explicit(config, state, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(physical_state_real), INTENT(IN) :: state
 
 
             REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx,sy,ix,iy
 
-        CALL eval_rheology_quadratic_semi_implicit(state,sx,sy)
-        CALL eval_rheology_quadratic_implicit_real(state,ix,iy)
+        CALL eval_rheology_quadratic_semi_implicit(config,state,sx,sy)
+        CALL eval_rheology_quadratic_implicit_real(config,state,ix,iy)
         rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_quadratic_explicit
 
@@ -59,7 +59,8 @@ CONTAINS
         !> supplies a zero source when the model has no term in this treatment.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_quadratic_semi_implicit(state, rate_x, rate_y)
+    SUBROUTINE eval_rheology_quadratic_semi_implicit(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(OUT) :: rate_x, rate_y
@@ -77,7 +78,8 @@ CONTAINS
         !> \param[in] moving True for a moving local state.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_quadratic_implicit(state, rate_x, rate_y)
+    SUBROUTINE eval_rheology_quadratic_implicit(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
@@ -85,7 +87,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_quadratic_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    SUBROUTINE eval_rheology_quadratic_implicit_real(state, rate_x, rate_y)
+    SUBROUTINE eval_rheology_quadratic_implicit_real(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
@@ -101,7 +104,8 @@ CONTAINS
         !> \param[in] dt Source integration interval [s].
         !> \param[in] speed_ratio Ratio of total to horizontal speed.
         !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_quadratic_analytic(config, dt, state, speed_ratio, velocity_after)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -115,7 +119,7 @@ CONTAINS
             CALL validate_analytic_velocity_inputs(dt, state%h,                                                        &
                         speed_ratio, speed_before, 'quadratic')
             IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
-            quadratic_drag = friction_factor * speed_ratio**2 / state%h
+            quadratic_drag = config%friction_factor * speed_ratio**2 / state%h
             CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC, [quadratic_drag],                                     &
                         dt, speed_before, speed_after)
             velocity_after = (speed_after / speed_before) * velocity_before

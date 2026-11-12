@@ -2,7 +2,7 @@ PROGRAM test_analytic_velocity
 
   USE parameters_2d, ONLY : wp, n_solid
   USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
-  USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
+  USE rheology_parameters_2d, ONLY : rheology_config_type, I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
        Fr_0, U_w, xi, T_ref
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &
@@ -26,7 +26,7 @@ PROGRAM test_analytic_velocity
        eval_rheology_lahar_analytic
   USE rheology_empirical_2d, ONLY : eval_rheology_empirical_implicit,   &
        eval_rheology_empirical_analytic
-  USE rheology_quadratic_2d, ONLY : friction_factor,                        &
+  USE rheology_quadratic_2d, ONLY :                        &
        eval_rheology_quadratic_implicit, eval_rheology_quadratic_analytic
   USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit,                  &
        eval_rheology_froude_analytic
@@ -38,6 +38,9 @@ PROGRAM test_analytic_velocity
   USE rheology_2d, ONLY : eval_rheology_analytic
 
   IMPLICIT NONE
+
+  TYPE(rheology_config_type) :: quadratic_config
+  REAL(wp) :: friction_factor
 
   TYPE(physical_state_real) :: rheo_state
   REAL(wp), PARAMETER :: integration_step = 0.01_wp
@@ -245,12 +248,13 @@ PROGRAM test_analytic_velocity
        REAL(complex_source_y,wp)], 'empirical')
 
   friction_factor = 0.1_wp
+  quadratic_config%friction_factor=friction_factor
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL eval_rheology_quadratic_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_quadratic_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_quadratic', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'quadratic dispatch')
@@ -269,7 +273,7 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_quadratic_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_quadratic_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
@@ -743,7 +747,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=excess_pore_pressure
-    CALL eval_rheology_analytic([model_id],integration_step,physical_state, &
+    CALL eval_rheology_analytic(quadratic_config,[model_id],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp,use_pore_pressure, &
          use_stochastic,stochastic,actual,model_supported, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
@@ -772,7 +776,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=0.0_wp
-    CALL eval_rheology_analytic(['rheology_unsupported'],integration_step,physical_state, &
+    CALL eval_rheology_analytic(quadratic_config,['rheology_unsupported'],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp, .FALSE., &
          .FALSE.,0.0_wp,actual,model_supported, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)

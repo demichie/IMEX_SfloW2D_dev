@@ -2,7 +2,7 @@
 PROGRAM test_shared_implicit_kernels
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s, grav, inv_grav
-    USE rheology_parameters_2d, ONLY : xi, I_0, mu_2, mu_s, muI_inf, T_ref
+    USE rheology_parameters_2d, ONLY : rheology_config_type, xi, I_0, mu_2, mu_s, muI_inf, T_ref
     USE rheology_2d, ONLY : eval_rheology_implicit_real_id
     USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, eval_rheology_newmodel_implicit_real
     USE state_types, ONLY : physical_state_real, physical_state_complex, &
@@ -15,13 +15,16 @@ PROGRAM test_shared_implicit_kernels
         eval_rheology_lava_explicit, eval_rheology_lava_semi_implicit, eval_rheology_lava_implicit
     USE rheology_plastic_2d, ONLY : tau, &
         eval_rheology_plastic_explicit, eval_rheology_plastic_semi_implicit, eval_rheology_plastic_implicit
-    USE rheology_quadratic_2d, ONLY : friction_factor, &
+    USE rheology_quadratic_2d, ONLY : &
         eval_rheology_quadratic_explicit, eval_rheology_quadratic_semi_implicit, eval_rheology_quadratic_implicit
     USE rheology_empirical_2d, ONLY : eval_rheology_empirical_explicit, &
         eval_rheology_empirical_semi_implicit, eval_rheology_empirical_implicit
     USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td2, &
         eval_rheology_lahar_explicit, eval_rheology_lahar_semi_implicit, eval_rheology_lahar_implicit
     IMPLICIT NONE
+
+    TYPE(rheology_config_type) :: quadratic_config
+    REAL(wp) :: friction_factor
 
     REAL(wp), PARAMETER :: eps_cs=1.0E-20_wp, fd_step=1.0E-6_wp
     TYPE(physical_state_real) :: state,shifted
@@ -51,6 +54,7 @@ PROGRAM test_shared_implicit_kernels
     visc_par=0.002_wp
     tau=0.15_wp
     friction_factor=0.01_wp
+    quadratic_config%friction_factor=friction_factor
     alpha2=150.0_wp
     beta2=2.0_wp
     alpha1_coeff=1.0_wp
@@ -73,7 +77,7 @@ PROGRAM test_shared_implicit_kernels
         CALL evaluate_real(model,state,explicit_rate,semi_rate)
         CALL promote_physical_state(state,complex_state)
         CALL evaluate_complex(model,complex_state,implicit_rate)
-        CALL eval_rheology_implicit_real_id(model_ids(model),state,.FALSE.,0.0_wp,implicit_real)
+        CALL eval_rheology_implicit_real_id(quadratic_config,model_ids(model),state,.FALSE.,0.0_wp,implicit_real)
         CALL assert_rate(implicit_real,REAL(implicit_rate,wp),1.0E-12_wp,model,-3)
         CALL assert_rate(explicit_rate,semi_rate+REAL(implicit_rate,wp),1.0E-12_wp,model,0)
 
@@ -153,8 +157,8 @@ CONTAINS
             CALL eval_rheology_plastic_explicit(s,explicit_part)
             CALL eval_rheology_plastic_semi_implicit(s,sx,sy)
         CASE(5)
-            CALL eval_rheology_quadratic_explicit(s,explicit_part)
-            CALL eval_rheology_quadratic_semi_implicit(s,sx,sy)
+            CALL eval_rheology_quadratic_explicit(quadratic_config,s,explicit_part)
+            CALL eval_rheology_quadratic_semi_implicit(quadratic_config,s,sx,sy)
         CASE(6)
             CALL eval_rheology_empirical_explicit(s,explicit_part)
             CALL eval_rheology_empirical_semi_implicit(s,sx,sy)
@@ -181,7 +185,7 @@ CONTAINS
         CASE(4)
             CALL eval_rheology_plastic_implicit(s,implicit_part(1),implicit_part(2))
         CASE(5)
-            CALL eval_rheology_quadratic_implicit(s,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_quadratic_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE(6)
             CALL eval_rheology_empirical_implicit(s,implicit_part(1),implicit_part(2))
         CASE(7)
