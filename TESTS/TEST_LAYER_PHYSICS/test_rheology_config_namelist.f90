@@ -1,4 +1,5 @@
 PROGRAM test_rheology_config_namelist
+    USE parameters_2d, ONLY : wp
     USE rheology_parameters_2d, ONLY : rheology_config_type
     IMPLICIT NONE
 
@@ -16,7 +17,8 @@ PROGRAM test_rheology_config_namelist
     CALL check(ios==0,'single-layer derived-type namelist')
     rheology_l1=rheology
     CALL check(rheology_l1%rheology_model=='voellmy','copy legacy into L1')
-    CALL check(rheology_l1%mu==0.3 .AND. rheology_l1%xi==300.0,'L1 coefficients')
+    CALL check(close_real(rheology_l1%mu,0.3_wp) .AND. &
+        close_real(rheology_l1%xi,300.0_wp),'L1 coefficients')
 
     lower=[CHARACTER(LEN=180) :: '&RHEOLOGY_L1_PARAMETERS', &
         "RHEOLOGY_L1%RHEOLOGY_MODEL='plastic',", &
@@ -29,12 +31,19 @@ PROGRAM test_rheology_config_namelist
     CALL check(ios==0,'layer 1 namelist')
     READ(upper,NML=rheology_l2_parameters,IOSTAT=ios)
     CALL check(ios==0,'layer 2 namelist')
-    CALL check(rheology_l1%tau==120.0,'L1 plastic coefficient')
-    CALL check(rheology_l2%Fr_0==1.0,'L2 Froude coefficient')
-    CALL check(rheology_l2%mu==-1.0 .AND. rheology_l1%mu==0.3, &
+    CALL check(close_real(rheology_l1%tau,120.0_wp),'L1 plastic coefficient')
+    CALL check(close_real(rheology_l2%Fr_0,1.0_wp),'L2 Froude coefficient')
+    CALL check(close_real(rheology_l2%mu,-1.0_wp) .AND. &
+        close_real(rheology_l1%mu,0.3_wp), &
         'layer configurations are independent')
-    PRINT *, 'PASS: NAMELIST derived-type reology configuration L1/L2'
+    PRINT *, 'PASS: NAMELIST derived-type rheology configuration L1/L2'
 CONTAINS
+    PURE LOGICAL FUNCTION close_real(actual,expected)
+        REAL(wp), INTENT(IN) :: actual,expected
+        close_real=ABS(actual-expected)<=32.0_wp*EPSILON(1.0_wp)* &
+            MAX(1.0_wp,ABS(actual),ABS(expected))
+    END FUNCTION close_real
+
     SUBROUTINE check(ok,label)
         LOGICAL, INTENT(IN) :: ok
         CHARACTER(*), INTENT(IN) :: label
