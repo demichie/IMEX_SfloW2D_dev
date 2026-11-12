@@ -1,5 +1,6 @@
 !> \brief Exercise the production spatial operator, active worksets and CFL API without time stepping.
 PROGRAM test_spatial_operator
+  USE thermal_parameters_2d, ONLY : thermal_l1
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
@@ -101,7 +102,7 @@ PROGRAM test_spatial_operator
              B_second_xx_geom(j,k),B_second_xy_geom(j,k),              &
              B_second_yy_geom(j,k),grav_coeff(j,k),qp(:,j,k),           &
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &
-             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp,materials=materials)
+             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp,materials=materials,thermal=thermal_l1)
      END DO
   END DO
   IF (.NOT.ALL(ieee_is_finite(cell_sources))) ERROR STOP 'nonfinite local source'

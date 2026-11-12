@@ -9,7 +9,7 @@ MODULE source_terms_2d
     USE mass_injection_coefficients_2d, ONLY : injection_material_set_type
     USE mass_injection_coefficients_2d
     USE parameters_2d
-    USE thermal_parameters_2d, ONLY : thermal_l1, thermal_radiative_coefficient, thermal_convective_coefficient
+    USE thermal_parameters_2d, ONLY : thermal_config_type
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
@@ -70,10 +70,11 @@ CONTAINS
     END SUBROUTINE scale_mass_exchange_transfer
 
     !> Assemble and limit a complete explicit Lie group, without committing state.
+    !> @param[in] thermal Immutable layer thermal configuration.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
-            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials)
+            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials,thermal)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -86,6 +87,7 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         TYPE(injection_material_set_type), INTENT(IN) :: materials
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -109,7 +111,7 @@ CONTAINS
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
                 arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
-                physical_ready,materials)
+                physical_ready,materials,thermal)
         END IF
 
         IF (has_exchange) THEN
@@ -265,13 +267,15 @@ CONTAINS
 
     !> Return the conservative equivalent rate of the exact source substep.
     !> The interval is supplied by the selected Lie group operator.
-    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch)
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
 
@@ -287,18 +291,21 @@ CONTAINS
 
         END IF
 
-        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
+        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch,thermal)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
 
-    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
+    !> @brief Evaluate the analytic conservative state of one source group.
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch,thermal)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: q_after(n_vars)
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
@@ -382,9 +389,7 @@ CONTAINS
             ! frozen heat capacity used by the exact cooling integrator.
             heat_capacity=q_before(4)/temperature_before
             CALL eval_thermal_analytic(['thermal_cooling'],temperature_before,interval,                               &
-                    heat_capacity,thermal_radiative_coefficient(thermal_l1), &
-                    thermal_convective_coefficient(thermal_l1), &
-                    T_ambient,temperature_after)
+                    heat_capacity,thermal,T_ambient,temperature_after)
             q_after(4)=heat_capacity*temperature_after
             status=0
 
@@ -444,7 +449,8 @@ CONTAINS
 
     !> Evaluate the REAL implicit source directly for Newton residuals.
     !> The source formulas are identical to those used by COMPLEX Jacobians.
-    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted)
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted,thermal)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,Zij,q_cell(n_vars)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
@@ -453,6 +459,7 @@ CONTAINS
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: temperature
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -467,7 +474,7 @@ CONTAINS
                 RETURN
             END IF
             CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature, &
-                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                thermal, &
                 T_ambient,rate(4))
             RETURN
         END IF
@@ -489,14 +496,15 @@ CONTAINS
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit_real(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                thermal, &
                 T_ambient,rate(4))
         END IF
     END SUBROUTINE eval_source_implicit_real
 
     !> Evaluate the COMPLEX implicit rate for Newton complex-step Jacobians.
     !> The real residual uses the distinct eval_source_implicit_real contract.
-    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted)
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted,thermal)
         REAL(wp), INTENT(IN) :: Bprimej_x,Bprimej_y,Zij
         COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
         COMPLEX(wp), INTENT(OUT) :: c_nh_term_impl(n_eqns)
@@ -506,6 +514,7 @@ CONTAINS
         TYPE(physical_state_complex), POINTER :: physical_state
         COMPLEX(wp) :: temperature
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -520,7 +529,7 @@ CONTAINS
                 RETURN
             END IF
             CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature, &
-                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                thermal, &
                 T_ambient,c_nh_term_impl(4))
             RETURN
         END IF
@@ -543,7 +552,7 @@ CONTAINS
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1),                  &
+                thermal,                  &
                 T_ambient,c_nh_term_impl(4))
         END IF
     END SUBROUTINE eval_source_implicit
@@ -551,11 +560,13 @@ CONTAINS
 
 
 
+    !> @brief Assemble explicit geometric and material source rates for one physical cell.
+    !> @param[in] thermal Immutable layer thermal configuration.
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
-            physical_ready,materials )
+            physical_ready,materials,thermal )
 
     USE parameters_2d, ONLY : pore_pressure_flag
 
@@ -588,6 +599,7 @@ CONTAINS
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         LOGICAL, INTENT(OUT), OPTIONAL :: physical_ready
         TYPE(injection_material_set_type), INTENT(IN) :: materials
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -668,7 +680,7 @@ CONTAINS
 
             IF (group%thermal_active) THEN
                 CALL eval_thermal_explicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                   &
-                    thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                    thermal, &
                     T_ambient,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
 

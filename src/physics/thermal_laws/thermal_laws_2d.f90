@@ -2,6 +2,8 @@
 !> Add future models in the SELECT CASE statements below.
 MODULE thermal_laws_2d
     USE parameters_2d, ONLY : wp
+    USE thermal_parameters_2d, ONLY : thermal_config_type, thermal_radiative_coefficient, &
+            thermal_convective_coefficient
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_ID_THERMAL_COOLING
     USE state_types, ONLY : physical_state_real, physical_state_complex
@@ -22,26 +24,33 @@ CONTAINS
 
     !> Thermal-only Newton groups use the same cooling formula without a
     !> heavyweight physical state. Full-state interfaces remain supported.
-    SUBROUTINE eval_thermal_implicit_temperature_real(model_id,T,radiative,convective,ambient,rate)
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_thermal_implicit_temperature_real(model_id,T,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
-        REAL(wp), INTENT(IN) :: T,radiative,convective,ambient
+        REAL(wp), INTENT(IN) :: T,ambient
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         REAL(wp), INTENT(OUT) :: rate
         SELECT CASE(model_id)
         CASE(SOURCE_ID_THERMAL_COOLING)
-            CALL eval_thermal_cooling_from_temperature_real(T,radiative,convective,ambient,rate)
+            CALL eval_thermal_cooling_from_temperature_real(T,thermal_radiative_coefficient(thermal), &
+                thermal_convective_coefficient(thermal),ambient,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown REAL thermal model ID')
         END SELECT
     END SUBROUTINE eval_thermal_implicit_temperature_real
 
-    SUBROUTINE eval_thermal_implicit_temperature_complex(model_id,T,radiative,convective,ambient,rate)
+    !> @brief Evaluate COMPLEX thermal-only Newton rate without building a full state.
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_thermal_implicit_temperature_complex(model_id,T,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         COMPLEX(wp), INTENT(IN) :: T
-        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        REAL(wp), INTENT(IN) :: ambient
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         COMPLEX(wp), INTENT(OUT) :: rate
         SELECT CASE(model_id)
         CASE(SOURCE_ID_THERMAL_COOLING)
-            CALL eval_thermal_cooling_from_temperature_complex(T,radiative,convective,ambient,rate)
+            CALL eval_thermal_cooling_from_temperature_complex(T,thermal_radiative_coefficient(thermal), &
+                thermal_convective_coefficient(thermal),ambient,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown COMPLEX thermal model ID')
         END SELECT
@@ -52,23 +61,24 @@ CONTAINS
     !> @brief Dispatch and sum explicit thermal sources.
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
-    !> @param[in] models Canonical thermal source names.
+    !> @param[in] model_id Canonical thermal source model identifier.
     !> @param[in] state Real physical cell state.
-    !> @param[in] radiative Radiative heat-exchange coefficient.
-    !> @param[in] convective Convective heat-exchange coefficient.
+    !> @param[in] thermal Read-only thermal configuration of this layer.
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] rate Assembled real thermal source rate.
-    SUBROUTINE eval_thermal_explicit(model_id,state,radiative,convective,ambient,rate)
+    SUBROUTINE eval_thermal_explicit(model_id,state,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        REAL(wp), INTENT(IN) :: ambient
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         REAL(wp), INTENT(OUT) :: rate
         REAL(wp) :: process_rate
         rate=0.0_wp
 
         SELECT CASE (model_id)
         CASE (SOURCE_ID_THERMAL_COOLING)
-            CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,process_rate)
+            CALL eval_thermal_cooling_explicit(state,thermal_radiative_coefficient(thermal), &
+                thermal_convective_coefficient(thermal),ambient,process_rate)
         CASE DEFAULT
             CALL fatal_error('Unknown explicit thermal model ID')
 
@@ -112,23 +122,24 @@ CONTAINS
     !> @brief Dispatch and sum complex thermal contributions for Newton.
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
-    !> @param[in] models Canonical thermal source names.
+    !> @param[in] model_id Canonical thermal source model identifier.
     !> @param[in] state Complex physical cell state.
-    !> @param[in] radiative Radiative heat-exchange coefficient.
-    !> @param[in] convective Convective heat-exchange coefficient.
+    !> @param[in] thermal Read-only thermal configuration of this layer.
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] rate Assembled complex thermal source rate.
-    SUBROUTINE eval_thermal_implicit(model_id,state,radiative,convective,ambient,rate)
+    SUBROUTINE eval_thermal_implicit(model_id,state,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_complex), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        REAL(wp), INTENT(IN) :: ambient
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         COMPLEX(wp), INTENT(OUT) :: rate
         COMPLEX(wp) :: process_rate
         rate=CMPLX(0.0_wp,0.0_wp,wp)
 
         SELECT CASE (model_id)
         CASE (SOURCE_ID_THERMAL_COOLING)
-            CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,process_rate)
+            CALL eval_thermal_cooling_implicit(state,thermal_radiative_coefficient(thermal), &
+                thermal_convective_coefficient(thermal),ambient,process_rate)
         CASE DEFAULT
             CALL fatal_error('Unknown implicit thermal model ID')
 
@@ -138,14 +149,18 @@ CONTAINS
 
 
     !> REAL implicit source for Newton residual evaluation.
-    SUBROUTINE eval_thermal_implicit_real(model_id,state,radiative,convective,ambient,rate)
+    !> @brief Dispatch REAL implicit thermal rates for Newton residuals.
+    !> @param[in] thermal Immutable layer thermal configuration.
+    SUBROUTINE eval_thermal_implicit_real(model_id,state,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: radiative,convective,ambient
+        REAL(wp), INTENT(IN) :: ambient
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         REAL(wp), INTENT(OUT) :: rate
         SELECT CASE(model_id)
         CASE(SOURCE_ID_THERMAL_COOLING)
-            CALL eval_thermal_cooling_implicit_real(state,radiative,convective,ambient,rate)
+            CALL eval_thermal_cooling_implicit_real(state,thermal_radiative_coefficient(thermal), &
+                thermal_convective_coefficient(thermal),ambient,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown REAL implicit thermal model ID')
         END SELECT
@@ -158,15 +173,15 @@ CONTAINS
     !> @param[in] initial_temperature Frozen mixture temperature; no full physical state is required.
     !> @param[in] interval Analytic substep duration [s].
     !> @param[in] heat_capacity Thermal capacity of the frozen mixture.
-    !> @param[in] radiative Radiative heat-exchange coefficient.
-    !> @param[in] convective Convective heat-exchange coefficient.
+    !> @param[in] thermal Read-only thermal configuration of this layer.
     !> @param[in] ambient Ambient temperature [K].
     !> @param[out] temperature_after Temperature after the thermal substep [K].
     SUBROUTINE eval_thermal_analytic(models,initial_temperature,interval,heat_capacity,                               &
-            radiative,convective,ambient,temperature_after)
+            thermal,ambient,temperature_after)
         CHARACTER(*), INTENT(IN) :: models(:)
         REAL(wp), INTENT(IN) :: initial_temperature
-        REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
+        REAL(wp), INTENT(IN) :: interval,heat_capacity,ambient
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         REAL(wp), INTENT(OUT) :: temperature_after
         REAL(wp) :: temperature_before
         INTEGER :: i
@@ -178,7 +193,8 @@ CONTAINS
         SELECT CASE (TRIM(models(i)))
         CASE ('thermal_cooling')
             CALL eval_thermal_cooling_analytic(temperature_before,interval,heat_capacity,                              &
-                radiative,convective,ambient,temperature_after)
+                thermal_radiative_coefficient(thermal),thermal_convective_coefficient(thermal), &
+                ambient,temperature_after)
         CASE DEFAULT
             CALL fatal_error('Unknown analytic thermal model: '//TRIM(models(i)))
 

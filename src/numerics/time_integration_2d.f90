@@ -13,6 +13,7 @@ MODULE time_integration_2d
     USE state_fields, ONLY : state_type,substrate_snapshot_type,initialize_dry_physical_cell
     USE state_composition, ONLY : conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
+    USE thermal_parameters_2d, ONLY : thermal_l1
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
     USE parameters_2d, ONLY : stochastic_flag
@@ -278,7 +279,7 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
-            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure)
+            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal_l1)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)

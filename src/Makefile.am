@@ -554,6 +554,9 @@ physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): physics/thermal_laws/thermal_
 
 # Block 1: missing direct USE edges, independently audited against all
 # 68 production Fortran sources. Keep these for deterministic parallel make.
+numerics/time_integration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+numerics/nonlinear_solver_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 geometry/domain_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
@@ -563,6 +566,7 @@ physics/mass_exchange/mass_exchange_2d.$(OBJEXT): numerics/source_catalog_2d.$(O
 physics/rheology_laws/rheology_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+physics/thermal_laws/thermal_laws_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 spatial/hyperbolic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)

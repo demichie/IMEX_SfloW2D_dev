@@ -1,5 +1,6 @@
 !> \brief N8-B prescribed-rate refinement and seeded repeated production geometry checks.
 PROGRAM test_projection_stress
+  USE thermal_parameters_2d, ONLY : thermal_l1
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
@@ -571,7 +572,7 @@ CONTAINS
     CALL begin_geometry_transaction(sparse=.TRUE.)
     CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_before, &
-         step_failed=failed,failure_message=message)
+         step_failed=failed,failure_message=message,thermal=thermal_l1)
     IF (failed) THEN
        CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
@@ -654,7 +655,7 @@ CONTAINS
     CALL initialize_lie_source_executor(executor,registry)
     CALL execute_lie_source_groups(executor,state,q_trial,qp_trial,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_invalid, &
-         step_failed=failed,failure_message=message)
+         step_failed=failed,failure_message=message,thermal=thermal_l1)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
     CALL state%restore_substrate(substrate_before)

@@ -6,6 +6,7 @@ PROGRAM test_source_registry
   USE thermal_parameters_2d, ONLY : thermal_l1, thermal_l2,                                              &
           thermal_radiative_coefficient, thermal_convective_coefficient,                                      &
           thermal_ground_temperatures_match
+  USE thermal_laws_2d, ONLY : eval_thermal_implicit_temperature
   USE source_input_2d
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,entrainment_flag
@@ -14,6 +15,8 @@ PROGRAM test_source_registry
   TYPE(source_group_type), ALLOCATABLE :: groups(:)
   CHARACTER(LEN=256) :: error
   INTEGER :: i,idx
+  REAL(wp) :: thermal_rate_l1,thermal_rate_l2
+  COMPLEX(wp) :: thermal_rate_complex
   n_eqns=4; n_vars=4
   idx_totMassEqn=1;idx_uEqn=2;idx_vEqn=3;idx_engyEqn=4
   idx_pore=0;idx_poreEqn=0
@@ -44,6 +47,14 @@ PROGRAM test_source_registry
        'L1 convective coefficient matches prior algebra')
   CALL require(thermal_convective_coefficient(thermal_l2)==0.5_wp, &
        'L2 convective coefficient is independent')
+  CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,600.0_wp,thermal_l1,300.0_wp,thermal_rate_l1)
+  CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,600.0_wp,thermal_l2,300.0_wp,thermal_rate_l2)
+  CALL require(thermal_rate_l1/=thermal_rate_l2,'thermal dispatcher uses the supplied layer config')
+  CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,CMPLX(600.0_wp,0.0_wp,wp), &
+       thermal_l1,300.0_wp,thermal_rate_complex)
+  CALL require(ABS(REAL(thermal_rate_complex,wp)-thermal_rate_l1)<= &
+       64.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(thermal_rate_l1)), &
+       'REAL/COMPLEX thermal dispatchers use the same coefficients')
   thermal_l1%T_ground=300.0_wp
   thermal_l2%T_ground=300.0_wp
   CALL require(thermal_ground_temperatures_match(thermal_l1,thermal_l2), &
