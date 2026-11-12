@@ -1,6 +1,6 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Piano di riferimento:** 12 novembre 2026. **Branch:** `feature/two-layer`. **Ultimo codice termico CI verificato:** TL04-T3 su `ba28e844` (build) e `0ded80c9` (regressioni). **TL04-C:** modulo di contatti inerte implementato, CI da verificare.
+**Piano di riferimento:** 12 novembre 2026. **Branch:** `feature/two-layer`. **Baseline CI verificata:** `4e9a591a` (build e regressioni). **TL04-C:** contatti verificati; collegamento termico ai contesti per-layer implementato, nuova CI da eseguire.
 **Stato:** codice di produzione ancora **single-layer**; `N_LAYERS=2` resta disabilitato. La presente roadmap è il **solo piano vigente**: specifica, stato verificato, attività, gate e milestone. La cronologia dettagliata è nei commit Git, non in versioni alternative del piano.
 **Documenti collegati:** [audit tecnico corrente](TWO_LAYER_CODE_AUDIT.md), [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md), manoscritto *IMEX_SfloW2D_v3*.
 
@@ -21,15 +21,15 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Layout | `model_layout_2d` contiene `n_layers`; `state_type%q/qp` e workspace di integrazione sono rank-4 `(componente,layer,x,y)`; i consumer di produzione selezionano esplicitamente L1. | `supported_layer_count` accetta solo 1; evoluzione L2, maschere inattive e test coupled. |
 | Deposito | `deposit_tot` è l'inventario canonico dello spessore; ramo lava distinto dal granulare, senza inventario autonomo `lava_deposit`; rollback e percorsi v7 sono stati adeguati. | Gate G1 completo: casi granulari/lava, `n_solid=0`, topografia on/off, I/O e restart round-trip documentati. |
 | Reologia | `rheology_config_type` contiene i coefficienti e i metadati; `rheology_l1/l2` sono due oggetti; parser legacy/L1 usa alias verso **unico L1 canonico**; kernel e dispatcher migrati a `config` esplicito e vecchi metadati globali eliminati. | Il coordinatore `source_terms_2d` seleziona ancora direttamente `rheology_l1`; il registro Lie non possiede scope L1/L2; L2 non valutato in produzione. |
-| Contesto per layer | `simulation_2d` possiede `layer_physics(:)` con reologia validata; la termica L1/L2 vive nel modulo canonico e TL04-T3 viene passata per riferimento read-only al percorso fisico. | Selezionare la configurazione dal contesto per-layer quando verranno abilitati scope L1/L2, senza copie da sincronizzare. |
+| Contesto per layer | `simulation_2d%layer_physics(:)` conserva fase e reologia; il contesto referenzia ora la configurazione termica canonica senza una seconda copia persistente. La vista read-only viene passata al passo Lie. | Completare le altre configurazioni SHARED/L1/L2 e gli scope fisici solo nei gate dedicati; nessuna sincronizzazione fra copie. |
 | Lie | Un solo Lie primo ordine, cell-outer/OpenMP, gruppi numerici ordinati, trial e rollback; chiamata corrente `execute_lie_source_groups(...q_trial(:,1,:,:),qp_trial(:,1,:,:)...)`. | Supportare gruppi con scope `L1`, `L2`, `INTERLAYER`, candidati entrambi i layer e commit atomico senza fisica nel driver. |
-| Termica | Configurazione canonica `thermal_config_type` per L1/L2, compresa `T_ground`; TL04-T3 passa la configurazione read-only da `time_integration_2d` al dispatcher termico REAL/COMPLEX/analitico. | Verificare simulazioni integrali single-layer e l'attivazione L2 con scope fisico solo dopo gate dedicati. |
+| Termica | `thermal_config_type` contiene coefficienti, metodo e `T_ground` per layer; T3 passa la configurazione in modo esplicito ai kernel REAL/COMPLEX/analitici. Il nuovo contesto L1 collega la configurazione autorevole all'integratore senza accesso diretto al globale nel modulo numerico. | Validare la nuova CI e gli esempi integrati; selezione L2 solo dopo abilitazione delle strutture accoppiate. |
 | Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
 | Sorgenti fisiche | Il registro corrente è ancora single-layer; `layer_contacts_2d` puro classifica atmosfera, terreno e contatto interlayer dai candidati locali, senza essere richiamato dal Lie. | Connessione futura a TL07/TL11 e ownership delle altre chiusure fisiche. |
 | Spaziale | `nonconservative_2d` è un integratore di percorso generico già utilizzato da HP-PCCU. | Tracce accoppiate, pressione interlayer, CFL coupled, wet/dry e iperbolicità. |
 | I/O | NetCDF single-layer `(x,y,time)`, reader/writer restart v7 con sola sezione L1, file legacy/probe/runout. | Schema/versione per due layer, restituzione completa e compatibilità dimostrata. |
 
-**Evidenza CI:** il build optimized/debug [#43300723463](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43300723463) è **success** su `ba28e844`; le regressioni fisiche/numeriche [#43301029364](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43301029364) sono **success** su `0ded80c9`, dopo la correzione di linking. **TL04-C richiede nuove Actions sul suo commit.** Full EXAMPLES, restart/NetCDF integrati, OpenMP e solver L2 restano non certificati.
+**Evidenza CI:** su `4e9a591a` [Build optimized/debug #43302860661](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43302860661) e [Cell physics/numerical regressions #43303227647](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43303227647) risultano **success**. Il collegamento termico nei contesti TL04-C richiede nuova CI sul proprio commit. I workflow non certificano full EXAMPLES, NetCDF/restart, OpenMP o un solver two-layer.
 
 ## 3. Dati, proprietà e configurazioni autorevoli
 
@@ -180,7 +180,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL03 — gate single-layer** | **CI parziale superata, gate G2 aperto** | Full EXAMPLES, bilanci, wet/dry, I/O/restart, OpenMP, profiling/memoria e confronto baseline; registrare eventuale delta termico autorizzato separatamente. |
 | **TL04-R — configurazione reologica** | **Implementata e CI superata** | Tipo canonico, parser legacy/L1, parametri espliciti nei kernel; completare le dipendenze dal contesto per L2 quando attivato. |
 | **TL04-T — configurazione termica** | **T1/T2 e T_ground verificate; T3 compilata e regressioni superate** | Configurazione canonica L1/L2, input legacy e propagazione read-only attraverso source assembler, NEWTON REAL/COMPLEX e metodo analitico. Restano esempi integrati, confronto single-layer e scope L2. |
-| **TL04-C — altre configurazioni e contatti** | **Modulo contatti implementato, nuova CI da eseguire; fase complessiva aperta** | `layer_contacts_2d` puro, inerte, test dei casi di colonna 1/2 layer e input invalidi. Restano proprietà delle altre chiusure, contesti read-only, IC/BC e slot inattivi. |
+| **TL04-C — altre configurazioni e contatti** | **Contatti verificati in CI; riferimento termico per layer implementato, nuova CI aperta; fase complessiva parziale** | Contatti puri, descriptor L1 che referenzia il thermal canonico senza duplicarlo, percorso read-only fino all'integratore; test L1/L2 dedicati aggiornati. Restano ownership delle altre chiusure, IC/BC, slot inattivi e scope. |
 | **TL05 — HP-PCCU indipendente per slot** | **Da implementare** | Trasporto/ricostruzione per L1 e L2 isolati e wet/dry combinati, `eta_1`/`eta_tot`; recupero single-layer quando assente una corrente. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
 | **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local, rate monolayer isolati, `Gamma` di coppia, commit/rollback atomico, gruppo 0 e OpenMP; gate G5. |
@@ -200,7 +200,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **M0** | TL00: baseline e specifiche | **Da certificare** | G0: tag, audit e benchmark riproducibile, branch protetto verificato. |
 | **M1** | TL00a: deposito unico | **Implementata, non certificata** | G1: deposizione lava/granulare, restart, topografia e output. |
 | **M2** | TL01–TL03: rank-4 single-layer validato | **Parziale, non certificata** | G2: full EXAMPLES, confronto baseline, NetCDF/restart, OpenMP e numerica. |
-| **M3** | TL04–TL05: infrastruttura L1/L2 isolata | **Reologia e TL04-T verificate parzialmente; contatti da certificare, resto aperto** | G3: config distinte, contatti inerti, slot e trasporto isolati, nessuna race; comportamento single-layer invariato. |
+| **M3** | TL04–TL05: infrastruttura L1/L2 isolata | **Contatti verificati; descrittore termico da certificare, resto aperto** | G3 richiede isolamento, scope, assenza race, test single-layer integrati e trasporto L2 isolato. |
 | **M4** | TL06: operatore spaziale accoppiato | **Non iniziata** | G4: path, pressione completa, topografia, CFL, wet/dry, clamp e iperbolicità. |
 | **M5** | TL07–TL11: Lie coppia e chiusure | **Non iniziata** | G5/G6: rate per-layer, coppia conservativa, budget esterni, rollback, contatti fisici e tutti i processi verificati. |
 | **M6** | TL12–TL13: modello disponibile | **Non iniziata** | G7: benchmark scientifici, prestazioni, I/O e restart, approvazione esplicita all'attivazione. |
@@ -214,7 +214,7 @@ Le milestone sono **punti di proposta di merge**, non autorizzazioni automatiche
 | **G0** | Baseline taggato, esempi riproducibili, confronti, condizioni OpenMP e prestazioni | Non certificato. |
 | **G1** | `deposit_tot` granulare/lava, `n_solid=0`, rollback, erosione, topografia e restart v7 | Codice e alcuni test esistenti; matrice integrata non certificata. |
 | **G2** | Rank-4 L1, IC/BC, lie, spatial, NUMERICS, full EXAMPLES, NetCDF, restart, OpenMP | CI build/regressioni su `410ad99e` **success**; resto non certificato. |
-| **G3** | Reologia/termica distinte L1/L2, input legacy, atmosfera unica, quattro contatti e mono, no race | Configurazioni termiche con CI pertinente; contatti implementati e test aggiunti ma da verificare sul nuovo commit. Gate ancora aperto. |
+| **G3** | Configurazioni reologica/termica distinte, contatti quattro casi + mono, OpenMP e input | Modulo contatti verificato su `4e9a591a`; riferimento termico dai descrittori implementato ma non ancora certificato sul nuovo commit. Gate complessivo aperto. |
 | **G4** | Idrostatica con path e topografia, coppia, residuo curvo, clamp, wet/dry, CFL | Da implementare. |
 | **G5** | Sorgenti L1/L2 indipendenti, coppia `Gamma`, limiti e rollback atomico, gruppo 0 | Da implementare. |
 | **G6** | Settling, elutriazione cold-start, drag, consolidazione, entrainment, lofting, termica e budget | Da implementare. |

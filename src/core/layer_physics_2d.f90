@@ -2,9 +2,11 @@
 !> @details Configuration is captured once before grid/worker allocation.
 !>          A descriptor is read via queries and is never used to switch
 !>          module-global phase/rheology parameters inside OpenMP loops.
-!>          Physical coefficients and two-layer activation are later TL04 steps.
+!>          Thermal configuration is referenced without a second persistent copy.
+!>          Two-layer activation remains a later step.
 MODULE layer_physics_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE thermal_parameters_2d, ONLY : thermal_config_type
     USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
         canonical_rheology_source_name, rheology_source_id, RHEOLOGY_ID_NONE
     IMPLICIT NONE
@@ -20,6 +22,8 @@ MODULE layer_physics_2d
         INTEGER :: rheology_id=RHEOLOGY_ID_NONE
         CHARACTER(LEN=64) :: rheology_source=''
         TYPE(rheology_config_type) :: config
+        !> Non-owning reference to the canonical thermal configuration.
+        TYPE(thermal_config_type), POINTER :: thermal => NULL()
         LOGICAL :: initialized=.FALSE.
     CONTAINS
         PROCEDURE :: initialize => initialize_layer_physics
@@ -29,15 +33,24 @@ MODULE layer_physics_2d
         PROCEDURE :: selected_rheology => layer_physics_rheology
         PROCEDURE :: selected_rheology_id => layer_physics_rheology_id
         PROCEDURE :: rheology_configuration => layer_physics_configuration
+        PROCEDURE :: thermal_configuration => layer_physics_thermal_configuration
     END TYPE layer_physics_type
 
 CONTAINS
 
-    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,error)
+    !> @brief Initialize the validated layer descriptor and bind canonical thermal settings.
+    !> @param[in,out] this Layer descriptor to initialize.
+    !> @param[in] phase Material carrier phase identifier.
+    !> @param[in] rheology_enabled Rheology activation for this layer.
+    !> @param[in] rheology_config Validated rheology settings.
+    !> @param[in] thermal_config Stable-lifetime canonical thermal settings.
+    !> @param[out] error Empty on success; diagnostic on failure.
+    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,thermal_config,error)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: phase
         LOGICAL, INTENT(IN) :: rheology_enabled
         TYPE(rheology_config_type), INTENT(IN) :: rheology_config
+        TYPE(thermal_config_type), TARGET, INTENT(IN) :: thermal_config
         CHARACTER(*), INTENT(OUT) :: error
         CHARACTER(LEN=64) :: source
         TYPE(source_term_type) :: term
@@ -68,6 +81,7 @@ CONTAINS
             END IF
         END IF
         this%config=rheology_config
+        this%thermal=>thermal_config
         this%carrier_phase=phase
         this%rheology_source=source
         this%rheology_id=RHEOLOGY_ID_NONE
@@ -78,6 +92,7 @@ CONTAINS
     SUBROUTINE finalize_layer_physics(this)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         this%config=rheology_config_type()
+        NULLIFY(this%thermal)
         this%carrier_phase=0
         this%rheology_id=RHEOLOGY_ID_NONE
         this%rheology_source=''
@@ -106,6 +121,15 @@ CONTAINS
         TYPE(rheology_config_type) :: config
         config=this%config
     END FUNCTION layer_physics_configuration
+
+    !> @brief Read the referenced canonical thermal configuration without exposing its pointer.
+    !> @param[in] this Initialized layer descriptor.
+    !> @return Temporary value view of the canonical thermal configuration.
+    PURE FUNCTION layer_physics_thermal_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(thermal_config_type) :: config
+        config=this%thermal
+    END FUNCTION layer_physics_thermal_configuration
 
     PURE INTEGER FUNCTION layer_physics_rheology_id(this)
         CLASS(layer_physics_type), INTENT(IN) :: this

@@ -17,6 +17,7 @@ MODULE simulation_2d
     USE diagnostics_2d, ONLY : fatal_error
 
     USE rheology_parameters_2d, ONLY : rheology_l1
+    USE thermal_parameters_2d, ONLY : thermal_l1
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
         LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
@@ -107,15 +108,15 @@ CONTAINS
         CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,                                          &
             n_add_gas, n_stoch_vars, n_pore_vars )
 
-        ! Freeze the configured per-layer phase/rheology selection before
-        ! source, state and OpenMP workspaces are initialized. The production
-        ! single-layer path still uses existing physics globals unchanged.
+        ! Validate phase/rheology and bind canonical thermal configuration before
+        ! source, state and OpenMP workspace initialization. The thermal pointer
+        ! is non-owning; this descriptor never caches another coefficient copy.
         IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
         ALLOCATE(this%layer_physics(this%model_layout%n_layers))
         carrier_phase=LAYER_PHASE_GAS
         IF (liquid_flag) carrier_phase=LAYER_PHASE_LIQUID
         IF (lava_flag) carrier_phase=LAYER_PHASE_LAVA
-        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_l1,source_error)
+        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_l1,thermal_l1,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL initialize_configured_sources(this%source_registry,source_error)
@@ -155,13 +156,15 @@ CONTAINS
         ! Lie sources, inside the integrator's unpublished trial transaction.
         IF (PRESENT(observer)) THEN
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operator,                                                      &
-                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                              &
-                stochastic_prepared_hook=notify_stochastic_prepared)
+                this%stochastic,this%domain,this%spatial_operator,                                              &
+                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
+                stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
+                thermal=this%layer_physics(1)%thermal_configuration())
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operator,                                                      &
-                pre_spatial_primitives_ready=pre_spatial_primitives_ready)
+                this%stochastic,this%domain,this%spatial_operator,                                              &
+                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
+                thermal=this%layer_physics(1)%thermal_configuration())
         END IF
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 

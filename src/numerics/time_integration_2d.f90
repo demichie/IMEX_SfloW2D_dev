@@ -13,7 +13,7 @@ MODULE time_integration_2d
     USE state_fields, ONLY : state_type,substrate_snapshot_type,initialize_dry_physical_cell
     USE state_composition, ONLY : conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
-    USE thermal_parameters_2d, ONLY : thermal_l1
+    USE thermal_parameters_2d, ONLY : thermal_config_type
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
     USE parameters_2d, ONLY : stochastic_flag
@@ -85,8 +85,9 @@ CONTAINS
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
+    !> @param[in] thermal Immutable selected layer thermal configuration.
     SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operator,pre_spatial_primitives_ready, &
-        stochastic_prepared_hook)
+        stochastic_prepared_hook,thermal)
         CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
         CLASS(state_type), TARGET, INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt
@@ -94,6 +95,7 @@ CONTAINS
         PROCEDURE(stochastic_stage_observer), OPTIONAL :: stochastic_prepared_hook
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
         REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:)
@@ -279,7 +281,7 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
-            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal_l1)
+            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
