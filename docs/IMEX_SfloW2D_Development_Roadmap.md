@@ -4,6 +4,8 @@
 
 > Questo è il solo documento operativo da aggiornare con priorità, risultati, lavori aperti e criteri di accettazione. I precedenti tracker D17–D20 e la roadmap storica sono conservati integralmente in `docs/archive/roadmaps/`, ma non sono piani concorrenti. Gli schemi IMEX-RK, le cadenze STAGE/STEP e i percorsi di compatibilità precedenti sono superati dal Lie splitting.
 
+**Verifica CI TL04 (12 novembre 2026):** la [Build (optimized and debug) #43195008141](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43195008141) è **success** sul commit `935013d`; la [Cell physics and numerical regressions #43196876959](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43196876959) è **success** sul commit `1424c4b`. La seconda include il test delle namelist di tipo derivato dopo la correzione delle comparazioni reali. Non implica che la lettura di produzione o i kernel siano stati migrati: quel lavoro è ancora aperto.
+
 **Fix test TL04 (12 novembre 2026):** `TEST_LAYER_PHYSICS/test_rheology_config_namelist.f90` falliva su `L1 coefficients` per un confronto reale esatto tra `REAL(wp)` e un letterale default-kind `0.3`. Confronti uniformati tramite tolleranza relativa/scalata a `EPSILON` e letterali `_wp`; CI da rilanciare sul nuovo commit. Nessuna modifica alla fisica o al parser di produzione.
 
 **Implementazione reologia TL04 (12 novembre 2026):** introdotto `rheology_config_type` con un solo elenco canonico di componenti e test di lettura delle NAMELIST con oggetto derivato (legacy single-layer, L1 e L2), esteso al runner `TEST_LAYER_PHYSICS`. La lettura di produzione e i kernel rimangono ancora sui globali: migrazione da completare, verifiche CI da eseguire. Nessun wrapper o duplicazione delle tre liste NAMELIST.
