@@ -15,6 +15,7 @@ MODULE mass_exchange_2d
         SOURCE_ID_EXCHANGE_VAPORIZATION, SOURCE_ID_EXCHANGE_LAVA_DEPOSITION
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     USE state_types, ONLY : physical_state_real, physical_state_complex
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
@@ -47,9 +48,10 @@ CONTAINS
         !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
-    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term,     &
+    SUBROUTINE eval_mass_exchange_explicit(config,physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term,     &
             scratch)
 
+            TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(physical_state_real), INTENT(IN) :: physical_state
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
             INTEGER, INTENT(IN) :: B_zone
@@ -102,7 +104,7 @@ CONTAINS
 
                 CALL reset_mass_exchange_rates(deposition_rates)
                 CALL reset_mass_exchange_rates(liquid_loss_rates)
-                IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
+                IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(config,physical_state,dt,deposition_rates)
                 IF (do_liquid_loss)                                                                                    &
                         CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
 
@@ -157,7 +159,7 @@ CONTAINS
 
             ! Lava deposition follows the same process_rates-rate accumulation contract.
             IF (do_lava .AND. lava_deposition_flag) THEN
-                CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
+                CALL eval_mass_exchange_lava_deposition_explicit(config,physical_state,dt,process_rates)
                 CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
             END IF

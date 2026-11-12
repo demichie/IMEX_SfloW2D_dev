@@ -3,7 +3,7 @@
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_deposition_2d
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, sutherland_flag,                                       &
-            rheology_model, mass_exchange_rates_type, reset_mass_exchange_rates
+            mass_exchange_rates_type, reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : alphastot_min, coeff_porosity, rho_s, sp_heat_s,                            &
             kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, sp_gas_const_a, settling_flag, grav,                        &
             collective_settling_flag, A_drag, B_drag, diam_s
@@ -11,6 +11,7 @@ MODULE mass_exchange_deposition_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
+    USE rheology_parameters_2d, ONLY : rheology_config_type
 
     IMPLICIT NONE
     PRIVATE
@@ -32,7 +33,8 @@ CONTAINS
         !> @param[in] state Local real physical state.
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_explicit(state,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_explicit(config, state,dt,r)
+            TYPE(rheology_config_type), INTENT(IN) :: config
 
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -52,7 +54,7 @@ CONTAINS
             END IF
 
             ! Evaluate settling before producing the conservative species, energy and bed terms.
-            CALL eval_deposition_volume_kernel(state%h, state%T, state%alphas, alpha, state%rho_m, state%rho_c, dt,                &
+            CALL eval_deposition_volume_kernel(config,state%h, state%T, state%alphas, alpha, state%rho_m, state%rho_c, dt,                &
                 r%solid_deposition_rate)
             r%carrier_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
             r%solid_mass_rate=-rho_s*r%solid_deposition_rate
@@ -119,7 +121,8 @@ CONTAINS
         !> @param[in] r_rho_c Carrier density [kg/m3].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] deposition_rate Solid deposition thickness flux for each species [m/s].
-    SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_rate)
+    SUBROUTINE eval_deposition_volume_kernel(config, r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_rate)
+            TYPE(rheology_config_type), INTENT(IN) :: config
 
             REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
             REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
@@ -144,7 +147,7 @@ CONTAINS
 
             END IF
 
-            CALL eval_settling_fluid_properties(rheology_model, r_T, alphas_tot, r_rho_m, r_rho_c, kin_visc_c_local,   &
+            CALL eval_settling_fluid_properties(config, r_T, alphas_tot, r_rho_m, r_rho_c, kin_visc_c_local,   &
                 rhoc, inv_kin_visc)
 
             DO i_solid=1,n_solid
@@ -155,7 +158,7 @@ CONTAINS
                                         rhoc , inv_kin_visc )
 
                             deposition_rate(i_solid) = eval_solid_deposition_rate(                                     &
-                                        rheology_model, r_alphas(i_solid), settling_vel, r_h, dt,                      &
+                                        config%rheology_model, r_alphas(i_solid), settling_vel, r_h, dt,                      &
                                         alphas_tot, alpha_max, hind_exp)
 
                             IF ( deposition_rate(i_solid) .LT. 0.0_wp ) THEN
@@ -273,10 +276,10 @@ CONTAINS
         !> @param[out] carrier_density Carrier density selected for the settling calculation
         !> [kg/m3].
         !> @param[out] inverse_kinematic_viscosity Inverse selected kinematic viscosity [s/m2].
-    SUBROUTINE eval_settling_fluid_properties(model_name, temperature, total_solid_fraction, mixture_density,      &
+    SUBROUTINE eval_settling_fluid_properties(config, temperature, total_solid_fraction, mixture_density,      &
             carrier_density_fallback, kinematic_viscosity_fallback, carrier_density, inverse_kinematic_viscosity)
+            TYPE(rheology_config_type), INTENT(IN) :: config
 
-            CHARACTER(*), INTENT(IN) :: model_name
             REAL(wp), INTENT(IN) :: temperature, total_solid_fraction, mixture_density
             REAL(wp), INTENT(IN) :: carrier_density_fallback
             REAL(wp), INTENT(IN) :: kinematic_viscosity_fallback
@@ -285,8 +288,8 @@ CONTAINS
 
             carrier_density = carrier_density_fallback
 
-            IF (model_name .EQ. 'lahar') THEN
-                    fluid_viscosity = eval_lahar_fluid_viscosity(temperature,                                          &
+            IF (config%rheology_model .EQ. 'lahar') THEN
+                    fluid_viscosity = eval_lahar_fluid_viscosity(config,temperature,                                          &
                                 total_solid_fraction)
                     carrier_density = mixture_density
                     inverse_kinematic_viscosity = mixture_density / fluid_viscosity

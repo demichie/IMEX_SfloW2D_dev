@@ -754,7 +754,7 @@ CONTAINS
         ! worker-local scratch. Standalone exchange calls still build normally.
         IF (.NOT.reuse_prepared_state) &
             CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
-        CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
+        CALL eval_mass_exchange_explicit(rheology_l1,exchange_state,B_zone,                                                        &
             erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d
