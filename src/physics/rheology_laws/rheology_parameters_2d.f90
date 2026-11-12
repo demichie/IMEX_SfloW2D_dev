@@ -36,7 +36,8 @@ MODULE rheology_parameters_2d
 
     ! Canonical layer configurations shared between input initialization and
     ! the simulation context. The parser owns their initialization and validation.
-    TYPE(rheology_config_type) :: rheology_l1, rheology_l2
+    TYPE(rheology_config_type), TARGET :: rheology_l1
+    TYPE(rheology_config_type) :: rheology_l2
 
 
 

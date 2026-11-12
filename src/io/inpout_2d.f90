@@ -298,7 +298,7 @@
     REAL(wp) :: initial_erodible_thickness
 
 
-    TYPE(rheology_config_type) :: rheology
+    TYPE(rheology_config_type), POINTER :: rheology => rheology_l1
 
 
     REAL(wp) :: thickness_levels0(10)
@@ -392,7 +392,7 @@
         T_ground, thermal_method, thermal_group
 
     ! One canonical coefficient list lives in rheology_config_type.
-    ! The legacy single-layer name reads 'rheology' and normalizes to L1.
+    ! Both NAMELIST spellings refer to the same L1 coefficient object.
     NAMELIST /rheology_parameters/ rheology
     NAMELIST /rheology_l1_parameters/ rheology_l1
     NAMELIST /rheology_l2_parameters/ rheology_l2
@@ -483,7 +483,6 @@
         INTEGER :: ios
 
         ! Reset all three NAMELIST objects between runs.
-        rheology=rheology_config_type()
         rheology_l1=rheology_config_type()
         rheology_l2=rheology_config_type()
         ! Reset physical-source preferences before any namelist is parsed.
@@ -1548,7 +1547,6 @@
             IF (n_rheology_legacy==1) THEN
                 READ(input_unit,NML=rheology_parameters,IOSTAT=ios)
                 IF (ios/=0) CALL fatal_error('ERROR: problem with namelist RHEOLOGY_PARAMETERS')
-                rheology_l1=rheology
             ELSE
                 READ(input_unit,NML=rheology_l1_parameters,IOSTAT=ios)
                 IF (ios/=0) CALL fatal_error('ERROR: problem with namelist RHEOLOGY_L1_PARAMETERS')
@@ -3506,9 +3504,7 @@
                 END IF
 
             END ASSOCIATE
-            ! Temporary single-layer bridge: existing physical kernels still use
-            ! module coefficient storage. This is removed when their interfaces
-            ! accept immutable per-layer configurations; do not duplicate laws.
+            ! The legacy metadata is consumed by the existing single-layer scheduler.
             rheology_model=rheology_l1%rheology_model
         END IF
 

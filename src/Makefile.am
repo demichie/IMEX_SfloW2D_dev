@@ -260,10 +260,12 @@ physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/param
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_lahar_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT) \
     core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_lava_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
@@ -271,6 +273,7 @@ physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2
     core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT) \
     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
