@@ -46,6 +46,9 @@ def main():
     for name in ('ambient-default','ambient-set','ambient-zero','ambient-nan','ambient-inf','ambient-missing'):
         cases.append((name,3,'nu_ref=.02, tau0=20, visc_par=.003, T_ref=900',
                       name in ('ambient-zero','ambient-nan','ambient-inf','ambient-missing')))
+    for name in ('thermal-l1','thermal-duplicate','thermal-l2','thermal-missing'):
+        cases.append((name,3,'nu_ref=.02, tau0=20, visc_par=.003, T_ref=900',
+                      name!='thermal-l1'))
     records=[]
     model_names={0:'none',1:'voellmy',2:'plastic',3:'lava',4:'lahar',
                  5:'empirical',6:'quadratic',9:'froude',10:'lucas',
@@ -61,7 +64,17 @@ def main():
         if model==3:
             text=text.replace("'froude_blend'","'h_x'")
             text=text.replace('&TEMPERATURE_PARAMETERS\n /',
-                '&TEMPERATURE_PARAMETERS\n EMISSIVITY=.8, ATM_HEAT_TRANSF_COEFF=4, EXP_AREA_FRACT=.5,\n /')
+                '&TEMPERATURE_PARAMETERS\n THERMAL%EMISSIVITY=.8, '
+                'THERMAL%ATM_HEAT_TRANSF_COEFF=4, THERMAL%EXP_AREA_FRACT=.5,\n /')
+            if name=='thermal-l1':
+                text=text.replace('&TEMPERATURE_PARAMETERS\n', '&TEMPERATURE_L1_PARAMETERS\n')
+                text=text.replace('THERMAL%', 'THERMAL_L1%')
+            elif name=='thermal-duplicate':
+                text+='\n&TEMPERATURE_L1_PARAMETERS\n THERMAL_L1%EMISSIVITY=.5,\n/\n'
+            elif name=='thermal-l2':
+                text+='\n&TEMPERATURE_L2_PARAMETERS\n THERMAL_L2%EMISSIVITY=.5,\n/\n'
+            elif name=='thermal-missing':
+                text=re.sub(r'&TEMPERATURE_PARAMETERS\n[^&]*?\n /', '', text, count=1)
             ambient={'ambient-set':'350','ambient-zero':'0',
                      'ambient-nan':'NaN','ambient-inf':'Infinity'}.get(name)
             if ambient is not None:
@@ -85,6 +98,10 @@ def main():
         log=(work/'run.log').read_text()
         if name.startswith('ambient-'):
             rejected='ERROR: invalid T_AMBIENT in GAS_TRANSPORT_PARAMETERS' in log
+        elif name.startswith('thermal-'):
+            rejected=any(token in log for token in (
+                'Provide exactly one TEMPERATURE_PARAMETERS',
+                'TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2'))
         else:
             rejected=any(token in log for token in (
                 'ERROR: problem with namelist RHEOLOGY_PARAMETERS',

@@ -68,7 +68,6 @@
     ! -- Variables for the namelist NUMERIC_PARAMETERS
     USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff
     USE source_input_2d, ONLY: read_mass_exchange_parameters, write_mass_exchange_parameters,                          &
-            thermal_method, thermal_group,                                                                             &
             pore_pressure_method, pore_pressure_group,                                                                 &
             bottom_circular_method, bottom_circular_group,                                                             &
             bottom_fissural_method, bottom_fissural_group,                                                             &
@@ -105,11 +104,11 @@
                                     h_collapse, alphas_collapse, alphag_collapse
 
     ! -- Variables for the namelist TEMPERATURE_PARAMETERS
-    USE constitutive_parameters_2d, ONLY: emissivity, exp_area_fract, enne,                                            &
-            emme, atm_heat_transf_coeff, thermal_conductivity, T_ground, c_p
+    USE constitutive_parameters_2d, ONLY: T_ground
+    USE thermal_parameters_2d, ONLY : thermal_config_type, thermal_l1, thermal_l2,                                     &
+            thermal_radiative_coefficient
 
     ! -- Variables for the namelist RHEOLOGY_PARAMETERS
-    USE parameters_2d, ONLY: thermal_cooling_flag
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
     USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
     USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2
@@ -298,6 +297,7 @@
 
 
     TYPE(rheology_config_type), POINTER :: rheology => rheology_l1
+    TYPE(thermal_config_type), POINTER :: thermal => thermal_l1
 
 
     REAL(wp) :: thickness_levels0(10)
@@ -386,9 +386,10 @@
     NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse,                                                    &
         r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
 
-    NAMELIST /temperature_parameters/ thermal_cooling_flag, emissivity, atm_heat_transf_coeff,                         &
-        thermal_conductivity, exp_area_fract, c_p, enne, emme, T_ground,                                           &
-        thermal_method, thermal_group
+    ! Legacy and L1 namelists share the same coefficient object.
+    NAMELIST /temperature_parameters/ thermal, T_ground
+    NAMELIST /temperature_l1_parameters/ thermal_l1, T_ground
+    NAMELIST /temperature_l2_parameters/ thermal_l2
 
     ! One canonical coefficient list lives in rheology_config_type.
     ! Both NAMELIST spellings refer to the same L1 coefficient object.
@@ -481,11 +482,12 @@
         LOGICAL :: lexist
         INTEGER :: ios
 
-        ! Reset all three NAMELIST objects between runs.
+        ! Reset canonical NAMELIST objects between runs.
         rheology_l1=rheology_config_type()
         rheology_l2=rheology_config_type()
+        thermal_l1=thermal_config_type()
+        thermal_l2=thermal_config_type()
         ! Reset physical-source preferences before any namelist is parsed.
-        thermal_method=''; thermal_group=2
         pore_pressure_method=''; pore_pressure_group=3
         bottom_circular_method=''; bottom_circular_group=0
         bottom_fissural_method=''; bottom_fissural_group=0
@@ -569,16 +571,8 @@
         grav = 9.81_wp
         inv_grav = 1.0_wp/grav
 
-        !-- Inizialization of the Variables for the namelist TEMPERATURE_PARAMETERS
-        exp_area_fract = 0.5_wp
-        emissivity = 0.0_wp                 ! no radiation to atmosphere
-        atm_heat_transf_coeff = 0.0_wp      ! no convection to atmosphere
-        thermal_conductivity = 0.0_wp       ! no conduction to ground
-        enne = 4.0_wp
-        emme = 12.0_wp
-        thermal_cooling_flag = .FALSE.
+        ! The material thermal properties are initialized in thermal_l1/l2.
         T_ground = 1200.0_wp
-        c_p = 1200.0_wp
 
         !-- Rheology coefficients are initialized once in rheology_config_type.
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
@@ -853,14 +847,7 @@
         initial_erodible_thickness = -1.0_wp
         erodible_deposit_flag = .FALSE.
 
-        exp_area_fract = -1.0_wp
-        emissivity = -1.0_wp
-        atm_heat_transf_coeff = -1.0_wp
-        thermal_conductivity = -1.0_wp
-        enne = -1.0_wp
-        emme = -1.0_wp
         T_ground = -1.0_wp
-        c_p = -1.0_wp
 
         grav = -1.0_wp
 
@@ -1021,8 +1008,7 @@
         USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
 
 
-        USE constitutive_parameters_2d, ONLY: coeff_porosity,                                                          &
-                radiative_term_coeff, SBconst, convective_term_coeff
+        USE constitutive_parameters_2d, ONLY: coeff_porosity
 
         USE init_2d, ONLY: erodible_init
 
@@ -1053,7 +1039,8 @@
         CHARACTER(LEN=15) :: chara
 
         INTEGER :: ios, n_rheology_legacy, n_rheology_l1, n_rheology_l2
-        CHARACTER(LEN=2048) :: rheology_line
+        INTEGER :: n_thermal_legacy, n_thermal_l1, n_thermal_l2
+        CHARACTER(LEN=2048) :: rheology_line, thermal_line
         CHARACTER(LEN=256) :: source_input_error
 
         REAL(wp) :: expA, expB, Tc
@@ -2233,16 +2220,17 @@
                 TRIM(rheology_l1%rheology_method)/='EXPLICIT' .AND.                                                    &
                 TRIM(rheology_l1%rheology_method)/='NEWTON' .AND.                                                      &
                 TRIM(rheology_l1%rheology_method)/='ANALYTIC') .OR.                                                    &
-                (LEN_TRIM(thermal_method)>0 .AND.                                                                      &
-                TRIM(thermal_method)/='EXPLICIT' .AND.                                                                 &
-                TRIM(thermal_method)/='NEWTON' .AND.                                                                   &
-                TRIM(thermal_method)/='ANALYTIC') .OR.                                                                 &
+                (LEN_TRIM(thermal_l1%thermal_method)>0 .AND.                                                           &
+                TRIM(thermal_l1%thermal_method)/='EXPLICIT' .AND.                                                      &
+                TRIM(thermal_l1%thermal_method)/='NEWTON' .AND.                                                        &
+                TRIM(thermal_l1%thermal_method)/='ANALYTIC') .OR.                                                      &
                 (LEN_TRIM(pore_pressure_method)>0 .AND.                                                                &
                 TRIM(pore_pressure_method)/='EXPLICIT' .AND.                                                           &
                 TRIM(pore_pressure_method)/='NEWTON' .AND.                                                             &
                 TRIM(pore_pressure_method)/='ANALYTIC'))                                                               &
                 source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
-            IF (rheology_l1%rheology_group<0 .OR. thermal_group<0 .OR. pore_pressure_group<0)                          &
+            IF (rheology_l1%rheology_group<0 .OR. thermal_l1%thermal_group<0 .OR.                            &
+                pore_pressure_group<0)                                                                                 &
                 source_input_error='D18 physical GROUP must be nonnegative'
 
         END IF
@@ -3487,34 +3475,37 @@
             END ASSOCIATE
         END IF
 
-        ! ------- READ temperature_parameters NAMELIST ------------------------------
-
-        ! Preserve historical behavior when the optional flag is absent.
-        thermal_cooling_flag = TRIM(rheology_l1%rheology_model) == 'lava'
-        READ (input_unit, temperature_parameters, IOSTAT=ios)
-
-        IF (ios .NE. 0) THEN
-
-            WRITE (*, *) 'IOSTAT=', ios
-            WRITE (*, *) 'ERROR: problem with namelist TEMPERATURE_PARAMETERS'
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
+        ! Read exactly one thermal namelist into the canonical L1 configuration.
+        n_thermal_legacy=0
+        n_thermal_l1=0
+        n_thermal_l2=0
+        REWIND(input_unit)
+        DO
+            READ(input_unit,'(A)',IOSTAT=ios) thermal_line
+            IF (ios<0) EXIT
+            IF (ios/=0) CALL fatal_error('Unable to scan temperature namelists')
+            thermal_line=uppercase_source_text(ADJUSTL(thermal_line))
+            IF (INDEX(thermal_line,'&TEMPERATURE_PARAMETERS')==1) n_thermal_legacy=n_thermal_legacy+1
+            IF (INDEX(thermal_line,'&TEMPERATURE_L1_PARAMETERS')==1) n_thermal_l1=n_thermal_l1+1
+            IF (INDEX(thermal_line,'&TEMPERATURE_L2_PARAMETERS')==1) n_thermal_l2=n_thermal_l2+1
+        END DO
+        REWIND(input_unit)
+        IF (n_thermal_l2/=0) CALL fatal_error('TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2')
+        IF (n_thermal_legacy+n_thermal_l1/=1)                                                                   &
+            CALL fatal_error('Provide exactly one TEMPERATURE_PARAMETERS or TEMPERATURE_L1_PARAMETERS')
+        ! Preserve the existing automatic cooling activation for lava.
+        thermal_l1%thermal_cooling_flag=TRIM(rheology_l1%rheology_model)=='lava'
+        IF (n_thermal_legacy==1) THEN
+            READ(input_unit,NML=temperature_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('ERROR: problem with namelist TEMPERATURE_PARAMETERS')
         ELSE
-
-            REWIND (input_unit)
-
-            IF (thermal_cooling_flag) THEN
-
-                WRITE (*, *) 'Cooling ambient temperature (K) =', T_ambient
-
-                radiative_term_coeff = SBconst*emissivity*exp_area_fract
-                WRITE (*, *) 'radiative_term_coeff', radiative_term_coeff
-
-                convective_term_coeff = atm_heat_transf_coeff*exp_area_fract
-
-            END IF
-
+            READ(input_unit,NML=temperature_l1_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('ERROR: problem with namelist TEMPERATURE_L1_PARAMETERS')
+        END IF
+        REWIND(input_unit)
+        IF (thermal_l1%thermal_cooling_flag) THEN
+            WRITE (*, *) 'Cooling ambient temperature (K) =', T_ambient
+            WRITE (*, *) 'radiative_term_coeff', thermal_radiative_coefficient(thermal_l1)
         END IF
 
         ! ---------------------------------------------------------------------------

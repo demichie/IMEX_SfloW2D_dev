@@ -69,7 +69,6 @@ MODULE parameters_2d
     LOGICAL :: rheology_flag
 
     ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
-    LOGICAL :: thermal_cooling_flag = .FALSE.
 
     LOGICAL :: liquid_flag
 

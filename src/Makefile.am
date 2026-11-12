@@ -17,6 +17,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/rheology_laws/rheology_parameters_2d.f90 \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
+                physics/thermal_laws/thermal_parameters_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
                 core/layer_physics_2d.f90 \
@@ -123,6 +124,8 @@ physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
 physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
+physics/thermal_laws/thermal_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT)
@@ -143,7 +146,8 @@ physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state/state_typ
 physics/mass_injection_terms/mass_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
-physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 
@@ -557,6 +561,8 @@ numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_2
     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 spatial/hyperbolic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)

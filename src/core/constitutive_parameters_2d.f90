@@ -20,10 +20,7 @@ MODULE constitutive_parameters_2d
     PUBLIC :: grav, inv_grav
     PUBLIC :: A_drag, B_drag, collective_settling_flag
     PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
-    PUBLIC :: emme, c_p
-    PUBLIC :: convective_term_coeff, atm_heat_transf_coeff, exp_area_fract
-    PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
-    PUBLIC :: thermal_conductivity
+    PUBLIC :: SBconst, T_ground
     PUBLIC :: rho_c_sub, rho_a_amb
     PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
     PUBLIC :: sp_heat_g, sp_gas_const_g
@@ -55,40 +52,11 @@ MODULE constitutive_parameters_2d
     INTEGER :: N_inh = 2 !< 2N+1 determines order of the smoothstep function for f_inhibit
     CHARACTER(LEN=8) :: f_inhibit_mode = 'OFF'  ! options: 'OFF','STATIC','DYNAMIC'
 
-    !> evironment temperature [K]
-
-    !> velocity boundary layer fraction of total thickness
-    REAL(wp) :: emme
-
-    !> specific heat [J kg-1 K-1]
-    REAL(wp) :: c_p
-
-    !> coefficient for the convective term in the temperature equation for lava
-    REAL(wp) :: convective_term_coeff
-
-    !> atmospheric heat trasnfer coefficient [W m-2 K-1] (lambda in C&M, 2005)
-    REAL(wp) :: atm_heat_transf_coeff
-
-    !> fractional area of the exposed inner core (f in C&M, 2005)
-    REAL(wp) :: exp_area_fract
-
-    !> coefficient for the radiative term in the temperature equation for lava
-    REAL(wp) :: radiative_term_coeff
-
-    !> Stephan-Boltzmann constant [W m-2 K-4]
+    !> Stefan-Boltzmann constant [W m-2 K-4].
     REAL(wp), PARAMETER :: SBconst = 5.67E-8_wp
 
-    !> emissivity (eps in Costa & Macedonio, 2005)
-    REAL(wp) :: emissivity
-
-    !> thermal boundary layer fraction of total thickness
-    REAL(wp) :: enne
-
-    !> temperature of lava-ground interface
+    !> Shared terrain temperature (K); no conduction law is active.
     REAL(wp) :: T_ground
-
-    !> thermal conductivity [W m-1 K-1] (k in Costa & Macedonio, 2005)
-    REAL(wp) :: thermal_conductivity
 
     !> Specific gas constant of gas mixture (units: J kg-1 K-1)
 

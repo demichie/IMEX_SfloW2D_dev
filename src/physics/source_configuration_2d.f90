@@ -9,13 +9,13 @@ MODULE source_configuration_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_input_2d
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
-    USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                               &
-            thermal_cooling_flag,                                                                                      &
+    USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                                               &
             pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag,                                        &
             bottom_fissural_source_flag, radial_source_flag,                                                           &
             liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag,                                                &
             idx_pore
     USE rheology_parameters_2d, ONLY : rheology_l1
+    USE thermal_parameters_2d, ONLY : thermal_l1
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,                                               &
             coeff_porosity, entrainment_flag
     IMPLICIT NONE
@@ -108,7 +108,7 @@ CONTAINS
         INTEGER, ALLOCATABLE :: affected(:)
         ! A failed reconfiguration must never leave a previous registry active.
         CALL registry%finalize()
-        CALL collect_active_source_names(thermal_cooling_flag,names,error)
+        CALL collect_active_source_names(thermal_l1%thermal_cooling_flag,names,error)
         IF (LEN_TRIM(error)>0) RETURN
         ALLOCATE(groups(1))
         groups(1)%id=0
@@ -133,8 +133,8 @@ CONTAINS
             requested_method=rheology_l1%rheology_method
             id=rheology_l1%rheology_group
         CASE('thermal_cooling')
-            requested_method=thermal_method
-            id=thermal_group
+            requested_method=thermal_l1%thermal_method
+            id=thermal_l1%thermal_group
         CASE('pore_pressure_dissipation')
             requested_method=pore_pressure_method
             id=pore_pressure_group

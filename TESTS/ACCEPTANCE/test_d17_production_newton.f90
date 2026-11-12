@@ -1,5 +1,6 @@
 ! Lie backward-Euler regression: full conservative source-rate footprint.
 PROGRAM test_d17_production_newton
+  USE thermal_parameters_2d, ONLY : thermal_l1
   USE parameters_2d
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : rheology_l1
@@ -21,7 +22,7 @@ PROGRAM test_d17_production_newton
   idx_add_gas_first=5;idx_add_gas_last=4
   idx_pore=0;idx_poreEqn=0;idx_stoch=0;idx_u=2;idx_v=3
   rheology_flag=.TRUE.;rheology_l1%rheology_model='newmodel'
-  pore_pressure_flag=.FALSE.;thermal_cooling_flag=.FALSE.
+  pore_pressure_flag=.FALSE.;thermal_l1%thermal_cooling_flag=.FALSE.
   slope_correction_flag=.FALSE.;curvature_term_flag=.FALSE.
   stochastic_flag=.FALSE.;stoch_transport_flag=.FALSE.
   liquid_flag=.TRUE.;gas_flag=.FALSE.;lava_flag=.FALSE.

@@ -9,6 +9,7 @@ MODULE source_terms_2d
     USE mass_injection_coefficients_2d, ONLY : injection_material_set_type
     USE mass_injection_coefficients_2d
     USE parameters_2d
+    USE thermal_parameters_2d, ONLY : thermal_l1, thermal_radiative_coefficient, thermal_convective_coefficient
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
@@ -381,7 +382,8 @@ CONTAINS
             ! frozen heat capacity used by the exact cooling integrator.
             heat_capacity=q_before(4)/temperature_before
             CALL eval_thermal_analytic(['thermal_cooling'],temperature_before,interval,                               &
-                    heat_capacity,radiative_term_coeff,convective_term_coeff,                                          &
+                    heat_capacity,thermal_radiative_coefficient(thermal_l1), &
+                    thermal_convective_coefficient(thermal_l1), &
                     T_ambient,temperature_after)
             q_after(4)=heat_capacity*temperature_after
             status=0
@@ -464,8 +466,9 @@ CONTAINS
                 IF (PRESENT(accepted)) accepted=.FALSE.
                 RETURN
             END IF
-            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
-                radiative_term_coeff,convective_term_coeff,T_ambient,rate(4))
+            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature, &
+                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                T_ambient,rate(4))
             RETURN
         END IF
         physical_state=>local_state
@@ -486,7 +489,8 @@ CONTAINS
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit_real(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                radiative_term_coeff,convective_term_coeff,T_ambient,rate(4))
+                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                T_ambient,rate(4))
         END IF
     END SUBROUTINE eval_source_implicit_real
 
@@ -515,8 +519,9 @@ CONTAINS
                 IF (PRESENT(accepted)) accepted=.FALSE.
                 RETURN
             END IF
-            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
-                radiative_term_coeff,convective_term_coeff,T_ambient,c_nh_term_impl(4))
+            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature, &
+                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                T_ambient,c_nh_term_impl(4))
             RETURN
         END IF
 
@@ -538,7 +543,8 @@ CONTAINS
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                radiative_term_coeff,convective_term_coeff,T_ambient,c_nh_term_impl(4))
+                thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1),                  &
+                T_ambient,c_nh_term_impl(4))
         END IF
     END SUBROUTINE eval_source_implicit
 
@@ -662,7 +668,8 @@ CONTAINS
 
             IF (group%thermal_active) THEN
                 CALL eval_thermal_explicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                   &
-                    radiative_term_coeff,convective_term_coeff,T_ambient,thermal_rate)
+                    thermal_radiative_coefficient(thermal_l1),thermal_convective_coefficient(thermal_l1), &
+                    T_ambient,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
 
             END IF

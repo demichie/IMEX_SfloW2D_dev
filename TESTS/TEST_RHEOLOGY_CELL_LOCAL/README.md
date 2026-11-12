@@ -116,13 +116,15 @@ select `froude_blend`. No production tableau or rheology selector is changed.
 `check_inputs.py` uses a fresh source-mass fixture and the real solver parser.
 It distinguishes input rejection text from the process exit code: plain Fortran
 STOP can return zero. Valid control runs must reach the end of a short run.
-The 33 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
+The 37 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
 name handling, rejection of unknown names and legacy numeric IDs, missing/
 zero/negative denominators, valid zero Coulomb coefficients, nonfinite
 coefficients and ambient cooling configuration. Generated fixtures allow
 overwrite only inside their supplied output directory. Lava uses `h_x`; other
 cases use `froude_blend`.
 
+The parser verifies legacy TEMPERATURE_PARAMETERS and the equivalent L1 spelling,
+rejects duplicate or missing temperature namelists and rejects L2 input in single-layer mode.
 The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
 and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection
 validates IEEE binary32/64 inputs under `-Ofast` without NaN comparisons.

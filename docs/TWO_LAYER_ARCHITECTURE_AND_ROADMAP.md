@@ -14,22 +14,22 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 4. `N_LAYERS=2` rifiutato negli input e nel layout di produzione fino a TL13/M6. Le funzionalità parziali sono testabili tramite harness isolati, non selezionabili come modello completo.
 5. Non cambiare formule, regolarizzazioni, limitatori, splitting o tolleranze implicitamente durante un refactoring. Rispettare disponibilità esplicita delle modalità EXPLICIT, SEMI_IMPLICIT, NEWTON/IMPLICIT e ANALYTIC; mai fallback silenziosi.
 
-## 2. Audit del codice sul commit `410ad99e`
+## 2. Audit della baseline CI e della migrazione TL04-T2
 
 | Area | Implementato e riscontrato nel codice | Ancora da implementare o certificare |
 |---|---|---|
 | Layout | `model_layout_2d` contiene `n_layers`; `state_type%q/qp` e workspace di integrazione sono rank-4 `(componente,layer,x,y)`; i consumer di produzione selezionano esplicitamente L1. | `supported_layer_count` accetta solo 1; evoluzione L2, maschere inattive e test coupled. |
 | Deposito | `deposit_tot` è l'inventario canonico dello spessore; ramo lava distinto dal granulare, senza inventario autonomo `lava_deposit`; rollback e percorsi v7 sono stati adeguati. | Gate G1 completo: casi granulari/lava, `n_solid=0`, topografia on/off, I/O e restart round-trip documentati. |
 | Reologia | `rheology_config_type` contiene i coefficienti e i metadati; `rheology_l1/l2` sono due oggetti; parser legacy/L1 usa alias verso **unico L1 canonico**; kernel e dispatcher migrati a `config` esplicito e vecchi metadati globali eliminati. | Il coordinatore `source_terms_2d` seleziona ancora direttamente `rheology_l1`; il registro Lie non possiede scope L1/L2; L2 non valutato in produzione. |
-| Contesto per layer | `simulation_2d` possiede `layer_physics(:)`; ciascun contesto contiene copia della reologia validata. | Contesto termico e altre chiusure specifiche del layer, ownership e configurazione L2 di produzione. |
+| Contesto per layer | `simulation_2d` possiede `layer_physics(:)` con copia della reologia validata; la configurazione termica L1/L2 è canonica nel modulo termico. | Integrare termica e ulteriori chiusure nel contesto fisico read-only quando il percorso L2 sarà collegato, senza copie da sincronizzare. |
 | Lie | Un solo Lie primo ordine, cell-outer/OpenMP, gruppi numerici ordinati, trial e rollback; chiamata corrente `execute_lie_source_groups(...q_trial(:,1,:,:),qp_trial(:,1,:,:)...)`. | Supportare gruppi con scope `L1`, `L2`, `INTERLAYER`, candidati entrambi i layer e commit atomico senza fisica nel driver. |
-| Termica | `TEMPERATURE_PARAMETERS` usa ancora coefficienti scalari globali, ma il cooling riceve ora la sola `T_ambient` da GAS; kernel REAL/COMPLEX/ANALYTIC conservati. | `thermal_config_type`, input L1/L2/legacy, passaggio della config ai kernel, verifiche; nessuna nuova conduzione. |
+| Termica | `thermal_config_type` è l'unico contenitore dei coefficienti e metadati L1/L2; il parser legacy e L1 condividono lo stesso oggetto L1. Cooling REAL/COMPLEX/ANALYTIC e formule originali conservati; coefficienti derivati calcolati senza cache globale. | CI e confronto single-layer sul nuovo codice; passare configurazione esplicita lungo l'intera catena di assemblaggio fisico in TL04-T3/TL07. |
 | Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
 | Sorgenti fisiche | `source_configuration_2d` costruisce sorgenti singole; `source_registry_2d` non ha scope; termica/rheologia/mass exchange dispongono di kernel locali. | Contatti fisici, selezione per layer, processi di coppia, nuove chiusure del manoscritto e relativa verifica. |
 | Spaziale | `nonconservative_2d` è un integratore di percorso generico già utilizzato da HP-PCCU. | Tracce accoppiate, pressione interlayer, CFL coupled, wet/dry e iperbolicità. |
 | I/O | NetCDF single-layer `(x,y,time)`, reader/writer restart v7 con sola sezione L1, file legacy/probe/runout. | Schema/versione per due layer, restituzione completa e compatibilità dimostrata. |
 
-**Evidenza CI verificata esattamente su `410ad99e`:** [Build optimized/debug #43264995583](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43264995583) **success**; [Cell physics and numerical regressions #43265344609](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43265344609) **success**. Questi esiti validano i job presenti nei workflow, **non** full EXAMPLES, confronto col baseline, restart/NetCDF completi, OpenMP o un solver two-layer. Il codice non è stato modificato nell'ambito di questo aggiornamento documentale.
+**Evidenza CI:** su `e6fc9310` (TL04-T1) [Build optimized/debug #43288120570](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43288120570) e [Cell physics and numerical regressions #43288309362](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43288309362) risultano **success**. La precedente baseline `410ad99e` aveva superato gli stessi workflow. **TL04-T2 richiede nuove Actions sul proprio commit.** Nessuno di questi job certifica automaticamente full EXAMPLES, restart/NetCDF integrati, OpenMP, baseline scientifico o two-layer.
 
 ## 3. Dati, proprietà e configurazioni autorevoli
 
@@ -64,10 +64,10 @@ In `N_LAYERS=1` è ammessa **una sola** tra `RHEOLOGY_PARAMETERS` (oggetto `rheo
 
 ### 4.1 Namelist e temperatura atmosferica
 
-Usare **un solo** `thermal_config_type` e due istanze canoniche `thermal_l1`, `thermal_l2`. Il parser deve offrire:
-- `N_LAYERS=1`: `TEMPERATURE_PARAMETERS` **oppure** `TEMPERATURE_L1_PARAMETERS`, mai entrambe; entrambe puntano allo stesso `thermal_l1`, senza struttura di copia.
+La configurazione canonica implementata è **un solo** `thermal_config_type` con due istanze `thermal_l1`, `thermal_l2`. Il parser applica:
+- `N_LAYERS=1`: **esattamente una** fra `TEMPERATURE_PARAMETERS` (`thermal%...`) e `TEMPERATURE_L1_PARAMETERS` (`thermal_l1%...`); il puntatore legacy e la L1 si riferiscono **allo stesso oggetto**, senza sincronizzazione.
 - `N_LAYERS=2` (solo quando abilitato): `TEMPERATURE_L1_PARAMETERS` e `TEMPERATURE_L2_PARAMETERS`, niente legacy. Input doppi, misti, incoerenti o senza dati richiesti sono errori espliciti.
-- I componenti si impostano con la sintassi del tipo derivato, come per la reologia; migrare insieme fixture, generatori, esempi e test.
+- I componenti usano la sintassi del tipo derivato, come per la reologia; fixture ed esempi attivi sono migrati in modo coerente. `T_ground` resta un valore condiviso, letto nel gruppo legacy o L1 senza duplicazione nel tipo.
 - `thermal_method`, `thermal_group` e l'abilitazione termica appartengono alla configurazione del **processo del layer**, non a globali che il parser sincronizza. Il registro Lie globale ordina comunque tutti i gruppi.
 
 **`T_env` è stata eliminata dai sorgenti di produzione** (dichiarazioni, namelist, default e consumer). **`T_ambient` è l'unica temperatura dell'atmosfera e viene letta esclusivamente dalla namelist obbligatoria `GAS_TRANSPORT_PARAMETERS`**, anche se `gas_flag=F`: sono stati rimossi gli ingressi da `INITIAL_CONDITIONS` e `RESTART_PARAMETERS` ed è richiesto un valore esplicito finito e positivo. Validare il nuovo contratto mediante CI ed esempi. Non introdurre alias o temperatura atmosferica per-layer. `T_ground` è una proprietà **condivisa del terreno**; non è una nuova legge di scambio.
@@ -80,7 +80,7 @@ k_conv,k = atm_heat_transf_coeff_k*exp_area_fract_k
 ```
 Nessuna nuova legge di conduzione verso il terreno, di scambio termico L1-L2 o modifica del trattamento REAL/COMPLEX/ANALYTIC. L'eventuale variazione dei risultati single-layer **derivante dalla sostituzione autorizzata di `T_env` con `T_ambient`** è ammessa e va misurata/documentata; tutte le altre differenze richiedono diagnosi. L'attuale default termico legato alla lava va migrato esplicitamente e testato, non disattivato implicitamente.
 
-**Audit preliminare obbligatorio prima del tipo definitivo:** assegnare ownership fisica, dimensioni e consumer a `thermal_cooling_flag`, `emissivity`, `atm_heat_transf_coeff`, `thermal_conductivity`, `exp_area_fract`, `c_p`, `enne`, `emme`, `T_ground`, `thermal_method`, `thermal_group`. In particolare, non spostare automaticamente `c_p` o proprietà del terreno nel layer. `thermal_conductivity` e `T_ground` sono in input, ma la legge di cooling radiativo/convettivo esaminata non implementa una conduzione al terreno.
+**Ownership verificata in TL04-T2:** `thermal_cooling_flag`, `thermal_method`, `thermal_group`, `emissivity`, `atm_heat_transf_coeff`, `exp_area_fract`, `thermal_conductivity`, `c_p`, `enne` ed `emme` appartengono alla configurazione del layer. `T_ground` e `T_ambient` appartengono rispettivamente al terreno e all'atmosfera condivisi; `SBconst` resta una costante universale. `thermal_conductivity`, `c_p`, `enne` ed `emme` non alimentano attualmente il raffreddamento radiativo/convettivo: conservarne l'input non autorizza una nuova legge. I coefficienti `radiative_term_coeff` e `convective_term_coeff` sono grandezze **derivate**, valutate dalle funzioni pure del modulo termico, non copie persistenti.
 
 ### 4.2 Modulo fisico dei contatti `src/physics/layer_contacts_2d.f90`
 
@@ -179,7 +179,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL02 — migrazione consumer** | **Implementato per L1, audit integrato aperto** | Verificare tutte le dipendenze di state, spatial, Lie, stochastic, input/output, test, OpenMP; eliminare wrapper obsoleti. |
 | **TL03 — gate single-layer** | **CI parziale superata, gate G2 aperto** | Full EXAMPLES, bilanci, wet/dry, I/O/restart, OpenMP, profiling/memoria e confronto baseline; registrare eventuale delta termico autorizzato separatamente. |
 | **TL04-R — configurazione reologica** | **Implementata e CI superata** | Tipo canonico, parser legacy/L1, parametri espliciti nei kernel; completare le dipendenze dal contesto per L2 quando attivato. |
-| **TL04-T — configurazione termica** | **T1 implementata nel branch; CI e T2/T3 aperti** | Audit proprietà e consumer; tipo canonico L1/L2; legacy alias L1; `T_ambient` unica da GAS; eliminare `T_env`; test input, REAL/COMPLEX, analitico, lava e dry. |
+| **TL04-T — configurazione termica** | **T1 verificata in CI; T2 implementata, CI da eseguire; T3 aperta** | T2: tipo canonico, coeff./metadati L1/L2, alias legacy, rimozione globali e coefficienti derivati senza cache. T3: passaggio esplicito della config attraverso assembler/kernel e test completi REAL/COMPLEX, analitico, lava/dry. |
 | **TL04-C — altre configurazioni e contatti** | **Da implementare** | Ownership SHARED/L1/L2/INTERLAYER; migrazione per processi necessari, `layer_contacts_2d` puro e testato **inerte**; contesti read-only; IC/BC e slot inattivi; nessuna fisica nel Lie. |
 | **TL05 — HP-PCCU indipendente per slot** | **Da implementare** | Trasporto/ricostruzione per L1 e L2 isolati e wet/dry combinati, `eta_1`/`eta_tot`; recupero single-layer quando assente una corrente. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
@@ -200,7 +200,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **M0** | TL00: baseline e specifiche | **Da certificare** | G0: tag, audit e benchmark riproducibile, branch protetto verificato. |
 | **M1** | TL00a: deposito unico | **Implementata, non certificata** | G1: deposizione lava/granulare, restart, topografia e output. |
 | **M2** | TL01–TL03: rank-4 single-layer validato | **Parziale, non certificata** | G2: full EXAMPLES, confronto baseline, NetCDF/restart, OpenMP e numerica. |
-| **M3** | TL04–TL05: infrastruttura L1/L2 isolata | **TL04-R implementata; resto aperto** | G3: due configurazioni distinte, termica, contatti inerti, slot e trasporto isolati, no race; single-layer invariato salvo delta termico deliberato. |
+| **M3** | TL04–TL05: infrastruttura L1/L2 isolata | **TL04-R e T1 verificate; T2 da certificare, resto aperto** | G3: due configurazioni distinte, termica, contatti inerti, slot e trasporto isolati, no race; single-layer invariato salvo delta termico deliberato. |
 | **M4** | TL06: operatore spaziale accoppiato | **Non iniziata** | G4: path, pressione completa, topografia, CFL, wet/dry, clamp e iperbolicità. |
 | **M5** | TL07–TL11: Lie coppia e chiusure | **Non iniziata** | G5/G6: rate per-layer, coppia conservativa, budget esterni, rollback, contatti fisici e tutti i processi verificati. |
 | **M6** | TL12–TL13: modello disponibile | **Non iniziata** | G7: benchmark scientifici, prestazioni, I/O e restart, approvazione esplicita all'attivazione. |
@@ -214,7 +214,7 @@ Le milestone sono **punti di proposta di merge**, non autorizzazioni automatiche
 | **G0** | Baseline taggato, esempi riproducibili, confronti, condizioni OpenMP e prestazioni | Non certificato. |
 | **G1** | `deposit_tot` granulare/lava, `n_solid=0`, rollback, erosione, topografia e restart v7 | Codice e alcuni test esistenti; matrice integrata non certificata. |
 | **G2** | Rank-4 L1, IC/BC, lie, spatial, NUMERICS, full EXAMPLES, NetCDF, restart, OpenMP | CI build/regressioni su `410ad99e` **success**; resto non certificato. |
-| **G3** | Reologia/termica distinte L1/L2, input legacy, T_ambient unica, contatti quattro casi + mono, no thread races | Reologia verificata in CI; migrazione T_ambient/T_env T1 in attesa di CI; termica per-layer e contatti aperti. |
+| **G3** | Reologia/termica distinte L1/L2, input legacy, T_ambient unica, contatti quattro casi + mono, no thread races | Reologia e T1 verificate in CI; T2 implementata in attesa di CI; configurazione esplicita nell'intera fisica e modulo contatti ancora aperti. |
 | **G4** | Idrostatica con path e topografia, coppia, residuo curvo, clamp, wet/dry, CFL | Da implementare. |
 | **G5** | Sorgenti L1/L2 indipendenti, coppia `Gamma`, limiti e rollback atomico, gruppo 0 | Da implementare. |
 | **G6** | Settling, elutriazione cold-start, drag, consolidazione, entrainment, lofting, termica e budget | Da implementare. |
