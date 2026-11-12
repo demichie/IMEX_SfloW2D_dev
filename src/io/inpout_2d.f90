@@ -3445,7 +3445,8 @@
                 ELSEIF (TRIM(rheology_model) .EQ. 'froude') THEN
                     WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
                     WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
-                    ! Stop the program if the parameters are not a double-precision floating-point numbers (real numbers).
+                    ! Stop the program if the parameters are not a double-precision floating-point numbers
+                    ! (real numbers).
                     IF (mu_0 .LT. 0.0_wp .OR. mu_inf .LT. 0.0_wp .OR. Fr_0 .LE. 0.0_wp) THEN
                         WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
                         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
@@ -3459,7 +3460,8 @@
                         WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
                         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
                         WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
-                        WRITE (*, *) 'mu_inf > mu_0 required (mu(Fr) should be increasing)! Please correct the input file!'
+                        WRITE (*, *) &
+                            'mu_inf > mu_0 required (mu(Fr) should be increasing)! Please correct the input file!'
                         STOP
 
                     END IF
@@ -3468,7 +3470,8 @@
                 ELSEIF (TRIM(rheology_model) .EQ. 'lucas') THEN
                     WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
                     WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
-                    ! Stop the program if the parameters are not a double-precision floating-point numbers (real numbers).
+                    ! Stop the program if the parameters are not a double-precision floating-point numbers
+                    ! (real numbers).
                     IF (mu_0 .LT. 0.0_wp .OR. mu_inf .LT. 0.0_wp .OR. U_w .LE. 0.0_wp) THEN
                         WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
                         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
@@ -3482,7 +3485,8 @@
                         WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
                         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
                         WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
-                        WRITE (*, *) 'mu_0 > mu_inf required (mu(U) should be decreasing)! Please correct the input file!'
+                        WRITE (*, *) &
+                            'mu_0 > mu_inf required (mu(U) should be decreasing)! Please correct the input file!'
                         STOP
 
                     END IF
@@ -4875,7 +4879,8 @@
 
             ! Stop the program if std_min > std_max
             IF (std_min .GT. std_max) THEN
-                ! Stop the program if the parameters are not positive double-precision floating-point numbers (real numbers).
+                ! Stop the program if the parameters are not positive double-precision floating-point numbers
+                ! (real numbers).
                 WRITE (*, *) 'ERROR: problem with namelist STOCHASTIC_PARAMETERS'
                 WRITE (*, *) 'std_min =', std_min, 'std_max =', std_max,                                               &
                     'std_slope_factor = ', std_slope_factor
@@ -6982,7 +6987,8 @@
 
             WRITE (probes_unit, 1710, ADVANCE='no') time, ','
 
-            CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_h,1, :, :), probes_coords(1, k), probes_coords(2, k), h_prb)
+            CALL interp_2d_scalarB(x_comp, y_comp, &
+                state%qp(idx_h,1, :, :), probes_coords(1, k), probes_coords(2, k), h_prb)
 
             WRITE (probes_unit, 1710, ADVANCE='no') h_prb, ','
 
@@ -6995,17 +7001,20 @@
 
                 WRITE (probes_unit, 1710, ADVANCE='no') rhom_prb, ','
 
-                CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_T,1, :, :), probes_coords(1, k), probes_coords(2, k),    &
+                CALL interp_2d_scalarB(x_comp, y_comp, &
+                    state%qp(idx_T,1, :, :), probes_coords(1, k), probes_coords(2, k),    &
                     T_prb)
 
                 WRITE (probes_unit, 1710, ADVANCE='no') T_prb, ','
 
-                CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_u,1, :, :), probes_coords(1, k), probes_coords(2, k),    &
+                CALL interp_2d_scalarB(x_comp, y_comp, &
+                    state%qp(idx_u,1, :, :), probes_coords(1, k), probes_coords(2, k),    &
                     u_prb)
 
                 WRITE (probes_unit, 1710, ADVANCE='no') u_prb, ','
 
-                CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_v,1, :, :), probes_coords(1, k), probes_coords(2, k),    &
+                CALL interp_2d_scalarB(x_comp, y_comp, &
+                    state%qp(idx_v,1, :, :), probes_coords(1, k), probes_coords(2, k),    &
                     v_prb)
 
                 WRITE (probes_unit, 1710, ADVANCE='no') v_prb, ','
@@ -7583,7 +7592,8 @@
                                             nf90_double, dimids, solid_varid(i), deflate_level=5,                      &
                                             shuffle=.true.))
             CALL check(nf90_put_att(ncid, solid_varid(i), 'units', ''))
-            CALL check(nf90_put_att(ncid, solid_varid(i), 'long_name', 'volume fraction of solid class '//TRIM(idx_string)))
+            CALL check(nf90_put_att(ncid, solid_varid(i), &
+                'long_name', 'volume fraction of solid class '//TRIM(idx_string)))
 
             CALL check(nf90_def_var(ncid, 'deposit__'//trim(idx_string),                                               &
                                             nf90_double, dimids, deposit_varid(i), deflate_level=5,                    &
@@ -7688,7 +7698,8 @@
             CALL check(nf90_def_var(ncid, 'Rouse_'//TRIM(idx_string), nf90_double,                                     &
                                             dimids, Rouse_varid(i), deflate_level=5, shuffle=.true.))
             CALL check(nf90_put_att(ncid, Rouse_varid(i), 'units', ''))
-            CALL check(nf90_put_att(ncid, Rouse_varid(i), 'long_name', 'Rouse number for solid class '//TRIM(idx_string)))
+            CALL check(nf90_put_att(ncid, Rouse_varid(i), &
+                'long_name', 'Rouse number for solid class '//TRIM(idx_string)))
 
         END DO
 
@@ -7977,7 +7988,8 @@
 
         ! Write stochastic variable
         DO i = 1, n_stoch_vars
-            CALL check(nf90_put_var(ncid, stoch_varid(i), state%qp(idx_stoch + i - 1,1, :, :), start=start, count=count))
+            CALL check(nf90_put_var(ncid, stoch_varid(i), &
+                state%qp(idx_stoch + i - 1,1, :, :), start=start, count=count))
 
         END DO
 
