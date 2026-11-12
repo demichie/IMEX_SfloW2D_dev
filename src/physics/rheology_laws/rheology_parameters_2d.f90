@@ -25,7 +25,7 @@ MODULE rheology_parameters_2d
         REAL(wp) :: nu_ref=-1.0_wp, visc_par=-1.0_wp
         REAL(wp) :: T_ref=-1.0_wp, tau0=-1.0_wp
         REAL(wp) :: alpha2=-1.0_wp, beta2=-1.0_wp
-        REAL(wp) :: alpha1_ref=-1.0_wp, beta1=-1.0_wp
+        REAL(wp) :: alpha1_ref=-1.0_wp, alpha1_coeff=-1.0_wp, beta1=-1.0_wp
         REAL(wp) :: Kappa=-1.0_wp, n_td=-1.0_wp
         REAL(wp) :: friction_factor=-1.0_wp
         REAL(wp) :: mu_0=-1.0_wp, mu_inf=-1.0_wp
