@@ -148,7 +148,7 @@ def write_input(path):
  /
 
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL = 'none',
+ RHEOLOGY%RHEOLOGY_MODEL = 'none',
  /
 
 &GAS_TRANSPORT_PARAMETERS

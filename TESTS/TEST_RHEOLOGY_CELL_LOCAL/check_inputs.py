@@ -66,12 +66,14 @@ def main():
             text=text.replace('&TEMPERATURE_PARAMETERS\n /',
                 '&TEMPERATURE_PARAMETERS\n EMISSIVITY=.8, ATM_HEAT_TRANSF_COEFF=4, EXP_AREA_FRACT=.5, '+ambient+'\n /')
         if name=='legacy-numeric-id':
-            model_assignment='rheology_model=6'
+            model_assignment='RHEOLOGY%RHEOLOGY_MODEL=6'
         else:
             model_name=model_names.get(model,'unsupported')
             if name=='valid-uppercase-name':
                 model_name=model_name.upper()
-            model_assignment=f"rheology_model='{model_name}'"
+            model_assignment=f"RHEOLOGY%RHEOLOGY_MODEL='{model_name}'"
+        # The NAMELIST owns one derived object; each coefficient is its component.
+        params=re.sub(r'(?<![\\w%])([A-Za-z][A-Za-z_0-9]*)\\s*=',r'RHEOLOGY%\\1=',params)
         (work/'IMEX_SfloW2D.inp').write_text(
             text+f'\n&RHEOLOGY_PARAMETERS\n {model_assignment}, {params}\n/\n')
         with (work/'run.log').open('w') as f:
