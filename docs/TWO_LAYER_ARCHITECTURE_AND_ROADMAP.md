@@ -1,6 +1,6 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Piano di riferimento:** 12 novembre 2026. **Branch di sviluppo:** `feature/two-layer`. **Baseline del presente audit:** commit `410ad99e`.
+**Piano di riferimento:** 12 novembre 2026. **Branch di sviluppo:** `feature/two-layer`. **Baseline CI verificata:** commit `410ad99e`; **ultima implementazione TL04-T1:** commit `b008473c` (test da verificare).
 **Stato:** codice di produzione ancora **single-layer**; `N_LAYERS=2` resta disabilitato. La presente roadmap è il **solo piano vigente**: specifica, stato verificato, attività, gate e milestone. La cronologia dettagliata è nei commit Git, non in versioni alternative del piano.
 **Documenti collegati:** [audit tecnico corrente](TWO_LAYER_CODE_AUDIT.md), [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md), manoscritto *IMEX_SfloW2D_v3*.
 
@@ -23,8 +23,8 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Reologia | `rheology_config_type` contiene i coefficienti e i metadati; `rheology_l1/l2` sono due oggetti; parser legacy/L1 usa alias verso **unico L1 canonico**; kernel e dispatcher migrati a `config` esplicito e vecchi metadati globali eliminati. | Il coordinatore `source_terms_2d` seleziona ancora direttamente `rheology_l1`; il registro Lie non possiede scope L1/L2; L2 non valutato in produzione. |
 | Contesto per layer | `simulation_2d` possiede `layer_physics(:)`; ciascun contesto contiene copia della reologia validata. | Contesto termico e altre chiusure specifiche del layer, ownership e configurazione L2 di produzione. |
 | Lie | Un solo Lie primo ordine, cell-outer/OpenMP, gruppi numerici ordinati, trial e rollback; chiamata corrente `execute_lie_source_groups(...q_trial(:,1,:,:),qp_trial(:,1,:,:)...)`. | Supportare gruppi con scope `L1`, `L2`, `INTERLAYER`, candidati entrambi i layer e commit atomico senza fisica nel driver. |
-| Termica | `TEMPERATURE_PARAMETERS` usa ancora scalari globali; `T_env` è distinta da `T_ambient`; il cooling esistente usa coeff. radiativo e convettivo e `T_env`, anche in REAL/COMPLEX/ANALYTIC. | `thermal_config_type`, input L1/L2/legacy, `T_ambient` unica, test e passaggio config ai kernel; nessuna nuova conduzione. |
-| Ambiente | `T_ambient` è dichiarata in `constitutive_parameters_2d` e letta da `GAS_TRANSPORT_PARAMETERS`, ma è **anche membro** di `INITIAL_CONDITIONS` e `RESTART_PARAMETERS`. | Rimuovere le letture alternative; controllo presenza/finitezza/positività dalla sola namelist gas, inclusi casi `gas_flag=F`. |
+| Termica | `TEMPERATURE_PARAMETERS` usa ancora coefficienti scalari globali, ma il cooling riceve ora la sola `T_ambient` da GAS; kernel REAL/COMPLEX/ANALYTIC conservati. | `thermal_config_type`, input L1/L2/legacy, passaggio della config ai kernel, verifiche; nessuna nuova conduzione. |
+| Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
 | Sorgenti fisiche | `source_configuration_2d` costruisce sorgenti singole; `source_registry_2d` non ha scope; termica/rheologia/mass exchange dispongono di kernel locali. | Contatti fisici, selezione per layer, processi di coppia, nuove chiusure del manoscritto e relativa verifica. |
 | Spaziale | `nonconservative_2d` è un integratore di percorso generico già utilizzato da HP-PCCU. | Tracce accoppiate, pressione interlayer, CFL coupled, wet/dry e iperbolicità. |
 | I/O | NetCDF single-layer `(x,y,time)`, reader/writer restart v7 con sola sezione L1, file legacy/probe/runout. | Schema/versione per due layer, restituzione completa e compatibilità dimostrata. |
@@ -70,7 +70,7 @@ Usare **un solo** `thermal_config_type` e due istanze canoniche `thermal_l1`, `t
 - I componenti si impostano con la sintassi del tipo derivato, come per la reologia; migrare insieme fixture, generatori, esempi e test.
 - `thermal_method`, `thermal_group` e l'abilitazione termica appartengono alla configurazione del **processo del layer**, non a globali che il parser sincronizza. Il registro Lie globale ordina comunque tutti i gruppi.
 
-**`T_env` va eliminata integralmente** (dichiarazioni, namelist, default, diagnosi e consumer). **`T_ambient` è l'unica temperatura dell'atmosfera e viene letta esclusivamente dalla namelist obbligatoria `GAS_TRANSPORT_PARAMETERS`**, anche se `gas_flag=F`: rimuoverla da `INITIAL_CONDITIONS` e `RESTART_PARAMETERS`, imporre valore esplicito finito e positivo, senza scritture successive che lo sovrascrivano. Non introdurre alias o temperatura atmosferica per-layer. `T_ground` è una proprietà **condivisa del terreno**; non è una nuova legge di scambio.
+**`T_env` è stata eliminata dai sorgenti di produzione** (dichiarazioni, namelist, default e consumer). **`T_ambient` è l'unica temperatura dell'atmosfera e viene letta esclusivamente dalla namelist obbligatoria `GAS_TRANSPORT_PARAMETERS`**, anche se `gas_flag=F`: sono stati rimossi gli ingressi da `INITIAL_CONDITIONS` e `RESTART_PARAMETERS` ed è richiesto un valore esplicito finito e positivo. Validare il nuovo contratto mediante CI ed esempi. Non introdurre alias o temperatura atmosferica per-layer. `T_ground` è una proprietà **condivisa del terreno**; non è una nuova legge di scambio.
 
 La legge atmosferica esistente resta:
 ```text
