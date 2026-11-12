@@ -73,7 +73,7 @@ def main():
                 model_name=model_name.upper()
             model_assignment=f"RHEOLOGY%RHEOLOGY_MODEL='{model_name}'"
         # The NAMELIST owns one derived object; each coefficient is its component.
-        params=re.sub(r'(?<![\\w%])([A-Za-z][A-Za-z_0-9]*)\\s*=',r'RHEOLOGY%\\1=',params)
+        params=re.sub(r'(?<![\w%])([A-Za-z][A-Za-z_0-9]*)\s*=',r'RHEOLOGY%\1=',params)
         (work/'IMEX_SfloW2D.inp').write_text(
             text+f'\n&RHEOLOGY_PARAMETERS\n {model_assignment}, {params}\n/\n')
         with (work/'run.log').open('w') as f:
@@ -86,7 +86,8 @@ def main():
             rejected=any(token in log for token in (
                 'ERROR: problem with namelist RHEOLOGY_PARAMETERS',
                 'ERROR: unknown RHEOLOGY_MODEL',
-                'numeric IDs are no longer accepted'))
+                'numeric IDs are no longer accepted',
+                'Provide exactly one RHEOLOGY_PARAMETERS'))
         # A process error elsewhere is not evidence that rheology validation rejected input.
         reached_end='Total elapsed real time' in log
         passed=(rejected if should_reject else (not rejected and reached_end and run.returncode==0))
