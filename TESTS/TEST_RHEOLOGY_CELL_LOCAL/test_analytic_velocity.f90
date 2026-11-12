@@ -350,15 +350,15 @@ PROGRAM test_analytic_velocity
   CALL assert_close(lambert_value*EXP(lambert_value), -0.2_wp,                &
        'Lambert W negative identity')
 
-  mu_0 = 0.5_wp
-  mu_inf = 0.2_wp
-  Fr_0 = 0.8_wp
+  quadratic_config%mu_0 = 0.5_wp
+  quadratic_config%mu_inf = 0.2_wp
+  quadratic_config%Fr_0 = 0.8_wp
   rheo_state%h=flow_depth
   rheo_state%u=velocity_before(1)
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(quadratic_config,integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Froude dispatch')
@@ -371,7 +371,7 @@ PROGRAM test_analytic_velocity
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_froude_semi_implicit(rheo_state, &
+CALL eval_rheology_froude_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .FALSE., &
              stochastic_value, &
@@ -386,7 +386,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(quadratic_config,integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .TRUE., stochastic_value, velocity_after, 'Froude stochastic dispatch')
@@ -399,7 +399,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_froude_semi_implicit(rheo_state, &
+CALL eval_rheology_froude_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .TRUE., &
              stochastic_value, &
@@ -409,21 +409,21 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
        mixture_density*flow_depth, [source_x, source_y], 'Froude clamp')
   stochastic_value = 0.0_wp
 
-  mu_0 = 0.0_wp
-  mu_inf = 0.0_wp
+  quadratic_config%mu_0 = 0.0_wp
+  quadratic_config%mu_inf = 0.0_wp
   rheo_state%h=flow_depth
   rheo_state%u=velocity_before(1)
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(quadratic_config,integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .FALSE., stochastic_value, velocity_after, 'Froude zero-drag dispatch')
   CALL assert_close(velocity_after(1), velocity_before(1), 'Froude zero-drag x')
   CALL assert_close(velocity_after(2), velocity_before(2), 'Froude zero-drag y')
-  mu_0 = 0.5_wp
-  mu_inf = 0.2_wp
+  quadratic_config%mu_0 = 0.5_wp
+  quadratic_config%mu_inf = 0.2_wp
 
   U_w = 2.0_wp
   rheo_state%h=flow_depth

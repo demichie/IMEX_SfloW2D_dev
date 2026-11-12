@@ -1,5 +1,8 @@
 # IMEX_SfloW2D — Roadmap generale di sviluppo
 
+**TL04 — Froude config (12 novembre 2026; DA VERIFICARE):** le quattro interfacce della legge Froude ricevono direttamente `rheology_config_type`, i rate e l'analitico usano esclusivamente i suoi coefficienti, ed il dispatcher e i test diretti sono aggiornati. I globali condivisi con Lucas restano da eliminare nel passo successivo; questa voce non certifica build o regressioni.
+
+
 **TL04 — correzione include turbolento Voellmy (12 novembre 2026):** `rheology_voellmy_turbulent.inc` e' condiviso fra Voellmy e mu(I)-Voellmy. Dopo la migrazione del primo modello, l'include faceva riferimento a `config%xi` anche nel secondo, il cui contratto non lo dichiara ancora, causando errore di compilazione. L'include ora usa lo scalare locale `xi_parameter` valorizzato dal chiamante (`config%xi` per Voellmy, `xi` per mu(I)-Voellmy). Nessuna nuova variabile globale o formula duplicata; resta da migrare mu(I)-Voellmy e rimuovere gli ultimi accessi globali. Build e regressioni da verificare.
 
 

@@ -3,7 +3,7 @@ PROGRAM test_rheology_froude
 
   USE parameters_2d
   USE constitutive_parameters_2d
-  USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
+  USE rheology_parameters_2d, ONLY : rheology_config_type
   USE state_types, ONLY : physical_state_real, physical_state_complex, &
        initialize_physical_state_real, promote_physical_state
   USE state_physical, ONLY : build_physical_state_from_qp
@@ -91,12 +91,12 @@ PROGRAM test_rheology_froude
      Fr = speed/SQRT(g_reduced*qp(1))
      IF (stochastic_flag) Fr = MAX(0.0_wp, Fr + z)
      friction = rho_m*qp(1)*G*g_reduced                              &
-          * (mu_inf + (mu_0 - mu_inf)*EXP(-Fr/Fr_0))
+          * (rheo_config%mu_inf + (rheo_config%mu_0 - rheo_config%mu_inf)*EXP(-Fr/rheo_config%Fr_0))
      expected = 0.0_wp
      expected(2:3) = -friction*[3.0_wp, -4.0_wp]/5.0_wp
      source=0.0_wp
      CALL build_physical_state_from_qp(qp,local_state,slope_x,slope_y,0.0_wp,0.0_wp,0.0_wp)
-     CALL eval_rheology_froude_semi_implicit(local_state,G,stochastic_flag,z, &
+     CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,G,stochastic_flag,z, &
           source(2),source(3))
      CALL assert_finite(source)
      IF (MAXVAL(ABS(source-expected)) >                             &
@@ -142,9 +142,9 @@ CONTAINS
     curvature_term_flag = .FALSE.
     pore_pressure_flag = .FALSE.
     stoch_transport_flag = .TRUE.
-    mu_0 = 0.1_wp
-    mu_inf = 0.5_wp
-    Fr_0 = 1.0_wp
+    rheo_config%mu_0 = 0.1_wp
+    rheo_config%mu_inf = 0.5_wp
+    rheo_config%Fr_0 = 1.0_wp
   END SUBROUTINE initialize_properties
 
   !> \brief Populate the canonical primitive state and cached velocities.
@@ -170,7 +170,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: bx, by
     source=0.0_wp
     CALL build_physical_state_from_qp(qp,local_state,bx,by,0.0_wp,0.0_wp,0.0_wp)
-    CALL eval_rheology_froude_semi_implicit(local_state,1.0_wp,stochastic_flag, &
+    CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,1.0_wp,stochastic_flag, &
          0.2_wp,source(2),source(3))
     CALL assert_finite(source)
     IF (ANY(source /= 0.0_wp)) THEN
@@ -182,7 +182,7 @@ CONTAINS
     CALL promote_physical_state(local_state,complex_state)
     complex_state%u=complex_state%u+CMPLX(0.0_wp,1.0E-20_wp,wp)
     complex_source=CMPLX(0.0_wp,0.0_wp,wp)
-    CALL eval_rheology_froude_implicit(complex_state,complex_source(2),complex_source(3))
+    CALL eval_rheology_froude_implicit(rheo_config,complex_state,complex_source(2),complex_source(3))
     CALL assert_finite(REAL(complex_source,wp))
     CALL assert_finite(AIMAG(complex_source))
     IF (ANY(complex_source /= CMPLX(0.0_wp,0.0_wp,wp))) &
