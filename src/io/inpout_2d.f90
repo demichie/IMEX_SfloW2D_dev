@@ -1547,7 +1547,7 @@
             ! Check the actual layer configuration immediately after NAMELIST input,
             ! before source scheduling and model-specific coefficient validation.
             ! A missing model must not silently fall through as the default 'none'.
-            IF (TRIM(rheology_l1%rheology_l1%rheology_model)=='none') THEN
+            IF (TRIM(rheology_l1%rheology_model)=='none') THEN
                 CALL fatal_error('RHEOLOGY_FLAG is true but no L1 rheology model was read')
             END IF
             REWIND(input_unit)
