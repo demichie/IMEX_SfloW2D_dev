@@ -120,7 +120,6 @@ MODULE inpout_2d
     USE rheology_plastic_2d, ONLY: tau
     USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
     USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
-    USE rheology_quadratic_2d, ONLY: friction_factor
     ! -- Functions used in the rheology calculations
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
         evaluate_mixture, evaluate_mixture_from_volume, primitive_to_volume_fractions
@@ -886,7 +885,6 @@ CONTAINS
         visc_par = -1
         T_ref = -1
         tau0 = -1
-        friction_factor = -1
         mu_0 = -1
         mu_inf = -1
         Fr_0 = -1
@@ -3568,7 +3566,6 @@ CONTAINS
         beta1=rheology_l1%beta1
         Kappa=rheology_l1%Kappa
         n_td=rheology_l1%n_td
-        friction_factor=rheology_l1%friction_factor
         tau0=rheology_l1%tau0
         mu_0=rheology_l1%mu_0
         mu_inf=rheology_l1%mu_inf
