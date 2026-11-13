@@ -4,7 +4,7 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, domain, layout, source registry and numerical workspaces. Initialization
+!> Owns state, runtime, per-layer domains, layout, source registry and numerical workspaces. Initialization
 !> follows their dependency order; finalization releases their storage.
 !********************************************************************************
 
@@ -74,7 +74,7 @@ MODULE simulation_2d
         TYPE(layer_physics_type), ALLOCATABLE :: layer_physics(:) !< Validated before worker allocation.
         TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
         TYPE(state_type) :: state
-        TYPE(domain_type) :: domain
+        TYPE(domain_type), ALLOCATABLE :: domains(:) !< Layer-local active cell and face worklists.
         TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
         TYPE(time_integration_workspace_type) :: time_integration
         TYPE(stochastic_workspace_type) :: stochastic
@@ -135,7 +135,12 @@ CONTAINS
             CALL this%spatial_operators(layer)%initialize
         END DO
 
-        CALL this%domain%initialize
+        ! Keep active-cell, face and reconstruction worklists independent.
+        ! Only L1 is evolved until the two-layer scientific gates are complete.
+        ALLOCATE(this%domains(this%model_layout%n_layers))
+        DO layer=1,SIZE(this%domains)
+            CALL this%domains(layer)%initialize
+        END DO
 
         CALL this%time_integration%initialize(this%source_registry)
 
@@ -166,7 +171,7 @@ CONTAINS
         ! Lie sources, inside the integrator's unpublished trial transaction.
         IF (PRESENT(observer)) THEN
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operators,                                              &
+                this%stochastic,this%domains(1),this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
                 thermal=this%layer_physics(1)%thermal_configuration(), &
@@ -176,7 +181,7 @@ CONTAINS
                 mass_config=this%layer_physics(1)%mass_exchange_configuration())
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operators,                                              &
+                this%stochastic,this%domains(1),this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
                 thermal=this%layer_physics(1)%thermal_configuration(), &
                 rheology=this%layer_physics(1)%rheology_configuration(), &
@@ -206,7 +211,12 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
         INTEGER :: layer
 
-        CALL this%domain%finalize
+        IF (ALLOCATED(this%domains)) THEN
+            DO layer=1,SIZE(this%domains)
+                CALL this%domains(layer)%finalize
+            END DO
+            DEALLOCATE(this%domains)
+        END IF
         CALL this%time_integration%finalize
 
         IF (ALLOCATED(this%spatial_operators)) THEN

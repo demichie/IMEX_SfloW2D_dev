@@ -24,6 +24,7 @@ PROGRAM test_spatial_operator
   IMPLICIT NONE
 
   TYPE(domain_type) :: domain
+    TYPE(domain_type) :: slot2_domain !< Independent L2 active-cell and face worksets.
   TYPE(spatial_operator_type) :: spatial
     TYPE(spatial_operator_type) :: slot2_spatial !< Independent inactive-slot HP-PCCU scratch.
   TYPE(reconstruction_workspace_type) :: reconstruction
@@ -33,6 +34,8 @@ PROGRAM test_spatial_operator
   REAL(wp), ALLOCATABLE :: q_faceL(:,:,:), q_faceR(:,:,:), q_faceB(:,:,:), q_faceT(:,:,:)
   REAL(wp), ALLOCATABLE :: q(:,:,:), q0(:,:,:), qp(:,:,:), term(:,:,:), direct(:,:,:), cell_sources(:,:,:)
     REAL(wp), ALLOCATABLE :: slot2_qp(:,:,:),slot2_term(:,:,:) !< Independent slot buffers.
+    REAL(wp), ALLOCATABLE :: slot_q(:,:,:,:) !< Test-only two-slot conservative states.
+    LOGICAL, ALLOCATABLE :: l1_solve_mask_before(:,:) !< Check L2 refresh does not modify L1.
   REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0),slot2_dt
   !> Independent rate derived from the public backend face payload [1/s].
   REAL(wp) :: lambda_x, lambda_y, expected_dt, combined_dt, saved_max_dt, rate
@@ -105,22 +108,60 @@ PROGRAM test_spatial_operator
     ! same single-layer flux and CFL for identical states. Neither one
     ! borrows the other's face traces, reconstruction or speed arrays.
     ALLOCATE(slot2_qp(n_vars,nx,ny),slot2_term(n_eqns,nx,ny))
+    ALLOCATE(slot_q(n_vars,2,nx,ny))
+    slot_q(:,1,:,:)=q
+    slot_q(:,2,:,:)=q
+    l1_solve_mask_before=domain%solve_mask
+    CALL slot2_domain%initialize
+    CALL slot2_domain%check_solve(slot_q(:,2,:,:),0.0_wp,.FALSE.)
+    IF (slot2_domain%solve_cells/=domain%solve_cells) ERROR STOP 'identical layer worksets differ'
+    IF (ANY(slot2_domain%solve_mask .NEQV. domain%solve_mask)) ERROR STOP 'L2 mask differs for same state'
     slot2_qp=qp
     CALL slot2_spatial%initialize
-    CALL slot2_spatial%compute_timestep(q,slot2_qp,0.0_wp,slot2_dt,domain)
+    CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain)
     CALL same_bits('slot-local CFL matches L1',[slot2_dt],[dt])
-    CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,domain)
+    CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
 
     DO k=1,ny
         DO j=1,nx
-            IF (.NOT.domain%solve_mask(j,k)) slot2_term(:,j,k)=0.0_wp
+            IF (.NOT.slot2_domain%solve_mask(j,k)) slot2_term(:,j,k)=0.0_wp
         END DO
     END DO
 
     CALL same_bits('slot-local HP-PCCU preserves L1 result', &
         RESHAPE(slot2_term,[SIZE(slot2_term)]),RESHAPE(term,[SIZE(term)]))
+    ! Only slot 2 changes wet/dry state; the already built L1 lists remain intact.
+    slot_q(:,2,2:nx-1,2:ny-1)=0.0_wp
+    CALL slot2_domain%check_solve(slot_q(:,2,:,:),0.0_wp,.FALSE.)
+    IF (ANY(domain%solve_mask .NEQV. l1_solve_mask_before)) &
+        ERROR STOP 'L2 wet/dry domain rebuild modified L1 solve mask'
+    CALL same_bits('L2 wet/dry domain rebuild did not change L1 state', &
+        RESHAPE(slot_q(:,1,:,:),[SIZE(q)]),RESHAPE(q,[SIZE(q)]))
+    IF (slot2_domain%reconstruction_cells<slot2_domain%solve_cells) &
+        ERROR STOP 'Invalid independent L2 reconstruction workset'
+
+    ! Exercise the existing isolated single-layer kernel on a different dry/wet
+    ! slot. This is an operator test, not physical two-layer coupling.
+    slot2_qp=0.0_wp
+    slot2_qp(4,:,:)=T_ambient
+    CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain)
+    IF (.NOT.ieee_is_finite(slot2_dt) .OR. slot2_dt<=0.0_wp) &
+        ERROR STOP 'Invalid independent L2 dry/wet CFL'
+    CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
+    DO k=1,ny
+        DO j=1,nx
+            IF (.NOT.slot2_domain%solve_mask(j,k)) CYCLE
+            IF (.NOT.ALL(ieee_is_finite(slot2_term(:,j,k)))) &
+                ERROR STOP 'Non-finite independent L2 dry/wet spatial term'
+        END DO
+    END DO
+
+    slot2_domain%solve_mask_time(1,1)=12.5_wp
+    IF (domain%solve_mask_time(1,1)==slot2_domain%solve_mask_time(1,1)) &
+        ERROR STOP 'L2 domain workset aliases the L1 domain'
     CALL slot2_spatial%finalize
-    DEALLOCATE(slot2_qp,slot2_term)
+    CALL slot2_domain%finalize
+    DEALLOCATE(slot2_qp,slot2_term,slot_q,l1_solve_mask_before)
 
   IF (.NOT.ALL(ieee_is_finite(term))) ERROR STOP 'nonfinite spatial term'
   CALL prepare_injection_materials(materials)

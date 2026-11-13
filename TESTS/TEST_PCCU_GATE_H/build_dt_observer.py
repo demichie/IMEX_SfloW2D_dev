@@ -30,8 +30,8 @@ def instrument(source, include_spatial=False):
         if source.count(declaration) != 1:
             raise AssertionError("unexpected main declaration")
         source = source.replace(declaration, declaration + "\n  REAL(wp) :: observed_spatial_dt", 1)
-        proposal = ("            simulation%runtime%dt, simulation%domain,                         &\n"
-                    "            boundary_source_enabled=boundary_source_enabled)")
+        proposal = ("                simulation%runtime%dt, simulation%domains(1), &\n"
+                    "                boundary_source_enabled=boundary_source_enabled)")
         if source.count(proposal) != 1:
             raise AssertionError("unexpected spatial proposal hook")
         source = source.replace(proposal, proposal + "\n      observed_spatial_dt = simulation%runtime%dt", 1)

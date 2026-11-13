@@ -16,6 +16,7 @@ PROGRAM test_workspace_lifecycle
   USE substrate_parameters_2d, ONLY : substrate
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+    USE domain_2d, ONLY : domain_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
   IMPLICIT NONE
 
@@ -24,6 +25,7 @@ PROGRAM test_workspace_lifecycle
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
     TYPE(spatial_operator_type), ALLOCATABLE :: spatial_slots(:) !< Independent slot-local workspaces.
+    TYPE(domain_type), ALLOCATABLE :: domain_slots(:) !< Independent per-layer active worksets.
   INTEGER :: j, k
   REAL(wp), ALLOCATABLE :: bed_before(:,:), center_before(:,:), &
        face_before(:,:), slope_before(:,:), gravity_before(:,:)
@@ -172,18 +174,24 @@ PROGRAM test_workspace_lifecycle
     ! The simulation owns one independent HP-PCCU workspace per material slot.
     ! Check allocation, finalization and repeated setup without enabling L2.
     DO j=1,2
-        ALLOCATE(spatial_slots(2))
+        ALLOCATE(spatial_slots(2),domain_slots(2))
 
         DO k=1,SIZE(spatial_slots)
             CALL spatial_slots(k)%initialize
+            CALL domain_slots(k)%initialize
         END DO
+
+        domain_slots(2)%solve_mask_time=25.0_wp
+        CALL assert_true('domain slots own separate masks',ALL(domain_slots(1)%solve_mask_time==0.0_wp))
 
         DO k=1,SIZE(spatial_slots)
             CALL spatial_slots(k)%finalize
+            CALL domain_slots(k)%finalize
         END DO
 
-        DEALLOCATE(spatial_slots)
-        CALL assert_true('slot workspaces released',.NOT.ALLOCATED(spatial_slots))
+        DEALLOCATE(spatial_slots,domain_slots)
+        CALL assert_true('slot workspaces released', &
+            .NOT.ALLOCATED(spatial_slots) .AND. .NOT.ALLOCATED(domain_slots))
     END DO
 
   PRINT *, 'PASS: workspace lifecycle and geometry transaction rollback verified'

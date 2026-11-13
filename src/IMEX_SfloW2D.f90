@@ -213,7 +213,7 @@ PROGRAM IMEX_SfloW2D
             ! ---------------------------------------------------------
             WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
             CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state,    &
-                simulation%domain)
+                simulation%domains(1))
             CALL validate_restart_output_manifest(simulation%runtime)
 
             is_binary_restart = .TRUE.
@@ -232,7 +232,7 @@ PROGRAM IMEX_SfloW2D
             ! CASE 2: CLASSIC INITIALIZATION (Python / ASCII)
             ! ---------------------------------------------------------
             WRITE(*,*) 'Standard format detected: Executing read_solution.'
-            CALL read_solution(simulation%state, simulation%domain)
+            CALL read_solution(simulation%state, simulation%domains(1))
 
         END IF
 
@@ -256,16 +256,16 @@ PROGRAM IMEX_SfloW2D
 
     IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-    CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:),                                                             &
+    CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
             simulation%runtime%t, .TRUE.)
-    CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
+    CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domains(1))
 
     ! For a new run or a classic restart, initialize the stochastic field only
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
     ! restart already contains Z and only needs its convolution kernel above.
     IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                                                             &
             CALL simulation%stochastic%initialize_steady(                                                              &
-            simulation%state, simulation%domain)
+            simulation%state, simulation%domains(1))
 
     IF ( substrate%topo_change_flag ) CALL refresh_topography_geometry
 
@@ -305,10 +305,10 @@ PROGRAM IMEX_SfloW2D
     !$OMP & thickness_exceeds,pressure_exceeds, &
     !$OMP & mod_vel,r_u,r_v,conversion_ok) REDUCTION(.OR.:conversion_failed)
 
-    DO l = 1,simulation%domain%solve_cells
+    DO l = 1,simulation%domains(1)%solve_cells
 
-        j = simulation%domain%j_cent(l)
-        k = simulation%domain%k_cent(l)
+        j = simulation%domains(1)%j_cent(l)
+        k = simulation%domains(1)%k_cent(l)
 
         IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
@@ -426,21 +426,21 @@ PROGRAM IMEX_SfloW2D
 
         IF ( simulation%runtime%t .EQ. t_start ) THEN
 
-            CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:),                                                     &
+            CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
                     simulation%runtime%t, .FALSE.)
 
         ELSE
 
-            CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:),                                                     &
+            CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
                     simulation%runtime%t, .FALSE.)
 
         END IF
 
-        CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
+        CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domains(1))
 
         CALL simulation%spatial_operators(1)%compute_timestep( &
                 simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
-                simulation%runtime%dt, simulation%domain,                                                              &
+                simulation%runtime%dt, simulation%domains(1), &
                 boundary_source_enabled=boundary_source_enabled)
 
         IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                                                         &
@@ -497,10 +497,10 @@ PROGRAM IMEX_SfloW2D
         !$OMP & thickness_exceeds,pressure_exceeds,mod_vel,r_u,r_v)
 
 
-        DO l = 1,simulation%domain%solve_cells
+        DO l = 1,simulation%domains(1)%solve_cells
 
-            j = simulation%domain%j_cent(l)
-            k = simulation%domain%k_cent(l)
+            j = simulation%domains(1)%j_cent(l)
+            k = simulation%domains(1)%k_cent(l)
 
             IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
@@ -621,7 +621,7 @@ PROGRAM IMEX_SfloW2D
 
                 CALL output_solution(simulation%runtime%t, simulation%state, simulation%runtime)
                 CALL write_restart_file(output_file_path('restart', 'restart.bin'), simulation%runtime,                &
-                    simulation%stochastic, simulation%state, simulation%domain)
+                    simulation%stochastic, simulation%state, simulation%domains(1))
 
             END IF
 
