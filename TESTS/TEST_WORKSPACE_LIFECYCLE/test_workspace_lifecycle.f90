@@ -16,12 +16,14 @@ PROGRAM test_workspace_lifecycle
   USE substrate_parameters_2d, ONLY : substrate
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+    USE spatial_operator_2d, ONLY : spatial_operator_type
   IMPLICIT NONE
 
   TYPE(state_type) :: state
   TYPE(substrate_snapshot_type) :: substrate_before
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
+    TYPE(spatial_operator_type), ALLOCATABLE :: spatial_slots(:) !< Independent slot-local workspaces.
   INTEGER :: j, k
   REAL(wp), ALLOCATABLE :: bed_before(:,:), center_before(:,:), &
        face_before(:,:), slope_before(:,:), gravity_before(:,:)
@@ -166,6 +168,23 @@ PROGRAM test_workspace_lifecycle
      CALL assert_true('speed bounds released', .NOT.ALLOCATED(hyperbolic%a_interface_xNeg))
      CALL assert_true('HP scratch released', .NOT.ALLOCATED(reconstruction%hp_eta_mask))
   END DO
+
+    ! The simulation owns one independent HP-PCCU workspace per material slot.
+    ! Check allocation, finalization and repeated setup without enabling L2.
+    DO j=1,2
+        ALLOCATE(spatial_slots(2))
+
+        DO k=1,SIZE(spatial_slots)
+            CALL spatial_slots(k)%initialize
+        END DO
+
+        DO k=1,SIZE(spatial_slots)
+            CALL spatial_slots(k)%finalize
+        END DO
+
+        DEALLOCATE(spatial_slots)
+        CALL assert_true('slot workspaces released',.NOT.ALLOCATED(spatial_slots))
+    END DO
 
   PRINT *, 'PASS: workspace lifecycle and geometry transaction rollback verified'
 

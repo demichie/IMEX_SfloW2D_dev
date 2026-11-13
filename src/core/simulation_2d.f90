@@ -75,7 +75,7 @@ MODULE simulation_2d
         TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
         TYPE(state_type) :: state
         TYPE(domain_type) :: domain
-        TYPE(spatial_operator_type) :: spatial_operator
+        TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
         TYPE(time_integration_workspace_type) :: time_integration
         TYPE(stochastic_workspace_type) :: stochastic
 
@@ -101,7 +101,7 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
 
         CHARACTER(LEN=256) :: source_error
-        INTEGER :: carrier_phase
+        INTEGER :: carrier_phase,layer
 
         ! Canonical state indices must be available before any initial-condition
         ! conversion, including collapsing-volume initialization.
@@ -127,7 +127,14 @@ CONTAINS
 
         CALL this%state%initialize( this%model_layout )
 
-        CALL this%spatial_operator%initialize
+        ! Each layer owns its reconstruction, face fluxes and CFL scratch.
+        ! The production layout still admits only L1; do not activate L2 here.
+        ALLOCATE(this%spatial_operators(this%model_layout%n_layers))
+
+        DO layer=1,SIZE(this%spatial_operators)
+            CALL this%spatial_operators(layer)%initialize
+        END DO
+
         CALL this%domain%initialize
 
         CALL this%time_integration%initialize(this%source_registry)
@@ -159,7 +166,7 @@ CONTAINS
         ! Lie sources, inside the integrator's unpublished trial transaction.
         IF (PRESENT(observer)) THEN
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operator,                                              &
+                this%stochastic,this%domain,this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
                 thermal=this%layer_physics(1)%thermal_configuration(), &
@@ -169,7 +176,7 @@ CONTAINS
                 mass_config=this%layer_physics(1)%mass_exchange_configuration())
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operator,                                              &
+                this%stochastic,this%domain,this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
                 thermal=this%layer_physics(1)%thermal_configuration(), &
                 rheology=this%layer_physics(1)%rheology_configuration(), &
@@ -197,10 +204,18 @@ CONTAINS
     SUBROUTINE finalize_simulation(this)
 
         CLASS(simulation_context_type), INTENT(INOUT) :: this
+        INTEGER :: layer
 
         CALL this%domain%finalize
         CALL this%time_integration%finalize
-        CALL this%spatial_operator%finalize
+
+        IF (ALLOCATED(this%spatial_operators)) THEN
+            DO layer=1,SIZE(this%spatial_operators)
+                CALL this%spatial_operators(layer)%finalize
+            END DO
+
+            DEALLOCATE(this%spatial_operators)
+        END IF
 
         CALL this%state%finalize
 

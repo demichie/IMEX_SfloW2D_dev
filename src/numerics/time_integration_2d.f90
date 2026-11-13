@@ -87,13 +87,13 @@ CONTAINS
     !> @param[in] stochastic_values Per-cell stochastic input array.
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
-    !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
+    !> @param[in,out] spatial_operators Per-layer HP-PCCU workspaces; only slot 1 executes today.
     !> @param[in] thermal Immutable selected layer thermal configuration.
     !> @param[in] rheology Immutable selected layer rheology configuration.
     !> @param[in] pore_pressure Immutable layer Darcy configuration.
     !> @param[in] pore_cache Derived Pascal coefficient cache for this layer.
     !> @param[in] mass_config Immutable layer combined mass-exchange configuration.
-    SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operator,pre_spatial_primitives_ready, &
+    SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operators,pre_spatial_primitives_ready, &
         stochastic_prepared_hook,thermal,rheology,pore_pressure,pore_cache,mass_config)
         CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
         CLASS(state_type), TARGET, INTENT(INOUT) :: state
@@ -101,7 +101,7 @@ CONTAINS
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
         PROCEDURE(stochastic_stage_observer), OPTIONAL :: stochastic_prepared_hook
         CLASS(domain_type), INTENT(IN) :: domain
-        CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
+        CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operators(:)
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
@@ -181,7 +181,7 @@ CONTAINS
         END IF
 
         ! The spatial step is conservative; only admissibility is checked.
-        CALL spatial_operator%evaluate(qp_pre,this%spatial_rate(:,1,:,:),t,domain,                                            &
+        CALL spatial_operators(1)%evaluate(qp_pre,this%spatial_rate(:,1,:,:),t,domain, &
             reuse_cfl_traces=reuse_cfl_traces)
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,conversion_ok)
         DO l=1,domain%solve_cells
@@ -249,7 +249,7 @@ CONTAINS
                 WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
                     ' before/rate/after=',state%q(eq,1,j,k), &
                     this%spatial_rate(eq,1,j,k),this%q_trial(eq,1,j,k)
-                CALL spatial_operator%diagnose_cell(j,k,eq)
+                CALL spatial_operators(1)%diagnose_cell(j,k,eq)
             END DO
             IF (this%cell_status(first_failure)==1)                                                                  &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')

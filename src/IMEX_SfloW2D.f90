@@ -258,7 +258,7 @@ PROGRAM IMEX_SfloW2D
 
     CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:),                                                             &
             simulation%runtime%t, .TRUE.)
-    CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
+    CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
 
     ! For a new run or a classic restart, initialize the stochastic field only
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -436,9 +436,9 @@ PROGRAM IMEX_SfloW2D
 
         END IF
 
-        CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
+        CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
 
-        CALL simulation%spatial_operator%compute_timestep(                                                             &
+        CALL simulation%spatial_operators(1)%compute_timestep( &
                 simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
                 simulation%runtime%dt, simulation%domain,                                                              &
                 boundary_source_enabled=boundary_source_enabled)

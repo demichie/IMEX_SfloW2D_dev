@@ -25,13 +25,15 @@ PROGRAM test_spatial_operator
 
   TYPE(domain_type) :: domain
   TYPE(spatial_operator_type) :: spatial
+    TYPE(spatial_operator_type) :: slot2_spatial !< Independent inactive-slot HP-PCCU scratch.
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
   TYPE(source_group_type) :: explicit_group
   TYPE(injection_material_set_type) :: materials
   REAL(wp), ALLOCATABLE :: q_faceL(:,:,:), q_faceR(:,:,:), q_faceB(:,:,:), q_faceT(:,:,:)
   REAL(wp), ALLOCATABLE :: q(:,:,:), q0(:,:,:), qp(:,:,:), term(:,:,:), direct(:,:,:), cell_sources(:,:,:)
-  REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0)
+    REAL(wp), ALLOCATABLE :: slot2_qp(:,:,:),slot2_term(:,:,:) !< Independent slot buffers.
+  REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0),slot2_dt
   !> Independent rate derived from the public backend face payload [1/s].
   REAL(wp) :: lambda_x, lambda_y, expected_dt, combined_dt, saved_max_dt, rate
   CHARACTER(LEN=32) :: argument
@@ -98,6 +100,28 @@ PROGRAM test_spatial_operator
   END DO
   CALL same_bits('public operator delegates complete spatial term',     &
        RESHAPE(term,[SIZE(term)]),RESHAPE(direct,[SIZE(direct)]))
+
+    ! The two independently owned HP-PCCU workspaces must reproduce the
+    ! same single-layer flux and CFL for identical states. Neither one
+    ! borrows the other's face traces, reconstruction or speed arrays.
+    ALLOCATE(slot2_qp(n_vars,nx,ny),slot2_term(n_eqns,nx,ny))
+    slot2_qp=qp
+    CALL slot2_spatial%initialize
+    CALL slot2_spatial%compute_timestep(q,slot2_qp,0.0_wp,slot2_dt,domain)
+    CALL same_bits('slot-local CFL matches L1',[slot2_dt],[dt])
+    CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,domain)
+
+    DO k=1,ny
+        DO j=1,nx
+            IF (.NOT.domain%solve_mask(j,k)) slot2_term(:,j,k)=0.0_wp
+        END DO
+    END DO
+
+    CALL same_bits('slot-local HP-PCCU preserves L1 result', &
+        RESHAPE(slot2_term,[SIZE(slot2_term)]),RESHAPE(term,[SIZE(term)]))
+    CALL slot2_spatial%finalize
+    DEALLOCATE(slot2_qp,slot2_term)
+
   IF (.NOT.ALL(ieee_is_finite(term))) ERROR STOP 'nonfinite spatial term'
   CALL prepare_injection_materials(materials)
   cell_sources=0.0_wp
