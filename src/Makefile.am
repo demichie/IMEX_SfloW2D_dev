@@ -502,6 +502,16 @@ IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
 IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 
 # Explicit Fortran module dependencies for deterministic parallel builds.
+# TL04-C1: the SHARED substrate module must be compiled after parameters_2d.
+# Every direct USE needs an explicit producer edge for parallel Automake builds.
+physics/substrate/substrate_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+state/state_fields.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+IMEX_SfloW2D.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                      physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
