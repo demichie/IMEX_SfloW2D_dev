@@ -32,7 +32,7 @@ PROGRAM test_pore_pressure_namelist_alias
     IF (pore_pressure_l1%pore_pressure_group/=3) ERROR STOP 'Legacy Darcy group mismatch'
 
     CALL precompute_pascal_coefficient(pore_pressure_l1,pore_pressure_cache_l1)
-    IF (.NOT.pore_pressure_cache_l1%pascal_coeff_precomputed) ERROR STOP 'Pascal cache not initialized'
+    IF (.NOT.ALLOCATED(pore_pressure_cache_l1%pascal_coeff)) ERROR STOP 'Pascal cache not initialized'
     IF (LBOUND(pore_pressure_cache_l1%pascal_coeff,1)/=0 .OR. &
         UBOUND(pore_pressure_cache_l1%pascal_coeff,1)/=2) ERROR STOP 'Pascal cache bounds mismatch'
 

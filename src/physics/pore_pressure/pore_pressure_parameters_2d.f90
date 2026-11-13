@@ -23,7 +23,6 @@ MODULE pore_pressure_parameters_2d
     !> @brief Derived Pascal coefficients, never a second copy of physical parameters.
     TYPE :: pore_pressure_cache_type
         REAL(wp), ALLOCATABLE :: pascal_coeff(:)  !< Binomial products indexed 0:N_inh.
-        LOGICAL :: pascal_coeff_precomputed=.FALSE.
     END TYPE pore_pressure_cache_type
 
     ! Canonical layer objects: L2 remains inactive in the current solver.
@@ -74,6 +73,5 @@ CONTAINS
             cache%pascal_coeff(n)=pascal1*pascal2
         END DO
 
-        cache%pascal_coeff_precomputed=.TRUE.
     END SUBROUTINE precompute_pascal_coefficient
 END MODULE pore_pressure_parameters_2d
