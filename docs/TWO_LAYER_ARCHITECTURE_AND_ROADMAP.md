@@ -1,6 +1,6 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Plan updated:** 13 November 2026. **Branch:** `feature/two-layer`. **Verified CI baseline:** [`672e0a0`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/672e0a06d6465dd6f2b3e5f9e91ef7ccc1a8e36f) (build optimized/debug and cell-physics/numerical regressions successful). **TL04-C3/C4:** canonical combined mass-exchange configuration and propagation CI-verified; scientific gate C5/G3 remains open pending the deferred EXAMPLES and extended physical checks. **TL05 preparation:** spatial operator workspaces CI-verified; independent per-slot active-domain worklists and isolated numerical wet/dry tests are the next step. No two-layer execution or coupled HP-PCCU.
+**Plan updated:** 13 November 2026. **Branch:** `feature/two-layer`. **Verified CI baseline:** [`d901609`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d9016093a4b1f5c790e083a7d137a055c890a66e) (build optimized/debug and cell-physics/numerical regressions successful). **TL04-C3/C4:** canonical combined mass-exchange configuration and propagation CI-verified; scientific gate C5/G3 remains open pending the deferred EXAMPLES and extended physical checks. **TL05 preparation:** spatial operators and independent per-slot active-domain worklists CI-verified on `d901609`; physical L2 transport and coupled HP-PCCU still pending. No two-layer execution.
 **Stato:** codice di produzione ancora **single-layer**; `N_LAYERS=2` resta disabilitato. La presente roadmap è il **solo piano vigente**: specifica, stato verificato, attività, gate e milestone. La cronologia dettagliata è nei commit Git, non in versioni alternative del piano.
 **Documenti collegati:** [audit tecnico corrente](TWO_LAYER_CODE_AUDIT.md), [roadmap generale](IMEX_SfloW2D_Development_Roadmap.md), manoscritto *IMEX_SfloW2D_v3*.
 
@@ -28,10 +28,10 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Substrate | TL04-C1 owns ground temperature, porosity, erodible inventory settings and topography setup in `substrate_parameters_2d`; code, input fixtures and generators were migrated. | Extended scientific checks on terrain energy, inventory/restart and formerly distinct ground temperatures remain part of G3. |
 | Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
 | Physical sources | The registry remains single-layer; `layer_contacts_2d` is implemented and pure. Combined mass-exchange L1/L2 configurations have one canonical owner; `mass_exchange_2d.f90` receives the selected read-only config and retains shared inventory limiters. CI verified on `32e4e33`. | Complete C5 scientific verification, including deferred EXAMPLES. Activate contact dispatch and L2 source execution only in TL07/TL11. |
-| Spaziale | `nonconservative_2d` resta l'integratore di percorso HP-PCCU. I workspace di ricostruzione/flussi/CFL sono per slot (CI verde su `672e0a0`); TL05-B prepara anche `domains(:)` con workset di celle, facce e ricostruzione indipendenti, mantenendo il driver L1. | Certificare le liste per slot con CI, implementare il trasporto L2 isolato con la sua closure fisica e poi `eta_1`/`eta_tot`, pressione accoppiata, CFL coupled, wet/dry e iperbolicità. |
+| Spaziale | `nonconservative_2d` resta l'integratore di percorso HP-PCCU. Gli operatori `spatial_operators(:)` e le worklist `domains(:)` sono indipendenti per slot; entrambe le Actions sono verdi su `d901609`. Il driver usa ancora solo L1. | Implementare il trasporto L2 isolato con la sua closure fisica e poi `eta_1`/`eta_tot`, pressione accoppiata, CFL coupled, wet/dry e iperbolicità, secondo il contratto geometrico di sezione 6. |
 | I/O | NetCDF single-layer `(x,y,time)`, restart v7 with L1 plus shared inventories, current `.asc/.q_2d` outputs and diagnostics. | Define one authoritative schema when I/O changes, update reader/writer/tests together and verify scientifically meaningful single-layer continuation; no superseded-format reader or backward-compatibility requirement. |
 
-**CI evidence:** [Build (optimized and debug) #43503101813](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43503101813) and [Cell physics and numerical regressions #43503392454](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43503392454) both succeeded on [`672e0a0`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/672e0a06d6465dd6f2b3e5f9e91ef7ccc1a8e36f), after TL04-C3/C4 and the spatial-workspace preparation. One additional regression run on that commit was cancelled; a distinct successful run exists. The user deferred EXAMPLES after mass-exchange migration; earlier examples do not certify these changes. NetCDF/restart, OpenMP, conservation and two-layer scientific gates remain open. The subsequent per-slot domain worklists require new CI.
+**CI evidence:** [Build (optimized and debug) #43505177703](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43505177703) and [Cell physics and numerical regressions #43505283197](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43505283197) both succeeded on [`d901609`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d9016093a4b1f5c790e083a7d137a055c890a66e), covering TL04-C3/C4 and TL05-A/B workspaces and worklists. The user deferred EXAMPLES after the mass-exchange migration; earlier examples do not certify these changes. NetCDF/restart, OpenMP, conservation and two-layer scientific gates remain open.
 
 ## 3. Dati, proprietà e configurazioni autorevoli
 
@@ -158,6 +158,73 @@ B       = quota del substrato
 eta_1   = B + h1
 eta_tot = B + h1 + h2
 ```
+### Approved two-layer geometric contract — IMEX_v3.pdf
+
+**Decision (13 November 2026, before TL05-C):** adopt the terrain-based geometry of
+*IMEX_SfloW2D_v3: A two-layer shallow-water model for pyroclastic density currents with
+pore-pressure transport, polydisperse settling and shear-driven elutriation* as the
+scientific reference for large-slope correction, curvature and interlayer pressure.
+The model uses a global Cartesian frame and vertically measured layer thicknesses.
+This records the chosen equations; it does **not** mean they are already implemented
+or scientifically validated in the current repository.
+
+- **SHARED reference geometry:** the ground elevation `B(x,y)`, `grad(B)` and
+  `B_xx, B_xy, B_yy` have one authoritative owner, with no L1/L2 copies.
+  The large-slope metric is `G = g_cell = 1/(1 + B_x**2 + B_y**2)` for **both**
+  layers. Do **not** replace `B` by `B+h1` when forming metric or terrain curvature.
+- **Layer-local kinematics:** when the large-slope correction is enabled, each
+  layer's bed-tangent vertical velocity is `w_i = u_i*B_x + v_i*B_y`;
+  use its own `(u_i,v_i)` in velocity magnitudes of the applicable closures.
+  Its curvature acceleration is
+  `kappa_curv_i = B_xx*u_i**2 + 2*B_xy*u_i*v_i + B_yy*v_i**2`.
+  Thus terrain derivatives are SHARED but `w_i` and `kappa_curv_i` are
+  computed per layer from the **current** layer velocities; no stored copies.
+- **Curvature placement:** distinguish the nonnegative reduced gravity
+  `max(gprime_i,0)`, which enters hydrostatic pressure fluxes and the
+  single-layer wave-speed estimates, from
+  `gtilde_i = max(gprime_i,0) + kappa_curv_i`, used by the topographic
+  slope source and (for dense L1) the effective normal stress of rheology.
+  Do **not** add curvature to pressure fluxes or CFL celerities.
+  Preserve the existing explicit metric-gradient source contributions.
+- **Moving interface, not a replacement terrain:** `eta_1=B+h1` and
+  `eta_tot=B+h1+h2` are derived from the two-layer state, not stored
+  alternative geometries. The upper flow feels the gradient of `B+h1`
+  through the hydrostatic pressure/coupling terms (Eqs. 6–7, 14–17),
+  **not** through a separate slope metric or a Hessian of `B+h1`.
+  The lower flow feels the spatial gradient of the overlying load.
+- **Nonconservative pair:** use the two products and metric placements given
+  directly below (Sect. 2.7.1 of the manuscript): `G` lies **outside**
+  the L1 derivative and **inside** the differentiated L2 expression.
+  When `L = rho_m2*gprime2*h2` is nonnegative and no clamp is active,
+  their sum is `-d_j(G*h1*L)`. The ash-cloud-side pressure load is clamped
+  to zero for buoyant L2; the lower-side product retains the raw load
+  gradient as specified in the manuscript. Track any resulting pair-budget
+  defect explicitly; do not silently force antisymmetry in the clamped case.
+- **Well-balancing qualification:** exact stratified rest on a flat bed,
+  and the paired product identity without clamping, are required checks.
+  On curved terrain the manuscript accepts a residual proportional to
+  `-rho_m2*gprime2*h2*h1*d_j(G)`, at the single-layer curved-bed
+  balance floor. Do not claim exact curved-bed equilibrium or change
+  the metric placements solely to remove this residual.
+- **Activation and scope:** these decisions constrain TL05-C (isolated L2
+  transport) and TL06 (coupled HP-PCCU). They do not enable `N_LAYERS=2`,
+  introduce interlayer curvature forces, or authorize changes to existing
+  single-layer flags, regularizations or numerical evaluation order.
+  Any layer-specific reinterpretation of `SLOPE_CORRECTION_FLAG` or
+  `CURVATURE_TERM_FLAG` requires a separate explicit decision.
+
+**Scientific reference:** IMEX_v3.pdf, Sect. 2.1.2 (Eqs. 6–7), Sect. 2.3
+(Eq. 34), Sect. 2.7.1 (metric placements and buoyancy clamp), Sect. 2.11
+(Eq. 73), Sect. 3.0.2 (path-conservative products), and Sect. 4.0.3
+(stratified lake-at-rest verification).
+
+**Required TL05/TL06 tests:** flat bed (`G=1`, zero curvature), constant-slope
+terrain, curved terrain with distinct `(u1,v1)` and `(u2,v2)`, a nonuniform
+`h1` with `B` fixed, L1-only/L2-only dry reductions, stratified rest,
+the unclamped pair-sum and clamped buoyancy-budget cases, coupled
+reconstruction/wet-dry and CFL/hyperbolicity diagnostics. Preserve
+single-layer bitwise regressions whenever the new features are inactive.
+
 Con `G=g_cell`, `K2=rho_m2*gprime2` e `L=K2*h2`, nella direzione `j` la coppia di pressione è:
 ```text
 S_inter1 = -G*h1*d_j(L)
@@ -173,7 +240,7 @@ Le velocità `u ± sqrt(G*gprime*h)` dei due layer separati **non** garantiscono
 
 **TL05-A — workspace HP-PCCU per slot (CI verificata su `672e0a0`):** `simulation_context_type` possiede `spatial_operators(:)` dimensionato sul layout canonico, con inizializzazione/finalizzazione per elemento. `time_integration_2d` riceve l'array ma usa soltanto `spatial_operators(1)`; anche il CFL produttivo resta L1. `TEST_SPATIAL_OPERATOR` confronta bit per bit due operatori indipendenti sullo stesso stato.
 
-**TL05-B — workset attivi per slot (implementazione in verifica):** il contesto possiede `domains(:)` dimensionato sul layout canonico, anziché un solo `domain`. Ciascun dominio mantiene separatamente maschere wet/dry, liste di celle e facce, aloni e workset HP, aggiornati da `domain_type%check_solve`. Il driver, il Lie, lo stochastic e I/O/restarter selezionano esplicitamente `domains(1)` per preservare il single-layer. In `TEST_SPATIAL_OPERATOR`, una coppia di stati conservativi rank-4 e due domini/operatori indipendenti verifica l'identità per input uguali e l'assenza di interferenze quando cambia il wet/dry dello slot 2. `TEST_WORKSPACE_LIFECYCLE` verifica allocazione/finalizzazione ripetuta delle coppie. Il test usa ancora il kernel monolayer sulla stessa closure solo come prova di isolamento numerico, **non** come validazione della fisica L2. La futura selezione per-layer delle sorgenti e della fase, i path `eta_1`/`eta_tot` e il trasporto L2 fisicamente corretto restano aperti. TL05 e i gate scientifici non sono conclusi.
+**TL05-B — workset attivi per slot (CI verificata su `d901609`):** il contesto possiede `domains(:)` dimensionato sul layout canonico, anziché un solo `domain`. Ciascun dominio mantiene separatamente maschere wet/dry, liste di celle e facce, aloni e workset HP, aggiornati da `domain_type%check_solve`. Il driver, il Lie, lo stochastic e I/O/restarter selezionano esplicitamente `domains(1)` per preservare il single-layer. In `TEST_SPATIAL_OPERATOR`, una coppia di stati conservativi rank-4 e due domini/operatori indipendenti verifica l'identità per input uguali e l'assenza di interferenze quando cambia il wet/dry dello slot 2. `TEST_WORKSPACE_LIFECYCLE` verifica allocazione/finalizzazione ripetuta delle coppie. Il test usa ancora il kernel monolayer sulla stessa closure solo come prova di isolamento numerico, **non** come validazione della fisica L2. La futura selezione per-layer delle sorgenti e della fase, i path `eta_1`/`eta_tot` e il trasporto L2 fisicamente corretto restano aperti. TL05 e i gate scientifici non sono conclusi.
 
 ## 7. Chiusure fisiche da implementare
 
@@ -207,7 +274,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL04-R — rheology configuration** | **Implemented; CI verified on `662e796`** | Explicit canonical L1 configuration propagated through source assembly, Lie, REAL/COMPLEX and analytic callers; both single-layer NAMELIST names intentionally retained. L2 production selection and complete scientific gate remain open. |
 | **TL04-T — thermal configuration** | **Implemented; CI verified on `662e796`** | Canonical L1/L2 cooling configs and explicit propagation; TL04-C1 relocated shared ground temperature. Both single-layer NAMELIST names intentionally retained; extended thermal scientific gate open. |
 | **TL04-C — remaining configurations and contacts** | **C1–C4 implemented; both CI workflows green on `32e4e33`; C5/G3 open** | Preserve one combined mass-exchange assembler and the approved single-layer NAMELIST aliases. Complete deferred EXAMPLES, extended physics, restart and OpenMP verification before certifying C5. |
-| **TL05 — HP-PCCU indipendente per slot** | **A: operatori per slot CI verificati su `672e0a0`; B: domain worklists per slot da validare** | Ogni slot ha workspace HP-PCCU e workset di celle/facce separati; il calcolo produttivo resta L1. Testare l'isolamento wet/dry numerico e poi implementare l'effettivo trasporto L2, `eta_1`/`eta_tot` e la riduzione single-layer. |
+| **TL05 — HP-PCCU indipendente per slot** | **A/B: operatori e domain worklists per slot, CI verificata su `d901609`; C aperto** | Ogni slot ha workspace HP-PCCU e workset di celle/facce separati; il calcolo produttivo resta L1. Implementare L2 isolato rispettando la geometria condivisa di sezione 6; successivamente `eta_1`/`eta_tot`, pressione coupled e riduzione single-layer. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
 | **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local, rate monolayer isolati, `Gamma` di coppia, commit/rollback atomico, gruppo 0 e OpenMP; gate G5. |
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
@@ -226,7 +293,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **M0** | TL00: baseline e specifiche | **Da certificare** | G0: tag, audit e benchmark riproducibile, branch protetto verificato. |
 | **M1** | TL00a: deposito unico | **Implementata, non certificata** | G1: deposizione lava/granulare, restart, topografia e output. |
 | **M2** | TL01–TL03: rank-4 single-layer validato | **Parziale, non certificata** | G2: full EXAMPLES, confronto baseline, NetCDF/restart, OpenMP e numerica. |
-| **M3** | TL04–TL05: isolated L1/L2 infrastructure | **Shared substrate, solids, L1/L2 exchange configs e workspace HP-PCCU L1 CI-verified on `672e0a0`; workset di dominio per slot in verifica; L2 fisico isolato e C5 aperti** | G3: single authoritative SHARED properties, two canonical per-layer exchange configs, one mass-exchange assembler, tests, OpenMP, inactive L2 and isolated L2 transport. |
+| **M3** | TL04–TL05: isolated L1/L2 infrastructure | **Shared substrate, solids, L1/L2 exchange configs and spatial operators/domains per slot CI-verified on `d901609`; isolated physical L2 transport and C5 remain open** | G3: single authoritative SHARED properties, two canonical per-layer exchange configs, one mass-exchange assembler, tests, OpenMP, inactive L2 and isolated L2 transport. |
 | **M4** | TL06: operatore spaziale accoppiato | **Non iniziata** | G4: path, pressione completa, topografia, CFL, wet/dry, clamp e iperbolicità. |
 | **M5** | TL07–TL11: Lie coppia e chiusure | **Non iniziata** | G5/G6: rate per-layer, coppia conservativa, budget esterni, rollback, contatti fisici e tutti i processi verificati. |
 | **M6** | TL12–TL13: modello disponibile | **Non iniziata** | G7: benchmark scientifici, prestazioni, I/O e restart, approvazione esplicita all'attivazione. |
@@ -239,7 +306,7 @@ Le milestone sono **punti di proposta di merge**, non autorizzazioni automatiche
 |---|---|---|
 | **G0** | Baseline taggato, esempi riproducibili, confronti, condizioni OpenMP e prestazioni | Non certificato. |
 | **G1** | `deposit_tot` granulare/lava, `n_solid=0`, rollback, erosione, topografia e restart v7 | Codice e alcuni test esistenti; matrice integrata non certificata. |
-| **G2** | Rank-4 L1, IC/BC, Lie, spatial, NUMERICS, full EXAMPLES, NetCDF, restart, OpenMP | Build e regressioni su `672e0a0` **success**; gli EXAMPLES dopo il mass exchange sono rinviati. Confronto baseline, NetCDF/restart, OpenMP e matrice scientifica non interamente certificati. |
+| **G2** | Rank-4 L1, IC/BC, Lie, spatial, NUMERICS, full EXAMPLES, NetCDF, restart, OpenMP | Build e regressioni su `d901609` **success**; gli EXAMPLES dopo il mass exchange sono rinviati. Confronto baseline, NetCDF/restart, OpenMP e matrice scientifica non interamente certificati. |
 | **G3** | Rheology/thermal/Darcy configs, one substrate, shared solid packing, per-layer combined mass exchange, four contact cases and no L2 activation | C1–C4 code verified by both CI workflows on `32e4e33`; inert contact classification tested. Migrated EXAMPLES, detailed budgets, I/O, OpenMP and C5 scientific certification remain pending. Physical contact dispatch remains deferred. |
 | **G4** | Idrostatica con path e topografia, coppia, residuo curvo, clamp, wet/dry, CFL | Da implementare. |
 | **G5** | Sorgenti L1/L2 indipendenti, coppia `Gamma`, limiti e rollback atomico, gruppo 0 | Da implementare. |
