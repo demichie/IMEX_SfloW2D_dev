@@ -1319,12 +1319,31 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
         END IF
 
+        ! A prescribed boundary depth is an external wet state even when the
+        ! adjacent interior cell starts dry. The cell-based eta/minmod/Froude
+        ! candidates above must not erase a Dirichlet depth imposed by the
+        ! first primitive reconstruction pass. Apply this before the final
+        ! composition normalization and discharge-to-velocity conversion.
         ! Select final depths after eta and radial boundary corrections.
         ! Keep the direct h_x candidate available for characteristic speed bounds.
         !$OMP PARALLEL DO PRIVATE(l,j,k)
         DO l=1,this%hp_eta_cells
             j=this%hp_eta_j(l)
             k=this%hp_eta_k(l)
+            IF (source_cell(j,k)/=2) THEN
+                IF (j==1) CALL preserve_dirichlet_hp_depth(bcW(idx_h),this%qp_adv_interfaceR(:,j,k),                  &
+                    B_face_x(j,k),this%eta_interfaceR(j,k),this%h_minmod_interfaceR(j,k), &
+                    this%h_froude_interfaceR(j,k))
+                IF (j==comp_cells_x) CALL preserve_dirichlet_hp_depth(bcE(idx_h),                                      &
+                    this%qp_adv_interfaceL(:,j+1,k),B_face_x(j+1,k),this%eta_interfaceL(j+1,k),                        &
+                    this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k))
+                IF (k==1) CALL preserve_dirichlet_hp_depth(bcS(idx_h),this%qp_adv_interfaceT(:,j,k),                  &
+                    B_face_y(j,k),this%eta_interfaceT(j,k),this%h_minmod_interfaceT(j,k), &
+                    this%h_froude_interfaceT(j,k))
+                IF (k==comp_cells_y) CALL preserve_dirichlet_hp_depth(bcN(idx_h),                                      &
+                    this%qp_adv_interfaceB(:,j,k+1),B_face_y(j,k+1),this%eta_interfaceB(j,k+1),                        &
+                    this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1))
+            END IF
             CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), this%eta_interfaceR(j,k),B_face_x(j,k),   &
                 this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k),                                           &
                 lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2,                                              &
@@ -1435,6 +1454,25 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         !> @param[in,out] trace Primitive face trace modified in place.
 
 
+
+    !> @brief Retain a prescribed external depth through HP face selection.
+    !> @details A dry interior cell may border a wet Dirichlet inlet. The
+    !>          cell-based eta, minmod and Froude candidates are then dry,
+    !>          but the external face must use its prescribed wet depth.
+    !>          Neumann/outflow and source boundaries are left unchanged.
+    SUBROUTINE preserve_dirichlet_hp_depth(depth_bc,trace,bed,eta,h_minmod,h_froude)
+        TYPE(bc), INTENT(IN) :: depth_bc
+        REAL(wp), INTENT(INOUT) :: trace(n_vars),eta,h_minmod,h_froude
+        REAL(wp), INTENT(IN) :: bed
+        REAL(wp) :: depth
+
+        IF (depth_bc%flag/=0) RETURN
+        depth=MAX(depth_bc%value,0.0_wp)
+        trace(idx_h)=depth
+        eta=bed+depth
+        h_minmod=depth
+        h_froude=depth
+    END SUBROUTINE preserve_dirichlet_hp_depth
 
     !> Convert an imposed discharge (Dirichlet or Neumann) into a primitive
     !> velocity boundary value, using the reconstructed first-pass depth.

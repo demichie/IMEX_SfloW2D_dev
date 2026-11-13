@@ -61,6 +61,7 @@ PROGRAM test_spatial_operator
   CLOSE(input_unit)
   q0=q
   CALL refresh_topography_geometry
+  CALL check_dry_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
   IF (domain%solve_cells<=0 .OR. domain%reconstruction_cells<domain%solve_cells) &
        ERROR STOP 'invalid production worksets'
@@ -283,6 +284,71 @@ CONTAINS
     CALL reconstruction%initialize
     CALL hyperbolic%initialize
   END SUBROUTINE initialize_fixture
+
+  !> Verify that a prescribed wet inlet remains wet in HP reconstruction,
+  !> even if the entire initial flow is dry (as in EXAMPLE_BW).
+  !> The same BC depth must be selected by all supported trace modes.
+  SUBROUTINE check_dry_dirichlet_inlet
+    TYPE(bc) :: saved_depth_bc,saved_discharge_bc
+    CHARACTER(LEN=32) :: saved_mode
+    CHARACTER(LEN=16), PARAMETER :: modes(4)=[CHARACTER(LEN=16):: &
+         'h_x','eta_x','minmod','froude_blend']
+    REAL(wp) :: scale
+    INTEGER :: mode
+
+    IF (nx<=1) RETURN
+    saved_depth_bc=bcW(idx_h)
+    saved_discharge_bc=bcW(idx_u)
+    saved_mode=kt_trace_reconstruction
+
+    bcW(idx_h)%flag=0
+    bcW(idx_h)%value=4.0_wp
+    bcW(idx_u)%flag=0
+    bcW(idx_u)%value=10.0_wp
+    q=0.0_wp
+    qp=0.0_wp
+    qp(idx_T,:,:)=T_ambient
+    CALL domain%check_solve(q,0.0_wp,.FALSE.)
+    IF (domain%solve_cells==0) ERROR STOP 'dry inlet not included in active domain'
+    CALL reconstruction%prepare_hp_workset(domain%hp_eta_cells,domain%hp_eta_j,domain%hp_eta_k)
+
+    DO mode=1,SIZE(modes)
+       kt_trace_reconstruction=TRIM(modes(mode))
+       CALL reconstruction%reconstruct(qp,0.0_wp,domain%solve_cells,domain%j_cent,domain%k_cent,.TRUE.)
+       CALL reconstruction%reconstruct_kt_eta(qp)
+
+       scale=MAX(1.0_wp,ABS(B_face_x(1,1)))
+       IF (ABS(reconstruction%h_selected_interfaceR(1,1)-4.0_wp)> &
+            64.0_wp*EPSILON(1.0_wp)) ERROR STOP 'wet Dirichlet HP depth lost'
+       IF (ABS(reconstruction%qp_adv_interfaceR(idx_h,1,1)-4.0_wp)> &
+            64.0_wp*EPSILON(1.0_wp)) ERROR STOP 'Dirichlet primitive depth lost'
+       IF (ABS(reconstruction%qp_adv_interfaceR(idx_u,1,1)-2.5_wp)> &
+            64.0_wp*EPSILON(1.0_wp)) ERROR STOP 'inlet discharge not preserved'
+       IF (ABS(reconstruction%eta_interfaceR(1,1)-B_face_x(1,1)-4.0_wp)> &
+            64.0_wp*EPSILON(1.0_wp)*scale) ERROR STOP 'boundary eta inconsistent with bed'
+       IF (ABS(reconstruction%h_selected_interfaceL(1,1)-4.0_wp)> &
+            64.0_wp*EPSILON(1.0_wp)) ERROR STOP 'boundary ghost depth not copied'
+    END DO
+
+    ! A dry Dirichlet boundary with zero discharge remains dry.
+    bcW(idx_h)%value=0.0_wp
+    bcW(idx_u)%value=0.0_wp
+    kt_trace_reconstruction='froude_blend'
+    CALL reconstruction%reconstruct(qp,0.0_wp,domain%solve_cells,domain%j_cent,domain%k_cent,.TRUE.)
+    CALL reconstruction%reconstruct_kt_eta(qp)
+    IF (reconstruction%h_selected_interfaceR(1,1)/=0.0_wp) &
+         ERROR STOP 'zero prescribed boundary depth did not stay dry'
+    IF (reconstruction%qp_adv_interfaceR(idx_u,1,1)/=0.0_wp) &
+         ERROR STOP 'zero prescribed discharge did not stay zero'
+
+    bcW(idx_h)=saved_depth_bc
+    bcW(idx_u)=saved_discharge_bc
+    kt_trace_reconstruction=saved_mode
+    q=q0
+    CALL reconstruction%finalize
+    CALL reconstruction%initialize
+    WRITE(*,*) 'PASS: wet Dirichlet inflow into a dry domain survives HP selection'
+  END SUBROUTINE check_dry_dirichlet_inlet
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.
   !> \details Uses mixed-sign and near-zero component stencils with a
