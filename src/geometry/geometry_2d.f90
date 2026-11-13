@@ -192,7 +192,8 @@ CONTAINS
             angle_source
     USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,                                            &
                 width_fissures
-    USE parameters_2d, ONLY : liquid_vaporization_flag,sea_mass_removal_flag
+    USE parameters_2d, ONLY : sea_mass_removal_flag
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
 
     IMPLICIT none
 
@@ -351,7 +352,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
 
         B_zone = 0
 
-        IF ( liquid_vaporization_flag .OR. sea_mass_removal_flag ) CALL topography_zones
+        IF ( mass_exchange_l1%vaporization%liquid_vaporization_flag .OR. sea_mass_removal_flag ) CALL topography_zones
 
         pi_g = 4.0_wp * ATAN(1.0_wp)
 

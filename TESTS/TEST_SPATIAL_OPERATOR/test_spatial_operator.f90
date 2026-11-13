@@ -4,6 +4,8 @@ PROGRAM test_spatial_operator
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE parameters_2d
   USE substrate_parameters_2d, ONLY : substrate
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
   USE constitutive_parameters_2d
   USE solid_transport_parameters_2d
   USE geometry_2d
@@ -247,7 +249,9 @@ CONTAINS
     liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
-    gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
+    pore_pressure_l1%gas_loss_flag=.FALSE.
+    mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
+    mass_exchange_l1%entrainment%flag=.FALSE.
     radial_source_flag=.FALSE.; lateral_source_flag=.FALSE.
     bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.FALSE.
     sutherland_flag=.FALSE.; substrate%topo_change_flag=.FALSE.; verbose_level=-1

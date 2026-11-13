@@ -8,16 +8,15 @@ MODULE source_configuration_2d
     USE source_catalog_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_input_2d
-    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
     USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                                               &
             pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag,                                        &
             bottom_fissural_source_flag, radial_source_flag,                                                           &
-            liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag,                                                &
+            liquid_flag, gas_flag, lava_flag,                                                &
             idx_pore
     USE rheology_parameters_2d, ONLY : rheology_l1
     USE thermal_parameters_2d, ONLY : thermal_l1
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, entrainment_flag
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources
@@ -66,13 +65,12 @@ CONTAINS
         IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
         IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
         ! Lateral boundary injection is a spatial boundary condition, not a Lie cell source.
-        IF (ALLOCATED(erosion_coeff)) THEN
-        IF (erosion_coeff>0.0_wp)                                                                                      &
+        IF (mass_exchange_l1%erosion%coefficient>0.0_wp) THEN
                 active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
 
         END IF
 
-        IF (lava_deposition_flag) THEN
+        IF (mass_exchange_l1%lava_deposition%flag) THEN
 
         IF (.NOT.lava_flag) THEN
             error='Lava deposition requires LAVA_FLAG=T'; RETURN
@@ -83,14 +81,15 @@ CONTAINS
 
         END IF
 
-        IF (settling_flag) THEN
+        IF (mass_exchange_l1%deposition%settling_flag) THEN
         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
 
         END IF
 
         IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
-        IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
-        IF (gas_flag .AND. liquid_vaporization_flag)                                                                   &
+        IF (mass_exchange_l1%entrainment%flag) &
+            active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
+        IF (gas_flag .AND. mass_exchange_l1%vaporization%liquid_vaporization_flag) &
             active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
         error=''
     END SUBROUTINE collect_active_source_names
@@ -160,8 +159,8 @@ CONTAINS
                 'mass_exchange_deposition','mass_exchange_carrier_liquid_loss',                                        &
                 'mass_exchange_entrainment',                                                                           &
                 'mass_exchange_vaporization')
-            requested_method=mass_exchange_method
-            id=mass_exchange_group
+            requested_method=mass_exchange_l1%method
+            id=mass_exchange_l1%group
         CASE DEFAULT
         END SELECT
 

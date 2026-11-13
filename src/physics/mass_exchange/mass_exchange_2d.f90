@@ -16,13 +16,13 @@ MODULE mass_exchange_2d
     USE solid_transport_parameters_2d, ONLY : maximum_solid_packing
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
     USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
     USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
-    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                                                 &
-            eval_mass_exchange_lava_deposition_explicit
+    USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
 
     IMPLICIT NONE
     PRIVATE
@@ -41,6 +41,8 @@ CONTAINS
         !> @brief Assemble explicit cell-local exchange rates with shared inventory limiters.
         !> @details The coordinator preserves the four-treatment contract;
         !>          unsupported treatments terminate with a diagnostic.
+        !> @param[in] config Layer rheology closure.
+        !> @param[in] mass_config Layer combined mass-exchange closure.
         !> @param[in] physical_state Local frozen physical state.
         !> @param[in] B_zone Substrate zone selecting eligible processes.
         !> @param[in] erodible Available erodible solid thickness by class.
@@ -48,10 +50,12 @@ CONTAINS
         !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
-    SUBROUTINE eval_mass_exchange_explicit(config,physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term, &
+    SUBROUTINE eval_mass_exchange_explicit(config,mass_config,physical_state,B_zone,erodible,dt,source_mask, &
+            total_rates,eqns_term, &
             scratch)
 
             TYPE(rheology_config_type), INTENT(IN) :: config
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: physical_state
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
             INTEGER, INTENT(IN) :: B_zone
@@ -88,7 +92,7 @@ CONTAINS
             IF (gas_flag .OR. liquid_flag) THEN
                 alpha=SUM(physical_state%alphas)
                 CALL reset_mass_exchange_rates(process_rates)
-                IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(physical_state,erodible,                      &
+                IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(mass_config,physical_state,erodible, &
                                 dt,process_rates)
                 ! Erosion can increase packing by importing a solid-rich substrate.
                 ! Limit it before accumulating any conservative or bed contribution.
@@ -105,9 +109,10 @@ CONTAINS
                 CALL reset_mass_exchange_rates(deposition_rates)
                 CALL reset_mass_exchange_rates(liquid_loss_rates)
                 IF (do_deposition)                                                                                     &
-                    CALL eval_mass_exchange_deposition_explicit(config,physical_state,dt,deposition_rates)
+                    CALL eval_mass_exchange_deposition_explicit(config,mass_config,physical_state,dt,deposition_rates)
                 IF (do_liquid_loss)                                                                                    &
-                        CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
+                        CALL eval_mass_exchange_carrier_liquid_loss_explicit( &
+                            mass_config,physical_state,liquid_loss_rates)
 
                 ! Deposition and liquid carrier loss share the exchange inventory.
                 ! Darcy gas loss is owned exclusively by the pore-pressure family.
@@ -139,13 +144,13 @@ CONTAINS
                 CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
 
                 IF (do_entrainment) THEN
-                        CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
+                        CALL eval_mass_exchange_entrainment_explicit(mass_config,physical_state,process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
                 END IF
 
                 IF (do_vaporization) THEN
-                        CALL eval_mass_exchange_vaporization_explicit(physical_state, B_zone,                          &
+                        CALL eval_mass_exchange_vaporization_explicit(mass_config,physical_state,B_zone, &
                             deposition_rates%solid_deposition_rate, process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
@@ -159,8 +164,8 @@ CONTAINS
             END IF  ! gas_flag .OR. liquid_flag
 
             ! Lava deposition follows the same process_rates-rate accumulation contract.
-            IF (do_lava .AND. lava_deposition_flag) THEN
-                CALL eval_mass_exchange_lava_deposition_explicit(config,physical_state,dt,process_rates)
+            IF (do_lava .AND. mass_config%lava_deposition%flag) THEN
+                CALL eval_mass_exchange_lava_deposition_explicit(config,mass_config,physical_state,dt,process_rates)
                 CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
             END IF

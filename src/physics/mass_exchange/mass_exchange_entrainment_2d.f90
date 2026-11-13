@@ -6,7 +6,8 @@ MODULE mass_exchange_entrainment_2d
             reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, T_ambient, sp_heat_a
+    USE constitutive_parameters_2d, ONLY : rho_a_amb, T_ambient, sp_heat_a
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     IMPLICIT NONE
     PRIVATE
 
@@ -22,14 +23,16 @@ CONTAINS
         !> @brief Evaluate explicit ambient-air entrainment.
         !> @param[in] state Local real physical state.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_explicit(state,r)
+        !> @param[in] mass_config Immutable layer entrainment configuration.
+    SUBROUTINE eval_mass_exchange_entrainment_explicit(mass_config,state,r)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
             CALL reset_mass_exchange_rates(r)
 
             ! Convert entrained ambient-air volume to mixture mass at ambient density.
-            r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(state%h,state%Ri,state%mod_vel2)
+            r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(mass_config,state%h,state%Ri,state%mod_vel2)
             r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
     END SUBROUTINE eval_mass_exchange_entrainment_explicit
 
@@ -77,10 +80,12 @@ CONTAINS
         !> @param[in] r_Ri Mixture Richardson number [dimensionless].
         !> @param[in] mod_vel2 Squared slope-corrected speed [m2/s2].
         !> @return Physical rate from the indicated constitutive closure.
-        REAL(wp) FUNCTION eval_entrainment_volume_kernel(r_h, r_Ri, mod_vel2)
+        !> @param[in] mass_config Immutable layer entrainment configuration.
+        REAL(wp) FUNCTION eval_entrainment_volume_kernel(mass_config,r_h, r_Ri, mod_vel2)
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
 
-            IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                                                     &
+            IF ( mass_config%entrainment%flag .AND.  ( r_h .GT. 0.0_wp ) .AND. &
                         ( r_Ri .GT. 0.0_wp ) ) THEN
 
                     eval_entrainment_volume_kernel = eval_air_entrainment_rate(r_Ri, mod_vel2)

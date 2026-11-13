@@ -21,6 +21,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/substrate/substrate_parameters_2d.f90 \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
+                physics/mass_exchange/mass_exchange_parameters_2d.f90 \
                 physics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
@@ -526,8 +527,7 @@ io/inpout_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
 IMEX_SfloW2D.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
 
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
                                          numerics/source_input_2d.$(OBJEXT) \
@@ -541,8 +541,7 @@ physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                   numerics/source_registry_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): physics/source_terms_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
-                                          physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
 
 # Remaining direct USE dependencies, audited against all production .f90 sources.
@@ -550,8 +549,7 @@ IMEX_SfloW2D.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
     numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): core/constitutive_parameters_2d.$(OBJEXT) \
-    core/parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
@@ -617,3 +615,22 @@ state/state_conversions.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 state/state_physical.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
+
+# TL04-C3/C4: canonical layer-local mass exchange owns all process coefficients.
+physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+geometry/geometry_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+core/layer_physics_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)

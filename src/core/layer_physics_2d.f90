@@ -8,6 +8,7 @@ MODULE layer_physics_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
         canonical_rheology_source_name, rheology_source_id, RHEOLOGY_ID_NONE
     IMPLICIT NONE
@@ -28,6 +29,8 @@ MODULE layer_physics_2d
         TYPE(thermal_config_type), POINTER :: thermal => NULL()
         !> Non-owning reference to the canonical layer Darcy parameters.
         TYPE(pore_pressure_config_type), POINTER :: pore_pressure => NULL()
+        !> Non-owning reference to canonical layer mass exchange.
+        TYPE(mass_exchange_config_type), POINTER :: mass_exchange => NULL()
         LOGICAL :: initialized=.FALSE.
     CONTAINS
         PROCEDURE :: initialize => initialize_layer_physics
@@ -39,6 +42,7 @@ MODULE layer_physics_2d
         PROCEDURE :: rheology_configuration => layer_physics_configuration
         PROCEDURE :: thermal_configuration => layer_physics_thermal_configuration
         PROCEDURE :: pore_pressure_configuration => layer_physics_pore_pressure_configuration
+        PROCEDURE :: mass_exchange_configuration => layer_physics_mass_exchange_configuration
     END TYPE layer_physics_type
 
 CONTAINS
@@ -50,14 +54,17 @@ CONTAINS
     !> @param[in] rheology_config Stable-lifetime canonical rheology settings.
     !> @param[in] thermal_config Stable-lifetime canonical thermal settings.
     !> @param[in] pore_config Stable-lifetime canonical Darcy settings.
+    !> @param[in] mass_config Stable-lifetime mass-exchange settings.
     !> @param[out] error Empty on success; diagnostic on failure.
-    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,thermal_config,pore_config,error)
+    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,thermal_config,pore_config, &
+        mass_config,error)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: phase
         LOGICAL, INTENT(IN) :: rheology_enabled
         TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology_config
         TYPE(thermal_config_type), TARGET, INTENT(IN) :: thermal_config
         TYPE(pore_pressure_config_type), TARGET, INTENT(IN) :: pore_config
+        TYPE(mass_exchange_config_type), TARGET, INTENT(IN) :: mass_config
         CHARACTER(*), INTENT(OUT) :: error
         CHARACTER(LEN=64) :: source
         TYPE(source_term_type) :: term
@@ -90,6 +97,7 @@ CONTAINS
         this%config=>rheology_config
         this%thermal=>thermal_config
         this%pore_pressure=>pore_config
+        this%mass_exchange=>mass_config
         this%carrier_phase=phase
         this%rheology_source=source
         this%rheology_id=RHEOLOGY_ID_NONE
@@ -102,6 +110,7 @@ CONTAINS
         NULLIFY(this%config)
         NULLIFY(this%thermal)
         NULLIFY(this%pore_pressure)
+        NULLIFY(this%mass_exchange)
         this%carrier_phase=0
         this%rheology_id=RHEOLOGY_ID_NONE
         this%rheology_source=''
@@ -148,6 +157,15 @@ CONTAINS
         TYPE(pore_pressure_config_type) :: config
         config=this%pore_pressure
     END FUNCTION layer_physics_pore_pressure_configuration
+
+    !> @brief Read layer mass-exchange configuration without exposing its pointer.
+    !> @param[in] this Initialized descriptor.
+    !> @return Temporary mass-exchange value view.
+    PURE FUNCTION layer_physics_mass_exchange_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(mass_exchange_config_type) :: config
+        config=this%mass_exchange
+    END FUNCTION layer_physics_mass_exchange_configuration
 
     PURE INTEGER FUNCTION layer_physics_rheology_id(this)
         CLASS(layer_physics_type), INTENT(IN) :: this

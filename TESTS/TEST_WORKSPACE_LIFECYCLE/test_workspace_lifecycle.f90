@@ -3,7 +3,8 @@ PROGRAM test_workspace_lifecycle
   USE parameters_2d, ONLY : wp, n_vars, n_eqns, verbose_level,             &
        radial_source_flag, lateral_source_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, n_fissures, slope_correction_flag,      &
-       curvature_term_flag, liquid_vaporization_flag, lava_flag, n_solid
+       curvature_term_flag, lava_flag, n_solid
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, x0, y0,   &
        topography_profile, nodata_topo, init_grid, B_vertex,                &
        sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x, &
@@ -39,7 +40,7 @@ PROGRAM test_workspace_lifecycle
   bottom_fissural_source_flag = .FALSE.
   slope_correction_flag = .FALSE.
   curvature_term_flag = .FALSE.
-  liquid_vaporization_flag = .FALSE.
+  mass_exchange_l1%vaporization%liquid_vaporization_flag = .FALSE.
   n_fissures = 0
   nodata_topo = -9999.0_wp
 

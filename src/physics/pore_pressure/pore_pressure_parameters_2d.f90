@@ -16,6 +16,7 @@ MODULE pore_pressure_parameters_2d
         INTEGER :: N_inh=2                        !< Smoothstep polynomial half order.
         CHARACTER(LEN=8) :: f_inhibit_mode='OFF'  !< OFF, STEP, STATIC, DYNAMIC.
         LOGICAL :: dynamic_permeability_flag=.FALSE.
+        LOGICAL :: gas_loss_flag=.FALSE.         !< Optional Darcy interstitial gas loss.
         CHARACTER(LEN=16) :: pore_pressure_method=''
         INTEGER :: pore_pressure_group=3
     END TYPE pore_pressure_config_type

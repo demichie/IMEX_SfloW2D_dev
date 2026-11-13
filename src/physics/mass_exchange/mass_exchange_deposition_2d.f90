@@ -5,7 +5,7 @@ MODULE mass_exchange_deposition_2d
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, sutherland_flag,                                       &
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : alphastot_min, kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, &
-        sp_gas_const_a, settling_flag, grav, collective_settling_flag, A_drag, B_drag
+        sp_gas_const_a, grav
     USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s, diam_s
     USE substrate_parameters_2d, ONLY : coeff_porosity
 
@@ -13,6 +13,7 @@ MODULE mass_exchange_deposition_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
     USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
 
     IMPLICIT NONE
     PRIVATE
@@ -31,11 +32,14 @@ MODULE mass_exchange_deposition_2d
 CONTAINS
 
         !> @brief Evaluate explicit sediment settling and deposition.
+        !> @param[in] config Layer rheology closure.
+        !> @param[in] mass_config Layer mass-exchange closure.
         !> @param[in] state Local real physical state.
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_explicit(config, state,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_explicit(config,mass_config,state,dt,r)
             TYPE(rheology_config_type), INTENT(IN) :: config
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
 
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: dt
@@ -55,7 +59,7 @@ CONTAINS
             END IF
 
             ! Evaluate settling before producing the conservative species, energy and bed terms.
-            CALL eval_deposition_volume_kernel(config,state%h, state%T, state%alphas, alpha,                           &
+            CALL eval_deposition_volume_kernel(config,mass_config,state%h,state%T,state%alphas,alpha, &
                 state%rho_m, state%rho_c, dt,                                                                          &
                 r%solid_deposition_rate)
             r%carrier_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
@@ -115,6 +119,8 @@ CONTAINS
     END SUBROUTINE solve_mass_exchange_deposition_analytic
 
         !> @brief Compute per-species settling and choose carrier-fluid properties.
+        !> @param[in] config Layer rheology closure.
+        !> @param[in] mass_config Layer mass-exchange closure.
         !> @param[in] r_h Mobile flow thickness [m].
         !> @param[in] r_T Local flow temperature [K].
         !> @param[in] r_alphas Solid volume fractions by species.
@@ -123,9 +129,10 @@ CONTAINS
         !> @param[in] r_rho_c Carrier density [kg/m3].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] deposition_rate Solid deposition thickness flux for each species [m/s].
-    SUBROUTINE eval_deposition_volume_kernel(config, r_h, r_T, r_alphas, alphas_tot, r_rho_m,                          &
+    SUBROUTINE eval_deposition_volume_kernel(config,mass_config,r_h,r_T,r_alphas,alphas_tot,r_rho_m, &
         r_rho_c, dt, deposition_rate)
             TYPE(rheology_config_type), INTENT(IN) :: config
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
 
             REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
             REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
@@ -155,9 +162,9 @@ CONTAINS
 
             DO i_solid=1,n_solid
 
-                    IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( settling_flag ) ) THEN
+                    IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( mass_config%deposition%settling_flag ) ) THEN
 
-                            settling_vel = settling_velocity( diam_s(i_solid) , rho_s(i_solid) ,                       &
+                            settling_vel = settling_velocity(mass_config,diam_s(i_solid),rho_s(i_solid), &
                                         rhoc , inv_kin_visc )
 
                             deposition_rate(i_solid) = eval_solid_deposition_rate(                                     &
@@ -182,12 +189,14 @@ CONTAINS
         !>          Beyond that point C_D is held at C_D(1000), continuously.
         !>          This is a constitutive choice; it replaces the former
         !>          discontinuous shortcut C_D=1 at the *initial* Reynolds.
+        !> @param[in] mass_config Layer deposition drag closure.
         !> @param[in] diam Solid particle diameter [m].
         !> @param[in] rhos Solid particle density [kg/m3].
         !> @param[in] rhoc Carrier density [kg/m3].
         !> @param[in] inv_kin_visc Inverse carrier kinematic viscosity [s/m2].
-        REAL(wp) FUNCTION settling_velocity(diam, rhos, rhoc, inv_kin_visc)
+        REAL(wp) FUNCTION settling_velocity(mass_config,diam, rhos, rhoc, inv_kin_visc)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             REAL(wp), INTENT(IN) :: diam, rhos, rhoc, inv_kin_visc
             REAL(wp), PARAMETER :: transition_re=1000.0_wp
             REAL(wp), PARAMETER :: solver_tolerance=1.0E-11_wp
@@ -212,8 +221,8 @@ CONTAINS
             ! drag, through the physical Reynolds number Re=1000.
             ! Above that point C_D stays constant at its transition value.
             drag_transition=24.0_wp*(1.0_wp+0.15_wp*transition_re**0.687_wp)/transition_re
-            IF (collective_settling_flag) drag_transition=drag_transition+                                             &
-                A_drag*(LOG(transition_re)-B_drag)
+            IF (mass_config%deposition%collective_settling_flag) drag_transition=drag_transition+ &
+                mass_config%deposition%A_drag*(LOG(transition_re)-mass_config%deposition%B_drag)
             IF (drag_transition<=0.0_wp) CALL fatal_error('settling: nonpositive drag at Re=1000')
 
             ! Re^2*C_D(Re)=Re0^2: compare the Reynolds of the solution,
@@ -246,9 +255,11 @@ CONTAINS
                 residual=24.0_wp*reynolds*(1.0_wp+0.15_wp*reynolds**0.687_wp)                                          &
                     -initial_re_squared
                 derivative=24.0_wp+6.0732_wp*reynolds**0.687_wp
-                IF (collective_settling_flag) THEN
-                    residual=residual+A_drag*reynolds_squared*(LOG(reynolds)-B_drag)
-                    derivative=derivative+A_drag*reynolds*(2.0_wp*(LOG(reynolds)-B_drag)+1.0_wp)
+                IF (mass_config%deposition%collective_settling_flag) THEN
+                    residual=residual+mass_config%deposition%A_drag*reynolds_squared* &
+                        (LOG(reynolds)-mass_config%deposition%B_drag)
+                    derivative=derivative+mass_config%deposition%A_drag*reynolds* &
+                        (2.0_wp*(LOG(reynolds)-mass_config%deposition%B_drag)+1.0_wp)
                 END IF
                 IF (ABS(residual)<=solver_tolerance*initial_re_squared) EXIT
                 IF (residual>0.0_wp) THEN

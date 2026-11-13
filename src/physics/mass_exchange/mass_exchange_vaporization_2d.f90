@@ -2,11 +2,12 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_vaporization_2d
-    USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, liquid_vaporization_flag,                              &
+    USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag,                              &
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : gamma_steam, sp_heat_g
+    USE constitutive_parameters_2d, ONLY : sp_heat_g
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s
 
     IMPLICIT NONE
@@ -31,20 +32,23 @@ CONTAINS
         !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_vaporization_explicit(state,B_zone,deposition,r)
+        !> @param[in] mass_config Immutable layer vaporization configuration.
+        !> @param[in] state Local physical state.
+    SUBROUTINE eval_mass_exchange_vaporization_explicit(mass_config,state,B_zone,deposition,r)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: state
             INTEGER, INTENT(IN) :: B_zone
             REAL(wp), INTENT(IN) :: deposition(n_solid)
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
-            IF (.NOT.(gas_flag .AND. liquid_vaporization_flag .AND. B_zone/=0)) RETURN
+            IF (.NOT.(gas_flag .AND. mass_config%vaporization%liquid_vaporization_flag .AND. B_zone/=0)) RETURN
             IF (n_add_gas<1) CALL fatal_error('vaporization requires additional gas species')
 
             ! Use already-limited deposition: generated vapor must reflect deposited solids.
             r%mixture_mass_rate=eval_vaporization_mass_rate(state%T,rho_s,sp_heat_s,                                   &
-                        deposition,gamma_steam)
+                        deposition,mass_config%vaporization%gamma_steam)
             r%add_gas_mass_rate(1)=r%mixture_mass_rate
             r%energy_rate=eval_vaporization_energy_rate(r%mixture_mass_rate,sp_heat_g(1))
     END SUBROUTINE

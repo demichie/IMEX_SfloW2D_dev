@@ -4,7 +4,7 @@
 
 MODULE pore_pressure_darcy_2d
 
-    USE parameters_2d, ONLY : wp, n_solid, gas_flag, gas_loss_flag, pore_pressure_flag,                                &
+    USE parameters_2d, ONLY : wp, n_solid, gas_flag, pore_pressure_flag,                                &
             n_eqns, n_add_gas, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,                                        &
             idx_poreEqn, idx_addGasEqn_first, idx_solidEqn_first,                                                      &
             idx_solidEqn_last, sutherland_flag
@@ -125,7 +125,7 @@ CONTAINS
         IF (active) lambda=REAL((pi_g/2.0_wp)**2*diffusion*inhibition,wp) /                                            &
             (state%h*MAX(h_min,state%h))
         A=0.0_wp
-        do_gas_loss=gas_flag .AND. gas_loss_flag
+        do_gas_loss=gas_flag .AND. config%gas_loss_flag
         IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
         IF (do_gas_loss .AND.                                                                                          &
             SUM(state%alphas)<maximum_solid_packing) THEN

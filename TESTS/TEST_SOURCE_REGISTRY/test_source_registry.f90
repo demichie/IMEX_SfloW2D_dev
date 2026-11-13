@@ -9,7 +9,7 @@ PROGRAM test_source_registry
   USE thermal_laws_2d, ONLY : eval_thermal_implicit_temperature
   USE source_input_2d
   USE parameters_2d
-  USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,entrainment_flag
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
   TYPE(source_registry_type) :: registry
@@ -26,15 +26,16 @@ PROGRAM test_source_registry
   thermal_l1%thermal_cooling_flag=.TRUE.;pore_pressure_flag=.FALSE.
   curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
   bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
-  lateral_source_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
+  lateral_source_flag=.FALSE.;mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
   lava_flag=.FALSE.;gas_flag=.FALSE.;liquid_flag=.TRUE.
-  settling_flag=.FALSE.;entrainment_flag=.FALSE.
-  IF (ALLOCATED(erosion_coeff)) DEALLOCATE(erosion_coeff)
+  mass_exchange_l1%deposition%settling_flag=.FALSE.
+  mass_exchange_l1%entrainment%flag=.FALSE.
+  mass_exchange_l1%erosion%coefficient=-1.0_wp
   rheology_l1%rheology_method='NEWTON';thermal_l1%thermal_method='NEWTON'
   rheology_l1%rheology_group=1;thermal_l1%thermal_group=1
   ! Keep the automatically active liquid-loss source in explicit GROUP 0.
   ! This fixture tests only coupling/separation of the Newton source groups.
-  mass_exchange_method='EXPLICIT';mass_exchange_group=0
+  mass_exchange_l1%method='EXPLICIT';mass_exchange_l1%group=0
   ! Layer-specific coefficients must remain independent and derived rates must
   ! match the established single-layer algebra without duplicate global caches.
   thermal_l1%emissivity=0.8_wp

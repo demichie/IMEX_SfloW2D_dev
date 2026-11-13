@@ -3,6 +3,7 @@ PROGRAM test_projection_stress
   USE thermal_parameters_2d, ONLY : thermal_l1
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
   USE parameters_2d
   USE constitutive_parameters_2d
   USE solid_transport_parameters_2d
@@ -299,12 +300,15 @@ CONTAINS
     CALL configure_canonical_state_indices()
     gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
-    gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
+    pore_pressure_l1%gas_loss_flag=.FALSE.
+    mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
+    mass_exchange_l1%entrainment%flag=.FALSE.
     sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; substrate%topo_change_flag=.TRUE.
     n_fissures=0
     substrate%erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.; radial_source_flag=.FALSE.
-    erosion_coeff=1000.0_wp; settling_flag=.FALSE.; alphastot_min=0.0_wp
+    mass_exchange_l1%erosion%coefficient=1000.0_wp
+    mass_exchange_l1%deposition%settling_flag=.FALSE.; alphastot_min=0.0_wp
     substrate%erodible_porosity=0.25_wp; coeff_porosity=substrate%erodible_porosity/(1.0_wp-substrate%erodible_porosity)
     grav=9.81_wp; rho_a_amb=1.2_wp; T_ambient=300.0_wp; substrate%T_ground=317.0_wp
     rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l
@@ -313,10 +317,11 @@ CONTAINS
     kin_visc_c=1.0E-6_wp; pore_pressure_l1%hydraulic_permeability=0.0_wp; maximum_solid_packing=0.6_wp
     eps_sing=1.0E-8_wp; eps_sing4=eps_sing**4; verbose_level=0
     ALLOCATE(rho_s(ns),inv_rho_s(ns),sp_heat_s(ns),diam_s(ns),erodible_fract(ns))
-    ALLOCATE(sp_heat_g(0),sp_gas_const_g(0),loss_rate)
+    ALLOCATE(sp_heat_g(0),sp_gas_const_g(0))
     rho_s=[2000.0_wp,3000.0_wp]; inv_rho_s=1.0_wp/rho_s
     sp_heat_s=[900.0_wp,1100.0_wp]; diam_s=[1.0E-4_wp,2.0E-4_wp]
-    erodible_fract=[0.6_wp,0.4_wp]; loss_rate=0.0_wp
+    erodible_fract=[0.6_wp,0.4_wp]
+    mass_exchange_l1%carrier_liquid_loss%loss_rate=0.0_wp
   END SUBROUTINE initialize_physics
 
   !> \brief Check continuity of the settling drag closure at physical Re=1000.
@@ -333,22 +338,22 @@ CONTAINS
 
     const_part=SQRT((4.0_wp/3.0_wp)*(solid_density/carrier_density-1.0_wp)*diam*grav)
     DO mode=1,2
-       collective_settling_flag=(mode==2)
-       IF (collective_settling_flag) THEN
+       mass_exchange_l1%deposition%collective_settling_flag=(mode==2)
+       IF (mass_exchange_l1%deposition%collective_settling_flag) THEN
           ! Use a positive, smooth collective correction at the transition.
-          A_drag=0.01_wp
-          B_drag=1.0_wp
+          mass_exchange_l1%deposition%A_drag=0.01_wp
+          mass_exchange_l1%deposition%B_drag=1.0_wp
        END IF
        cd_transition=24.0_wp*(1.0_wp+0.15_wp*re_transition**0.687_wp)/re_transition
-       IF (collective_settling_flag) cd_transition=cd_transition+ &
-            A_drag*(LOG(re_transition)-B_drag)
+       IF (mass_exchange_l1%deposition%collective_settling_flag) cd_transition=cd_transition+ &
+            mass_exchange_l1%deposition%A_drag*(LOG(re_transition)-mass_exchange_l1%deposition%B_drag)
        initial_re_transition=re_transition*SQRT(cd_transition)
        inv_visc=initial_re_transition/(diam*const_part)
 
-       w_below=settling_velocity(diam,solid_density,carrier_density, &
+       w_below=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density, &
             inv_visc*(1.0_wp-delta))
-       w_at=settling_velocity(diam,solid_density,carrier_density,inv_visc)
-       w_above=settling_velocity(diam,solid_density,carrier_density, &
+       w_at=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density,inv_visc)
+       w_above=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density, &
             inv_visc*(1.0_wp+delta))
        w_expected=const_part/SQRT(cd_transition)
 
@@ -367,8 +372,8 @@ CONTAINS
        IF (ABS(w_above-w_expected)>64.0_wp*EPSILON(1.0_wp)*w_expected) &
            ERROR STOP 'incorrect constant high-Re settling drag'
     END DO
-    collective_settling_flag=.FALSE.
-    IF (settling_velocity(diam,carrier_density,carrier_density,inv_visc)/=0.0_wp) &
+    mass_exchange_l1%deposition%collective_settling_flag=.FALSE.
+    IF (settling_velocity(mass_exchange_l1,diam,carrier_density,carrier_density,inv_visc)/=0.0_wp) &
          ERROR STOP 'no buoyant settling at equal density'
   END SUBROUTINE check_settling_drag_transition
 
@@ -386,22 +391,23 @@ CONTAINS
 
     k=SQRT((4.0_wp/3.0_wp)*(solid_density/carrier_density-1.0_wp)*diam*grav)
     DO mode=1,2
-       collective_settling_flag=(mode==2)
-       A_drag=0.01_wp
-       B_drag=1.0_wp
+       mass_exchange_l1%deposition%collective_settling_flag=(mode==2)
+       mass_exchange_l1%deposition%A_drag=0.01_wp
+       mass_exchange_l1%deposition%B_drag=1.0_wp
        cd_transition=24.0_wp*(1.0_wp+0.15_wp*1000.0_wp**0.687_wp)/1000.0_wp
-       IF (collective_settling_flag) cd_transition=cd_transition+ &
-            A_drag*(LOG(1000.0_wp)-B_drag)
+       IF (mass_exchange_l1%deposition%collective_settling_flag) cd_transition=cd_transition+ &
+            mass_exchange_l1%deposition%A_drag*(LOG(1000.0_wp)-mass_exchange_l1%deposition%B_drag)
        DO i=1,SIZE(reference_re)
           reference=reference_re(i)
           IF (reference<=1000.0_wp) THEN
              cd=24.0_wp*(1.0_wp+0.15_wp*reference**0.687_wp)/reference
-             IF (collective_settling_flag) cd=cd+A_drag*(LOG(reference)-B_drag)
+             IF (mass_exchange_l1%deposition%collective_settling_flag) &
+                 cd=cd+mass_exchange_l1%deposition%A_drag*(LOG(reference)-mass_exchange_l1%deposition%B_drag)
           ELSE
              cd=cd_transition
           END IF
           inv_visc=reference*SQRT(cd)/(diam*k)
-          speed=settling_velocity(diam,solid_density,carrier_density,inv_visc)
+          speed=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density,inv_visc)
           actual_re=diam*speed*inv_visc
           IF (ABS(actual_re-reference)>1.0E-8_wp*reference) THEN
              WRITE(*,*) 'FAIL: settling root',mode,reference,actual_re
@@ -409,7 +415,7 @@ CONTAINS
           END IF
        END DO
     END DO
-    collective_settling_flag=.FALSE.
+    mass_exchange_l1%deposition%collective_settling_flag=.FALSE.
   END SUBROUTINE check_settling_newton_roots
 
   !> \brief Verify that cached real and complex physical properties are complete.
@@ -577,7 +583,8 @@ CONTAINS
     CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
-          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1)
+          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1, &
+          mass_config=mass_exchange_l1)
     IF (failed) THEN
        CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
@@ -661,7 +668,8 @@ CONTAINS
     CALL execute_lie_source_groups(executor,state,q_trial,qp_trial,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_invalid, &
          step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
-          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1)
+          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1, &
+          mass_config=mass_exchange_l1)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
     CALL state%restore_substrate(substrate_before)

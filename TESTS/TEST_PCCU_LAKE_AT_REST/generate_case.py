@@ -142,7 +142,8 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
  KIN_VISC_L=1.0D-6,
  /
 &MASS_EXCHANGE_PARAMETERS
- ENTRAINMENT_FLAG=F, LOSS_RATE=0.0D0,
+ MASS_EXCHANGE%ENTRAINMENT%FLAG=F,
+ MASS_EXCHANGE%CARRIER_LIQUID_LOSS%LOSS_RATE=0.0D0,
  /
 """)
 

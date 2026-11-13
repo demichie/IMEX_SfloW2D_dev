@@ -6,7 +6,8 @@ MODULE mass_exchange_erosion_2d
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, alphastot_min, rho_l, pres, sp_gas_const_a
+    USE constitutive_parameters_2d, ONLY : alphastot_min, rho_l, pres, sp_gas_const_a
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s
     USE substrate_parameters_2d, ONLY : substrate, erodible_fract
     IMPLICIT NONE
@@ -26,8 +27,10 @@ CONTAINS
         !> @param[in] erodible Available erodible solid inventory by species [m].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_explicit(state,erodible,dt,r)
+        !> @param[in] mass_config Immutable layer erosion parameters.
+    SUBROUTINE eval_mass_exchange_erosion_explicit(mass_config,state,erodible,dt,r)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
@@ -44,7 +47,8 @@ CONTAINS
             normal_speed=state%mod_vel
 
             ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
-            CALL eval_erosion_volume_kernel(state%h, normal_speed, alpha, erodible, dt, r%solid_erosion_rate,          &
+            CALL eval_erosion_volume_kernel(mass_config,state%h,normal_speed,alpha,erodible,dt, &
+                r%solid_erosion_rate, &
                 r%carrier_erosion_rate)
             r%solid_mass_rate=rho_s*r%solid_erosion_rate
             r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%carrier_erosion_rate
@@ -111,14 +115,17 @@ CONTAINS
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
         !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
-    SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, erosion_rate,                    &
+        !> @param[in] mass_config Immutable layer erosion parameters.
+    SUBROUTINE eval_erosion_volume_kernel(mass_config,r_h,mod_vel,alphas_tot,erodible,dt,erosion_rate, &
             carrier_erosion_rate)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
             REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), carrier_erosion_rate
 
-            IF (erosion_coeff .GT. 0.0_wp) THEN
-                    CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff, substrate%erodible_porosity, &
+            IF (mass_config%erosion%coefficient .GT. 0.0_wp) THEN
+                    CALL eval_erosion_rates(r_h,mod_vel,alphas_tot,mass_config%erosion%coefficient, &
+                        substrate%erodible_porosity, &
                         erodible_fract(1:n_solid), erodible(1:n_solid), dt, erosion_rate(1:n_solid),                   &
                         carrier_erosion_rate)
 

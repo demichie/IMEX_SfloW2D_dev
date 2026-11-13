@@ -103,7 +103,6 @@ MODULE parameters_2d
     !> - T      => vaporization form a source of water
     !> - F      => no vaporization
     !> .
-    LOGICAL :: liquid_vaporization_flag
 
     !> Remove transported flow material entering the identified sea zone.
     LOGICAL :: sea_mass_removal_flag = .FALSE.
@@ -251,7 +250,6 @@ MODULE parameters_2d
     !> Dimensionless excess pore-pressure production factor for the active injection source.
     REAL(wp) :: pore_pres_fract
 
-    LOGICAL :: gas_loss_flag
 
     INTEGER :: n_vars   !< Number of conservative variables
     INTEGER :: n_eqns   !< Number of equations

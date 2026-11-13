@@ -47,7 +47,7 @@
     USE parameters_2d, ONLY: n_layers, n_solid, n_add_gas, n_stoch_vars,                                               &
                                     n_pore_vars
     USE parameters_2d, ONLY: rheology_flag,                                                                            &
-                                    radial_source_flag, collapsing_volume_flag,                                                &
+                                    radial_source_flag, collapsing_volume_flag, &
                                     liquid_flag, gas_flag, lava_flag, subtract_init_flag, bottom_radial_source_flag,   &
                                     lateral_source_flag, serial_flag,                                                  &
                                     bottom_fissural_source_flag, n_fissures,                                           &
@@ -71,9 +71,7 @@
             bottom_circular_method, bottom_circular_group,                                                             &
             bottom_fissural_method, bottom_fissural_group,                                                             &
             radial_injection_method, radial_injection_group,                                                           &
-            geometry_curvature_method, geometry_curvature_group,                                                       &
-            mass_exchange_configuration_present, mass_exchange_method,                                                 &
-            mass_exchange_group, uppercase_source_text
+            geometry_curvature_method, geometry_curvature_group, uppercase_source_text
 
     ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
     USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -109,7 +107,7 @@
 
     ! -- Variables for the namelist RHEOLOGY_PARAMETERS
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
-    USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type, mass_exchange_l1, mass_exchange_l2
     USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1, rheology_l2
     ! -- Functions used in the rheology calculations
     USE state_mixture, ONLY : sauter_diameter, average_density_solids,                                                 &
@@ -121,21 +119,21 @@
             pore_pressure_cache_type, pore_pressure_cache_l1, pore_pressure_cache_l2, precompute_pascal_coefficient
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
-    USE constitutive_parameters_2d, ONLY : vonK, settling_flag, erosion_coeff, alphastot_min
+    USE constitutive_parameters_2d, ONLY : vonK, alphastot_min
     USE solid_transport_parameters_2d, ONLY : rho_s, diam_s, sphericity_s, sp_heat_s
     USE solid_transport_parameters_2d, ONLY : maximum_solid_packing
 
     ! --- Variables for the namelist GAS_TRANSPORT_PARAMETERS
     USE constitutive_parameters_2d, ONLY: sp_heat_a, sp_gas_const_a,                                                   &
-            kin_visc_a, pres, T_ambient, entrainment_flag, sp_heat_g,                                                  &
-            sp_gas_const_g, gamma_steam, Tref_Suth, muRef_Suth, S_mu
+            kin_visc_a, pres, T_ambient, sp_heat_g,                                                                   &
+            sp_gas_const_g, Tref_Suth, muRef_Suth, S_mu
 
-    USE parameters_2d, ONLY: liquid_vaporization_flag, sea_mass_removal_flag,                                          &
+    USE parameters_2d, ONLY: sea_mass_removal_flag, &
                                     sutherland_flag,                                                                   &
                                     water_level
 
     ! --- Variables for the namelist LIQUID_TRANSPORT_PARAMETERS
-    USE constitutive_parameters_2d, ONLY: sp_heat_l, rho_l, kin_visc_l, loss_rate
+    USE constitutive_parameters_2d, ONLY: sp_heat_l, rho_l, kin_visc_l
 
     ! --- Variables for the namelist VULNERABILITY_TABLE_PARAMETERS
     USE parameters_2d, ONLY: n_thickness_levels, n_dyn_pres_levels,                                                    &
@@ -150,7 +148,6 @@
 
     ! Darcy configuration and its Pascal cache have canonical layer-local owners.
     USE parameters_2d, ONLY: pore_pres_fract
-    USE parameters_2d, ONLY: gas_loss_flag
 
     IMPLICIT NONE
 
@@ -416,11 +413,11 @@
     NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                        &
         xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
     NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s,                                                 &
-        sp_heat_s, alphastot_min, maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
+        sp_heat_s, alphastot_min, maximum_solid_packing, vonK
     NAMELIST /substrate_parameters/ substrate, erodible_fract
     NAMELIST /gas_transport_parameters/ sp_heat_a, sp_gas_const_a, kin_visc_a,                                         &
         pres, T_ambient, sp_heat_g, sp_gas_const_g,                                                                    &
-        water_level, gamma_steam, sutherland_flag,                                                                     &
+        water_level, sutherland_flag,                                                                     &
         Tref_Suth, muRef_Suth, S_mu
 
     CONTAINS
@@ -484,12 +481,12 @@
         pore_pressure_l2=pore_pressure_config_type()
         pore_pressure_cache_l1=pore_pressure_cache_type()
         pore_pressure_cache_l2=pore_pressure_cache_type()
+        mass_exchange_l1=mass_exchange_config_type()
+        mass_exchange_l2=mass_exchange_config_type()
         bottom_circular_method=''; bottom_circular_group=0
         bottom_fissural_method=''; bottom_fissural_group=0
         radial_injection_method=''; radial_injection_group=0
         geometry_curvature_method=''; geometry_curvature_group=0
-        mass_exchange_configuration_present=.FALSE.
-        mass_exchange_method='EXPLICIT'; mass_exchange_group=4
 
         n_vars = 3
         n_layers = 1
@@ -585,7 +582,6 @@
 
         !-- Inizialization of the Variables for the namelist PORE_PRESSURE_PARAMETERS
         pore_pres_fract = -1.0_wp
-        gas_loss_flag = .FALSE.
 
         !-------------- Check if input file exists ----------------------------------
         input_file = 'IMEX_SfloW2D.inp'
@@ -814,13 +810,8 @@
         !- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
         rho_s = -1.0_wp
         diam_s = -1.0_wp
-        A_drag = -1.0_wp
-        B_drag = -1.0_wp
-        collective_settling_flag = .FALSE.
         sphericity_s = 1.0_wp
         sp_heat_s = -1.0_wp
-        settling_flag = .FALSE.
-        erosion_coeff = -1.0_wp
         n_solid = -1
         erodible_fract = -1.0_wp
         alphastot_min = 0.0_wp
@@ -836,9 +827,7 @@
         T_ambient = -1.0_wp
         sp_heat_g = -1.0_wp
         sp_gas_const_g = -1.0_wp
-        liquid_vaporization_flag = .FALSE.
         water_level = -1.0E7_wp
-        gamma_steam = -1.0_wp
         sutherland_flag = .FALSE.
         Tref_Suth = -1.0_wp
         muRef_Suth = -1.0_wp
@@ -848,7 +837,6 @@
         sp_heat_l = -1.0_wp
         rho_l = -1.0_wp
         kin_visc_l = -1.0_wp
-        loss_rate = -1.0_wp
 
         !- Variables for the namelist RADIAL_SOURCE_PARAMETERS
         T_source = -1.0_wp
@@ -1298,11 +1286,11 @@
 
         END IF
 
-        IF ((.NOT. gas_flag) .AND. (liquid_flag .AND. entrainment_flag)) THEN
+        IF ((.NOT. gas_flag) .AND. (liquid_flag .AND. mass_exchange_l1%entrainment%flag)) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
             WRITE (*, *) 'LIQUID_FLAG', liquid_flag
-            WRITE (*, *) 'ENTRAINMENT_FLAG =', entrainment_flag
+            WRITE (*, *) 'ENTRAINMENT_FLAG =', mass_exchange_l1%entrainment%flag
             WRITE (*, *) 'Please check the input file'
             STOP
 
@@ -1316,19 +1304,20 @@
 
         END IF
 
-        IF (sea_mass_removal_flag .AND. liquid_vaporization_flag) THEN
+        IF (sea_mass_removal_flag .AND. mass_exchange_l1%vaporization%liquid_vaporization_flag) THEN
             CALL fatal_error('Sea mass removal and liquid vaporization cannot both be enabled')
         END IF
-        IF ((sea_mass_removal_flag .OR. liquid_vaporization_flag) .AND. water_level==-1.0E7_wp) THEN
+        IF ((sea_mass_removal_flag .OR. mass_exchange_l1%vaporization%liquid_vaporization_flag) .AND. &
+            water_level==-1.0E7_wp) THEN
             CALL fatal_error('WATER_LEVEL is required when a sea process is enabled')
         END IF
 
-        IF (liquid_vaporization_flag) THEN
+        IF (mass_exchange_l1%vaporization%liquid_vaporization_flag) THEN
 
             IF (.NOT. gas_flag) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'liquid_vaporization_flag =', liquid_vaporization_flag
+                WRITE (*, *) 'liquid_vaporization_flag =', mass_exchange_l1%vaporization%liquid_vaporization_flag
                 WRITE (*, *) 'This flag can be set to .TRUE. only when gas_flag = T'
                 WRITE (*, *) 'Please check the input file'
                 STOP
@@ -1338,17 +1327,18 @@
             IF (n_add_gas .LT. 1) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'liquid_vaporization_flag =', liquid_vaporization_flag
+                WRITE (*, *) 'liquid_vaporization_flag =', mass_exchange_l1%vaporization%liquid_vaporization_flag
                 WRITE (*, *) 'This flag can be set to .TRUE. only when n_add_gas > 1 '
                 WRITE (*, *) 'Please check the input file'
                 STOP
 
             END IF
 
-            IF ((gamma_steam .LT. 0.0_wp) .OR. (gamma_steam .GT. 1.0_wp)) THEN
+            IF ((mass_exchange_l1%vaporization%gamma_steam .LT. 0.0_wp) .OR. &
+                (mass_exchange_l1%vaporization%gamma_steam .GT. 1.0_wp)) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'gamma_steam =', gamma_steam
+                WRITE (*, *) 'gamma_steam =', mass_exchange_l1%vaporization%gamma_steam
                 WRITE (*, *) 'Specify a value between 0 and 1'
                 WRITE (*, *) 'Please check the input file'
                 STOP
@@ -1365,11 +1355,11 @@
 
             ELSE
 
-                IF (.NOT. liquid_vaporization_flag .AND. .NOT. sea_mass_removal_flag) THEN
+                IF (.NOT. mass_exchange_l1%vaporization%liquid_vaporization_flag .AND. .NOT. sea_mass_removal_flag) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
                     WRITE (*, *) 'water_level =', water_level
-                    WRITE (*, *) 'liquid_vaporization_flag =', liquid_vaporization_flag
+                    WRITE (*, *) 'liquid_vaporization_flag =', mass_exchange_l1%vaporization%liquid_vaporization_flag
                     WRITE (*, *) 'Specify a value only when GAS_VAPORIZATION_FLAG = T'
                     WRITE (*, *) 'Please check the input file'
                     STOP
@@ -1380,10 +1370,10 @@
 
         ELSE
 
-            IF (gamma_steam .NE. -1.0_wp) THEN
+            IF (mass_exchange_l1%vaporization%gamma_steam .NE. -1.0_wp) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist GAS_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'gamma_steam =', gamma_steam
+                WRITE (*, *) 'gamma_steam =', mass_exchange_l1%vaporization%gamma_steam
                 WRITE (*, *) 'Specify a value only when GAS_VAPORIZATION_FLAG = T'
                 WRITE (*, *) 'Please check the input file'
                 STOP
@@ -1541,10 +1531,10 @@
 
             END IF
 
-            IF (loss_rate .LT. 0.0_wp) THEN
+            IF (mass_exchange_l1%carrier_liquid_loss%loss_rate .LT. 0.0_wp) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'LOSS_RATE =', loss_rate
+                WRITE (*, *) 'LOSS_RATE =', mass_exchange_l1%carrier_liquid_loss%loss_rate
                 WRITE (*, *) 'Please check the input file'
                 STOP
 
@@ -1786,16 +1776,16 @@
 
             END IF
 
-            IF (erosion_coeff .LT. 0.0_wp) THEN
+            IF (mass_exchange_l1%erosion%coefficient .LT. 0.0_wp) THEN
 
                 WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
-                WRITE (*, *) 'EROSION_COEFF =', erosion_coeff
+                WRITE (*, *) 'EROSION_COEFF =', mass_exchange_l1%erosion%coefficient
                 WRITE (*, *) 'Please check the input file'
                 STOP
 
             ELSE
 
-                IF (erosion_coeff .EQ. 0.0_wp) THEN
+                IF (mass_exchange_l1%erosion%coefficient .EQ. 0.0_wp) THEN
 
                     substrate%erodible_porosity = 0.0_wp
                     ! derived from erodible_porosity; without this it stays
@@ -1881,10 +1871,10 @@
 
                 IF (substrate%initial_erodible_thickness .GE. 0.0_wp) THEN
 
-                    IF (erosion_coeff .EQ. 0.0_wp) THEN
+                    IF (mass_exchange_l1%erosion%coefficient .EQ. 0.0_wp) THEN
 
                         WRITE (*, *) 'WARNING: erodible_file not used'
-                        WRITE (*, *) 'erosion_coeff = ', erosion_coeff
+                        WRITE (*, *) 'erosion_coeff = ', mass_exchange_l1%erosion%coefficient
 
                         erodible_init(:, :) = 0.0E+0_wp
 
@@ -1921,10 +1911,10 @@
 
                 END IF
 
-                IF (erosion_coeff .EQ. 0.0_wp) THEN
+                IF (mass_exchange_l1%erosion%coefficient .EQ. 0.0_wp) THEN
 
                     WRITE (*, *) 'WARNING: erodible_file not used'
-                    WRITE (*, *) 'erosion_coeff = ', erosion_coeff
+                    WRITE (*, *) 'erosion_coeff = ', mass_exchange_l1%erosion%coefficient
 
                     erodible_init(:, :) = 0.0E+0_wp
 
@@ -1955,24 +1945,25 @@
             END IF
 
 
-            IF (settling_flag) THEN
+            IF (mass_exchange_l1%deposition%settling_flag) THEN
 
-                IF (collective_settling_flag) THEN
+                IF (mass_exchange_l1%deposition%collective_settling_flag) THEN
 
-                    IF (A_drag .EQ. -1.0_wp) THEN
+                    IF (mass_exchange_l1%deposition%A_drag .EQ. -1.0_wp) THEN
                         WRITE (*, *) 'ERROR: A_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
                         STOP
 
                     END IF
 
-                    IF (B_drag .EQ. -1.0_wp) THEN
+                    IF (mass_exchange_l1%deposition%B_drag .EQ. -1.0_wp) THEN
                         WRITE (*, *) 'ERROR: B_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
                         STOP
 
                     END IF
 
                     IF (verbose_level .GE. 0) WRITE (*, *)                                                             &
-                        'Settling: collective drag law, A_DRAG/B_DRAG =', A_drag, B_drag
+                        'Settling: collective drag law, A_DRAG/B_DRAG =', &
+                        mass_exchange_l1%deposition%A_drag, mass_exchange_l1%deposition%B_drag
                 ELSE
                     IF (verbose_level .GE. 0) WRITE (*, *)                                                             &
                         'Settling: original Schiller-Naumann drag law'
@@ -5342,7 +5333,7 @@
                 DEALLOCATE( thickness_vertex )
                 CALL refresh_topography_geometry
 
-                IF (erosion_coeff .GT. 0.0_wp) THEN
+                IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
                     IF (MAXVAL(erodible_init(:, :)) .GT. 0.0_wp) THEN
 
@@ -5787,7 +5778,7 @@
 
             OPEN (output_unit_2d, FILE=output_file_2d, status='unknown', form='formatted')
 
-            IF (erosion_coeff .GT. 0.0_wp) THEN
+            IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
                 output_file_erosion = snapshot_file_path(                                                              &
                         TRIM(run_name)//'_erosion_'//idx_string//'.q_2d')
@@ -5800,7 +5791,7 @@
 
             END IF
 
-            IF (settling_flag) THEN
+            IF (mass_exchange_l1%deposition%settling_flag) THEN
 
                 output_file_deposit = snapshot_file_path(                                                              &
                         TRIM(run_name)//'_deposit_'//idx_string//'.q_2d')
@@ -5832,7 +5823,7 @@
                     WRITE (output_unit_2d, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k),                              &
                     (state%q(i_vars,1, j, k), i_vars=1, n_vars)
 
-                    IF (erosion_coeff .GT. 0.0_wp) THEN
+                    IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
                         WRITE (output_unit_erosion, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k),                     &
                             (state%erosion(j, k, i_vars), i_vars=1, n_solid)
@@ -5842,7 +5833,7 @@
 
                     END IF
 
-                    IF (settling_flag) THEN
+                    IF (mass_exchange_l1%deposition%settling_flag) THEN
 
                         WRITE (output_unit_deposit, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k),                     &
                             (state%deposit(j, k, i_vars), i_vars=1, n_solid)
@@ -5860,14 +5851,14 @@
 
                 WRITE (output_unit_2d, *) ' '
 
-                IF (erosion_coeff .GT. 0.0_wp) THEN
+                IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
                     WRITE (output_unit_erosion, *) ' '
                     WRITE (output_unit_erodible, *) ' '
 
                 END IF
 
-                IF (settling_flag) WRITE (output_unit_deposit, *) ' '
+                IF (mass_exchange_l1%deposition%settling_flag) WRITE (output_unit_deposit, *) ' '
 
                 IF (substrate%topo_change_flag) WRITE (output_unit_B, *) ' '
 
@@ -5878,7 +5869,7 @@
 
             CLOSE (output_unit_2d)
 
-            IF (erosion_coeff .GT. 0.0_wp) THEN
+            IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
                 WRITE (output_unit_erosion, *) ' '
                 WRITE (output_unit_erosion, *) ' '
@@ -5890,7 +5881,7 @@
 
             END IF
 
-            IF (settling_flag) THEN
+            IF (mass_exchange_l1%deposition%settling_flag) THEN
 
                 WRITE (output_unit_deposit, *) ' '
                 WRITE (output_unit_deposit, *) ' '
@@ -6252,7 +6243,7 @@
 
             CLOSE (dem_esri_unit)
 
-            IF (liquid_vaporization_flag) THEN
+            IF (mass_exchange_l1%vaporization%liquid_vaporization_flag) THEN
 
                 OPEN (dem_esri_unit, FILE=output_file_path('terrain', 'dem_esri_water.asc'),                           &
                         status='unknown', form='formatted')
@@ -6340,7 +6331,7 @@
 
         CLOSE (output_esri_unit)
 
-        IF (settling_flag .OR. lava_flag) THEN
+        IF (mass_exchange_l1%deposition%settling_flag .OR. lava_flag) THEN
 
             !Save solid classes deposit
             DO i_solid = 1, n_solid
@@ -6416,7 +6407,7 @@
 
         END IF
 
-        IF (erosion_coeff .GT. 0.0_wp) THEN
+        IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
             !Save erosion
             DO i_solid = 1, n_solid
@@ -6790,7 +6781,7 @@
 
                 END DO
 
-                IF (settling_flag) THEN
+                IF (mass_exchange_l1%deposition%settling_flag) THEN
 
                     DO i_solid = 1, n_solid
 
@@ -6823,7 +6814,7 @@
 
                 END DO
 
-                IF (settling_flag) THEN
+                IF (mass_exchange_l1%deposition%settling_flag) THEN
 
                     DO i_solid = 1, n_solid
 
@@ -6935,7 +6926,7 @@
 
             END IF
 
-            IF (settling_flag) THEN
+            IF (mass_exchange_l1%deposition%settling_flag) THEN
 
                 DO i_solid = 1, n_solid
 

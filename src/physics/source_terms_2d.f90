@@ -21,6 +21,7 @@ MODULE source_terms_2d
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
     USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
@@ -73,11 +74,12 @@ CONTAINS
     !> Assemble and limit a complete explicit Lie group, without committing state.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] mass_config Immutable layer mass-exchange configuration.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
             non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
-            thermal,rheology)
+            thermal,rheology,mass_config)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -92,6 +94,7 @@ CONTAINS
         TYPE(injection_material_set_type), INTENT(IN) :: materials
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -121,7 +124,8 @@ CONTAINS
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready,rheology)
+                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready,rheology, &
+                mass_config)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -774,8 +778,10 @@ CONTAINS
     !> \param[out] eqns_term Conservative equation source-rate vector.
     !> \param[out] topo_term Proposed bed-elevation rate.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] mass_config Immutable layer mass-exchange configuration.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready,rheology)
+            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready,rheology, &
+            mass_config)
         REAL(wp), INTENT(IN) :: qpj(n_vars),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -786,6 +792,7 @@ CONTAINS
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         LOGICAL, INTENT(IN), OPTIONAL :: physical_ready
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: exchange_state
         LOGICAL :: reuse_prepared_state
@@ -804,7 +811,7 @@ CONTAINS
         ! worker-local scratch. Standalone exchange calls still build normally.
         IF (.NOT.reuse_prepared_state) &
             CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
-        CALL eval_mass_exchange_explicit(rheology,exchange_state,B_zone, &
+        CALL eval_mass_exchange_explicit(rheology,mass_config,exchange_state,B_zone, &
             erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d
