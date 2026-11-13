@@ -159,12 +159,14 @@ CONTAINS
                 this%stochastic,this%domain,this%spatial_operator,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
-                thermal=this%layer_physics(1)%thermal_configuration())
+                thermal=this%layer_physics(1)%thermal_configuration(), &
+                rheology=this%layer_physics(1)%rheology_configuration())
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
                 this%stochastic,this%domain,this%spatial_operator,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
-                thermal=this%layer_physics(1)%thermal_configuration())
+                thermal=this%layer_physics(1)%thermal_configuration(), &
+                rheology=this%layer_physics(1)%rheology_configuration())
         END IF
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 

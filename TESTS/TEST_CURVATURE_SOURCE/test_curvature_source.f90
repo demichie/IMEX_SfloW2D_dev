@@ -1,6 +1,7 @@
 PROGRAM test_curvature_source
 
   USE thermal_parameters_2d, ONLY : thermal_l1
+  USE rheology_parameters_2d, ONLY : rheology_l1
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : rho_l, inv_rho_l, rho_a_amb, grav, &
        sp_heat_l, inv_rho_s, sp_heat_s, sp_heat_g, sp_gas_const_g
@@ -94,14 +95,14 @@ PROGRAM test_curvature_source
      original=physical
      CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
           0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-          curvature_group,0.0_wp,materials=materials,thermal=thermal_l1)
+          curvature_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
      CALL assert_small('dry curvature source',MAXVAL(ABS(explicit_source)),0.0_wp)
      CALL assert_small('dry physical state retained',MAXVAL(ABS(physical-original)),0.0_wp)
   END DO
   physical(1)=2.0_wp*dry_thickness_tolerance; physical(idx_u)=u; physical(idx_v)=v
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       curvature_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       curvature_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   CALL eval_geometry_curvature_explicit(Bx,By,Bxx,Bxy,Byy,G,          &
        rho_l*physical(1),u,v,expected_x,expected_y)
   tolerance=128.0_wp*EPSILON(1.0_wp)*MAX(ABS(expected_x),ABS(expected_y))
@@ -117,12 +118,12 @@ PROGRAM test_curvature_source
   physical(1)=dry_thickness_tolerance/2.0_wp
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       curvature_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       curvature_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   CALL assert_small('unselected circular injection excluded', &
        MAXVAL(ABS(explicit_source)),0.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   expected_x=0.25_wp*vel_source*rho_l
   CALL assert_small('dry-cell mass injection retained',ABS(explicit_source(1)-expected_x), &
        64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -139,7 +140,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(4.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        4.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   expected_x=0.5_wp*0.25_wp*vel_source*rho_l
   CALL assert_small('partially active step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -148,7 +149,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(0.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   expected_x=0.75_wp*0.25_wp*vel_source*rho_l
   CALL assert_small('linearly ramped step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -157,7 +158,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(9.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        9.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   expected_x=0.5_wp*0.25_wp*vel_source*rho_l
   CALL assert_small('period-wrapped step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -165,7 +166,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(5.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        5.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       circular_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   CALL assert_small('inactive step-averaged mass source', &
        MAXVAL(ABS(explicit_source)),0.0_wp)
 
@@ -179,7 +180,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(4.0_wp,2.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        4.0_wp,0.0_wp,[0.25_wp],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
-       fissural_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       fissural_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   expected_x=0.5_wp*0.25_wp*linear_vel_fissures(1)*rho_l
   CALL assert_small('partially active fissural source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
@@ -191,7 +192,7 @@ PROGRAM test_curvature_source
   CALL set_source_time_coefficients(0.0_wp,1.0_wp)
   CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.0_wp,[REAL(wp)::],2.0_wp,1.0_wp,0.0_wp,1.0_wp, &
-       radial_injection_group,0.0_wp,materials=materials,thermal=thermal_l1)
+       radial_injection_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1)
   ramp_mean=0.5_wp-1.0_wp/ACOS(-1.0_wp)
   expected_x=ramp_mean*h_source*vel_source*2.0_wp*rho_l
   CALL assert_small('cosine-ramped radial source', &

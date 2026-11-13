@@ -6,7 +6,8 @@ PROGRAM test_layer_physics
         LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
     IMPLICIT NONE
     TYPE(layer_physics_type) :: l1,l2
-    TYPE(rheology_config_type) :: config1,config2,returned
+    TYPE(rheology_config_type), TARGET :: config1,config2
+    TYPE(rheology_config_type) :: returned
     TYPE(thermal_config_type), TARGET :: thermal1,thermal2
     TYPE(thermal_config_type) :: thermal_view
     CHARACTER(LEN=256) :: err
@@ -32,10 +33,10 @@ PROGRAM test_layer_physics
     CALL require(ABS(returned%mu-0.3_wp)<EPSILON(1.0_wp),'layer retains L1 coefficient')
     returned%mu=5.0_wp
     returned=l1%rheology_configuration()
-    CALL require(ABS(returned%mu-0.3_wp)<EPSILON(1.0_wp),'snapshot is read-only')
+    CALL require(ABS(returned%mu-0.3_wp)<EPSILON(1.0_wp),'value view is read-only')
     config1%mu=7.0_wp
     returned=l1%rheology_configuration()
-    CALL require(ABS(returned%mu-0.3_wp)<EPSILON(1.0_wp),'layer independent of input variable')
+    CALL require(ABS(returned%mu-7.0_wp)<EPSILON(1.0_wp),'binding tracks canonical rheology input')
     thermal_view=l1%thermal_configuration()
     CALL require(thermal_view%emissivity==0.8_wp,'L1 reads canonical thermal input')
     thermal_view%emissivity=0.0_wp

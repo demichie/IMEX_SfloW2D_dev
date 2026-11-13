@@ -37,14 +37,14 @@ PROGRAM test_d17_production_newton
   old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
   q=old;dt=0.2_wp
   CALL solve_backward_euler_group(group,q,dt,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
-       iterations,converged,info,search_failed,thermal=thermal_l1)
+       iterations,converged,info,search_failed,thermal=thermal_l1,rheology=rheology_l1)
   IF (.NOT.converged .OR. info/=0 .OR. search_failed) &
        ERROR STOP 'Lie Newton nonlinear solve failed'
   IF (iterations<1) ERROR STOP 'Newton iterations not recorded'
   IF (q(1)/=old(1) .OR. q(4)/=old(4)) &
        ERROR STOP 'Inactive conservative equations changed'
   CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp, &
-       c_qj=CMPLX(q,0.0_wp,wp),c_nh_term_impl=rate_complex,group=group,thermal=thermal_l1)
+       c_qj=CMPLX(q,0.0_wp,wp),c_nh_term_impl=rate_complex,group=group,thermal=thermal_l1,rheology=rheology_l1)
   rate=REAL(rate_complex,wp)
   residual=q-old-dt*rate
   IF (MAXVAL(ABS(residual(group%equation_ids)))>1.0E-6_wp) &

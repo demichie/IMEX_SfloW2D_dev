@@ -149,7 +149,8 @@ physics/mass_injection_terms/mass_injection_2d.$(OBJEXT): state/state_types.$(OB
 physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
-    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 
@@ -558,9 +559,12 @@ physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): physics/thermal_laws/thermal_
 
 # Block 1: missing direct USE edges, independently audited against all
 # 68 production Fortran sources. Keep these for deterministic parallel make.
-numerics/time_integration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
-numerics/lie_source_executor_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
-numerics/nonlinear_solver_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+numerics/nonlinear_solver_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 geometry/domain_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)

@@ -19,7 +19,7 @@ MODULE source_terms_2d
             eval_thermal_implicit_real, eval_thermal_analytic, eval_thermal_implicit_temperature
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
-    USE rheology_parameters_2d, ONLY : rheology_l1
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
@@ -71,10 +71,12 @@ CONTAINS
 
     !> Assemble and limit a complete explicit Lie group, without committing state.
     !> @param[in] thermal Immutable layer thermal configuration.
+    !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
-            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials,thermal)
+            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
+            thermal,rheology)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -88,6 +90,7 @@ CONTAINS
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         TYPE(injection_material_set_type), INTENT(IN) :: materials
         TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -111,13 +114,13 @@ CONTAINS
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
                 arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
-                physical_ready,materials,thermal)
+                physical_ready,materials,thermal,rheology)
         END IF
 
         IF (has_exchange) THEN
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready)
+                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready,rheology)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -268,7 +271,8 @@ CONTAINS
     !> Return the conservative equivalent rate of the exact source substep.
     !> The interval is supplied by the selected Lie group operator.
     !> @param[in] thermal Immutable layer thermal configuration.
-    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal)
+    !> @param[in] rheology Immutable layer rheology configuration.
+    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal,rheology)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -276,6 +280,7 @@ CONTAINS
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
 
@@ -291,14 +296,17 @@ CONTAINS
 
         END IF
 
-        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch,thermal)
+        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
+            thermal,rheology)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
 
     !> @brief Evaluate the analytic conservative state of one source group.
     !> @param[in] thermal Immutable layer thermal configuration.
-    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch,thermal)
+    !> @param[in] rheology Immutable layer rheology configuration.
+    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
+            thermal,rheology)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -306,6 +314,7 @@ CONTAINS
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
@@ -327,7 +336,7 @@ CONTAINS
         ! cp_m, which determines T from conservative energy. Keep the old dry
         ! branch to preserve its ambient-temperature and rejection semantics.
         needs_physical_state=INDEX(selected_model_name,'rheology_')==1 .OR.                                            &
-            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp) .OR.                            &
+            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp) .OR. &
             (selected_model_name=='thermal_cooling' .AND. q_before(1)<=0.0_wp)
         IF (needs_physical_state) THEN
             physical_state=>local_state
@@ -355,7 +364,7 @@ CONTAINS
 
             END IF
 
-            CALL eval_rheology_analytic(rheology_l1,[selected_model_name], interval, physical_state,                               &
+            CALL eval_rheology_analytic(rheology,[selected_model_name], interval, physical_state, &
                     speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag,                              &
                     stochastic_flag, context%Zij, velocity_after, supported,                                           &
                     context%Bprime_x, context%Bprime_y, context%Bsecond_xx,                                            &
@@ -418,13 +427,15 @@ CONTAINS
 
     !> Evaluate the frozen semi-implicit contribution of one Newton Lie group.
     !> All inputs refer to one cell; no domain indices or shared-state writes.
+    !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE eval_source_semi_implicit(group,q_cell,Bprime_x,Bprime_y,                                               &
-            grav_correction,stochastic_value,rate,physical_scratch)
+            grav_correction,stochastic_value,rate,physical_scratch,rheology)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(physical_state_real), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
 
@@ -443,14 +454,16 @@ CONTAINS
         END IF
         CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                      &
             0.0_wp,0.0_wp,0.0_wp)
-        CALL eval_rheology_semi_implicit_id(rheology_l1,group%rheology_id,physical_state,                                          &
+        CALL eval_rheology_semi_implicit_id(rheology,group%rheology_id,physical_state, &
             grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
 
     !> Evaluate the REAL implicit source directly for Newton residuals.
     !> The source formulas are identical to those used by COMPLEX Jacobians.
     !> @param[in] thermal Immutable layer thermal configuration.
-    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted,thermal)
+    !> @param[in] rheology Immutable layer rheology configuration.
+    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted, &
+            thermal,rheology)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,Zij,q_cell(n_vars)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
@@ -460,6 +473,7 @@ CONTAINS
         REAL(wp) :: temperature
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -491,7 +505,7 @@ CONTAINS
             RETURN
         END IF
         IF (group%rheology_implicit) THEN
-            CALL eval_rheology_implicit_real_id(rheology_l1,group%rheology_id,physical_state, &
+            CALL eval_rheology_implicit_real_id(rheology,group%rheology_id,physical_state, &
                 stochastic_flag,Zij,rate(2:3))
         END IF
         IF (group%thermal_active) THEN
@@ -504,7 +518,9 @@ CONTAINS
     !> Evaluate the COMPLEX implicit rate for Newton complex-step Jacobians.
     !> The real residual uses the distinct eval_source_implicit_real contract.
     !> @param[in] thermal Immutable layer thermal configuration.
-    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted,thermal)
+    !> @param[in] rheology Immutable layer rheology configuration.
+    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted, &
+            thermal,rheology)
         REAL(wp), INTENT(IN) :: Bprimej_x,Bprimej_y,Zij
         COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
         COMPLEX(wp), INTENT(OUT) :: c_nh_term_impl(n_eqns)
@@ -515,6 +531,7 @@ CONTAINS
         COMPLEX(wp) :: temperature
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -547,7 +564,7 @@ CONTAINS
             RETURN
         END IF
         IF (group%rheology_implicit) THEN
-            CALL eval_rheology_implicit_id(rheology_l1,group%rheology_id,physical_state, &
+            CALL eval_rheology_implicit_id(rheology,group%rheology_id,physical_state, &
                 stochastic_flag,Zij,c_nh_term_impl(2:3))
         END IF
         IF (group%thermal_active) THEN
@@ -562,11 +579,12 @@ CONTAINS
 
     !> @brief Assemble explicit geometric and material source rates for one physical cell.
     !> @param[in] thermal Immutable layer thermal configuration.
+    !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
-            physical_ready,materials,thermal )
+            physical_ready,materials,thermal,rheology )
 
     USE parameters_2d, ONLY : pore_pressure_flag
 
@@ -600,6 +618,7 @@ CONTAINS
         LOGICAL, INTENT(OUT), OPTIONAL :: physical_ready
         TYPE(injection_material_set_type), INTENT(IN) :: materials
         TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -671,7 +690,7 @@ CONTAINS
             ! Source rates are evaluated at the same unmodified stage state.
             ! The construction of EXPLICIT stays inside each physical module.
             IF (group%rheology_id>0 .AND. r_h>dry_thickness_tolerance) THEN
-                CALL eval_rheology_explicit(rheology_l1,group%rheology_id,physical_state,                                          &
+                CALL eval_rheology_explicit(rheology,group%rheology_id,physical_state, &
                     grav_coeff, pore_pressure_flag,                                                                    &
                     stochastic_flag, stochastic_value, rheology_rate)
                 expl_term(2:3)=expl_term(2:3)+rheology_rate
@@ -744,8 +763,9 @@ CONTAINS
     !> \param[out] carrier_loss_term Limited carrier loss rate.
     !> \param[out] eqns_term Conservative equation source-rate vector.
     !> \param[out] topo_term Proposed bed-elevation rate.
+    !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready)
+            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready,rheology)
         REAL(wp), INTENT(IN) :: qpj(n_vars),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -755,6 +775,7 @@ CONTAINS
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         LOGICAL, INTENT(IN), OPTIONAL :: physical_ready
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: exchange_state
         LOGICAL :: reuse_prepared_state
@@ -773,7 +794,7 @@ CONTAINS
         ! worker-local scratch. Standalone exchange calls still build normally.
         IF (.NOT.reuse_prepared_state) &
             CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
-        CALL eval_mass_exchange_explicit(rheology_l1,exchange_state,B_zone,                                                        &
+        CALL eval_mass_exchange_explicit(rheology,exchange_state,B_zone, &
             erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d
