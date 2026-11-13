@@ -13,8 +13,6 @@ MODULE source_input_2d
     IMPLICIT NONE
     PRIVATE
     ! D18: physical-source scheduling preferences, absent unless specified.
-    CHARACTER(LEN=16), PUBLIC :: pore_pressure_method=''
-    INTEGER, PUBLIC :: pore_pressure_group=3
     CHARACTER(LEN=16), PUBLIC :: bottom_circular_method=''
     INTEGER, PUBLIC :: bottom_circular_group=0
     CHARACTER(LEN=16), PUBLIC :: bottom_fissural_method=''

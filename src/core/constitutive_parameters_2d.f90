@@ -19,7 +19,6 @@ MODULE constitutive_parameters_2d
     PUBLIC :: entrainment_flag
     PUBLIC :: grav, inv_grav
     PUBLIC :: A_drag, B_drag, collective_settling_flag
-    PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
     PUBLIC :: SBconst
     PUBLIC :: rho_c_sub, rho_a_amb
     PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
@@ -30,10 +29,7 @@ MODULE constitutive_parameters_2d
     PUBLIC :: erosion_coeff, loss_rate, erodible_fract, erodible_porosity
     PUBLIC :: coeff_porosity, T_erodible
     PUBLIC :: pres, inv_pres, rho_l, inv_rho_l, sp_heat_l, gamma_steam, vonK
-    PUBLIC :: hydraulic_permeability, dynamic_permeability_flag
     PUBLIC :: maximum_solid_packing
-    PUBLIC :: pascal_coeff, pascal_coeff_precomputed
-    PUBLIC :: precompute_pascal_coefficient
 
     !> flag to activate air entrainment
     LOGICAL :: entrainment_flag
@@ -47,11 +43,6 @@ MODULE constitutive_parameters_2d
     REAL(wp) :: A_drag
     REAL(wp) :: B_drag
     LOGICAL :: collective_settling_flag
-    !> f_inhibit
-    REAL(wp) :: alpha_trans !< solid volume fraction at which f_inhibit starts decreasing
-    INTEGER :: N_inh = 2 !< 2N+1 determines order of the smoothstep function for f_inhibit
-    CHARACTER(LEN=8) :: f_inhibit_mode = 'OFF'  ! options: 'OFF','STATIC','DYNAMIC'
-
     !> Stefan-Boltzmann constant [W m-2 K-4].
     REAL(wp), PARAMETER :: SBconst = 5.67E-8_wp
 
@@ -158,90 +149,7 @@ MODULE constitutive_parameters_2d
     !> Von Karman constant used for the diagnostic Rouse number
     REAL(wp) :: vonK
 
-    !> Hydraulic permeability (units: m2)
-    REAL(wp) :: hydraulic_permeability
-    !> Flag to activate dynamic permeability
-    LOGICAL :: dynamic_permeability_flag
-
     !> Maximum solid packing fraction
     REAL(wp) :: maximum_solid_packing
-
-    ! store combined pascal coefficients: coeff(n) = pascal1(n) * pascal2(n)
-    REAL(wp), ALLOCATABLE :: pascal_coeff(:)   ! index with 0..N_inh
-    LOGICAL :: pascal_coeff_precomputed
-
-CONTAINS
-
-    !> \brief Precompute binomial coefficients for constitutive polynomial expansions.
-    !>
-    !> Function that calculates the pascal coefficients for the smooth transition of f_inhibit
-    !>
-    !> \param[in] N_order Nonnegative transition-polynomial order; coefficients use indices
-    !> 0:N_order.
-    !>
-    !> \note Writes pascal_coeff(0:N_order) and pascal_coeff_precomputed in this module.
-
-    SUBROUTINE precompute_pascal_coefficient(N_order)
-        !! Computes the two Pascal-like coefficients for each n = 0..N
-        !! Stores their product in the module array pascal_coeff(0:N_order).
-    IMPLICIT NONE
-        INTEGER, INTENT(IN) :: N_order
-        INTEGER :: n, k
-        REAL(wp) :: pascal1, pascal2
-
-        ! allocate or reallocate pascal_coeff with 0-based indices
-    IF ( ALLOCATED(pascal_coeff) ) THEN
-
-        IF ( LBOUND(pascal_coeff,1) /= 0 .OR. UBOUND(pascal_coeff,1) /= N_order ) THEN
-            DEALLOCATE(pascal_coeff)
-            ALLOCATE(pascal_coeff(0:N_order))
-
-        END IF
-    ELSE
-        ALLOCATE(pascal_coeff(0:N_order))
-
-    END IF
-
-        ! Validate input
-        IF (N_order < 0) THEN
-            WRITE(*,*) 'ERROR: N must be >= 0. N =', N_order
-            STOP
-
-        END IF
-
-        ! Loop over n = 0..N and compute the two coefficients
-        DO n = 0, N_order
-            ! ----- First coefficient: pascal_triangle(-N-1, n) -----
-            pascal1 = 1.0_wp
-
-            IF (n > 0) THEN
-
-                DO k = 0, n-1
-                    pascal1 = pascal1 * ( -REAL(N_order,kind=wp) - 1.0_wp -                                            &
-                                        REAL(k, kind=wp) ) / REAL(k+1,kind=wp)
-
-                END DO
-
-            END IF
-            ! ----- Second coefficient: pascal_triangle(2N+1, N-n) -----
-            pascal2 = 1.0_wp
-
-            IF (N_order - n > 0) THEN
-
-                DO k = 0, N_order - n - 1
-                    pascal2 = pascal2 * (2.0_wp*REAL(N_order,kind=wp)+1.0_wp-                                          &
-                                        REAL(k,kind=wp) ) / REAL(k+1,kind=wp)
-
-                END DO
-
-            END IF
-
-            pascal_coeff(n) = pascal1 * pascal2
-
-        END DO
-
-        pascal_coeff_precomputed = .TRUE.
-
-    END SUBROUTINE precompute_pascal_coefficient
 
 END MODULE constitutive_parameters_2d

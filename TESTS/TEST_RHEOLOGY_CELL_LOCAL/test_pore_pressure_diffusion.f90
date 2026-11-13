@@ -4,8 +4,8 @@ PROGRAM test_pore_pressure_diffusion
        n_stoch_vars, n_pore_vars, configure_canonical_state_indices, &
        idx_poreEqn, idx_solidEqn_first, idx_solidEqn_last, &
        gas_flag, pore_pressure_flag, sutherland_flag
-  USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
-       kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
+  USE constitutive_parameters_2d, ONLY : kin_visc_c, sp_heat_a, sp_gas_const_a, pres
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
   USE geometry_2d, ONLY : pi_g
   USE pore_pressure_darcy_2d, ONLY : eval_pore_pressure_darcy_analytic
   USE state_types, ONLY : physical_state_real
@@ -34,9 +34,9 @@ PROGRAM test_pore_pressure_diffusion
   ALLOCATE(solid_fractions(n_solid))
   gas_flag = .FALSE.
   sutherland_flag = .FALSE.
-  dynamic_permeability_flag = .FALSE.
-  f_inhibit_mode = 'OFF'
-  hydraulic_permeability = 1.0E-10_wp
+  pore_pressure_l1%dynamic_permeability_flag = .FALSE.
+  pore_pressure_l1%f_inhibit_mode = 'OFF'
+  pore_pressure_l1%hydraulic_permeability = 1.0E-10_wp
   kin_visc_c = 1.5E-5_wp
   sp_heat_a = 1005.0_wp
   sp_gas_const_a = 287.0_wp
@@ -102,7 +102,7 @@ PROGRAM test_pore_pressure_diffusion
   CALL assert_close(after_full, 0.0_wp, 1.0e-10_wp,                         &
        'long-time diffusion limit did not decay excess pressure to zero')
 
-  hydraulic_permeability = 0.0_wp
+  pore_pressure_l1%hydraulic_permeability = 0.0_wp
   CALL advance_pore_pressure_diffusion(initial_pressure, integration_step,   &
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, initial_pressure, 0.0_wp,                    &
@@ -125,7 +125,7 @@ CONTAINS
     gamma=sp_heat_a/(sp_heat_a-sp_gas_const_a)
     gas_density=pres/(sp_gas_const_a*temp)
     compressibility=1.0_wp/(gamma*pres)
-    diffusion=hydraulic_permeability/ &
+    diffusion=pore_pressure_l1%hydraulic_permeability/ &
          (porosity*kin_visc_c*gas_density*compressibility)
     source=CMPLX(-mixture_density*(pi_g/2.0_wp)**2*diffusion*p0/ &
          MAX(1.0e-10_wp,h),0.0_wp,wp)
@@ -150,7 +150,7 @@ CONTAINS
     q_before=0.0_wp
     q_before(1)=mass
     q_before(idx_poreEqn)=mass*p0
-    CALL eval_pore_pressure_darcy_analytic(state,q_before,dt,rate,ok)
+    CALL eval_pore_pressure_darcy_analytic(pore_pressure_l1,pore_pressure_cache_l1,state,q_before,dt,rate,ok)
     IF (.NOT.ok) ERROR STOP 'analytic Darcy diffusion rejected valid state'
     p_after=(q_before(idx_poreEqn)+dt*rate(idx_poreEqn))/ &
          (q_before(1)+dt*rate(1))

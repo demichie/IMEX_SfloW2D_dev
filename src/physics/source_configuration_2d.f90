@@ -16,6 +16,7 @@ MODULE source_configuration_2d
             idx_pore
     USE rheology_parameters_2d, ONLY : rheology_l1
     USE thermal_parameters_2d, ONLY : thermal_l1
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,                                               &
             coeff_porosity, entrainment_flag
     IMPLICIT NONE
@@ -136,8 +137,8 @@ CONTAINS
             requested_method=thermal_l1%thermal_method
             id=thermal_l1%thermal_group
         CASE('pore_pressure_dissipation')
-            requested_method=pore_pressure_method
-            id=pore_pressure_group
+            requested_method=pore_pressure_l1%pore_pressure_method
+            id=pore_pressure_l1%pore_pressure_group
         CASE('bottom_circular_injection','bottom_fissural_injection',                                                  &
                 'radial_injection','geometry_curvature')
 

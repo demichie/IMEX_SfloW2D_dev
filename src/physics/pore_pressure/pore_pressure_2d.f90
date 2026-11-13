@@ -5,6 +5,7 @@ MODULE pore_pressure_2d
     USE parameters_2d, ONLY : wp, n_solid, n_eqns, pore_pressure_flag
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE diagnostics_2d, ONLY : fatal_error
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE pore_pressure_darcy_2d, ONLY :                                                                                 &
             darcy_explicit => eval_pore_pressure_darcy_explicit,                                                       &
             darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit,                                             &
@@ -19,11 +20,13 @@ CONTAINS
     !> @brief Dispatch explicit pressure sources; unsupported Darcy treatment is an error.
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] config Immutable Darcy closure configuration.
     !> @param[in] models Canonical pressure model names.
     !> @param[in] state Read-only real physical cell state.
     !> @param[out] rate Conservative explicit rate vector.
     !> @param[in] include_gas_loss Optional switch for coupled interstitial gas loss.
-    SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
+    SUBROUTINE eval_pore_pressure_explicit(config,models,state,rate,include_gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -35,7 +38,7 @@ CONTAINS
 
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
-            CALL darcy_explicit(state,rate,include_gas_loss)
+            CALL darcy_explicit(config,state,rate,include_gas_loss)
         CASE DEFAULT
             CALL fatal_error('Unknown explicit pore-pressure model: '//TRIM(models(i)))
 
@@ -47,10 +50,12 @@ CONTAINS
     !> @brief Dispatch pressure sources through the semi-implicit interface.
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] config Immutable Darcy closure configuration.
     !> @param[in] models Canonical pressure model names.
     !> @param[in] state Read-only real physical cell state.
     !> @param[out] rate Conservative semi-implicit rate vector.
-    SUBROUTINE eval_pore_pressure_semi_implicit(models,state,rate)
+    SUBROUTINE eval_pore_pressure_semi_implicit(config,models,state,rate)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -61,7 +66,7 @@ CONTAINS
 
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
-            CALL darcy_semi_implicit(state,rate)
+            CALL darcy_semi_implicit(config,state,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown semi-implicit pore-pressure model: '//TRIM(models(i)))
 
@@ -73,10 +78,12 @@ CONTAINS
     !> @brief Dispatch pressure sources through the complex Newton interface.
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] config Immutable Darcy closure configuration.
     !> @param[in] models Canonical pressure model names.
     !> @param[in] state Read-only complex physical cell state.
     !> @param[out] rate Complex conservative source vector.
-    SUBROUTINE eval_pore_pressure_implicit(models,state,rate)
+    SUBROUTINE eval_pore_pressure_implicit(config,models,state,rate)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
@@ -87,7 +94,7 @@ CONTAINS
 
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
-            CALL darcy_implicit(state,rate)
+            CALL darcy_implicit(config,state,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown implicit pore-pressure model: '//TRIM(models(i)))
 
@@ -102,14 +109,19 @@ CONTAINS
     !> @brief Integrate supported pore-pressure sources analytically over a Lie substep.
     !> @details The dispatcher retains each of the four numerical interfaces;
     !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] config Immutable Darcy closure configuration.
     !> @param[in] models Canonical pressure model names.
+    !> @param[in] cache Derived Pascal coefficients for the selected layer.
     !> @param[in] state Frozen real physical cell state.
     !> @param[in] q_before Conservative state at the beginning of the substep.
     !> @param[in] interval Nonnegative substep duration [s].
     !> @param[out] rate Mean conservative rate across the substep.
     !> @param[out] admissible Acceptance flag for the resulting local state.
     !> @param[in] include_gas_loss Optional coupled pore-gas loss switch.
-    SUBROUTINE eval_pore_pressure_analytic(models, state, q_before, interval, rate, admissible, include_gas_loss)
+    SUBROUTINE eval_pore_pressure_analytic(config,cache,models,state,q_before,interval,rate,admissible, &
+        include_gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: cache
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
@@ -130,7 +142,7 @@ CONTAINS
 
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
-            CALL darcy_analytic(state,q_before,interval,rate,admissible,include_gas_loss)
+            CALL darcy_analytic(config,cache,state,q_before,interval,rate,admissible,include_gas_loss)
         CASE DEFAULT
             CALL fatal_error('Unknown analytic pore-pressure model: '//TRIM(models(i)))
 

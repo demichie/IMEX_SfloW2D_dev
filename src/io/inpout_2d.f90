@@ -68,7 +68,6 @@
     ! -- Variables for the namelist NUMERIC_PARAMETERS
     USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff
     USE source_input_2d, ONLY: read_mass_exchange_parameters, write_mass_exchange_parameters,                          &
-            pore_pressure_method, pore_pressure_group,                                                                 &
             bottom_circular_method, bottom_circular_group,                                                             &
             bottom_fissural_method, bottom_fissural_group,                                                             &
             radial_injection_method, radial_injection_group,                                                           &
@@ -117,7 +116,8 @@
     USE state_composition, ONLY : normalize_face_composition
     USE state_types, ONLY : physical_state_real, initialize_physical_state_real
     USE state_physical, ONLY : build_physical_state_from_qp
-    USE constitutive_parameters_2d, ONLY: precompute_pascal_coefficient
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_l1, pore_pressure_l2,            &
+            pore_pressure_cache_type, pore_pressure_cache_l1, pore_pressure_cache_l2, precompute_pascal_coefficient
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
     USE constitutive_parameters_2d, ONLY: rho_s, diam_s, sphericity_s,                                                 &
@@ -149,10 +149,7 @@
     USE stochastic_random_2d, ONLY: stochastic_seed
     USE parameters_2d, ONLY: length_spatial_corr
 
-    ! --- Variables for the namelist PORE_PRESSURE_PARAMETERS
-    USE constitutive_parameters_2d, ONLY: hydraulic_permeability,                                                      &
-            dynamic_permeability_flag, alpha_trans, N_inh, f_inhibit_mode,                                             &
-            pascal_coeff_precomputed
+    ! Darcy configuration and its Pascal cache have canonical layer-local owners.
     USE parameters_2d, ONLY: pore_pres_fract
     USE parameters_2d, ONLY: gas_loss_flag
 
@@ -297,6 +294,7 @@
 
     TYPE(rheology_config_type), POINTER :: rheology => rheology_l1
     TYPE(thermal_config_type), POINTER :: thermal => thermal_l1
+    TYPE(pore_pressure_config_type), POINTER :: pore_pressure => pore_pressure_l1
 
 
     REAL(wp) :: thickness_levels0(10)
@@ -410,10 +408,9 @@
         tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag,                                      &
         stochastic_seed, noise_activation_velocity
 
-    NAMELIST /pore_pressure_parameters/ hydraulic_permeability,                                       &
-        alpha_trans, N_inh, f_inhibit_mode,                                                                            &
-        dynamic_permeability_flag, pore_pressure_method,                                                               &
-        pore_pressure_group
+    NAMELIST /pore_pressure_parameters/ pore_pressure
+    NAMELIST /pore_pressure_l1_parameters/ pore_pressure_l1
+    NAMELIST /pore_pressure_l2_parameters/ pore_pressure_l2
 
     NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW,                                                         &
         xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
@@ -479,7 +476,8 @@
         IMPLICIT none
 
         LOGICAL :: lexist
-        INTEGER :: ios
+        INTEGER :: ios, n_pore_legacy, n_pore_l1, n_pore_l2
+        CHARACTER(LEN=2048) :: pore_line
 
         ! Reset canonical NAMELIST objects between runs.
         rheology_l1=rheology_config_type()
@@ -487,7 +485,10 @@
         thermal_l1=thermal_config_type()
         thermal_l2=thermal_config_type()
         ! Reset physical-source preferences before any namelist is parsed.
-        pore_pressure_method=''; pore_pressure_group=3
+        pore_pressure_l1=pore_pressure_config_type()
+        pore_pressure_l2=pore_pressure_config_type()
+        pore_pressure_cache_l1=pore_pressure_cache_type()
+        pore_pressure_cache_l2=pore_pressure_cache_type()
         bottom_circular_method=''; bottom_circular_group=0
         bottom_fissural_method=''; bottom_fissural_group=0
         radial_injection_method=''; radial_injection_group=0
@@ -593,13 +594,8 @@
         noise_activation_velocity = -1.0_wp
 
         !-- Inizialization of the Variables for the namelist PORE_PRESSURE_PARAMETERS
-        hydraulic_permeability = 0.0_wp
         pore_pres_fract = -1.0_wp
         gas_loss_flag = .FALSE.
-        alpha_trans = 0.0_wp
-        f_inhibit_mode = 'OFF'
-        dynamic_permeability_flag = .FALSE.
-        pascal_coeff_precomputed = .FALSE.
 
         !-------------- Check if input file exists ----------------------------------
         input_file = 'IMEX_SfloW2D.inp'
@@ -702,50 +698,54 @@
 
             END IF
 
+            n_pore_legacy=0
+            n_pore_l1=0
+            n_pore_l2=0
+            REWIND(input_unit)
+            DO
+                READ(input_unit,'(A)',IOSTAT=ios) pore_line
+                IF (ios<0) EXIT
+                IF (ios/=0) CALL fatal_error('Unable to scan pore-pressure namelists')
+                pore_line=uppercase_source_text(ADJUSTL(pore_line))
+                IF (INDEX(pore_line,'&PORE_PRESSURE_PARAMETERS')==1) n_pore_legacy=n_pore_legacy+1
+                IF (INDEX(pore_line,'&PORE_PRESSURE_L1_PARAMETERS')==1) n_pore_l1=n_pore_l1+1
+                IF (INDEX(pore_line,'&PORE_PRESSURE_L2_PARAMETERS')==1) n_pore_l2=n_pore_l2+1
+            END DO
+            REWIND(input_unit)
+            IF (n_pore_l2/=0) CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
             IF (pore_pressure_flag) THEN
-
-                READ (input_unit, pore_pressure_parameters, IOSTAT=ios)
-                REWIND (input_unit)
+                IF (n_pore_legacy+n_pore_l1/=1) &
+                    CALL fatal_error('Provide exactly one PORE_PRESSURE_PARAMETERS or PORE_PRESSURE_L1_PARAMETERS')
+                IF (n_pore_legacy==1) THEN
+                    READ(input_unit,NML=pore_pressure_parameters,IOSTAT=ios)
+                ELSE
+                    READ(input_unit,NML=pore_pressure_l1_parameters,IOSTAT=ios)
+                END IF
+                IF (ios/=0) CALL fatal_error('Invalid L1 pore-pressure NAMELIST')
+                REWIND(input_unit)
                 n_pore_vars = 1
 
                 idx_pore = 5 + n_solid + n_add_gas + n_stoch_vars
                 idx_poreEqn = idx_pore
 
-                ! Normalize and validate f_inhibit_mode (require uppercase tokens in input)
-                f_inhibit_mode = trim(adjustl(f_inhibit_mode))
-                IF (.NOT. (f_inhibit_mode == 'OFF' .OR. f_inhibit_mode == 'STEP' .OR.                                  &
-                                f_inhibit_mode == 'STATIC' .OR. f_inhibit_mode == 'DYNAMIC')) THEN
-                    WRITE (*, *) 'ERROR: invalid F_INHIBIT_MODE in RHEOLOGY_PARAMETERS: ', f_inhibit_mode
-                    WRITE (*, *) 'Allowed values: OFF, STEP, STATIC, DYNAMIC (use upper case)'
-                    STOP
-                ELSEIF (f_inhibit_mode == 'STATIC' .OR. f_inhibit_mode == 'DYNAMIC') THEN
-                    ! only compute once
-                    IF (.NOT. pascal_coeff_precomputed) THEN
-                        CALL precompute_pascal_coefficient(N_inh)
-                        WRITE (*, *) 'f_inhibit_mode = ', f_inhibit_mode
-                        WRITE (*, *) 'Precomputed Pascal coefficients for N_INH = ', N_inh
-                        WRITE (*, *) 'pascal_coeff_precomputed = ', pascal_coeff_precomputed
-
-                    END IF
-
-                    IF (N_inh <= 0) THEN
-                        WRITE (*, *) 'ERROR: N_INH must be > 0 when F_INHIBIT_MODE is STATIC or DYNAMIC'
-                        STOP
-
-                    END IF
-
-                    IF (alpha_trans .LE. 0.0_wp) THEN
-                        WRITE (*, *) 'ERROR: problem with namelist PORE_PRESSURE_PARAMETERS'
-                        WRITE (*, *) 'alpha_trans =', alpha_trans
-                        WRITE (*, *) 'Please check that alpha_trans is > 0.0 when F_INHIBIT_MODE is STATIC or DYNAMIC'
-                        STOP
-
-                    END IF
-
-                END IF
+                ! Validate the canonical layer object before initializing the Lie worker pool.
+                pore_pressure_l1%f_inhibit_mode=TRIM(ADJUSTL(pore_pressure_l1%f_inhibit_mode))
+                SELECT CASE(TRIM(pore_pressure_l1%f_inhibit_mode))
+                CASE('OFF','STEP')
+                    CONTINUE
+                CASE('STATIC','DYNAMIC')
+                    IF (pore_pressure_l1%N_inh<=0) &
+                        CALL fatal_error('N_INH must be > 0 for STATIC or DYNAMIC Darcy inhibition')
+                    IF (pore_pressure_l1%alpha_trans<=0.0_wp) &
+                        CALL fatal_error('ALPHA_TRANS must be > 0 for STATIC or DYNAMIC Darcy inhibition')
+                    CALL precompute_pascal_coefficient(pore_pressure_l1,pore_pressure_cache_l1)
+                CASE DEFAULT
+                    CALL fatal_error('Invalid F_INHIBIT_MODE in PORE_PRESSURE_PARAMETERS')
+                END SELECT
 
             ELSE
-
+                IF (n_pore_legacy+n_pore_l1/=0) &
+                    CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
                 n_pore_vars = 0
 
                 WRITE (*, *) 'NOTE: PORE_PRESSURE_FLAG is FALSE. Pore pressure equation will not be solved.'
@@ -936,14 +936,8 @@
         stochastic_seed = -1
         noise_activation_velocity = -1.0_wp
 
-        !-- Variable for the namelist PORE_PRESSURE_PARAMETERS
-        hydraulic_permeability = 0.0_wp
-        pore_pres_fract = -1.0_wp
-        gas_loss_flag = .FALSE.
-        alpha_trans = 0.0_wp
-        f_inhibit_mode = 'OFF'
-        dynamic_permeability_flag = .FALSE.
-        pascal_coeff_precomputed = .FALSE.
+        ! Pore-pressure configuration was initialized once before parsing.
+        ! No second coefficient representation is reset here.
 
     END SUBROUTINE init_param
 
@@ -1012,7 +1006,8 @@
 
         INTEGER :: ios, n_rheology_legacy, n_rheology_l1, n_rheology_l2
         INTEGER :: n_thermal_legacy, n_thermal_l1, n_thermal_l2
-        CHARACTER(LEN=2048) :: rheology_line, thermal_line
+        INTEGER :: n_pore_legacy, n_pore_l1, n_pore_l2
+        CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line
         CHARACTER(LEN=256) :: source_input_error
 
         REAL(wp) :: expA, expB, Tc
@@ -1439,31 +1434,38 @@
 
         END IF
 
+        ! The canonical single-layer Darcy NAMELIST is selected exactly once.
+        n_pore_legacy=0
+        n_pore_l1=0
+        n_pore_l2=0
+        REWIND(input_unit)
+        DO
+            READ(input_unit,'(A)',IOSTAT=ios) pore_line
+            IF (ios<0) EXIT
+            IF (ios/=0) CALL fatal_error('Unable to scan pore-pressure namelists')
+            pore_line=uppercase_source_text(ADJUSTL(pore_line))
+            IF (INDEX(pore_line,'&PORE_PRESSURE_PARAMETERS')==1) n_pore_legacy=n_pore_legacy+1
+            IF (INDEX(pore_line,'&PORE_PRESSURE_L1_PARAMETERS')==1) n_pore_l1=n_pore_l1+1
+            IF (INDEX(pore_line,'&PORE_PRESSURE_L2_PARAMETERS')==1) n_pore_l2=n_pore_l2+1
+        END DO
+        REWIND(input_unit)
+        IF (n_pore_l2/=0) CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
         IF (pore_pressure_flag) THEN
-
-            READ (input_unit, pore_pressure_parameters, IOSTAT=ios)
-
-            IF (ios .NE. 0) THEN
-
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist PORE_PRESSURE_PARAMETERS'
-                WRITE (*, pore_pressure_parameters)
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
+            IF (n_pore_legacy+n_pore_l1/=1) &
+                CALL fatal_error('Provide exactly one PORE_PRESSURE_PARAMETERS or PORE_PRESSURE_L1_PARAMETERS')
+            IF (n_pore_legacy==1) THEN
+                READ(input_unit,NML=pore_pressure_parameters,IOSTAT=ios)
             ELSE
-
-                REWIND (input_unit)
-
+                READ(input_unit,NML=pore_pressure_l1_parameters,IOSTAT=ios)
             END IF
-
-            n_pore_vars = 1
-            n_vars = n_vars + 1
-
+            IF (ios/=0) CALL fatal_error('ERROR: invalid L1 pore-pressure NAMELIST')
+            REWIND(input_unit)
+            n_pore_vars=1
+            n_vars=n_vars+1
         ELSE
-
-            n_pore_vars = 0
-
+            IF (n_pore_legacy+n_pore_l1/=0) &
+                CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
+            n_pore_vars=0
         END IF
 
         ! Layer rheology must be read for gas, liquid and lava carriers.
@@ -2005,10 +2007,10 @@
             ! If alpha_trans was provided earlier in the pore-pressure namelist,
             ! ensure it does not exceed the maximum solid packing read here.
 
-            IF (maximum_solid_packing .LT. alpha_trans) THEN
+            IF (maximum_solid_packing .LT. pore_pressure_l1%alpha_trans) THEN
                 WRITE (*, *) 'ERROR: inconsistency between SOLID_TRANSPORT and PORE_PRESSURE parameters'
                 WRITE (*, *) 'maximum_solid_packing =', maximum_solid_packing
-                WRITE (*, *) 'alpha_trans =', alpha_trans
+                WRITE (*, *) 'alpha_trans =', pore_pressure_l1%alpha_trans
                 WRITE (*, *) 'Please check that MAXIMUM_SOLID_PACKING >= ALPHA_TRANS'
                 STOP
 
@@ -2196,13 +2198,13 @@
                 TRIM(thermal_l1%thermal_method)/='EXPLICIT' .AND.                                                      &
                 TRIM(thermal_l1%thermal_method)/='NEWTON' .AND.                                                        &
                 TRIM(thermal_l1%thermal_method)/='ANALYTIC') .OR.                                                      &
-                (LEN_TRIM(pore_pressure_method)>0 .AND.                                                                &
-                TRIM(pore_pressure_method)/='EXPLICIT' .AND.                                                           &
-                TRIM(pore_pressure_method)/='NEWTON' .AND.                                                             &
-                TRIM(pore_pressure_method)/='ANALYTIC'))                                                               &
+                (LEN_TRIM(pore_pressure_l1%pore_pressure_method)>0 .AND.                                               &
+                TRIM(pore_pressure_l1%pore_pressure_method)/='EXPLICIT' .AND.                                          &
+                TRIM(pore_pressure_l1%pore_pressure_method)/='NEWTON' .AND.                                            &
+                TRIM(pore_pressure_l1%pore_pressure_method)/='ANALYTIC')) &
                 source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
             IF (rheology_l1%rheology_group<0 .OR. thermal_l1%thermal_group<0 .OR.                            &
-                pore_pressure_group<0)                                                                                 &
+                pore_pressure_l1%pore_pressure_group<0) &
                 source_input_error='D18 physical GROUP must be nonnegative'
 
         END IF

@@ -15,6 +15,7 @@ MODULE time_integration_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
     USE parameters_2d, ONLY : stochastic_flag
@@ -88,8 +89,10 @@ CONTAINS
     !> @param[in,out] spatial_operator Spatial flux operator and scratch buffers.
     !> @param[in] thermal Immutable selected layer thermal configuration.
     !> @param[in] rheology Immutable selected layer rheology configuration.
+    !> @param[in] pore_pressure Immutable layer Darcy configuration.
+    !> @param[in] pore_cache Derived Pascal coefficient cache for this layer.
     SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operator,pre_spatial_primitives_ready, &
-        stochastic_prepared_hook,thermal,rheology)
+        stochastic_prepared_hook,thermal,rheology,pore_pressure,pore_cache)
         CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
         CLASS(state_type), TARGET, INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt
@@ -99,6 +102,8 @@ CONTAINS
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
         REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:)
@@ -284,7 +289,8 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
-            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal,rheology)
+            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal,rheology, &
+            pore_pressure,pore_cache)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)

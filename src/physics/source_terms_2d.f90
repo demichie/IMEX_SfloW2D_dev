@@ -10,6 +10,7 @@ MODULE source_terms_2d
     USE mass_injection_coefficients_2d
     USE parameters_2d
     USE thermal_parameters_2d, ONLY : thermal_config_type
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
@@ -272,7 +273,10 @@ CONTAINS
     !> The interval is supplied by the selected Lie group operator.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
-    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal,rheology)
+    !> @param[in] pore_pressure Immutable Darcy configuration for this layer.
+    !> @param[in] pore_cache Derived Pascal coefficients owned by this layer.
+    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal,rheology, &
+            pore_pressure,pore_cache)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -281,6 +285,8 @@ CONTAINS
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
 
@@ -297,7 +303,7 @@ CONTAINS
         END IF
 
         CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
-            thermal,rheology)
+            thermal,rheology,pore_pressure,pore_cache)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
@@ -305,8 +311,10 @@ CONTAINS
     !> @brief Evaluate the analytic conservative state of one source group.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] pore_pressure Immutable layer Darcy configuration.
+    !> @param[in] pore_cache Immutable Pascal coefficient cache.
     SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
-            thermal,rheology)
+            thermal,rheology,pore_pressure,pore_cache)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -315,6 +323,8 @@ CONTAINS
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
@@ -404,7 +414,7 @@ CONTAINS
 
         ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
             IF (q_before(1)>0.0_wp) THEN
-                CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],                                              &
+                CALL eval_pore_pressure_analytic(pore_pressure,pore_cache,['pore_pressure_darcy'], &
                         physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
 
                 IF (.NOT.pore_ok) THEN

@@ -18,6 +18,7 @@ IMEX_SfloW2D_SOURCES = \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
+                physics/pore_pressure/pore_pressure_parameters_2d.f90 \
                 physics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
@@ -128,10 +129,16 @@ physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state/state_types.$(OBJ
 physics/layer_contacts_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state/state_types.$(OBJEXT)
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): state/state_types.$(OBJEXT)
@@ -150,17 +157,21 @@ physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
-    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
 core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/layer_physics_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 state/state_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.

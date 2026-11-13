@@ -44,6 +44,10 @@ for profile in strict optimized; do
     "$compiler" $common $objects test_rheology_namelist_alias.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_rheology_namelist_alias
     ./test_rheology_namelist_alias
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_pore_pressure_namelist_alias.f90"
+    "$compiler" $common $objects test_pore_pressure_namelist_alias.o -llapack $netcdf_flibs $netcdf_clibs \
+        -o test_pore_pressure_namelist_alias
+    ./test_pore_pressure_namelist_alias
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_source_modules.f90"
     "$compiler" $common $objects test_source_modules.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_source_modules

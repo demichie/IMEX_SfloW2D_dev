@@ -18,6 +18,7 @@ MODULE simulation_2d
 
     USE rheology_parameters_2d, ONLY : rheology_l1
     USE thermal_parameters_2d, ONLY : thermal_l1
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
         LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
@@ -116,7 +117,8 @@ CONTAINS
         carrier_phase=LAYER_PHASE_GAS
         IF (liquid_flag) carrier_phase=LAYER_PHASE_LIQUID
         IF (lava_flag) carrier_phase=LAYER_PHASE_LAVA
-        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_l1,thermal_l1,source_error)
+        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_l1,thermal_l1, &
+            pore_pressure_l1,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL initialize_configured_sources(this%source_registry,source_error)
@@ -160,13 +162,17 @@ CONTAINS
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
                 thermal=this%layer_physics(1)%thermal_configuration(), &
-                rheology=this%layer_physics(1)%rheology_configuration())
+                rheology=this%layer_physics(1)%rheology_configuration(), &
+                pore_pressure=this%layer_physics(1)%pore_pressure_configuration(), &
+                pore_cache=pore_pressure_cache_l1)
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
                 this%stochastic,this%domain,this%spatial_operator,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
                 thermal=this%layer_physics(1)%thermal_configuration(), &
-                rheology=this%layer_physics(1)%rheology_configuration())
+                rheology=this%layer_physics(1)%rheology_configuration(), &
+                pore_pressure=this%layer_physics(1)%pore_pressure_configuration(), &
+                pore_cache=pore_pressure_cache_l1)
         END IF
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 

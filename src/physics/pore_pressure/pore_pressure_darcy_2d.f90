@@ -10,10 +10,9 @@ MODULE pore_pressure_darcy_2d
             idx_solidEqn_last, sutherland_flag
     USE COMPLEXIFY
     USE diagnostics_2d, ONLY : fatal_error
-    USE constitutive_parameters_2d, ONLY : alpha_trans, N_inh, f_inhibit_mode,                                         &
-            pascal_coeff, hydraulic_permeability, kin_visc_c, sp_heat_a,                                               &
-            sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,                                         &
-            dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
+    USE constitutive_parameters_2d, ONLY : kin_visc_c, sp_heat_a, sp_gas_const_a, pres,                               &
+            diam_s, sphericity_s, maximum_solid_packing, muRef_Suth, Tref_Suth, S_mu
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE geometry_2d, ONLY : pi_g
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -30,10 +29,12 @@ MODULE pore_pressure_darcy_2d
 CONTAINS
 
     !> @brief Reject the unsupported explicit Darcy pressure treatment.
+    !> @param[in] config Layer Darcy configuration (unused by this unsupported method).
   !> @param[in] state Local real physical cell state.
   !> @param[out] rate Conservative source rate, unused before failure.
   !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
-    SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
+    SUBROUTINE eval_pore_pressure_darcy_explicit(config,state,rate,include_gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
@@ -41,10 +42,12 @@ CONTAINS
     END SUBROUTINE eval_pore_pressure_darcy_explicit
 
     !> @brief Reject the unsupported semi-implicit Darcy treatment.
+    !> @param[in] config Layer Darcy configuration (unused by this unsupported method).
   !> @param[in] state Local real physical cell state.
   !> @param[out] rate Conservative source rate, unused before failure.
   !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
-  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
+  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(config,state,rate,include_gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
@@ -52,19 +55,32 @@ CONTAINS
     END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
 
     !> @brief Reject the unsupported Newton Darcy treatment.
+    !> @param[in] config Layer Darcy configuration (unused by this unsupported method).
   !> @param[in] state Local complex physical cell state.
   !> @param[out] rate Complex conservative rate, unused before failure.
   !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
-  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate,include_gas_loss)
+  SUBROUTINE eval_pore_pressure_darcy_implicit(config,state,rate,include_gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
         CALL fatal_error('Darcy pore pressure supports ANALYTIC/STEP only (NEWTON unavailable)')
     END SUBROUTINE eval_pore_pressure_darcy_implicit
 
-    !> Integrate frozen-coefficient Darcy directly and return the full
+    !> @brief Integrate frozen-coefficient Darcy directly and return the full
     !> conservative mean rate for the selected substep.
-    SUBROUTINE eval_pore_pressure_darcy_analytic(state, q_before, interval, rate, admissible, include_gas_loss)
+    !> @param[in] config Immutable Darcy closure parameters for this layer.
+    !> @param[in] cache Immutable derived Pascal coefficients.
+    !> @param[in] state Frozen physical cell state.
+    !> @param[in] q_before Beginning conservative state.
+    !> @param[in] interval Source substep duration [s].
+    !> @param[out] rate Mean conservative source rate.
+    !> @param[out] admissible True if the candidate is physically admissible.
+    !> @param[in] include_gas_loss Optional gas-loss operator selection.
+    SUBROUTINE eval_pore_pressure_darcy_analytic(config,cache,state,q_before,interval,rate,admissible, &
+        include_gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: cache
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -101,7 +117,8 @@ CONTAINS
         END IF
 
         solid_fractions=CMPLX(state%alphas,0.0_wp,wp)
-        CALL eval_pore_pressure_diffusion_factors(CMPLX(state%h,0.0_wp,wp), CMPLX(state%T,0.0_wp,wp), solid_fractions, &
+        CALL eval_pore_pressure_diffusion_factors(config,cache,CMPLX(state%h,0.0_wp,wp),                            &
+            CMPLX(state%T,0.0_wp,wp),solid_fractions, &
             diffusion, inhibition, active)
         lambda=0.0_wp
         IF (active) lambda=REAL((pi_g/2.0_wp)**2*diffusion*inhibition,wp) /                                            &
@@ -117,8 +134,10 @@ CONTAINS
             ! Evaluate at p_e=1 Pa to obtain the mass-loss coefficient A.
             BLOCK
                 COMPLEX(wp) :: gas_loss_coefficient
-                CALL pore_gas_loss_complex(CMPLX(state%h,0.0_wp,wp), CMPLX(state%T,0.0_wp,wp),                         &
-                    CMPLX(state%alphas,0.0_wp,wp), CMPLX(SUM(state%alphas),0.0_wp,wp), CMPLX(state%rho_c,0.0_wp,wp),         &
+                CALL pore_gas_loss_complex(config,cache,CMPLX(state%h,0.0_wp,wp),                                     &
+                    CMPLX(state%T,0.0_wp,wp), &
+                    CMPLX(state%alphas,0.0_wp,wp),CMPLX(SUM(state%alphas),0.0_wp,wp),                                  &
+                    CMPLX(state%rho_c,0.0_wp,wp), &
                     CMPLX(1.0_wp,0.0_wp,wp), gas_loss_coefficient)
                 A=state%rho_c*REAL(gas_loss_coefficient,wp)
 
@@ -249,6 +268,8 @@ CONTAINS
     !>          \f$v_D=\frac{\pi k p_e}{2\nu_g\rho_c\max(10^{-5}\,\mathrm{m},h)}\f$,
     !>          and \f$\texttt{gas\_loss}=Iv_D\f$. The dynamic-permeability and Sutherland
     !>          options use the same mixture closures as pore-pressure diffusion.
+    !> @param[in] config Immutable Darcy closure parameters.
+    !> @param[in] cache Derived Pascal coefficients for inhibition.
     !> \param[in] flow_depth Flow depth h [m].
     !> \param[in] temperature Gas temperature T [K].
     !> \param[in] solid_fractions Per-class solid volume fractions.
@@ -259,8 +280,11 @@ CONTAINS
     !******************************************************************************
 
 
-    SUBROUTINE pore_gas_loss_complex(flow_depth, temperature, solid_fractions, total_solid_fraction, carrier_density,  &
+    SUBROUTINE pore_gas_loss_complex(config,cache,flow_depth,temperature,solid_fractions,                             &
+        total_solid_fraction,carrier_density,                                                                     &
         excess_pressure, gas_loss)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: cache
         COMPLEX(wp), INTENT(IN) :: flow_depth,temperature
         COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
         COMPLEX(wp), INTENT(IN) :: total_solid_fraction,carrier_density,excess_pressure
@@ -269,7 +293,8 @@ CONTAINS
         LOGICAL :: active
 
         gas_loss=CMPLX(0.0_wp,0.0_wp,wp)
-        CALL eval_pore_pressure_diffusion_factors(flow_depth, temperature, solid_fractions, diffusion, inhibition,     &
+        CALL eval_pore_pressure_diffusion_factors(config,cache,flow_depth,temperature,solid_fractions,                &
+            diffusion,inhibition, &
             active, mobility)
         IF (.NOT.active) RETURN
         IF (REAL(carrier_density,wp)<=0.0_wp) RETURN
@@ -288,19 +313,25 @@ CONTAINS
     !>          or evaluated from the Kozeny-Carman mixture closure; the Sutherland
     !>          viscosity law is used when configured. The inhibition output
     !>          implements the selected OFF, STEP, STATIC or DYNAMIC closure.
+    !> @param[in] config Immutable Darcy closure parameters.
+    !> @param[in] cache Derived Pascal coefficients for inhibition.
     !> \param[in] flow_depth Complex-valued flow depth h [m].
     !> \param[in] temperature Complex-valued gas/mixture temperature T [K].
     !> \param[in] solid_fractions Complex-valued per-class solid volume fractions.
     !> \param[out] diffusion_coefficient Pressure-diffusion coefficient D [m^2 s^-1].
     !> \param[out] inhibition Dimensionless solid-fraction inhibition factor I.
+    !> @param[out] mobility Optional permeability/kinematic-viscosity ratio [m].
     !> \param[out] active True when the state has carrier/pore volume for diffusion;
     !>                    otherwise both returned factors are their neutral defaults.
     !> \note Real parts select piecewise branches while smooth closure algebra retains
     !>       complex perturbations for complex-step differentiation.
     !******************************************************************************
-    SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature, solid_fractions, diffusion_coefficient,   &
+    SUBROUTINE eval_pore_pressure_diffusion_factors(config,cache,flow_depth,temperature,solid_fractions,              &
+        diffusion_coefficient,                                                                                     &
         inhibition, active, mobility)
 
+        TYPE(pore_pressure_config_type), INTENT(IN) :: config
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: cache
         COMPLEX(wp), INTENT(IN) :: flow_depth, temperature
         COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
         COMPLEX(wp), INTENT(OUT) :: diffusion_coefficient, inhibition
@@ -322,21 +353,21 @@ CONTAINS
 
         IF (REAL(1.0_wp-SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
 
-        IF (dynamic_permeability_flag) THEN
+        IF (config%dynamic_permeability_flag) THEN
             IF (REAL(SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
 
         END IF
 
         active = .TRUE.
 
-        local_permeability = CMPLX(hydraulic_permeability, 0.0_wp, wp)
+        local_permeability = CMPLX(config%hydraulic_permeability, 0.0_wp, wp)
         local_kinematic_viscosity = CMPLX(kin_visc_c, 0.0_wp, wp)
         gamma_gas = sp_heat_a / (sp_heat_a - sp_gas_const_a)
         gas_compressibility = 1.0_wp / (gamma_gas * pres)
         gas_density = pres / (sp_gas_const_a * temperature)
         porosity = 1.0_wp - SUM(solid_fractions)
 
-        IF (dynamic_permeability_flag) THEN
+        IF (config%dynamic_permeability_flag) THEN
 
             IF (n_solid .GT. 1) THEN
                 sauter_diam = SUM(solid_fractions) / SUM(solid_fractions / diam_s)
@@ -366,7 +397,7 @@ CONTAINS
             (porosity * local_kinematic_viscosity * gas_density *                                                      &
             gas_compressibility)
 
-        SELECT CASE (TRIM(ADJUSTL(f_inhibit_mode)))
+        SELECT CASE (TRIM(ADJUSTL(config%f_inhibit_mode)))
         CASE ('OFF')
             inhibition = 1.0_wp
 
@@ -379,21 +410,21 @@ CONTAINS
             END IF
 
         CASE ('STATIC')
-            IF (N_inh .LT. 0) THEN
-                WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
+            IF (config%N_inh .LT. 0) THEN
+                WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', config%N_inh
                 STOP
 
             END IF
 
             x = SUM(solid_fractions)
-            width = maximum_solid_packing - alpha_trans
-            normalized_fraction = (x - alpha_trans) / width
+            width = maximum_solid_packing - config%alpha_trans
+            normalized_fraction = (x - config%alpha_trans) / width
             IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
             IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
             smoothstep = CMPLX(0.0_wp, 0.0_wp, wp)
 
-            DO n = 0, N_inh
-                term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1)
+            DO n = 0, config%N_inh
+                term = cache%pascal_coeff(n) * normalized_fraction**(config%N_inh + n + 1)
                 smoothstep = smoothstep + term
 
             END DO
@@ -408,8 +439,8 @@ CONTAINS
 
             END IF
 
-            IF (N_inh .LT. 0) THEN
-                WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
+            IF (config%N_inh .LT. 0) THEN
+                WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', config%N_inh
                 STOP
 
             END IF
@@ -421,8 +452,8 @@ CONTAINS
             IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
             smoothstep = CMPLX(0.0_wp, 0.0_wp, wp)
 
-            DO n = 0, N_inh
-                term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1)
+            DO n = 0, config%N_inh
+                term = cache%pascal_coeff(n) * normalized_fraction**(config%N_inh + n + 1)
                 smoothstep = smoothstep + term
 
             END DO

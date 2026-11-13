@@ -7,6 +7,7 @@
 MODULE layer_physics_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE thermal_parameters_2d, ONLY : thermal_config_type
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
         canonical_rheology_source_name, rheology_source_id, RHEOLOGY_ID_NONE
     IMPLICIT NONE
@@ -25,6 +26,8 @@ MODULE layer_physics_2d
         TYPE(rheology_config_type), POINTER :: config => NULL()
         !> Non-owning reference to the canonical thermal configuration.
         TYPE(thermal_config_type), POINTER :: thermal => NULL()
+        !> Non-owning reference to the canonical layer Darcy parameters.
+        TYPE(pore_pressure_config_type), POINTER :: pore_pressure => NULL()
         LOGICAL :: initialized=.FALSE.
     CONTAINS
         PROCEDURE :: initialize => initialize_layer_physics
@@ -35,6 +38,7 @@ MODULE layer_physics_2d
         PROCEDURE :: selected_rheology_id => layer_physics_rheology_id
         PROCEDURE :: rheology_configuration => layer_physics_configuration
         PROCEDURE :: thermal_configuration => layer_physics_thermal_configuration
+        PROCEDURE :: pore_pressure_configuration => layer_physics_pore_pressure_configuration
     END TYPE layer_physics_type
 
 CONTAINS
@@ -45,13 +49,15 @@ CONTAINS
     !> @param[in] rheology_enabled Rheology activation for this layer.
     !> @param[in] rheology_config Stable-lifetime canonical rheology settings.
     !> @param[in] thermal_config Stable-lifetime canonical thermal settings.
+    !> @param[in] pore_config Stable-lifetime canonical Darcy settings.
     !> @param[out] error Empty on success; diagnostic on failure.
-    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,thermal_config,error)
+    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,thermal_config,pore_config,error)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: phase
         LOGICAL, INTENT(IN) :: rheology_enabled
         TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology_config
         TYPE(thermal_config_type), TARGET, INTENT(IN) :: thermal_config
+        TYPE(pore_pressure_config_type), TARGET, INTENT(IN) :: pore_config
         CHARACTER(*), INTENT(OUT) :: error
         CHARACTER(LEN=64) :: source
         TYPE(source_term_type) :: term
@@ -83,6 +89,7 @@ CONTAINS
         END IF
         this%config=>rheology_config
         this%thermal=>thermal_config
+        this%pore_pressure=>pore_config
         this%carrier_phase=phase
         this%rheology_source=source
         this%rheology_id=RHEOLOGY_ID_NONE
@@ -94,6 +101,7 @@ CONTAINS
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         NULLIFY(this%config)
         NULLIFY(this%thermal)
+        NULLIFY(this%pore_pressure)
         this%carrier_phase=0
         this%rheology_id=RHEOLOGY_ID_NONE
         this%rheology_source=''
@@ -131,6 +139,15 @@ CONTAINS
         TYPE(thermal_config_type) :: config
         config=this%thermal
     END FUNCTION layer_physics_thermal_configuration
+
+    !> @brief Read the canonical per-layer Darcy configuration as a value view.
+    !> @param[in] this Initialized layer descriptor.
+    !> @return Temporary Darcy configuration, independent of the canonical owner.
+    PURE FUNCTION layer_physics_pore_pressure_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(pore_pressure_config_type) :: config
+        config=this%pore_pressure
+    END FUNCTION layer_physics_pore_pressure_configuration
 
     PURE INTEGER FUNCTION layer_physics_rheology_id(this)
         CLASS(layer_physics_type), INTENT(IN) :: this
