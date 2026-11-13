@@ -5,6 +5,7 @@ PROGRAM test_spatial_operator
   USE parameters_2d
   USE substrate_parameters_2d, ONLY : substrate
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
   USE spatial_operator_2d, ONLY : spatial_operator_type

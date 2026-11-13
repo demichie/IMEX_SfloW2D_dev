@@ -5,6 +5,7 @@ PROGRAM test_projection_stress
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
   USE substrate_parameters_2d, ONLY : substrate, erodible_fract, coeff_porosity
   USE geometry_2d
   USE state_fields, ONLY : state_type,substrate_snapshot_type

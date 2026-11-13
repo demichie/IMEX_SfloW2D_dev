@@ -3,8 +3,9 @@ PROGRAM test_curvature_source
   USE thermal_parameters_2d, ONLY : thermal_l1
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE parameters_2d
-  USE constitutive_parameters_2d, ONLY : rho_l, inv_rho_l, rho_a_amb, grav, &
-       sp_heat_l, inv_rho_s, sp_heat_s, sp_heat_g, sp_gas_const_g
+  USE constitutive_parameters_2d, ONLY : rho_l, inv_rho_l, rho_a_amb, grav, sp_heat_l, sp_heat_g, &
+      sp_gas_const_g
+  USE solid_transport_parameters_2d, ONLY : inv_rho_s, sp_heat_s
   USE geometry_2d, ONLY : bottom_source_area_ratio, pi_g
   USE rheology_2d, ONLY : curvature_acceleration
   USE source_terms_2d, ONLY : eval_geometry_curvature_explicit

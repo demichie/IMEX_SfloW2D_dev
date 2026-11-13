@@ -1,6 +1,7 @@
 PROGRAM test_state
     USE parameters_2d
     USE constitutive_parameters_2d
+    USE solid_transport_parameters_2d
     USE state_types
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
         evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity, &

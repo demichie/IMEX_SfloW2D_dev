@@ -3,6 +3,7 @@ PROGRAM test_d17_production_newton
   USE thermal_parameters_2d, ONLY : thermal_l1
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON

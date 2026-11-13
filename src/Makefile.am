@@ -17,6 +17,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/rheology_laws/rheology_parameters_2d.f90 \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
+                core/solid_transport_parameters_2d.f90 \
                 physics/substrate/substrate_parameters_2d.f90 \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
@@ -502,6 +503,18 @@ IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
 IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 
 # Explicit Fortran module dependencies for deterministic parallel builds.
+# TL04-C2: canonical shared solids catalog and all its direct consumers.
+core/solid_transport_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+state/state_mixture.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/rheology_laws/rheology_mui_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+
 # TL04-C1: the SHARED substrate module must be compiled after parameters_2d.
 # Every direct USE needs an explicit producer edge for parallel Automake builds.
 physics/substrate/substrate_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)

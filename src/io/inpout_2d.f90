@@ -121,9 +121,9 @@
             pore_pressure_cache_type, pore_pressure_cache_l1, pore_pressure_cache_l2, precompute_pascal_coefficient
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
-    USE constitutive_parameters_2d, ONLY: rho_s, diam_s, sphericity_s,                                                 &
-            sp_heat_s, vonK, settling_flag, erosion_coeff, alphastot_min
-    USE constitutive_parameters_2d, ONLY: maximum_solid_packing
+    USE constitutive_parameters_2d, ONLY : vonK, settling_flag, erosion_coeff, alphastot_min
+    USE solid_transport_parameters_2d, ONLY : rho_s, diam_s, sphericity_s, sp_heat_s
+    USE solid_transport_parameters_2d, ONLY : maximum_solid_packing
 
     ! --- Variables for the namelist GAS_TRANSPORT_PARAMETERS
     USE constitutive_parameters_2d, ONLY: sp_heat_a, sp_gas_const_a,                                                   &
@@ -953,7 +953,8 @@
 
         USE constitutive_parameters_2d, ONLY: rho_a_amb, kin_visc_c
 
-        USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
+        USE constitutive_parameters_2d, ONLY : inv_pres, inv_rho_l
+        USE solid_transport_parameters_2d, ONLY : inv_rho_s
 
 
 

@@ -28,3 +28,10 @@ gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
     "$repo_dir/src/physics/substrate/substrate_parameters_2d.f90" \
     "$test_dir/test_substrate_config_namelist.f90" -o test_substrate_config_namelist
 ./test_substrate_config_namelist
+
+# Shared solid species and packing are owned by the canonical material module.
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/core/solid_transport_parameters_2d.f90" \
+    "$test_dir/test_solid_transport_namelist.f90" -o test_solid_transport_namelist
+./test_solid_transport_namelist

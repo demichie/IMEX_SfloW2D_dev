@@ -2,6 +2,7 @@ PROGRAM test_state_conversion
 
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
   USE state_conversion_2d
   USE equation_terms_2d, ONLY : eval_inertial_flux, limit_component_mass_flux
   USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit

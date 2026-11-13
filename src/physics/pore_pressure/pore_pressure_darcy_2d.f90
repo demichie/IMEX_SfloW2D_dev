@@ -10,8 +10,9 @@ MODULE pore_pressure_darcy_2d
             idx_solidEqn_last, sutherland_flag
     USE COMPLEXIFY
     USE diagnostics_2d, ONLY : fatal_error
-    USE constitutive_parameters_2d, ONLY : kin_visc_c, sp_heat_a, sp_gas_const_a, pres,                               &
-            diam_s, sphericity_s, maximum_solid_packing, muRef_Suth, Tref_Suth, S_mu
+    USE constitutive_parameters_2d, ONLY : kin_visc_c, sp_heat_a, sp_gas_const_a, pres, muRef_Suth, Tref_Suth, &
+        S_mu
+    USE solid_transport_parameters_2d, ONLY : diam_s, sphericity_s, maximum_solid_packing
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE geometry_2d, ONLY : pi_g
     USE state_types, ONLY : physical_state_real, physical_state_complex

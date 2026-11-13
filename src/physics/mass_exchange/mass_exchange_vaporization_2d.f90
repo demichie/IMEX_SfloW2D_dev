@@ -6,7 +6,8 @@ MODULE mass_exchange_vaporization_2d
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
+    USE constitutive_parameters_2d, ONLY : gamma_steam, sp_heat_g
+    USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s
 
     IMPLICIT NONE
     PRIVATE

@@ -24,11 +24,9 @@ MODULE constitutive_parameters_2d
     PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
     PUBLIC :: sp_heat_g, sp_gas_const_g
     PUBLIC :: kin_visc_l, kin_visc_c, Tref_Suth, muRef_Suth, S_mu, T_ambient
-    PUBLIC :: rho_s, inv_rho_s, diam_s, sphericity_s, sp_heat_s
     PUBLIC :: settling_flag, alphastot_min
     PUBLIC :: erosion_coeff, loss_rate
     PUBLIC :: pres, inv_pres, rho_l, inv_rho_l, sp_heat_l, gamma_steam, vonK
-    PUBLIC :: maximum_solid_packing
 
     !> flag to activate air entrainment
     LOGICAL :: entrainment_flag
@@ -84,21 +82,6 @@ MODULE constitutive_parameters_2d
     !> Temperature of ambient air (units: K)
     REAL(wp) :: T_ambient
 
-    !> Density of sediments ( units: kg m-3 )
-    REAL(wp), ALLOCATABLE :: rho_s(:)
-
-    !> Reciprocal of density of sediments ( units: kg m-3 )
-    REAL(wp), ALLOCATABLE :: inv_rho_s(:)
-
-    !> Diameter of sediments ( units: m )
-    REAL(wp), ALLOCATABLE :: diam_s(:)
-
-    !> Sphericity of sediments (dimensionless, default 1.0)
-    REAL(wp), ALLOCATABLE :: sphericity_s(:)
-
-    !> Specific heat of solids (units: J K-1 kg-1)
-    REAL(wp), ALLOCATABLE :: sp_heat_s(:)
-
     !> Flag to determine if sedimentation is active
     LOGICAL :: settling_flag
 
@@ -132,7 +115,5 @@ MODULE constitutive_parameters_2d
     !> Von Karman constant used for the diagnostic Rouse number
     REAL(wp) :: vonK
 
-    !> Maximum solid packing fraction
-    REAL(wp) :: maximum_solid_packing
 
 END MODULE constitutive_parameters_2d

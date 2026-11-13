@@ -1,7 +1,8 @@
 PROGRAM test_analytic_velocity
 
   USE parameters_2d, ONLY : wp, n_solid
-  USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
+  USE constitutive_parameters_2d, ONLY : grav, inv_grav
+  USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
   USE rheology_parameters_2d, ONLY : rheology_config_type
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &

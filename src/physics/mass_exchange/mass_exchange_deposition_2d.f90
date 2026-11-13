@@ -4,9 +4,9 @@
 MODULE mass_exchange_deposition_2d
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, sutherland_flag,                                       &
             mass_exchange_rates_type, reset_mass_exchange_rates
-    USE constitutive_parameters_2d, ONLY : alphastot_min, rho_s, sp_heat_s,                                           &
-            kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, sp_gas_const_a, settling_flag, grav,                        &
-            collective_settling_flag, A_drag, B_drag, diam_s
+    USE constitutive_parameters_2d, ONLY : alphastot_min, kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, &
+        sp_gas_const_a, settling_flag, grav, collective_settling_flag, A_drag, B_drag
+    USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s, diam_s
     USE substrate_parameters_2d, ONLY : coeff_porosity
 
     USE diagnostics_2d, ONLY : fatal_error

@@ -26,7 +26,7 @@ MODULE rheology_mui_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_solid
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : diam_s, rho_s
+    USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE state_mixture, ONLY : sauter_diameter, average_density_solids
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &

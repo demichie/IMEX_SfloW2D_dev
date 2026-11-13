@@ -3,6 +3,7 @@ PROGRAM test_rheology_froude
 
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
   USE rheology_parameters_2d, ONLY : rheology_config_type
   USE state_types, ONLY : physical_state_real, physical_state_complex, &
        initialize_physical_state_real, promote_physical_state

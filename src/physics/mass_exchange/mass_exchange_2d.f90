@@ -13,7 +13,7 @@ MODULE mass_exchange_2d
     USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                           &
         SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                        &
         SOURCE_ID_EXCHANGE_VAPORIZATION, SOURCE_ID_EXCHANGE_LAVA_DEPOSITION
-    USE constitutive_parameters_2d, ONLY : maximum_solid_packing
+    USE solid_transport_parameters_2d, ONLY : maximum_solid_packing
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit

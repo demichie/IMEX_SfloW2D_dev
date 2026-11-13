@@ -1,6 +1,7 @@
 PROGRAM test_state_equivalence
     USE parameters_2d
     USE constitutive_parameters_2d
+    USE solid_transport_parameters_2d
     USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, &
         old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, &
         physical_state_type, complex_physical_state_type, old_mixture=>mixt_var, &

@@ -8,7 +8,7 @@ cd "$build_dir"
 netcdf_fflags=$(nf-config --fflags)
 netcdf_flibs=$(nf-config --flibs)
 netcdf_clibs=$(nc-config --libs)
-for source in core/parameters_2d.f90 core/constitutive_parameters_2d.f90 core/diagnostics_2d.f90 state/state_conversion_2d.f90; do
+for source in core/parameters_2d.f90 core/constitutive_parameters_2d.f90 core/solid_transport_parameters_2d.f90 core/diagnostics_2d.f90 state/state_conversion_2d.f90; do
     gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/state" $netcdf_fflags -c "$repo_dir/src/$source"
 done
 for source in state_types.f90 state_composition.f90 state_mixture.f90 state_conversions.f90 state_physical.f90 state.f90; do

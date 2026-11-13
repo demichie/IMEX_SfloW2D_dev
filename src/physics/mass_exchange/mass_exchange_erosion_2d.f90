@@ -6,8 +6,8 @@ MODULE mass_exchange_erosion_2d
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, alphastot_min, rho_s, sp_heat_s,                         &
-            rho_l, pres, sp_gas_const_a
+    USE constitutive_parameters_2d, ONLY : erosion_coeff, alphastot_min, rho_l, pres, sp_gas_const_a
+    USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s
     USE substrate_parameters_2d, ONLY : substrate, erodible_fract
     IMPLICIT NONE
     PRIVATE

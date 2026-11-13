@@ -1,7 +1,8 @@
 !> Verify the single REAL/COMPLEX implicit formula used by seven rheologies.
 PROGRAM test_shared_implicit_kernels
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas
-    USE constitutive_parameters_2d, ONLY : diam_s, rho_s, grav, inv_grav
+    USE constitutive_parameters_2d, ONLY : grav, inv_grav
+    USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_2d, ONLY : eval_rheology_implicit_real_id
     USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, eval_rheology_newmodel_implicit_real

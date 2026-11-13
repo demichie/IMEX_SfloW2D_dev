@@ -7,10 +7,12 @@ MODULE state_mixture
     USE parameters_2d, ONLY : wp, gas_flag
     USE parameters_2d, ONLY : n_solid, n_add_gas, n_vars, idx_h, idx_T,                                                &
         idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last
-    USE constitutive_parameters_2d, ONLY : sp_heat_a, sp_heat_g, sp_heat_s, sp_heat_l
+    USE constitutive_parameters_2d, ONLY : sp_heat_a, sp_heat_g, sp_heat_l
+    USE solid_transport_parameters_2d, ONLY : sp_heat_s
     USE constitutive_parameters_2d, ONLY : sp_gas_const_a, sp_gas_const_g
     USE constitutive_parameters_2d, ONLY : inv_pres, pres, rho_l, inv_rho_l
-    USE constitutive_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s, rho_a_amb, grav
+    USE constitutive_parameters_2d, ONLY : rho_a_amb, grav
+    USE solid_transport_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s
     USE state_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
