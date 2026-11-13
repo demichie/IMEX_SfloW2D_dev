@@ -20,14 +20,13 @@ MODULE constitutive_parameters_2d
     PUBLIC :: grav, inv_grav
     PUBLIC :: A_drag, B_drag, collective_settling_flag
     PUBLIC :: SBconst
-    PUBLIC :: rho_c_sub, rho_a_amb
+    PUBLIC :: rho_a_amb
     PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
     PUBLIC :: sp_heat_g, sp_gas_const_g
     PUBLIC :: kin_visc_l, kin_visc_c, Tref_Suth, muRef_Suth, S_mu, T_ambient
     PUBLIC :: rho_s, inv_rho_s, diam_s, sphericity_s, sp_heat_s
     PUBLIC :: settling_flag, alphastot_min
-    PUBLIC :: erosion_coeff, loss_rate, erodible_fract, erodible_porosity
-    PUBLIC :: coeff_porosity, T_erodible
+    PUBLIC :: erosion_coeff, loss_rate
     PUBLIC :: pres, inv_pres, rho_l, inv_rho_l, sp_heat_l, gamma_steam, vonK
     PUBLIC :: maximum_solid_packing
 
@@ -48,9 +47,6 @@ MODULE constitutive_parameters_2d
 
 
     !> Specific gas constant of gas mixture (units: J kg-1 K-1)
-
-    !> Density of carrier phase in substrate ( units: kg m-3 )
-    REAL(wp) :: rho_c_sub
 
     !> Ambient density of air ( units: kg m-3 )
     REAL(wp) :: rho_a_amb
@@ -114,19 +110,6 @@ MODULE constitutive_parameters_2d
 
     !> water loss_rate (unit: m s-1)
     REAL(wp), ALLOCATABLE :: loss_rate
-
-    !> erodible substrate solid relative volume fractions
-    REAL(wp), ALLOCATABLE :: erodible_fract(:)
-
-    !> erodible substrate porosity (we assume filled by continous phase)
-    REAL(wp) :: erodible_porosity
-
-    !> coefficient to compute (eroded/deposited) volume of continuous phase
-    !> from volume of solid
-    REAL(wp) :: coeff_porosity
-
-    !> temperature of erodible substrate (units: K)
-    REAL(wp) :: T_erodible
 
     !> ambient pressure (units: Pa)
     REAL(wp) :: pres

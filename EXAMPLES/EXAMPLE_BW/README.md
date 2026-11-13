@@ -12,7 +12,7 @@ tags:
 
 ## Overview
 
-A 1-D flow down a gentle slope with friction, sedimentation and air entrainment. The thermal-energy transport equation is retained. Deposition does not change the topography when `TOPO_CHANGE_FLAG=F`; the original README recommends changing this flag to study its effect. The parameters are similar to Bursik and Woods (1996).
+A 1-D flow down a gentle slope with friction, sedimentation and air entrainment. The thermal-energy transport equation is retained. Deposition does not change the topography when `SUBSTRATE%TOPO_CHANGE_FLAG=F`; the original README recommends changing this flag to study its effect. The parameters are similar to Bursik and Woods (1996).
 
 ## Main parameters
 

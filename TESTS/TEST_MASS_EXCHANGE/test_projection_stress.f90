@@ -5,6 +5,7 @@ PROGRAM test_projection_stress
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE substrate_parameters_2d, ONLY : substrate, erodible_fract, coeff_porosity
   USE geometry_2d
   USE state_fields, ONLY : state_type,substrate_snapshot_type
   USE state_composition, ONLY : conservative_mass_admissible
@@ -300,12 +301,12 @@ CONTAINS
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
     sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; topo_change_flag=.TRUE.
     n_fissures=0
-    erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
+    substrate%erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.; radial_source_flag=.FALSE.
     erosion_coeff=1000.0_wp; settling_flag=.FALSE.; alphastot_min=0.0_wp
-    erodible_porosity=0.25_wp; coeff_porosity=erodible_porosity/(1.0_wp-erodible_porosity)
-    grav=9.81_wp; rho_a_amb=1.2_wp; T_ambient=300.0_wp; T_erodible=317.0_wp
-    rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; rho_c_sub=rho_l
+    substrate%erodible_porosity=0.25_wp; coeff_porosity=substrate%erodible_porosity/(1.0_wp-substrate%erodible_porosity)
+    grav=9.81_wp; rho_a_amb=1.2_wp; T_ambient=300.0_wp; substrate%T_ground=317.0_wp
+    rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l
     sp_heat_l=4180.0_wp; sp_heat_a=998.0_wp; sp_gas_const_a=287.05_wp
     pres=101300.0_wp; inv_pres=1.0_wp/pres
     kin_visc_c=1.0E-6_wp; pore_pressure_l1%hydraulic_permeability=0.0_wp; maximum_solid_packing=0.6_wp

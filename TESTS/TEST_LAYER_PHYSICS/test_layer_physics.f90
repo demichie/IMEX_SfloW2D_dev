@@ -14,8 +14,6 @@ PROGRAM test_layer_physics
     TYPE(pore_pressure_config_type), TARGET :: pore1,pore2
     TYPE(pore_pressure_config_type) :: pore_view
     CHARACTER(LEN=256) :: err
-    thermal1%T_ground=300.0_wp
-    thermal2%T_ground=300.0_wp
     thermal1%emissivity=0.8_wp
     thermal2%emissivity=0.3_wp
     config1%rheology_model='voellmy'

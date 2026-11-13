@@ -5,8 +5,7 @@ PROGRAM test_source_registry
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE thermal_parameters_2d, ONLY : thermal_l1, thermal_l2,                                              &
-          thermal_radiative_coefficient, thermal_convective_coefficient,                                      &
-          thermal_ground_temperatures_match
+          thermal_radiative_coefficient, thermal_convective_coefficient
   USE thermal_laws_2d, ONLY : eval_thermal_implicit_temperature
   USE source_input_2d
   USE parameters_2d
@@ -58,13 +57,6 @@ PROGRAM test_source_registry
   CALL require(ABS(REAL(thermal_rate_complex,wp)-thermal_rate_l1)<= &
        64.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(thermal_rate_l1)), &
        'REAL/COMPLEX thermal dispatchers use the same coefficients')
-  thermal_l1%T_ground=300.0_wp
-  thermal_l2%T_ground=300.0_wp
-  CALL require(thermal_ground_temperatures_match(thermal_l1,thermal_l2), &
-       'two-layer ground temperature is consistent')
-  thermal_l2%T_ground=310.0_wp
-  CALL require(.NOT.thermal_ground_temperatures_match(thermal_l1,thermal_l2), &
-       'two-layer ground mismatch is detected')
   ! TL04-C: independently test all depth-averaged column contacts.
   CALL check_contacts([1.0_wp,2.0_wp],[.FALSE.,.TRUE.],[.TRUE.,.FALSE.],.TRUE., &
        'wet L1 and wet L2')

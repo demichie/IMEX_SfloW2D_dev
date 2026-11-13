@@ -21,3 +21,10 @@ gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
     "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
     "$test_dir/test_rheology_config_namelist.f90" -o test_rheology_config_namelist
 ./test_rheology_config_namelist
+
+# The substrate input has one scalar derived object plus an allocatable class array.
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/physics/substrate/substrate_parameters_2d.f90" \
+    "$test_dir/test_substrate_config_namelist.f90" -o test_substrate_config_namelist
+./test_substrate_config_namelist

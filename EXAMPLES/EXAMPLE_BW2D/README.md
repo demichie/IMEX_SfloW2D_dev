@@ -12,7 +12,7 @@ tags:
 
 ## Overview
 
-A 2-D radial flow with basal friction, sedimentation and entrainment above sloping terrain, based on Bursik and Woods (1996). In contrast to a conventional radial inlet, mixture enters vertically from the bottom of a circular region without horizontal momentum; sedimentation and entrainment are disabled within the source area. At steady state the outward mass flux matches the bottom input flux. Retained thermal-energy transport is enabled; topography is fixed by `TOPO_CHANGE_FLAG=F`.
+A 2-D radial flow with basal friction, sedimentation and entrainment above sloping terrain, based on Bursik and Woods (1996). In contrast to a conventional radial inlet, mixture enters vertically from the bottom of a circular region without horizontal momentum; sedimentation and entrainment are disabled within the source area. At steady state the outward mass flux matches the bottom input flux. Retained thermal-energy transport is enabled; topography is fixed by `SUBSTRATE%TOPO_CHANGE_FLAG=F`.
 
 ## Main parameters
 

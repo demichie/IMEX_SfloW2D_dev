@@ -1,6 +1,6 @@
 This example simulates a 2d radial flow  with friction, deposition and entrainment over a slope. The settings are similar to those presented in Bursik & Woods 1996 [1].
 The retained thermal-energy transport equation is solved in this example.
-Topography does not change with deposition (TOPO_CHANGE_FLAG=F). A simple firction model, as in [1], is used for this example.
+Topography does not change with deposition (SUBSTRATE%TOPO_CHANGE_FLAG=F). A simple firction model, as in [1], is used for this example.
 
 Here, instead of a radial source, flow enters from the bottom of a circular area centered at (0,0), without horizontal momentum. Deposition and entrainment are not present in this area. In this way, when a steady condition is reached, the mass flux entering the domain from the bottom source is the same of the mass flux going out of the source area. 
 

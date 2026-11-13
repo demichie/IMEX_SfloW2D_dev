@@ -47,7 +47,7 @@
     USE parameters_2d, ONLY: n_layers, n_solid, n_add_gas, n_stoch_vars,                                               &
                                     n_pore_vars
     USE parameters_2d, ONLY: rheology_flag,                                                                            &
-                                    topo_change_flag, radial_source_flag, collapsing_volume_flag,                      &
+                                    radial_source_flag, collapsing_volume_flag,                                                &
                                     liquid_flag, gas_flag, lava_flag, subtract_init_flag, bottom_radial_source_flag,   &
                                     lateral_source_flag, serial_flag,                                                  &
                                     bottom_fissural_source_flag, n_fissures,                                           &
@@ -104,7 +104,8 @@
 
     ! -- Variables for the namelist TEMPERATURE_PARAMETERS
     USE thermal_parameters_2d, ONLY : thermal_config_type, thermal_l1, thermal_l2,                                     &
-            thermal_radiative_coefficient, thermal_ground_temperatures_match
+            thermal_radiative_coefficient
+    USE substrate_parameters_2d, ONLY : substrate_config_type, substrate, erodible_fract, coeff_porosity
 
     ! -- Variables for the namelist RHEOLOGY_PARAMETERS
     USE source_catalog_2d, ONLY: canonical_rheology_source_name
@@ -121,9 +122,7 @@
 
     ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
     USE constitutive_parameters_2d, ONLY: rho_s, diam_s, sphericity_s,                                                 &
-            sp_heat_s, vonK, settling_flag, erosion_coeff, erodible_porosity,                                          &
-            erodible_fract, T_erodible, alphastot_min
-    USE parameters_2d, ONLY: erodible_deposit_flag
+            sp_heat_s, vonK, settling_flag, erosion_coeff, alphastot_min
     USE constitutive_parameters_2d, ONLY: maximum_solid_packing
 
     ! --- Variables for the namelist GAS_TRANSPORT_PARAMETERS
@@ -177,8 +176,6 @@
     CHARACTER(LEN=2048) :: output_esri_file !< Name of the esri output files
     CHARACTER(LEN=2048) :: output_max_file  !< Name of the esri max. thick. file
     CHARACTER(LEN=2048) :: runout_file      !< Name of the runout file
-    CHARACTER(LEN=40) :: topography_file    !< Name of the esri DEM file
-    CHARACTER(LEN=40) :: erodible_file      !< Name of the esri DEM file
     CHARACTER(LEN=2048) :: output_VT_file
     CHARACTER(LEN=2048) :: mass_center_file
 
@@ -289,8 +286,6 @@
     ! absolute precentages of solids in the initial volume
     REAL(wp), ALLOCATABLE :: sed_vol_perc(:)
 
-    REAL(wp) :: initial_erodible_thickness
-
 
     TYPE(rheology_config_type), POINTER :: rheology => rheology_l1
     TYPE(thermal_config_type), POINTER :: thermal => thermal_l1
@@ -343,10 +338,10 @@
     NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time,                                        &
         T_init, u_init, v_init, sed_vol_perc
 
-    NAMELIST /newrun_parameters/ n_solid, topography_file, x0, y0,                                                     &
+    NAMELIST /newrun_parameters/ n_solid, x0, y0,                                                     &
         comp_cells_x, comp_cells_y, cell_size, rheology_flag,                                                          &
         liquid_flag, radial_source_flag, collapsing_volume_flag,                                                       &
-        topo_change_flag, gas_flag, lava_flag, subtract_init_flag, n_add_gas,                                          &
+        gas_flag, lava_flag, subtract_init_flag, n_add_gas,                                          &
         bottom_radial_source_flag, slope_correction_flag, curvature_term_flag,                                         &
         lateral_source_flag, bottom_fissural_source_flag, n_fissures,                                                  &
         stochastic_flag, n_layers,                                                                                     &
@@ -421,10 +416,8 @@
     NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                        &
         xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
     NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s,                                                 &
-        sp_heat_s, erodible_porosity,                                                                                  &
-        T_erodible, erodible_file, erodible_fract, alphastot_min,                                                      &
-        initial_erodible_thickness, erodible_deposit_flag,                                                             &
-        maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
+        sp_heat_s, alphastot_min, maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
+    NAMELIST /substrate_parameters/ substrate, erodible_fract
     NAMELIST /gas_transport_parameters/ sp_heat_a, sp_gas_const_a, kin_visc_a,                                         &
         pres, T_ambient, sp_heat_g, sp_gas_const_g,                                                                    &
         water_level, gamma_steam, sutherland_flag,                                                                     &
@@ -484,6 +477,8 @@
         rheology_l2=rheology_config_type()
         thermal_l1=thermal_config_type()
         thermal_l2=thermal_config_type()
+        substrate=substrate_config_type()
+        coeff_porosity=0.0_wp
         ! Reset physical-source preferences before any namelist is parsed.
         pore_pressure_l1=pore_pressure_config_type()
         pore_pressure_l2=pore_pressure_config_type()
@@ -529,7 +524,6 @@
 
         !-- Inizialization of the Variables for the namelist newrun_parameters
         sea_mass_removal_flag = .FALSE.
-        topography_file = 'topography_dem.asc'
         nodata_topo = -9999.0_wp
         x0 = 0.0_wp
         y0 = 0.0_wp
@@ -539,7 +533,6 @@
         n_solid = -1
         n_add_gas = -1
         rheology_flag = .FALSE.
-        topo_change_flag = .FALSE.
         radial_source_flag = .FALSE.
         lateral_source_flag = .FALSE.
         collapsing_volume_flag = .FALSE.
@@ -570,9 +563,6 @@
         !-- Inizialization of the Variables for the namelist EXPL_TERMS_PARAMETERS
         grav = 9.81_wp
         inv_grav = 1.0_wp/grav
-
-        ! The material thermal properties are initialized in thermal_l1/l2.
-        thermal_l1%T_ground = 1200.0_wp
 
         !-- Rheology coefficients are initialized once in rheology_config_type.
         !-- Inizialization of the Variables for the namelist RUNOUT_PARAMETERS
@@ -816,11 +806,6 @@
 
         rho_s = -1.0_wp
         sphericity_s = 1.0_wp
-        initial_erodible_thickness = -1.0_wp
-        erodible_deposit_flag = .FALSE.
-
-        thermal_l1%T_ground = -1.0_wp
-
         grav = -1.0_wp
 
         x0_runout = -1.0_wp
@@ -837,10 +822,7 @@
         settling_flag = .FALSE.
         erosion_coeff = -1.0_wp
         n_solid = -1
-        T_erodible = -1.0_wp
-        erodible_file = ""
         erodible_fract = -1.0_wp
-        erodible_porosity = -1.0_wp
         alphastot_min = 0.0_wp
         maximum_solid_packing = 0.64_wp
         vonK = 0.4_wp
@@ -969,12 +951,11 @@
         USE parameters_2d, ONLY: bcW, bcE, bcS, bcN
 
 
-        USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
+        USE constitutive_parameters_2d, ONLY: rho_a_amb, kin_visc_c
 
         USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
 
 
-        USE constitutive_parameters_2d, ONLY: coeff_porosity
 
         USE init_2d, ONLY: erodible_init
 
@@ -1621,6 +1602,11 @@
 
         IF (lava_flag .AND. verbose_level .GE. 0) WRITE (*, *) 'CARRIER PHASE: lava'
 
+        ! The shared substrate and its erodible fractions are read once per simulation.
+        READ (input_unit, substrate_parameters, IOSTAT=ios)
+        IF (ios/=0) CALL fatal_error('Invalid SUBSTRATE_PARAMETERS namelist')
+        REWIND (input_unit)
+
         ! ------- READ solid_transport_parameters NAMELIST --------------------------
 
         ALLOCATE (erodible_init(comp_cells_x, comp_cells_y))
@@ -1810,27 +1796,27 @@
 
                 IF (erosion_coeff .EQ. 0.0_wp) THEN
 
-                    erodible_porosity = 0.0_wp
+                    substrate%erodible_porosity = 0.0_wp
                     ! derived from erodible_porosity; without this it stays
                     ! undefined and is still used by the deposition and
                     ! continuous-phase loss terms
                     coeff_porosity = 0.0_wp
                     erodible_fract(1:n_solid) = 1.0_wp/n_solid
-                    T_erodible = 300.0_wp
+                    substrate%T_ground = 300.0_wp
 
                 ELSE
 
-                    IF ((erodible_porosity .LT. 0.0_wp) .OR.                                                           &
-                        (erodible_porosity .GT. 1.0_wp)) THEN
+                    IF ((substrate%erodible_porosity .LT. 0.0_wp) .OR. &
+                        (substrate%erodible_porosity .GT. 1.0_wp)) THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
-                        WRITE (*, *) 'erodible_porosity =', erodible_porosity
+                        WRITE (*, *) 'erodible_porosity =', substrate%erodible_porosity
                         WRITE (*, *) 'Please check the input file'
                         STOP
 
                     END IF
 
-                    coeff_porosity = erodible_porosity/(1.0_wp - erodible_porosity)
+                    coeff_porosity = substrate%erodible_porosity/(1.0_wp - substrate%erodible_porosity)
 
                     read_erodible_fract: IF (n_solid .EQ. 1) THEN
 
@@ -1861,14 +1847,14 @@
                         END IF
 
                         WRITE (*, *) 'Absolute fractions of solide phases in erodible layer:'
-                        WRITE (*, *) erodible_fract*(1.0_wp - erodible_porosity)
+                        WRITE (*, *) erodible_fract*(1.0_wp - substrate%erodible_porosity)
 
                     END IF read_erodible_fract
 
-                    IF (T_erodible .LT. 0.0_wp) THEN
+                    IF (substrate%T_ground .LT. 0.0_wp) THEN
 
                         WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
-                        WRITE (*, *) 'T_erodible =', T_erodible
+                        WRITE (*, *) 'substrate%T_ground =', substrate%T_ground
                         WRITE (*, *) 'Please check the input file'
                         STOP
 
@@ -1878,21 +1864,11 @@
 
             END IF
 
-            IF (gas_flag) THEN
+            IF (substrate%erodible_deposit_flag) THEN
 
-                rho_c_sub = pres/(sp_gas_const_a*T_erodible)
+                IF (substrate%T_ground .GT. 0.0_wp) THEN
 
-            ELSE
-
-                rho_c_sub = rho_l
-
-            END IF
-
-            IF (erodible_deposit_flag) THEN
-
-                IF (t_erodible .GT. 0.0_wp) THEN
-
-                    WRITE (*, *) 'WARNING: t_erodible NOT USED'
+                    WRITE (*, *) 'WARNING: substrate%T_ground NOT USED'
                     WRITE (*, *) 'Temperature of erodible layer is set equal to'
                     WRITE (*, *) 'that of the flow'
 
@@ -1900,9 +1876,9 @@
 
             END IF
 
-            check_erodible_file: IF (TRIM(erodible_file) .EQ. '') THEN
+            check_erodible_file: IF (TRIM(substrate%erodible_file) .EQ. '') THEN
 
-                IF (initial_erodible_thickness .GE. 0.0_wp) THEN
+                IF (substrate%initial_erodible_thickness .GE. 0.0_wp) THEN
 
                     IF (erosion_coeff .EQ. 0.0_wp) THEN
 
@@ -1913,10 +1889,10 @@
 
                     ELSE
 
-                        erodible_init(:, :) = initial_erodible_thickness
+                        erodible_init(:, :) = substrate%initial_erodible_thickness
 
                         WRITE (*, *) 'Initial thickness of erodible layer',                                            &
-                            initial_erodible_thickness
+                            substrate%initial_erodible_thickness
 
                     END IF
 
@@ -1938,7 +1914,7 @@
 
             ELSE
 
-                IF (initial_erodible_thickness .GE. 0.0_wp) THEN
+                IF (substrate%initial_erodible_thickness .GE. 0.0_wp) THEN
 
                     WRITE (*, *) 'WARNING: initial_erodible_thicknes not used'
 
@@ -1956,7 +1932,7 @@
                     IF (verbose_level .GE. 0.0_wp) THEN
 
                         WRITE (*, *) 'Maximum thick. for erosion read from : ',                                        &
-                            TRIM(erodible_file)
+                            TRIM(substrate%erodible_file)
 
                     END IF
 
@@ -3486,8 +3462,6 @@
         IF (n_layers==2) THEN
             READ(input_unit,NML=temperature_l2_parameters,IOSTAT=ios)
             IF (ios/=0) CALL fatal_error('ERROR: problem with namelist TEMPERATURE_L2_PARAMETERS')
-            IF (.NOT. thermal_ground_temperatures_match(thermal_l1,thermal_l2))                                  &
-                CALL fatal_error('L1 and L2 T_GROUND must be identical')
             REWIND(input_unit)
         END IF
         IF (thermal_l1%thermal_cooling_flag) THEN
@@ -3501,15 +3475,15 @@
 
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Searching for DEM file'
 
-        INQUIRE (FILE=topography_file, EXIST=lexist)
+        INQUIRE (FILE=substrate%topography_file, EXIST=lexist)
 
         IF (lexist) THEN
 
-            OPEN (2001, file=topography_file, status='old', action='read')
+            OPEN (2001, file=substrate%topography_file, status='old', action='read')
 
         ELSE
 
-            WRITE (*, *) 'no dem file: ', TRIM(topography_file)
+            WRITE (*, *) 'no dem file: ', TRIM(substrate%topography_file)
             STOP
 
         END IF
@@ -4914,6 +4888,7 @@
 
         CALL write_mass_exchange_parameters(backup_unit)
         WRITE (backup_unit, solid_transport_parameters)
+        WRITE (backup_unit, substrate_parameters)
         WRITE (backup_unit, gas_transport_parameters)
 
         IF (liquid_flag) WRITE (backup_unit, liquid_transport_parameters)
@@ -5145,7 +5120,7 @@
         ! A later collapse correction in this routine may replace these values.
         DO i_solid=1,n_solid
             state%erodible(i_solid,:,:)=erodible_fract(i_solid)*                                                       &
-                    (1.0_wp-erodible_porosity)*erodible_init(:,:)
+                    (1.0_wp-substrate%erodible_porosity)*erodible_init(:,:)
 
         END DO
 
@@ -5374,7 +5349,7 @@
                         WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
                         erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)*                              &
                                                         (SUM(alphas_init(1:n_solid))/                                  &
-                                                        (1.0_wp - erodible_porosity))
+                                                        (1.0_wp - substrate%erodible_porosity))
 
                         IF (MINVAL(erodible_init(:, :)) .LT. 0.0_wp) THEN
 
@@ -5389,7 +5364,7 @@
                         DO i_solid = 1, n_solid
 
                             state%erodible(i_solid, :, :) = erodible_fract(i_solid)*                                   &
-                                                                (1.0_wp - erodible_porosity)*erodible_init(:, :)
+                        (1.0_wp - substrate%erodible_porosity)*erodible_init(:, :)
 
                         END DO
 
@@ -5614,25 +5589,25 @@
 
         REAL(wp) :: xl, xr, yl, yr
 
-        INQUIRE (FILE=erodible_file, exist=lexist)
+        INQUIRE (FILE=substrate%erodible_file, exist=lexist)
 
         WRITE (*, *)
 
         IF (lexist .EQV. .FALSE.) THEN
 
-            WRITE (*, *) 'Erodible file: ', TRIM(erodible_file), ' not found'
+            WRITE (*, *) 'Erodible file: ', TRIM(substrate%erodible_file), ' not found'
             STOP
 
         END IF
 
-        OPEN (erodible_unit, FILE=erodible_file, STATUS='old')
+        OPEN (erodible_unit, FILE=substrate%erodible_file, STATUS='old')
 
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Erodible file: ',                                                      &
-        TRIM(erodible_file), ' found'
+        TRIM(substrate%erodible_file), ' found'
 
-        dot_idx = SCAN(erodible_file, ".", .TRUE.)
+        dot_idx = SCAN(substrate%erodible_file, ".", .TRUE.)
 
-        check_file = erodible_file(dot_idx + 1:dot_idx + 3)
+        check_file = substrate%erodible_file(dot_idx + 1:dot_idx + 3)
 
         IF (check_file .NE. 'asc') THEN
 
@@ -5833,7 +5808,7 @@
 
             END IF
 
-            IF (topo_change_flag) THEN
+            IF (substrate%topo_change_flag) THEN
 
                 output_file_B = snapshot_file_path(TRIM(run_name)//'_B_'//idx_string//'.q_2d')
                 OPEN (output_unit_B, FILE=output_file_B, status='unknown', form='formatted')
@@ -5873,7 +5848,7 @@
 
                     END IF
 
-                    IF (topo_change_flag) THEN
+                    IF (substrate%topo_change_flag) THEN
 
                         WRITE (output_unit_B, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k),                           &
                             B_cent(j, k)
@@ -5893,7 +5868,7 @@
 
                 IF (settling_flag) WRITE (output_unit_deposit, *) ' '
 
-                IF (topo_change_flag) WRITE (output_unit_B, *) ' '
+                IF (substrate%topo_change_flag) WRITE (output_unit_B, *) ' '
 
             END DO
 
@@ -5922,7 +5897,7 @@
 
             END IF
 
-            IF (topo_change_flag) THEN
+            IF (substrate%topo_change_flag) THEN
 
                 WRITE (output_unit_B, *) ' '
                 WRITE (output_unit_B, *) ' '
@@ -7668,7 +7643,7 @@
         ! Granular porosity is not meaningful for the separate lava carrier.
         IF (.NOT.lava_flag .AND. n_solid>0) THEN
             erodible2D = SUM(state%erodible(1:n_solid, :, :), DIM=1) /                                                 &
-                            (1.0_wp - erodible_porosity)
+                            (1.0_wp - substrate%erodible_porosity)
         ELSE
             erodible2D = 0.0_wp
         END IF
@@ -7991,7 +7966,7 @@
         USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                             &
                                             n_pore_vars
         USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
-        USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
+        USE parameters_2d, ONLY: stochastic_flag, gas_flag, liquid_flag, lava_flag
 
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN) :: filename
@@ -8020,7 +7995,7 @@
             n_pore_vars, n_thickness_levels, n_dyn_pres_levels
         CALL check_restart_io(ierr, io_message, 'writing dimensions to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_flag,                                               &
-            topo_change_flag, gas_flag, liquid_flag, lava_flag
+            substrate%topo_change_flag, gas_flag, liquid_flag, lava_flag
         CALL check_restart_io(ierr, io_message, 'writing model flags to', filename)
 
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,                                         &
@@ -8125,7 +8100,7 @@
         USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                             &
                                             n_pore_vars
         USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
-        USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
+        USE parameters_2d, ONLY: stochastic_flag, gas_flag, liquid_flag, lava_flag
         USE geometry_2d, ONLY: refresh_topography_geometry
 
         IMPLICIT NONE
@@ -8193,7 +8168,7 @@
             topo_change_check, gas_check, liquid_check, lava_check
         CALL check_restart_io(ierr, io_message, 'reading model flags from', filename)
         IF ((stochastic_check .NEQV. stochastic_flag) .OR.                                                             &
-            (topo_change_check .NEQV. topo_change_flag) .OR.                                                           &
+            (topo_change_check .NEQV. substrate%topo_change_flag) .OR. &
             (gas_check .NEQV. gas_flag) .OR.                                                                           &
             (liquid_check .NEQV. liquid_flag) .OR.                                                                     &
             (lava_check .NEQV. lava_flag)) THEN

@@ -97,9 +97,9 @@ with open(bakfile) as fp:
             run_name = run_name.replace(' ', '')
             run_name = run_name.rstrip()
 
-        if "TOPOGRAPHY_FILE" in line:
+        if "SUBSTRATE%TOPOGRAPHY_FILE" in line:
 
-            topography_file = line.replace('TOPOGRAPHY_FILE', '')
+            topography_file = line.replace('SUBSTRATE%TOPOGRAPHY_FILE', '')
             topography_file = topography_file.replace('=', '')
             topography_file = topography_file.replace('"', '')
             topography_file = topography_file.replace(',', '')

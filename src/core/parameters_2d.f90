@@ -75,8 +75,6 @@ MODULE parameters_2d
     LOGICAL :: lava_flag = .FALSE.
     LOGICAL :: gas_flag
 
-    LOGICAL :: topo_change_flag
-
     LOGICAL :: radial_source_flag
 
     LOGICAL :: lateral_source_flag
@@ -100,12 +98,6 @@ MODULE parameters_2d
     !> - F      => neglect the term
     !> .
     LOGICAL :: curvature_term_flag
-
-    !> Flag to account for the deposit thickness in the erobidle layer
-    !> - T      => add deposit to erodible thickness
-    !> - F      => do not add deposit to erobile thickness
-    !> .
-    LOGICAL :: erodible_deposit_flag
 
     !> Flag to account for vaporization of liquid water
     !> - T      => vaporization form a source of water

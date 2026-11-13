@@ -17,8 +17,7 @@ MODULE source_configuration_2d
     USE rheology_parameters_2d, ONLY : rheology_l1
     USE thermal_parameters_2d, ONLY : thermal_l1
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,                                               &
-            coeff_porosity, entrainment_flag
+    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, entrainment_flag
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources

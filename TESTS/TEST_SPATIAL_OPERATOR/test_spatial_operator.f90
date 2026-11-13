@@ -3,6 +3,7 @@ PROGRAM test_spatial_operator
   USE thermal_parameters_2d, ONLY : thermal_l1
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE parameters_2d
+  USE substrate_parameters_2d, ONLY : substrate
   USE constitutive_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
@@ -247,7 +248,7 @@ CONTAINS
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
     radial_source_flag=.FALSE.; lateral_source_flag=.FALSE.
     bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.FALSE.
-    sutherland_flag=.FALSE.; topo_change_flag=.FALSE.; verbose_level=-1
+    sutherland_flag=.FALSE.; substrate%topo_change_flag=.FALSE.; verbose_level=-1
     n_fissures=0; n_intervals=0
     rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; rho_a_amb=1.2_wp; grav=9.81_wp
     sp_heat_l=4180.0_wp; sp_heat_a=998.0_wp; sp_gas_const_a=287.05_wp

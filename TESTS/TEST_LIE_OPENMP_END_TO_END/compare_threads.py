@@ -78,8 +78,8 @@ def prepare(repo, root, name, cells=32, horizon='2.0E-2'):
         text = replace_one(text, r"^\s*RHEOLOGY_MODEL\s*=.*$",
                            " RHEOLOGY_MODEL='quadratic',\n RHEOLOGY_METHOD='NEWTON',\n RHEOLOGY_GROUP=2,")
     if name == "EXAMPLE_2D_TOPO":
-        text = replace_one(text, r"^\s*TOPO_CHANGE_FLAG\s*=.*$",
-                           " TOPO_CHANGE_FLAG=T,")
+        text = replace_one(text, r"^\s*SUBSTRATE%TOPO_CHANGE_FLAG\s*=.*$",
+                           " SUBSTRATE%TOPO_CHANGE_FLAG=T,")
         # Dedicated active-settling fixture. A coarse solid diameter makes
         # deposition measurable against the finite-precision bed elevation;
         # disabling entrainment removes an unrelated competing mass-transfer

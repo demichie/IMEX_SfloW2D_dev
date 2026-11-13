@@ -4,7 +4,7 @@
 !>          fully accepted timestep publishes fluid, substrate and geometry.
 MODULE time_integration_2d
     USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                  &
-            idx_add_gas_first,idx_add_gas_last,topo_change_flag,sea_mass_removal_flag,n_layers
+            idx_add_gas_first,idx_add_gas_last,sea_mass_removal_flag,n_layers
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &

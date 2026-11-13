@@ -79,7 +79,7 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : t_end
     USE parameters_2d, ONLY : dt_output
     USE parameters_2d, ONLY : dt0
-    USE parameters_2d, ONLY : topo_change_flag
+    USE substrate_parameters_2d, ONLY : substrate
     USE parameters_2d, ONLY : verbose_level
     USE parameters_2d, ONLY : n_solid
     USE parameters_2d, ONLY : n_vars
@@ -267,7 +267,7 @@ PROGRAM IMEX_SfloW2D
             CALL simulation%stochastic%initialize_steady(                                                              &
             simulation%state, simulation%domain)
 
-    IF ( topo_change_flag ) CALL refresh_topography_geometry
+    IF ( substrate%topo_change_flag ) CALL refresh_topography_geometry
 
     IF ( verbose_level .GE. 0 ) THEN
 

@@ -13,7 +13,8 @@ MODULE state_fields
     USE parameters_2d, ONLY : idx_h, idx_T,                                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
-    USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity
+    USE constitutive_parameters_2d, ONLY : T_ambient
+    USE substrate_parameters_2d, ONLY : substrate
 
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE model_layout_2d, ONLY : model_layout_type
@@ -220,11 +221,11 @@ CONTAINS
         END IF
         ! Totals include the carrier-filled pore volume of the deposited/eroded layer.
         ! A zero-solid-volume substrate (porosity=1) cannot define this conversion.
-        IF (.NOT.ieee_is_finite(erodible_porosity) .OR.                                                                &
-            erodible_porosity<0.0_wp .OR. erodible_porosity>=1.0_wp)                                                   &
+        IF (.NOT.ieee_is_finite(substrate%erodible_porosity) .OR. &
+            substrate%erodible_porosity<0.0_wp .OR. substrate%erodible_porosity>=1.0_wp) &
             ERROR STOP 'Invalid substrate porosity for aggregate thickness'
-        this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-erodible_porosity)
-        this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
+        this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-substrate%erodible_porosity)
+        this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-substrate%erodible_porosity)
     END SUBROUTINE refresh_substrate_totals
 
     !> @brief Test finiteness of all primitive components in one cell.

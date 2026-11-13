@@ -85,8 +85,11 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
  N_SOLID=0, N_ADD_GAS=0,
  RHEOLOGY_FLAG=F, GAS_FLAG=F, LIQUID_FLAG=T,
  RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F,
- TOPO_CHANGE_FLAG=F, SLOPE_CORRECTION_FLAG={'T' if slope_correction else 'F'},
+ SLOPE_CORRECTION_FLAG={'T' if slope_correction else 'F'},
  CURVATURE_TERM_FLAG={'T' if curvature else 'F'},
+ /
+&SUBSTRATE_PARAMETERS
+ SUBSTRATE%TOPO_CHANGE_FLAG=F,
  /
 &RESTART_PARAMETERS
  RESTART_FILES="lake_rest_0000.q_2d",

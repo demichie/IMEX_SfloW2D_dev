@@ -17,6 +17,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/rheology_laws/rheology_parameters_2d.f90 \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
+                physics/substrate/substrate_parameters_2d.f90 \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
                 physics/layer_contacts_2d.f90 \

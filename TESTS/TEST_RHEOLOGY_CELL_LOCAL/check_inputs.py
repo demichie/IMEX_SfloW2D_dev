@@ -66,7 +66,9 @@ def main():
             text=text.replace('&TEMPERATURE_PARAMETERS\n /',
                 '&TEMPERATURE_PARAMETERS\n THERMAL%EMISSIVITY=.8, '
                 'THERMAL%ATM_HEAT_TRANSF_COEFF=4, THERMAL%EXP_AREA_FRACT=.5, '
-                'THERMAL%T_GROUND=300,\n /')
+                '\n /')
+            text=text.replace('&SUBSTRATE_PARAMETERS\n',
+                '&SUBSTRATE_PARAMETERS\n SUBSTRATE%T_GROUND=300,\n')
             if name=='thermal-l1':
                 text=text.replace('&TEMPERATURE_PARAMETERS\n', '&TEMPERATURE_L1_PARAMETERS\n')
                 text=text.replace('THERMAL%', 'THERMAL_L1%')
@@ -77,7 +79,7 @@ def main():
             elif name=='thermal-missing':
                 text=re.sub(r'&TEMPERATURE_PARAMETERS\n[^&]*?\n /', '', text, count=1)
             elif name=='thermal-ground-bare':
-                text=text.replace('THERMAL%T_GROUND=300,', 'T_GROUND=300,')
+                text=text.replace('SUBSTRATE%T_GROUND=300,', 'T_GROUND=300,')
             ambient={'ambient-set':'350','ambient-zero':'0',
                      'ambient-nan':'NaN','ambient-inf':'Infinity'}.get(name)
             if ambient is not None:
@@ -105,7 +107,8 @@ def main():
             rejected=any(token in log for token in (
                 'Provide exactly one TEMPERATURE_PARAMETERS',
                 'TEMPERATURE_L2_PARAMETERS requires N_LAYERS=2',
-                'ERROR: problem with namelist TEMPERATURE_PARAMETERS'))
+                'ERROR: problem with namelist TEMPERATURE_PARAMETERS',
+                 'Invalid SUBSTRATE_PARAMETERS namelist'))
         else:
             rejected=any(token in log for token in (
                 'ERROR: problem with namelist RHEOLOGY_PARAMETERS',

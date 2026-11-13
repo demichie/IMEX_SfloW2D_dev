@@ -77,7 +77,7 @@ CONTAINS
     !> @param[in] source_registry Validated ordered physical-source groups.
     SUBROUTINE initialize_lie_source_executor(executor,source_registry)
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON
-        USE parameters_2d, ONLY : topo_change_flag
+        USE substrate_parameters_2d, ONLY : substrate
         USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         TYPE(source_registry_type), INTENT(IN) :: source_registry
@@ -130,13 +130,13 @@ CONTAINS
                 IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                   &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
                 executor%has_exchange_group=.TRUE.
-                IF (topo_change_flag) executor%bed_group_id=executor%groups(group_index)%id
+                IF (substrate%topo_change_flag) executor%bed_group_id=executor%groups(group_index)%id
             END IF
             IF (executor%groups(group_index)%method==SOURCE_METHOD_NEWTON) executor%has_newton_group=.TRUE.
         END DO
         executor%all_groups_dry_noop=ALL(executor%dry_noop_group .OR.                                   &
             [(SIZE(executor%groups(group_index)%source_names)==0,group_index=1,SIZE(executor%groups))])
-        executor%has_bed_group=executor%has_exchange_group .AND. topo_change_flag
+        executor%has_bed_group=executor%has_exchange_group .AND. substrate%topo_change_flag
         ! Read diagnostic and D20 test settings only at startup.
         env_value=''
         CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_DIAGNOSTICS',env_value)
@@ -267,7 +267,8 @@ CONTAINS
         USE state_conversions, ONLY : conservative_to_primitive
         USE state_fields, ONLY : initialize_dry_physical_cell,physical_cell_state_finite,finite_real_value
         USE state_composition, ONLY : conservative_mass_admissible
-        USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
+        USE parameters_2d, ONLY : sea_mass_removal_flag,idx_h
+        USE substrate_parameters_2d, ONLY : substrate
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
@@ -556,7 +557,7 @@ CONTAINS
                         deposit_candidate=deposit_local+time_step*executor%source_transfers(tid)%solid_deposition_rate
                         erosion_candidate=erosion_local+time_step*executor%source_transfers(tid)%solid_erosion_rate
                         erodible_candidate=erodible_local-time_step*executor%source_transfers(tid)%solid_erosion_rate
-                        IF (erodible_deposit_flag) erodible_candidate=                                                 &
+                        IF (substrate%erodible_deposit_flag) erodible_candidate= &
                             erodible_candidate+time_step*executor%source_transfers(tid)%solid_deposition_rate
                         lava_candidate=lava_local+time_step*executor%source_transfers(tid)%lava_deposit_rate
                         IF (ANY(erodible_candidate<0.0_wp) .OR. ANY(deposit_candidate<0.0_wp) .OR.                 &
@@ -602,7 +603,7 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+                &
+                        IF (substrate%topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+ &
                             executor%source_transfers(tid)%dB_dt
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
