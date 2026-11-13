@@ -43,13 +43,17 @@ Gli indici delle equazioni sono comuni ai due layer. Le quantità significative 
 
 ### 3.2 Ownership: L1, L2, INTERLAYER, SHARED
 
+**Contratto uniforme dei processi:** per le configurazioni fisiche migrate utilizzare un solo tipo derivato, un oggetto canonico L1 e uno L2, con input legacy come alias dello stesso L1. L'uniformita' degli oggetti e dell'input non implica che ogni legge sia applicabile a entrambi i layer: ogni sorgente deve verificare esplicitamente lo scope consentito. Per Darcy lo scope operativo e' solo single-layer/L1; l'oggetto L2 viene predisposto senza attivarne la sorgente. I parametri di altri processi non vanno inseriti nelle configurazioni Darcy solo perche' contribuiscono alla stessa variabile conservativa.
+
+**Parametro d'iniezione:** `pore_pres_fract` quantifica la produzione di pressione interstiziale associata alla massa immessa. E' un parametro della sorgente attiva, letto da `RADIAL_SOURCE_PARAMETERS` (radiale o circolare dal fondo) o da `FISSURAL_SOURCE_PARAMETERS` (fissure dal fondo), non da `PORE_PRESSURE_PARAMETERS`. Poiche' queste modalita' sono mutualmente esclusive nel modello single-layer attuale, il runtime conserva un solo valore autorevole; quando gli input delle sorgenti saranno separati per layer si rivalutera' l'ownership del relativo processo.
+
 Ogni proprietà deve avere **un solo proprietario**. Le proprietà intrinseche delle specie solide e gas, i parametri dell'atmosfera, gravità, geometria e timestep restano condivisi; configurazione reologica e coefficienti di chiusure specifiche appartengono al layer; coefficienti di trasferimenti L1↔L2 appartengono alla **coppia**. I parametri non diventano per-layer per la sola presenza in una namelist.
 
 | Famiglia esistente | Contratto target | Passo |
 |---|---|---|
 | `RHEOLOGY_PARAMETERS` | Unico `rheology_config_type`, istanze L1/L2, legacy alias L1 in `N_LAYERS=1`; già realizzato per le leggi. | Completare scope/consumatori al momento dell'attivazione L2. |
 | `TEMPERATURE_PARAMETERS` | Unico `thermal_config_type`, istanze `thermal_l1/l2`, legacy alias verso L1; coefficienti del processo per layer. | TL04-T (specifica §4). |
-| `PORE_PRESSURE_PARAMETERS` | Chiusura fisica L1; nessuna copia operativa L2 solo per simmetria. | TL04-C/TL11. |
+| `PORE_PRESSURE_PARAMETERS` | Configurazione Darcy L1, con schema canonico legacy/L1/L2 da completare; l'oggetto L2 sara' predisposto ma Darcy rimane attivabile solo in L1. `pore_pres_fract` appartiene invece alle NAMELIST d'iniezione. | TL04-C: configurazione Darcy e controllo di applicabilita' L1; nessuna duplicazione del parametro d'iniezione. |
 | `SOLID_TRANSPORT_PARAMETERS` e `GAS_TRANSPORT_PARAMETERS` | Proprietà delle specie e ambiente **condivisi**; opzioni delle chiusure in L1/L2/coppia se necessarie. | TL04-C/TL08–TL11. |
 | `MASS_EXCHANGE_PARAMETERS` | Distinguere processi terreno↔fluido, atmosfera↔fluido e L1↔L2; non usare una configurazione globale per processi fisici differenti. | TL07–TL11. |
 | `NEW RUN_PARAMETERS`, IC e BC | Configurazione globale della simulazione e condizioni del singolo layer; evitare doppie proprietà ambiente. | TL04/TL05/TL13. |

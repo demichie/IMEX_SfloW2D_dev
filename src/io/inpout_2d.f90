@@ -366,7 +366,7 @@
         r2_source, angle_source, vel_source, T_source, h_source,                                                       &
         alphas_source, alphag_source, time_param, Ri_source,                                                           &
         mfr_source, xs_source, xg_source, azimuth_source, arc_width_source,                                            &
-        n_intervals, t_intervals, vel_intervals
+        n_intervals, t_intervals, vel_intervals, pore_pres_fract
 
     NAMELIST /particle_distribution_parameters/ fractal_dim, diam_min, diam_max,                                       &
         rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0, alphas_source_total
@@ -380,7 +380,7 @@
         y_fissures_end_points, width_fissures, linear_vel_fissures,                                                    &
         T_fissures, time_param_fissures, alphas_source, alphag_source,                                                 &
         xs_source, xg_source,                                                                                          &
-        bottom_fissural_method, bottom_fissural_group
+        bottom_fissural_method, bottom_fissural_group, pore_pres_fract
 
     NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse,                                                    &
         r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
@@ -410,7 +410,7 @@
         tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag,                                      &
         stochastic_seed, noise_activation_velocity
 
-    NAMELIST /pore_pressure_parameters/ hydraulic_permeability, pore_pres_fract,                                       &
+    NAMELIST /pore_pressure_parameters/ hydraulic_permeability,                                       &
         alpha_trans, N_inh, f_inhibit_mode,                                                                            &
         dynamic_permeability_flag, pore_pressure_method,                                                               &
         pore_pressure_group
@@ -710,33 +710,6 @@
 
                 idx_pore = 5 + n_solid + n_add_gas + n_stoch_vars
                 idx_poreEqn = idx_pore
-
-                IF (radial_source_flag .OR. bottom_radial_source_flag .OR.                                             &
-                    bottom_fissural_source_flag) THEN
-
-                    IF (pore_pres_fract .LE. 0.0_wp) THEN
-
-                        WRITE (*, *) 'ERROR: problem with namelist PORE_PRESSURE_PARAMETERS'
-                        WRITE (*, *) 'pore_pres_fract =', pore_pres_fract
-                        WRITE (*, *) 'Please check the input file'
-                        STOP
-
-                    END IF
-
-                ELSE
-
-                    IF (pore_pres_fract .GT. 0.0_wp) THEN
-
-                        WRITE (*, *) 'ERROR: problem with namelist PORE_PRESSURE_PARAMETERS'
-                        WRITE (*, *) 'pore_pres_fract =', pore_pres_fract
-                        WRITE (*, *) 'It should not be defined unless RADIAL_SOURCE_FLAG=T'
-                        WRITE (*, *) 'or BOTTOM_RADIAL_SOURCE_FLAG=T'
-                        WRITE (*, *) 'Please check the input file'
-                        STOP
-
-                    END IF
-
-                END IF
 
                 ! Normalize and validate f_inhibit_mode (require uppercase tokens in input)
                 f_inhibit_mode = trim(adjustl(f_inhibit_mode))
@@ -3843,6 +3816,17 @@
 
                 REWIND (input_unit)
 
+                ! Pore-pressure production belongs to the active injection source.
+                IF (pore_pressure_flag .AND. &
+                    (radial_source_flag .OR. bottom_radial_source_flag .OR. bottom_fissural_source_flag)) THEN
+                    IF (pore_pres_fract <= 0.0_wp) THEN
+                        WRITE (*, *) 'ERROR: problem with namelist ', TRIM(source_name)
+                        WRITE (*, *) 'PORE_PRES_FRACT must be positive for pore-pressure injection'
+                        WRITE (*, *) 'pore_pres_fract =', pore_pres_fract
+                        STOP
+                    END IF
+                END IF
+
                 IF (bottom_fissural_source_flag) THEN
 
                     DO i = 1, n_fissures
@@ -4933,7 +4917,9 @@
         IF (liquid_flag) WRITE (backup_unit, liquid_transport_parameters)
         IF (lava_flag) WRITE (backup_unit, lava_transport_parameters)
 
-        IF (radial_source_flag) WRITE (backup_unit, radial_source_parameters)
+        IF (radial_source_flag .OR. bottom_radial_source_flag) &
+            WRITE (backup_unit, radial_source_parameters)
+        IF (bottom_fissural_source_flag) WRITE (backup_unit, fissural_source_parameters)
 
         IF (stochastic_flag) WRITE (backup_unit, stochastic_parameters)
 

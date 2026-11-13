@@ -256,6 +256,7 @@ MODULE parameters_2d
     !> Initial sediment concentration in the pile of material
     REAL(wp), ALLOCATABLE :: alphas_init(:)
 
+    !> Dimensionless excess pore-pressure production factor for the active injection source.
     REAL(wp) :: pore_pres_fract
 
     LOGICAL :: gas_loss_flag
