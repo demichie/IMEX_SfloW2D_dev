@@ -2,6 +2,7 @@
 PROGRAM test_projection_stress
   USE thermal_parameters_2d, ONLY : thermal_l1
   USE rheology_parameters_2d, ONLY : rheology_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
@@ -307,7 +308,7 @@ CONTAINS
     rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; rho_c_sub=rho_l
     sp_heat_l=4180.0_wp; sp_heat_a=998.0_wp; sp_gas_const_a=287.05_wp
     pres=101300.0_wp; inv_pres=1.0_wp/pres
-    kin_visc_c=1.0E-6_wp; hydraulic_permeability=0.0_wp; maximum_solid_packing=0.6_wp
+    kin_visc_c=1.0E-6_wp; pore_pressure_l1%hydraulic_permeability=0.0_wp; maximum_solid_packing=0.6_wp
     eps_sing=1.0E-8_wp; eps_sing4=eps_sing**4; verbose_level=0
     ALLOCATE(rho_s(ns),inv_rho_s(ns),sp_heat_s(ns),diam_s(ns),erodible_fract(ns))
     ALLOCATE(sp_heat_g(0),sp_gas_const_g(0),loss_rate)
@@ -573,7 +574,8 @@ CONTAINS
     CALL begin_geometry_transaction(sparse=.TRUE.)
     CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_before, &
-         step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1)
+         step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
+          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1)
     IF (failed) THEN
        CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
@@ -656,7 +658,8 @@ CONTAINS
     CALL initialize_lie_source_executor(executor,registry)
     CALL execute_lie_source_groups(executor,state,q_trial,qp_trial,1.0_wp,domain, &
          q_original=q_before,qp_original=qp_invalid, &
-         step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1)
+         step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
+          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
     CALL state%restore_substrate(substrate_before)
