@@ -299,7 +299,7 @@ CONTAINS
     gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
-    sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; topo_change_flag=.TRUE.
+    sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; substrate%topo_change_flag=.TRUE.
     n_fissures=0
     substrate%erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.; radial_source_flag=.FALSE.

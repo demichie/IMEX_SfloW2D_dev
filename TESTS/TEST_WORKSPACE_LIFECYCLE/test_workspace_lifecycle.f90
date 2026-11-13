@@ -12,7 +12,7 @@ PROGRAM test_workspace_lifecycle
        commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
   USE state_fields, ONLY : state_type, substrate_snapshot_type
-  USE constitutive_parameters_2d, ONLY : erodible_porosity
+  USE substrate_parameters_2d, ONLY : substrate
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   IMPLICIT NONE
@@ -85,7 +85,7 @@ PROGRAM test_workspace_lifecycle
   ! without consulting the (deliberately invalid) granular porosity.
   lava_flag=.TRUE.
   n_solid=0
-  erodible_porosity=1.0_wp
+  substrate%erodible_porosity=1.0_wp
   state%deposit_tot=2.5_wp
   CALL state%refresh_substrate_totals()
   CALL assert_true('lava deposit survives n_solid=0 refresh', ALL(state%deposit_tot==2.5_wp))
@@ -118,7 +118,7 @@ PROGRAM test_workspace_lifecycle
        ALL(state%erosion_tot==0.0_wp))
   lava_flag=.FALSE.
   n_solid=1
-  erodible_porosity=0.25_wp
+  substrate%erodible_porosity=0.25_wp
   CALL state%refresh_substrate_totals()
   CALL assert_true('granular deposit uses porosity', ALL(ABS(state%deposit_tot-4.0_wp/3.0_wp)<1.0E-12_wp))
 
