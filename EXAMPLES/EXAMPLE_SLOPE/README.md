@@ -63,3 +63,9 @@ Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in 
 ## Legacy documentation and preservation
 
 The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+
+## Topography files
+
+Run `python create_example.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` and the `DEM/` directory when needed. The input
+references that location; do not place generated terrain in the example root.

@@ -142,7 +142,8 @@ header = (
     f"cellsize {dx}\n"
     "NODATA_value -9999\n"
 )
-with open('topography_dem.asc', 'w') as f:
+Path('DEM').mkdir(parents=True, exist_ok=True)
+with open('DEM/topography_dem.asc', 'w') as f:
     np.savetxt(f, Z, header=header, fmt='%1.12f', comments='')
 
 # Write restart file (example_2D_0000.q_2d)
@@ -197,7 +198,7 @@ print(f"Created dam-break setup with NX={nx_cells}, NY={ny_cells}")
 print(f"Domain length {x_length} m, width {y_width} m")
 print(f"Dam length {bed_length} m, height {bed_height} m")
 print(f"Pore pressure fraction: {pore_pressure_fract}")
-print(f"Saved topography_dem.asc, {init_file}, IMEX_SfloW2D.inp")
+print(f"Saved DEM/topography_dem.asc, {init_file}, IMEX_SfloW2D.inp")
 
 # Optional plot of the initial bed
 if plot_flag:

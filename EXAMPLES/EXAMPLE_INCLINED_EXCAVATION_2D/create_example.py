@@ -166,7 +166,8 @@ def main():
         )
 
     outdir = Path(__file__).resolve().parent
-    topo_file = outdir / "topography_dem.asc"
+    (outdir / "DEM").mkdir(parents=True, exist_ok=True)
+    topo_file = outdir / "DEM" / "topography_dem.asc"
     write_esri_vertex_aligned(
         topo_file, B_vertex, x_min, x_max, y_min, y_max, dx, slope, z_ref,
         x1, x2, y1, y2, depth

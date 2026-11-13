@@ -133,7 +133,9 @@ header += "yllcorner " + str(y_min - 0.5 * dx) + "\n"
 header += "cellsize " + str(dx) + "\n"
 header += "NODATA_value -9999\n"
 
-output_full = 'topography_dem.asc'
+from pathlib import Path
+Path('DEM').mkdir(parents=True, exist_ok=True)
+output_full = 'DEM/topography_dem.asc'
 
 np.savetxt(output_full, Z_vrtx, header=header, fmt='%1.12f', comments='')
 

@@ -57,7 +57,7 @@ The resulting input uses the specified continuous, vertex-aligned Q1 bed geometr
 python3 create_example.py 120 --plot
 ```
 
-The generator writes `topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`,
+The generator writes `DEM/topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`,
 `IMEX_SfloW2D.inp`, `initial_condition_reference.npz`,
 and, when plotting is requested, `initial_thickness.png` and
 `initial_centerline.png`.
@@ -73,7 +73,7 @@ and, when plotting is requested, `initial_thickness.png` and
 
 ## Expected output
 
-`create_example.py` produces `topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`, `IMEX_SfloW2D.inp`, `initial_condition_reference.npz`, and (with `--plot`) `initial_thickness.png` and `initial_centerline.png`.
+`create_example.py` produces `DEM/topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`, `IMEX_SfloW2D.inp`, `initial_condition_reference.npz`, and (with `--plot`) `initial_thickness.png` and `initial_centerline.png`.
 
 ## Geometry and Q1 consistency
 
@@ -96,3 +96,9 @@ The original README proposes the following integral measures: `M_uphill` for `x<
 ## Legacy documentation and preservation
 
 The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+
+## Topography files
+
+Run `python create_example.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` and the `DEM/` directory when needed. The input
+references that location; do not place generated terrain in the example root.

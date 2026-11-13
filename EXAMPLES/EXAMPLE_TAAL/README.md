@@ -47,7 +47,15 @@ For this lateral radial source, the four timing parameters mean: period between 
 
 ## How to run
 
-The source parameters and pulse schedule are described above. The input and terrain are already supplied, so no Python generator is needed. From this example directory, link the executable and run the solver:
+The source parameters are supplied. The single compressed terrain archive is tracked in `DEM/`; extract it before running (no Python generator is needed). From this example directory, link the executable and run the solver:
+
+**Extract the canonical DEM:**
+
+```bash
+unzip DEM/topography_dem.zip -d DEM
+```
+
+The input uses `DEM/topography_dem.asc`. Do not track the extracted ASC or duplicate this archive in `EXAMPLE_TAAL_BOTTOM`.
 
 **Create a local executable link:**
 

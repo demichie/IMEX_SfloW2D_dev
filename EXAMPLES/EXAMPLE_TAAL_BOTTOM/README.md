@@ -49,7 +49,22 @@ For the bottom radial source, `TIME_PARAM(1:3)` define the cycle period (30 s), 
 
 ## How to run
 
-The source parameters and pulse schedule are described above. The input and terrain are already supplied, so no Python generator is needed. From this example directory, link the executable and run the solver:
+The source parameters and pulse schedule are supplied, but the DEM is **not duplicated** in this example. Prepare it from the canonical Taal example before running: From this example directory, link the executable and run the solver:
+
+**Prepare the terrain (copy ZIP and extract):**
+
+```bash
+cp ../EXAMPLE_TAAL/DEM/topography_dem.zip DEM/
+unzip DEM/topography_dem.zip -d DEM
+```
+
+If the canonical ASC has already been extracted, you can instead run:
+
+```bash
+cp ../EXAMPLE_TAAL/DEM/topography_dem.asc DEM/
+```
+
+See [DEM/README.md](DEM/README.md) for both alternatives. The input uses `DEM/topography_dem.asc`.
 
 **Create a local executable link:**
 

@@ -11,6 +11,7 @@
  VERBOSE_LEVEL=          0,
  /
 &NEWRUN_PARAMETERS
+ TOPOGRAPHY_FILE = 'DEM/topography_dem.asc',
  X0= 271432.0D0     ,
  Y0=  1529642.0D0     ,
  COMP_CELLS_X=  500,

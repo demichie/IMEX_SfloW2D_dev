@@ -20,7 +20,7 @@ This example sets up multiple pyroclastic-avalanche simulations at Etna, samples
 | Parameter | Value |
 | --- | --- |
 | Site | Mount Etna |
-| Input DEM | `DEM/Etna2014_crop.zip` |
+| Input DEM | Canonical archive: `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip` |
 | Parameter sampling | `create_ensemble.py` |
 | Case generation | `create_inputfiles.py` |
 | Parallel launch | `launch_jobs.py`, configurable `max_processes` |
@@ -33,13 +33,13 @@ Requires Python 3 and the IMEX_SfloW2D executable. NumPy and pandas are used for
 ## How to run
 
 Perform these operations in order from the
-`EXAMPLES/EXAMPLE_ENSEMBLE_ETNA` directory. The shared DEM and
+`EXAMPLES/EXAMPLE_ENSEMBLE_ETNA` directory. The shared DEM (copied from `EXAMPLE_ETNA/DEM`, not tracked twice) and
 template executable link must exist before generating any ensemble
 member.
 
 ### 1. Prepare the shared DEM and executable link
 
-The suggested directory organization is:
+The canonical archive is kept only in `EXAMPLE_ETNA/DEM`; see [DEM/README.md](DEM/README.md) for the copy or extraction alternatives. The suggested local directory organization is:
 
 ```text
 EXAMPLE_ENSEMBLE_ETNA/
@@ -67,6 +67,7 @@ cd DEM
 ```
 
 ```bash
+cp ../../EXAMPLE_ETNA/DEM/Etna2014_crop.zip .
 unzip Etna2014_crop.zip
 ```
 

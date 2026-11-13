@@ -24,7 +24,7 @@ Dilute gas–particle mixture collapsing over the Campi Flegrei area. Initial co
 | Collapse radius | 500 m |
 | Collapse height | 400 m |
 | Initial solid volume fraction | 0.015 |
-| Topography | `topo.zip` |
+| Topography | `DEM/topo.zip` |
 
 ## How to run
 
@@ -33,8 +33,10 @@ From this example directory, execute the following commands in order:
 **Extract the topography archive:**
 
 ```bash
-unzip topo.zip
+unzip DEM/topo.zip -d DEM
 ```
+
+The input uses `DEM/topography_dem.asc`; unpack the archive only into `DEM/`.
 
 **Run the solver:**
 

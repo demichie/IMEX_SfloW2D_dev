@@ -71,3 +71,10 @@ The paired [`README.txt`](README.txt) is retained as a verbatim archival record.
 ## Documentation verification note
 
 **Generator command.** The tracked Python generator is `create_example.py`; the legacy mention of `create_example4.py` is a stale filename.
+
+## Topography files
+
+Run `python create_example.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` (and the directory if necessary). The generated
+`IMEX_SfloW2D.inp` points to that path; the DEM is not written to the
+example root. Keep numerical outputs outside `DEM/`.

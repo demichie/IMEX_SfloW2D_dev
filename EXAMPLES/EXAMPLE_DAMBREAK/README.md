@@ -86,7 +86,7 @@ The generator `create_dambreak.py` takes **ten positional arguments**:
 9. **PORE_PRESSURE_FRACT** — Initial pore-pressure fraction relative to hydrostatic pressure (0–1).
 10. **PLOT_FLAG** — Whether to create a preview PNG (`true` or `false`).
 
-The first command writes `IMEX_SfloW2D.inp`, `topography_dem.asc`,
+The first command writes `IMEX_SfloW2D.inp`, `DEM/topography_dem.asc`,
 the initial conservative state, and (when requested) the preview figure.
 The legacy README mentions `create_dambreak_static.py`; the tracked
 script to use is `create_dambreak.py`.
@@ -159,7 +159,7 @@ python clean_folder.py --apply
 
 ## Expected output
 
-The generator writes `IMEX_SfloW2D.inp`, `topography_dem.asc`, an initial conservative-state file and optional preview. The run writes `OUTPUT/dambreak2D/fields/dambreak2D.nc`; `height_summary_nc.py` produces `frames/dambreak2D_hcenter_####.png` and an MP4 (or GIF fallback). For MP4, install `imageio[ffmpeg]`, `imageio-ffmpeg`, and system `ffmpeg`.
+The generator writes `IMEX_SfloW2D.inp`, `DEM/topography_dem.asc`, an initial conservative-state file and optional preview. The run writes `OUTPUT/dambreak2D/fields/dambreak2D.nc`; `height_summary_nc.py` produces `frames/dambreak2D_hcenter_####.png` and an MP4 (or GIF fallback). For MP4, install `imageio[ffmpeg]`, `imageio-ffmpeg`, and system `ffmpeg`.
 
 ## Pore-pressure and permeability options
 
@@ -187,3 +187,9 @@ The paired [`README.txt`](README.txt) is retained as a verbatim archival record.
 ## Documentation verification note
 
 **Generator filename.** The existing setup program is `create_dambreak.py` (the names `create_dambreak_static.py` and `create_example_Roche_static.py` are historical references in the source/README). The supplied CLI has 10 positional arguments. Any alternative names in embedded docstrings are not working paths.
+
+## Topography files
+
+Run `python create_dambreak.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` and the `DEM/` directory when needed. The input
+references that location; do not place generated terrain in the example root.

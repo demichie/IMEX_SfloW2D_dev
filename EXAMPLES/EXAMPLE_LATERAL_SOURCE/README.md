@@ -78,3 +78,9 @@ The paired [`README.txt`](README.txt) is retained as a verbatim archival record,
 ## Documentation verification note
 
 **Parameter interpretation.** The generator maps its third argument to `MFR_SOURCE`; the solver reports this rate in kg/s and derives `H_SOURCE` from it. The final argument maps to `ALPHAS_SOURCE`, a solid volume fraction. At 900 K, 1% solid volume yields a mixture density of approximately 20.39 kg/m³ and positive reduced gravity of approximately 9.24 m/s². By contrast, `XS_SOURCE=0.01` means 1% solids by mass and gives negative reduced gravity at 900 K; that is not the intended example composition.
+
+## Topography files
+
+Run `python create_example.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` and the `DEM/` directory when needed. The input
+references that location; do not place generated terrain in the example root.

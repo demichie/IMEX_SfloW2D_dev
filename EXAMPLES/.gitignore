@@ -1,0 +1,11 @@
+# DEM rasters are generated or extracted in each example's DEM/ directory.
+**/DEM/*.asc
+**/DEM/*.tif
+**/DEM/*.tiff
+**/DEM/*.grd
+# Shared archives are tracked only in their canonical owner directory.
+EXAMPLE_TAAL_BOTTOM/DEM/*.zip
+EXAMPLE_ENSEMBLE_ETNA/DEM/*.zip
+EXAMPLE_ETNA_LAVA/DEM/*.zip
+# Old generator layout; do not re-add DEM rasters at example root.
+**/topography_dem.asc

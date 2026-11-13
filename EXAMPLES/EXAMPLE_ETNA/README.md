@@ -36,7 +36,7 @@ ellipsoidal excavation **before** launching the solver.
 
 ### 1. Prepare the DEM and ellipsoid configuration
 
-Extract the DEM archive `DEM/Etna2014_crop.zip` into `DEM/`
+Extract the single canonical DEM archive `DEM/Etna2014_crop.zip` into `DEM/`
 and edit `input_ellipsoid.py`, which defines the preprocessing
 parameters. The ellipsoid is constrained by the lowest and highest
 planimetric points of the initial avalanche, and its transverse
@@ -118,3 +118,9 @@ The paired [`README.txt`](README.txt) is retained as a verbatim archival record.
 ## Documentation verification note
 
 **Cleanup command.** The tracked cleanup utility is `cleanFolder.sh` (case sensitive); the old `cleanfolder.sh` spelling is not the tracked filename.
+
+## Shared terrain ownership
+
+The archive `DEM/Etna2014_crop.zip` is the only tracked Etna raster
+source. `EXAMPLE_ENSEMBLE_ETNA` copies/extracts it locally; `EXAMPLE_ETNA_LAVA`
+uses its own verified preparation script. Do not commit additional copies.
