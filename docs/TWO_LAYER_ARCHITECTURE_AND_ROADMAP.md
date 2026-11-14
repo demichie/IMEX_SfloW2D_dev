@@ -62,7 +62,7 @@ Gli indici delle equazioni sono comuni ai due layer. Le quantità significative 
 
 **One combined source:** Retain `src/physics/mass_exchange/mass_exchange_2d.f90` as the sole assembler of the active erosion, deposition, entrainment, carrier-loss, vaporization and lava-immobilization processes, with shared carrier/packing limiters and mass, momentum and energy budgets. Retain the current separate `mass_exchange_*_2d.f90` law files; add only `mass_exchange_parameters_2d.f90` for canonical nested configs. Do not create separate authoritative `erosion_l1` or multiple independent Lie integrations. Any future NEWTON or ANALYTIC treatment must solve the *combined* active processes consistently; currently only EXPLICIT mass exchange is supported and other treatments must remain explicitly rejected. `gas_loss_flag` has been moved from mass-exchange input to the canonical Darcy L1/L2 configuration without duplicate storage; the Darcy source reads its supplied configuration.
 
-**Local contacts:** `layer_contacts_2d` already distinguishes both-wet, L1-only, L2-only and both-dry candidates. Bed erosion/deposition applies to the **terrain-exposed** layer; atmospheric entrainment to the **atmosphere-exposed** layer, each using its independent law config. L2-only may contact both boundaries; L1-only likewise. Evaluate contacts from the *current candidate* in physics, not from committed state or Lie control logic. Conservative L2-to-L1 settling (TL08) is not ground deposition; L1-to-L2 elutriation (TL09) may cold-start an absent receiver.
+**Local contacts:** `layer_contacts_2d` already distinguishes both-wet, L1-only, L2-only and both-dry candidates. Bed erosion/deposition applies to the **terrain-exposed** layer; atmospheric entrainment to the **atmosphere-exposed** layer, each using its independent law config. L2-only may contact both boundaries; L1-only likewise. Evaluate contacts in the numerical cell/group loop from the *current candidate*, outside physics, not from committed state. Conservative L2-to-L1 settling (TL08) is not ground deposition; L1-to-L2 elutriation (TL09) may cold-start an absent receiver.
 
 ### 3.3 TL04-C implementation steps and acceptance gates
 
@@ -162,8 +162,8 @@ avere stati, composizioni, temperature, concentrazioni solide, reologie
 e configurazioni delle sorgenti differenti, ma non fasi portanti
 differenti. L'uso dei flag di fase globali nei kernel fisici e' quindi
 corretto e non richiede argomenti o flag per layer. Restano distinti
-i contatti cell-local e le attivazioni Darcy/stochastic, il cui scope
-va verificato separatamente prima di modificare i kernel.
+i contatti cell-local e le attivazioni Darcy/stochastic per layer;
+la loro selezione numerica e il relativo input devono restare coerenti.
 Il registro resta single-layer e i controlli per L2 non si attivano
 prima dei candidati accoppiati e rollback atomico di TL07/TL11.
 Test richiesti in quella fase: quattro stati, cambi di esposizione tra
@@ -195,6 +195,36 @@ q1_candidate = q1 + dt*Gamma
 q2_candidate = q2 - dt*Gamma
 ```
 Un solo limiter di disponibilità condiviso; nessun limitatore indipendente che rompa l'antisimmetria. Validazione e rollback atomici di entrambi i layer, substrato, geometria e diagnostiche. La variabile termica conservativa trasferita va contabilizzata; l'energia cinetica e la dissipazione possono avere regole ulteriori, esplicite. L'approssimazione del gas di packing è un **difetto esterno diagnosticato**, non un trasferimento fittiziamente conservativo. Non imporre un Newton globale `2*n_eqns` senza evidenza di necessità.
+
+**Per-layer optional-equation activation (approved, 14 November 2026).**
+`pore_pressure_flag` and `stoch_transport_flag` have layer-local physical
+activation: L1 and L2 may independently enable or disable Darcy and stochastic
+conservative transport. The **single** canonical component layout is unchanged:
+`n_vars`, `n_eqns`, all state indices and the first dimension of rank-4
+state/workspace arrays are shared by both layers. Optional stochastic/pore
+components are allocated once in that shared layout when **any** layer needs
+them (logical OR over layer activations). A disabled layer retains its
+allocated optional component at zero, with no source or interlayer transfer
+into that component; enforce zero consistently in initialization,
+conversions, transport, boundaries, restarts and output, with regression tests.
+Do not create variable-length layer states, separate index sets, or masks that
+duplicate already authoritative source activation. `stochastic_flag`
+(OU evolution/rheology) and `stoch_transport_flag` (conservative transported
+component) are separate choices; migration must preserve this distinction.
+The input parser, Lie registry, stochastic workspace and I/O currently use
+single-layer/global flags and are **not yet migrated** to independent L2
+activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
+TL07/TL13, preserving accepted single-layer inputs and budgets.
+
+**Initial Darcy analytic decoupling (14 November 2026, CI pending).**
+The existing analytic Darcy dispatcher and Darcy kernel no longer treat the
+run-global `pore_pressure_flag` as an internal activation switch. They are
+invoked only for a caller-selected Darcy model; an empty model list is a
+no-op. This makes the selected physical operation independent of whether
+another layer has Darcy enabled. Current L1 source registry still uses its
+existing global flag to schedule the model, so single-layer scheduling is
+unchanged. The full per-layer flag migration, including stochastic and
+input/output, remains pending.
 
 **Global carrier-phase decision (14 November 2026).**
 `gas_flag`, `liquid_flag`, `lava_flag` and shared carrier properties belong to

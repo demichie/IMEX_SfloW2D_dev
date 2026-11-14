@@ -4,7 +4,7 @@
 
 MODULE pore_pressure_darcy_2d
 
-    USE parameters_2d, ONLY : wp, n_solid, gas_flag, pore_pressure_flag,                                &
+    USE parameters_2d, ONLY : wp, n_solid, gas_flag,                                &
             n_eqns, n_add_gas, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,                                        &
             idx_poreEqn, idx_addGasEqn_first, idx_solidEqn_first,                                                      &
             idx_solidEqn_last, sutherland_flag
@@ -102,12 +102,7 @@ CONTAINS
         rate=0.0_wp
         admissible=.FALSE.
 
-        IF (.NOT.pore_pressure_flag) THEN
-        admissible=.TRUE.
-        RETURN
-
-        END IF
-
+        ! This kernel is invoked only for an explicitly selected Darcy source.
         IF (interval<0.0_wp .OR. .NOT.ieee_is_finite(interval)) RETURN
         IF (q_before(idx_totMassEqn)<=0.0_wp) RETURN
 

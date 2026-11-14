@@ -2,7 +2,7 @@
 !> The model list contains canonical names, allowing future physical models
 !> to be added without changing any caller. Darcy is the only model today.
 MODULE pore_pressure_2d
-    USE parameters_2d, ONLY : wp, n_solid, n_eqns, pore_pressure_flag
+    USE parameters_2d, ONLY : wp, n_solid, n_eqns
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE diagnostics_2d, ONLY : fatal_error
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
@@ -131,8 +131,7 @@ CONTAINS
         INTEGER :: i
         rate=0.0_wp
         admissible=.TRUE.
-        IF (.NOT.pore_pressure_flag) RETURN
-
+        ! The caller selects active models for this layer; no global activation flag is consulted.
         IF (SIZE(models)>1) THEN
         CALL fatal_error('Coupled pore-pressure analytic models require state reconstruction')
 
