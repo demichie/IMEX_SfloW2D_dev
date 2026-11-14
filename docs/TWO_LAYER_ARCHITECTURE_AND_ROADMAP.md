@@ -125,6 +125,84 @@ La tabella è il contratto di contatto **per geometria di colonna depth-averaged
 
 La preparazione dei contatti deve usare il **candidato corrente**, non una lettura da `state%q` pubblicato, che durante Lie può essere vecchio. Il gruppo 0 conserva l'eccezione pre-spatial. La nuova infrastruttura può essere aggiunta come TL04 **inerte**, ma non modificare il gating delle sorgenti single-layer esistenti fino a test di equivalenza: un `*_exposed` non sostituisce indiscriminatamente regolarizzazioni wet/dry storiche.
 
+### 4.3.1 Approved ownership boundary for cell-local source activation (14 November 2026)
+
+**Decision:** all physical-law evaluations in `src/physics`, including every
+`src/physics/mass_exchange/*.f90` kernel, remain **cell-local and grid-index-free**.
+No `j,k`, grid-cell IDs, access to rank-4 solution arrays, or direct lookup of
+either layer's global state is allowed in these kernels. Physical laws receive
+only their own layer's local state, immutable configuration, and the necessary
+local substrate/ambient inputs; they return local rates and conservative
+contributions. Local loops over species, groups or coefficients are not grid
+loops. Do not rewrite, fork, or copy already migrated physical formulas.
+
+**Responsibility boundary (TL07/TL11):**
+
+1. `src/numerics/lie_source_executor_2d.f90` owns cell traversal, `j,k`,
+   candidate and pre-group snapshots for **both** layers, shared substrate
+   inventories, group scheduling, rate application, admissibility and
+   atomic commit/rollback. It passes one cell's candidate physical data
+   downstream but **does not** classify contacts or choose physical laws.
+   Preserve group-0 pre-spatial semantics and the existing OpenMP cell-outer
+   worker scratch; no cell-level allocation or shared mutable contact state.
+2. `src/physics/layer_contacts_2d.f90` remains a pure stateless classifier.
+   The `src/physics/source_terms_2d.f90` **cell-local physical assembly
+   boundary** receives the candidate thicknesses of L1/L2 at the same cell
+   and calls `evaluate_layer_contacts` when evaluating a group. Use current
+   candidate thicknesses (not `state%q` already committed), because
+   exposure can change between Lie groups. An invalid contact classification
+   rejects the candidate through the existing validation/rollback protocol.
+3. Physical assembly selects the target layer and its canonical closure,
+   forms a **local effective process mask** from the registry's immutable
+   configured `source_mask` and the classified contacts, and calls the
+   unchanged combined `eval_mass_exchange_explicit` in `mass_exchange_2d`
+   interface with that effective mask. Never mutate registry group metadata,
+   shared canonical configurations, or a global mask in a cell/worker loop.
+   `mass_exchange_2d` remains the sole local rate aggregator/limiter,
+   including carrier availability, packing, mass, momentum, energy and
+   substrate exchange bookkeeping. Other physics families receive local
+   contact/exposure inputs only where the governing law actually needs them.
+4. A process may contribute only when **both** its configured activation
+   and its physical contact eligibility hold. Erosion, terrain deposition
+   and lava deposition require `terrain_exposed(i)`. Atmospheric entrainment
+   requires `atmosphere_exposed(i)`; surface-only thermal/environmental
+   terms must honor their own documented exposure model. Vaporization
+   coupled to terrain deposition follows the *actual post-limiter deposition*
+   rate and must not run as an independent terrain process. Carrier-liquid
+   loss and Darcy dissipation are not blanket-gated by terrain/atmosphere
+   contact; retain their law-specific phase and state conditions.
+   Ground deposition is not L2-to-L1 settling; settling, elutriation and
+   drag are separate `INTERLAYER` operators with their own eligibility
+   (in particular, a dry receiver may be created by elutriation).
+5. Required contact cases: wet/wet -> L1 terrain, L2 atmosphere;
+   L1-only -> L1 both; L2-only -> L2 both; both dry -> no ordinary
+   surface processes. Single-layer wet/dry must retain existing behavior.
+   The contact flags are necessary *eligibility* conditions, not substitutes
+   for phase checks, packing/inventory limits, dry regularizations,
+   injection and other permitted source-driven wetting.
+
+**Explicit dependency audit before activation:** cell-local does not
+automatically mean *layer-parameter independent*. `mass_exchange_2d.f90`
+and individual erosion/deposition kernels currently read the
+`parameters_2d` global phase selectors `gas_flag`/`liquid_flag`.
+Before evaluating distinct L1/L2 carrier phases, migrate **only** these
+layer-dependent dependencies to the selected explicit layer phase/context,
+coherently across all callers, REAL/COMPLEX variants and tests. Retain
+truly SHARED atmosphere, solid material properties and substrate ownership;
+do not duplicate the physics or alter single-layer formulas. Source
+configuration and `source_group_type` are still L1-only and lack scope;
+do not claim contact-aware execution is implemented until TL07/TL11.
+
+**Acceptance:** unit-test the mask selection and actual local rates for
+all four contact patterns, verify absence of erosion/deposition on an
+unexposed layer, no double withdrawal of shared terrain inventory or
+atmospheric resources, conservation/budget accounting and independent
+layer-configuration selection. Check repeated intra-timestep changes of
+contacts, group-0 behavior, dry-source injection/cold-start exceptions,
+OpenMP determinism and bitwise single-layer regressions. The two-layer
+contact gate must remain inert in production until the paired Lie
+candidate/rollback infrastructure is in place.
+
 ### 4.4 Verifica specifica della migrazione
 
 Testare le due NAMELIST single-layer ammesse (breve e `_L1`) sullo stesso oggetto canonico, il rifiuto di gruppi duplicati e di L2 prematuro, i vecchi scalari non supportati, le configurazioni termiche indipendenti e i kernel REAL/COMPLEX/ANALYTIC. La suite `TEST_SOURCE_REGISTRY` comprende ora anche i quattro casi di contatto L1/L2, single-layer wet/dry, soglia canonica e input non validi. Nessun contatto è ancora applicato nel percorso Lie.
@@ -276,11 +354,11 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL04-C — remaining configurations and contacts** | **C1–C4 implemented; both CI workflows green on `32e4e33`; C5/G3 open** | Preserve one combined mass-exchange assembler and the approved single-layer NAMELIST aliases. Complete deferred EXAMPLES, extended physics, restart and OpenMP verification before certifying C5. |
 | **TL05 — HP-PCCU indipendente per slot** | **A/B: operatori e domain worklists per slot, CI verificata su `d901609`; C aperto** | Ogni slot ha workspace HP-PCCU e workset di celle/facce separati; il calcolo produttivo resta L1. Implementare L2 isolato rispettando la geometria condivisa di sezione 6; successivamente `eta_1`/`eta_tot`, pressione coupled e riduzione single-layer. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
-| **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local, rate monolayer isolati, `Gamma` di coppia, commit/rollback atomico, gruppo 0 e OpenMP; gate G5. |
+| **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local e snapshot coerenti; Lie proprietario di `j,k`, transazioni e commit/rollback atomico, ma nessuna scelta fisica dei contatti nel Lie. Rate monolayer isolati, `Gamma` di coppia, gruppo 0 e OpenMP; sezione 4.3.1, gate G5. |
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
 | **TL09 — elutriazione L1→L2** | **Da implementare** | Inventario, co-lift, cold-start e compatibilità con i contatti. |
 | **TL10 — drag interlayer** | **Da implementare** | Momento uguale/opposto, forza nulla ai limiti, analisi stabilità. |
-| **TL11 — sorgenti esterne e basali** | **Da implementare** | Uso dei contatti da `physics` per atmosfera/terreno, consolidazione, entrainment, lofting, pore pressure; chiusure del manoscritto e gate G6. |
+| **TL11 — sorgenti esterne e basali** | **Da implementare** | Contatti calcolati da `source_terms_2d` sui candidati locali; filtro `source_mask` per erosione/deposizione/entrainment e altre leggi di esposizione, mai nei kernel né nel Lie. Audire e rendere espliciti i phase flags L1/L2; preservare limitatori e budget SHARED. Consolidazione, lofting, pore pressure e gate G6; sezione 4.3.1. |
 | **TL12 — validazione scientifica** | **Da implementare** | Benchmark coupled, resting states, budgets, wet/dry, OpenMP, CFL, restart, prestazioni, regressioni single-layer; gate G7. |
 | **TL13 — integrazione e rilascio** | **Da implementare** | Contratti di input/NetCDF/restart, esempi e postprocessing, documentazione delle opzioni e limiti, decisione esplicita prima di abilitare `N_LAYERS=2`. |
 
