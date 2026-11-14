@@ -16,6 +16,7 @@ PROGRAM test_spatial_operator
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE source_terms_2d, ONLY : eval_source_explicit
   USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
+  USE state_composition, ONLY : conservative_mass_admissible
   USE mass_injection_coefficients_2d, ONLY : injection_material_set_type, prepare_injection_materials
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_group_type
@@ -302,14 +303,15 @@ PROGRAM test_spatial_operator
 
 CONTAINS
 
-    !> @brief Exercise actual isolated dilute gas transport on the existing upper-layer HP-PCCU.
-    !> @details First a quiescent buoyant plume must have zero hydrostatic momentum
-    !>          residual even on nonflat shared terrain. Next a dense gas-solid layer
-    !>          must retain positive pressure, finite transport and a valid CFL.
-    !>          L1 is dry and remains untouched; production two-layer is still disabled.
+    !> @brief Verify isolated L2 pressure, advective transport and conservative Euler update.
+    !> @details A buoyant plume at rest must have zero residual on shared terrain.
+    !>          A dense moving gas-solid layer must preserve total mass, solid mass
+    !>          and energy through a CFL-limited spatial step with a quiet collar.
+    !>          L1 is dry and unchanged; this does not activate coupled two-layer physics.
     SUBROUTINE check_isolated_gas_l2
-        REAL(wp) :: primitive(n_vars),reduced_gravity,gamma
-        REAL(wp) :: isolated_dt
+        REAL(wp) :: primitive(n_vars),reduced_gravity,gamma,isolated_dt
+        REAL(wp) :: initial_mass,initial_solids,initial_energy
+        REAL(wp) :: final_mass,final_solids,final_energy,transport_norm
         LOGICAL :: conversion_ok
         INTEGER :: j,k,l
 
@@ -357,15 +359,26 @@ CONTAINS
         IF (reduced_gravity<=0.0_wp .OR. gamma<=0.0_wp) &
             ERROR STOP 'Expected positive reduced gravity for dense gas-solid L2'
 
+        ! A constant boundary collar has no normal transport: all component
+        ! budgets should therefore be conserved by the isolated L2 spatial step.
         DO k=1,ny
             DO j=1,nx
-                primitive(idx_h)=0.5_wp+0.01_wp*REAL(j+k,wp)
-                primitive(idx_u)=0.1_wp+0.01_wp*REAL(j,wp)
-                primitive(idx_v)=-0.1_wp-0.01_wp*REAL(k,wp)
+                primitive(idx_h)=0.7_wp
+                primitive(idx_u)=0.0_wp
+                primitive(idx_v)=0.0_wp
+                IF (j>3 .AND. j<nx-2 .AND. k>3 .AND. k<ny-2) THEN
+                    primitive(idx_h)=0.7_wp+0.02_wp*SIN(REAL(j+k,wp))
+                    primitive(idx_u)=0.10_wp*SIN(REAL(j,wp))
+                    primitive(idx_v)=0.08_wp*COS(REAL(k,wp))
+                END IF
                 CALL primitive_to_conservative(primitive,slot_q(:,2,j,k),accepted=conversion_ok)
                 IF (.NOT.conversion_ok) ERROR STOP 'Rejected dense L2 gas composition'
             END DO
         END DO
+
+        initial_mass=SUM(slot_q(idx_totMassEqn,2,:,:))
+        initial_solids=SUM(slot_q(idx_solidEqn_first,2,:,:))
+        initial_energy=SUM(slot_q(idx_engyEqn,2,:,:))
 
         CALL slot2_domain%check_solve(slot_q(:,2,:,:),0.0_wp,.FALSE.)
         slot2_qp=0.0_wp
@@ -373,18 +386,38 @@ CONTAINS
         IF (.NOT.ieee_is_finite(isolated_dt) .OR. isolated_dt<=0.0_wp) &
             ERROR STOP 'Invalid dense L2 CFL'
         CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
+
+        transport_norm=0.0_wp
         DO l=1,slot2_domain%solve_cells
             j=slot2_domain%j_cent(l)
             k=slot2_domain%k_cent(l)
             IF (.NOT.ALL(ieee_is_finite(slot2_term(:,j,k)))) &
                 ERROR STOP 'Non-finite moving L2 gas transport'
+            transport_norm=MAX(transport_norm,ABS(slot2_term(idx_totMassEqn,j,k)))
+            slot_q(1:n_eqns,2,j,k)=slot_q(1:n_eqns,2,j,k)-isolated_dt*slot2_term(:,j,k)
+            IF (.NOT.conservative_mass_admissible(slot_q(1:n_eqns,2,j,k))) &
+                ERROR STOP 'Isolated L2 spatial update lost admissible mass fractions'
+            IF (slot_q(idx_engyEqn,2,j,k)<=0.0_wp) &
+                ERROR STOP 'Isolated L2 spatial update lost positive thermal energy'
         END DO
+
+        IF (nx>8 .AND. ny>8 .AND. transport_norm==0.0_wp) &
+            ERROR STOP 'Moving dense L2 has no conservative transport'
+        final_mass=SUM(slot_q(idx_totMassEqn,2,:,:))
+        final_solids=SUM(slot_q(idx_solidEqn_first,2,:,:))
+        final_energy=SUM(slot_q(idx_engyEqn,2,:,:))
+        IF (ABS(final_mass-initial_mass)>4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,initial_mass)) &
+            ERROR STOP 'Isolated L2 total mass not conserved'
+        IF (ABS(final_solids-initial_solids)>4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,initial_solids)) &
+            ERROR STOP 'Isolated L2 solid mass not conserved'
+        IF (ABS(final_energy-initial_energy)>4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,initial_energy)) &
+            ERROR STOP 'Isolated L2 energy not conserved'
 
         IF (ANY(slot_q(:,1,:,:)/=0.0_wp)) ERROR STOP 'Isolated L2 modified dry L1'
         CALL same_bits('L2 gas evaluation does not modify L1',RESHAPE(q,[SIZE(q)]),RESHAPE(q0,[SIZE(q0)]))
         gas_flag=.FALSE.
         liquid_flag=.TRUE.
-        WRITE(*,*) 'PASS: isolated buoyant/dense L2 gas pressure and transport'
+        WRITE(*,*) 'PASS: isolated buoyant/dense L2 gas pressure, conservation and transport'
     END SUBROUTINE check_isolated_gas_l2
 
 

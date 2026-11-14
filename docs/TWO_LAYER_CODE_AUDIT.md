@@ -1,11 +1,11 @@
 # IMEX-SfloW2D — Audit tecnico del branch two-layer
 
-**Verifica statica:** 14 novembre 2026. **Branch:** `feature/two-layer`; baseline CI [`d901609`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d9016093a4b1f5c790e083a7d137a055c890a66e) con TL05-A/B operatori e worklist per slot. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md). **Scopo corrente:** applicare il principio di semplicità ai contatti: usare il classificatore puro esistente, senza filtro aggiuntivo o attivazione di L2. La sezione TL04-C0 in fondo conserva la fotografia storica precedente.
+**Verifica statica:** 14 novembre 2026. **Branch:** `feature/two-layer`; baseline CI [`9427826`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/942782656d43f4e2e3fe2bd6659a95e4ab83ba82) con TL05-A/B/C1. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md). **Scopo corrente:** TL05-C2, verificare i bilanci di un passo spaziale isolato L2 senza nuovi kernel e senza attivazione two-layer. La sezione TL04-C0 in fondo conserva la fotografia storica precedente.
 
 ## Evidenze verificate
 
 - Le modifiche termiche sono state preparate esclusivamente su `feature/two-layer`; nessun merge in `master` è autorizzato o effettuato in questa fase.
-- [Build optimized/debug #43505177703](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43505177703) e [regressioni #43505283197](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43505283197) **success** su `d901609`, che include TL04-C3/C4 e TL05-A/B. L'utente ha rinviato la nuova esecuzione degli EXAMPLES; le prove precedenti non certificano i nuovi commit.
+- [Build optimized/debug #43584710511](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43584710511) e [regressioni #43584822116](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43584822116) **success** su `9427826`, che include TL05-C1 e la preparazione precedente. La nuova prova C2 va certificata sul suo commit; gli EXAMPLES estesi sono rinviati.
 - L'audit ha riscontrato la propagazione reologica/termica/Darcy e la nuova ownership shared di terreno e solidi. Per TL04-C0 sono stati letti sul branch i moduli di input, il coordinatore mass exchange, le sei leggi, source registry, Lie e relativi caller, oltre a esempi/test rappresentativi. Restano da completare una ricerca esaustiva di tutti i generatori/fixture e la validazione sul checkout.
 - Nessuna compilazione/esecuzione è stata lanciata da questo audit; gli esiti CI sono evidenze **esterne** limitate ai job eseguiti.
 
@@ -21,11 +21,11 @@
 | **A06 — Termica fisica** | TL04-T3 usa configurazione read-only dal coordinamento single-layer fino al dispatcher termico, senza duplicazioni di coefficienti; cooling REAL/COMPLEX/analitico invariato nelle formule. | Validare esempi integrati lava/dry e futuro scope L2. |
 | **A07 — Contatti** | `layer_contacts_2d.f90` è l'unica classificazione canonica dei quattro stati L1/L2; `TEST_SOURCE_REGISTRY` verifica già tutti i casi, le soglie e gli input invalidi. La routine ridondante `filter_contact_mass_exchange_mask` del commit `e4ef157` è stata rimossa. | TL07/TL11: usare direttamente `evaluate_layer_contacts` dentro l'assemblaggio cell-local `source_terms_2d`, senza helper o API aggiuntivi. Lie e kernel mass exchange rimangono invariati, L2 non attivo. |
 | **A08 — Registro/integrazione Lie** | `source_registry_2d.f90:source_group_type` contiene id, method, source_names, equation_ids, cache; nessun `scope`. `lie_source_executor_2d.f90:execute_lie_source_groups` riceve array rank-3 di L1 ed esegue gruppi cell-outer. | Scope L1/L2/INTERLAYER, coppia candidati e trasferimento unico, rollback atomico; kernel monolayer ricevono solo q/qp e rate del layer bersaglio. |
-| **A09 — HP-PCCU/path** | Workspace `spatial_operators(:)` e `domains(:)` indipendenti, CI su `d901609`. TL05-C1 aggiunge in `hyperbolic_2d` il clamp idrostatico della sola L2 (`Gamma2=max(rho_m2*gprime2,0)`), selezionato al setup dall'indice canonico di layer, senza nuovo kernel. Test gas L2 isolato integrato in `TEST_SPATIAL_OPERATOR`. | C1 richiede CI sul nuovo commit e la verifica del test gas. TL05-C rimane aperto; TL06 integra i path accoppiati `B,eta_1,eta_tot`, wet/dry e bound CFL coupled. Nessuna estensione dei flag globali della fase per attivare soluzioni improprie. |
+| **A09 — HP-PCCU/path** | Workspace `spatial_operators(:)` e `domains(:)` indipendenti, CI su `d901609`. TL05-C1 aggiunge in `hyperbolic_2d` il clamp idrostatico della sola L2 (`Gamma2=max(rho_m2*gprime2,0)`), selezionato al setup dall'indice canonico di layer, senza nuovo kernel. Test gas L2 isolato integrato in `TEST_SPATIAL_OPERATOR`. | C1 verificato dalle due Actions su `9427826`. C2 aggiunge un passo test-only conservativo L2 e attende CI. TL05-C rimane aperto; TL06 integra i path accoppiati `B,eta_1,eta_tot`, wet/dry e bound CFL coupled. |
 | **A10 — Deposito e substrato** | `deposit_tot` canonico e ramo lava/granulare distinti; scratch e transazioni del Lie aggiornati. | Prove end-to-end (lava `n_solid=0`, erosione, topografia, restart v7, NetCDF) ancora non certificate dall'evidenza disponibile. |
 | **A11 — Specie e processi** | Substrato e specie solide restano SHARED; TL04-C3/C4 ha migrato coefficienti e attivazioni del mass exchange in `mass_exchange_l1/l2`, mantenendo un assemblatore e i due nomi NAMELIST L1 alternativi. `gas_loss_flag` appartiene a Darcy. | EXAMPLES della migrazione differiti; budget scientifici, restart e OpenMP da completare, senza ripristinare coefficienti globali. |
 | **A12 — I/O** | NetCDF single-layer `(x,y,time)`, restart v7 con accesso L1 e substrato condiviso, formati legacy. | Versione two-layer, schema del layer, continuazione e test round-trip; preservare produzione mono. |
-| **A13 — Workflow** | Entrambe le Actions sono **success** su `d901609` (13 novembre); gli EXAMPLES dopo il mass exchange sono rinviati. | Nuovo clamp HP-PCCU per L2 richiede build optimized/debug e regressioni numeriche/spaziali sul nuovo commit; le Actions precedenti non certificano TL05-C1. |
+| **A13 — Workflow** | Entrambe le Actions sono **success** su `9427826` (14 novembre); gli EXAMPLES dopo il mass exchange sono rinviati. | TL05-C2 richiede nuova compilazione optimized/debug, `TEST_SPATIAL_OPERATOR` e regressioni numeriche sul commit che contiene la nuova prova. |
 
 ## Catena di dipendenze da rispettare
 
@@ -125,4 +125,25 @@ nessuna CI nuova è implicita nella pubblicazione.
 
 **Implementazione:** il solo operatore HP-PCCU gia' esistente riceve l'indice canonico L1/L2 in fase di inizializzazione. Per L2 `hyperbolic_2d` azzera i coefficienti `Gamma` negativi nei trace gamma usati dal CFL, nei termini di percorso ricostruiti localmente e nel limite numerico dei residui a riposo. Per L1 il flag rimane falso e tutti i calcoli restano invariati. Le velocita' caratteristiche attuali hanno gia' celerita' nulla se `gprime*h<0`; nessuna nuova formula o struttura dei flussi. `TEST_SPATIAL_OPERATOR` esegue un caso gassoso buoyant L2-only a riposo e uno dense gas-solid L2 in moto, conservando il controllo bitwise del single-layer e l'isolamento del dominio L1. L'operatore pubblico mantiene il default L1 e non viene abilitata la modalita' two-layer in produzione.
 
-**Verifica:** controlli statici di interfacce, Fortran 120 colonne, dipendenze e copertura dei path; le due Actions devono essere eseguite e lette sul commit effettivo. Nessuna build locale del repository e nessuna prova EXAMPLE dichiarate. Rimangono aperti TL05-C (trasporto L2 completo), TL06 (pressione accoppiata e CFL due-layer) e TL07/TL11 (candidati e sorgenti secondo i contatti).
+**Verifica:** [Build #43584710511](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43584710511) e [regressioni #43584822116](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43584822116) entrambe **success** su `9427826`. Nessuna prova EXAMPLE nuova dichiarata. Rimangono aperti TL05-C (trasporto L2 completo), TL06 (pressione accoppiata e CFL due-layer) e TL07/TL11 (candidati e sorgenti secondo i contatti).
+
+## TL05-C2 — prova di trasporto conservativo L2 isolato (14 novembre 2026; CI da verificare)
+
+Nessun kernel o tipo nuovo: il test `TEST_SPATIAL_OPERATOR` riutilizza il
+percorso `slot2_spatial%compute_timestep` / `evaluate`, su stato L2
+gas/solidi fisicamente denso e L1 asciutto. I bordi del dominio sono
+quiescenti, con stato costante in una fascia di almeno tre celle,
+per sopprimere i flussi esterni di massa. Il test usa il CFL di L2
+per un unico passo Euler esplicito **solo nel test** e verifica massa
+di miscela, massa solida, variabile termica conservativa, ammissibilita'
+del budget dei solidi e positività dell'energia. Chiede trasporto
+non banale sulla griglia 2-D, e conserva il controllo bitwise
+dell'operatore L1 e gli invarianti del gas L2 galleggiante.
+
+Le formule, `state_mixture` REAL/COMPLEX, `pccu_2d`,
+`hyperbolic_2d`, `simulation_2d` e `src/Makefile.am`
+sono immutati rispetto al baseline certificato. La nuova verifica
+deve essere compilata nella suite ottimizzata/debug e testata con
+OpenMP prima di dichiarare C2 chiuso. TL05-C completo, trasporto
+L2 in produzione, pressione accoppiata, contatti nel Lie e
+CFL globale two-layer restano aperti.
