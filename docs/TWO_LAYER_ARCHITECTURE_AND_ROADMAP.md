@@ -216,6 +216,16 @@ single-layer/global flags and are **not yet migrated** to independent L2
 activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
 TL07/TL13, preserving accepted single-layer inputs and budgets.
 
+**Rheology EXPLICIT/ANALYTIC layer selection (14 November 2026, CI pending).**
+The existing Lie executor passes selected layer Darcy and stochastic-rheology
+activations to EXPLICIT and ANALYTIC source dispatchers, removing their
+dependency on global activation flags. Stochastic rheology remains distinct
+from the conservative stochastic transport flag. Physical rheology laws,
+formulas and the common variable layout are unchanged. Production L1 and
+standalone explicit test callers supply their existing input flags.
+NEWTON/SEMI-IMPLICIT residuals and the complex Jacobian still read globals
+and require a coherent migration before L2 can execute.
+
 **Optional-slot state conversion (14 November 2026, CI pending).**
 The canonical REAL/COMPLEX conservative-to-primitive, primitive-to-
 conservative and physical-state constructors read optional stochastic and

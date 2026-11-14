@@ -258,9 +258,10 @@ CONTAINS
     !> @param[in] mass_config Immutable combined mass-exchange closure for this layer.
     !> @param[in] transport_stochastic Selected layer stochastic transport.
     !> @param[in] pore_enabled Selected layer pore pressure.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
         step_start_time,q_original,qp_original,step_failed,failure_message,thermal,rheology,pore_pressure,pore_cache, &
-        mass_config,transport_stochastic,pore_enabled)
+        mass_config,transport_stochastic,pore_enabled,stochastic_enabled)
         USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, B_second_xy_geom,                    &
             B_second_yy_geom, grav_coeff, apply_local_bed_rate, B_vertex,        &
             B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
@@ -283,7 +284,7 @@ CONTAINS
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
         TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,stochastic_enabled
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
@@ -528,7 +529,7 @@ CONTAINS
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
                         q_original(1:n_eqns,j,k),executor%injection_materials,thermal,rheology,mass_config, &
-                         transport_stochastic,pore_enabled)
+                         transport_stochastic,pore_enabled,stochastic_enabled)
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -623,7 +624,7 @@ CONTAINS
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
                         time_step, analytic_rate, status, executor%source_physical_scratch(tid),thermal,rheology, &
-                        pore_pressure,pore_cache)
+                        pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

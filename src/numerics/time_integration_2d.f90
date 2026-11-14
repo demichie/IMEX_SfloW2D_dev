@@ -294,7 +294,7 @@ CONTAINS
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
             stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal,rheology, &
-            pore_pressure,pore_cache,mass_config,stoch_transport_flag,pore_pressure_flag)
+            pore_pressure,pore_cache,mass_config,stoch_transport_flag,pore_pressure_flag,stochastic_flag)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)

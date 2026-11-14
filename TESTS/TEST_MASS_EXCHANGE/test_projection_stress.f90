@@ -585,7 +585,8 @@ CONTAINS
          step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
           pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1, &
           mass_config=mass_exchange_l1, &
-           transport_stochastic=stoch_transport_flag,pore_enabled=pore_pressure_flag)
+           transport_stochastic=stoch_transport_flag,pore_enabled=pore_pressure_flag, &
+           stochastic_enabled=stochastic_flag)
     IF (failed) THEN
        CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
@@ -671,7 +672,8 @@ CONTAINS
          step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
           pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1, &
           mass_config=mass_exchange_l1, &
-           transport_stochastic=stoch_transport_flag,pore_enabled=pore_pressure_flag)
+           transport_stochastic=stoch_transport_flag,pore_enabled=pore_pressure_flag, &
+           stochastic_enabled=stochastic_flag)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
     CALL state%restore_substrate(substrate_before)

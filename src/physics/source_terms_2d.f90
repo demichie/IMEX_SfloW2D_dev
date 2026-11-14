@@ -77,11 +77,12 @@ CONTAINS
     !> @param[in] mass_config Immutable layer mass-exchange configuration.
     !> @param[in] transport_stochastic Selected layer stochastic transport.
     !> @param[in] pore_enabled Selected layer pore pressure.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
             non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
-            thermal,rheology,mass_config,transport_stochastic,pore_enabled)
+            thermal,rheology,mass_config,transport_stochastic,pore_enabled,stochastic_enabled)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -97,7 +98,7 @@ CONTAINS
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,stochastic_enabled
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -121,7 +122,7 @@ CONTAINS
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
                 arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
-                physical_ready,materials,thermal,rheology)
+                physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled)
         END IF
 
         IF (has_exchange) THEN
@@ -282,8 +283,10 @@ CONTAINS
     !> @param[in] rheology Immutable layer rheology configuration.
     !> @param[in] pore_pressure Immutable Darcy configuration for this layer.
     !> @param[in] pore_cache Derived Pascal coefficients owned by this layer.
+    !> @param[in] pore_enabled Selected layer Darcy activation for rheology.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal,rheology, &
-            pore_pressure,pore_cache)
+            pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -294,6 +297,7 @@ CONTAINS
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
         TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
 
@@ -310,7 +314,7 @@ CONTAINS
         END IF
 
         CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
-            thermal,rheology,pore_pressure,pore_cache)
+            thermal,rheology,pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
@@ -320,8 +324,10 @@ CONTAINS
     !> @param[in] rheology Immutable layer rheology configuration.
     !> @param[in] pore_pressure Immutable layer Darcy configuration.
     !> @param[in] pore_cache Immutable Pascal coefficient cache.
+    !> @param[in] pore_enabled Selected layer Darcy activation for rheology.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
-            thermal,rheology,pore_pressure,pore_cache)
+            thermal,rheology,pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
@@ -332,6 +338,7 @@ CONTAINS
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
         TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
@@ -382,8 +389,8 @@ CONTAINS
             END IF
 
             CALL eval_rheology_analytic(rheology,[selected_model_name], interval, physical_state, &
-                    speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag,                              &
-                    stochastic_flag, context%Zij, velocity_after, supported,                                           &
+                    speed_ratio, context%grav_coeff, curvature_accel, pore_enabled,                              &
+                    stochastic_enabled, context%Zij, velocity_after, supported, &
                     context%Bprime_x, context%Bprime_y, context%Bsecond_xx,                                            &
                     context%Bsecond_xy, context%Bsecond_yy)
 
@@ -597,15 +604,13 @@ CONTAINS
     !> @brief Assemble explicit geometric and material source rates for one physical cell.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] pore_enabled Selected layer Darcy activation for rheology.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
-            physical_ready,materials,thermal,rheology )
-
-    USE parameters_2d, ONLY : pore_pressure_flag
-
-
+            physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled )
 
     IMPLICIT NONE
 
@@ -636,6 +641,7 @@ CONTAINS
         TYPE(injection_material_set_type), INTENT(IN) :: materials
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -708,8 +714,8 @@ CONTAINS
             ! The construction of EXPLICIT stays inside each physical module.
             IF (group%rheology_id>0 .AND. r_h>dry_thickness_tolerance) THEN
                 CALL eval_rheology_explicit(rheology,group%rheology_id,physical_state, &
-                    grav_coeff, pore_pressure_flag,                                                                    &
-                    stochastic_flag, stochastic_value, rheology_rate)
+                    grav_coeff, pore_enabled,                                                                    &
+                    stochastic_enabled, stochastic_value, rheology_rate)
                 expl_term(2:3)=expl_term(2:3)+rheology_rate
 
             END IF

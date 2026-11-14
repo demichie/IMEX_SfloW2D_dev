@@ -177,7 +177,8 @@ PROGRAM test_spatial_operator
              B_second_yy_geom(j,k),grav_coeff(j,k),qp(:,j,k),           &
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &
              0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp,materials=materials,thermal=thermal_l1, &
-             rheology=rheology_l1)
+             rheology=rheology_l1, &
+             pore_enabled=pore_pressure_flag,stochastic_enabled=stochastic_flag)
      END DO
   END DO
   IF (.NOT.ALL(ieee_is_finite(cell_sources))) ERROR STOP 'nonfinite local source'
