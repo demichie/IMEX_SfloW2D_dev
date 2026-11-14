@@ -27,7 +27,7 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Thermal | Canonical L1/L2 cooling configurations and explicit kernel propagation are implemented; `T_ground` has moved out of thermal configs into the single shared `substrate%T_ground`. The accepted single-layer NAMELIST names both resolve to L1. | Extended single-layer thermal verification remains open; no new thermal law is activated. |
 | Substrate | TL04-C1 owns ground temperature, porosity, erodible inventory settings and topography setup in `substrate_parameters_2d`; code, input fixtures and generators were migrated. | Extended scientific checks on terrain energy, inventory/restart and formerly distinct ground temperatures remain part of G3. |
 | Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
-| Physical sources | The registry remains single-layer; `layer_contacts_2d` is implemented and pure. Combined mass-exchange L1/L2 configurations have one canonical owner; `mass_exchange_2d.f90` receives the selected read-only config and retains shared inventory limiters. CI verified on `32e4e33`. | Complete C5 scientific verification, including deferred EXAMPLES. Activate contact dispatch and L2 source execution only in TL07/TL11. |
+| Physical sources | The registry remains single-layer; `layer_contacts_2d` is pure. Canonical L1/L2 mass-exchange configs and the unchanged combined rate/limiter backend are CI verified on `32e4e33`. A contact-aware cell-local process-mask selector is prepared in `source_terms_2d` for TL07/TL11, pending CI. | Do not call the selector in the single-layer Lie path before paired candidates and rollback. Complete contact-aware dispatch, L2 source execution and phase-selectors audit in TL07/TL11; C5/EXAMPLES scientific verification remains open. |
 | Spaziale | `nonconservative_2d` resta l'integratore di percorso HP-PCCU. Gli operatori `spatial_operators(:)` e le worklist `domains(:)` sono indipendenti per slot; entrambe le Actions sono verdi su `d901609`. Il driver usa ancora solo L1. | Implementare il trasporto L2 isolato con la sua closure fisica e poi `eta_1`/`eta_tot`, pressione accoppiata, CFL coupled, wet/dry e iperbolicità, secondo il contratto geometrico di sezione 6. |
 | I/O | NetCDF single-layer `(x,y,time)`, restart v7 with L1 plus shared inventories, current `.asc/.q_2d` outputs and diagnostics. | Define one authoritative schema when I/O changes, update reader/writer/tests together and verify scientifically meaningful single-layer continuation; no superseded-format reader or backward-compatibility requirement. |
 
@@ -203,6 +203,31 @@ OpenMP determinism and bitwise single-layer regressions. The two-layer
 contact gate must remain inert in production until the paired Lie
 candidate/rollback infrastructure is in place.
 
+**Implementation checkpoint (14 November 2026; CI pending):** a pure
+`filter_contact_mass_exchange_mask` in `source_terms_2d` routine applies the
+above contract using only the immutable configured source bitset,
+one/two local candidate thicknesses and the target layer index. It calls
+`layer_contacts_2d%evaluate_layer_contacts` inside `physics` and returns
+an eligible *local* mask plus a validity result; invalid thickness/slot
+returns `valid=.FALSE.` and a zero mask. It clears ground erosion,
+ground deposition, lava deposition and deposition-dependent vaporization
+if the target layer is not terrain-exposed, and clears atmospheric
+entrainment if not atmosphere-exposed. It preserves carrier-liquid
+withdrawal and unrelated bits so that their original physical gates
+continue to apply in their kernels. This selector neither changes the
+global registry nor touches the existing mass-exchange formulas or
+limiters. `TEST_SOURCE_REGISTRY` exercises all wet/wet, L1-only, L2-only,
+both-dry and single-layer cases, threshold and invalid inputs.
+`src/Makefile.am` records the `layer_contacts_2d` module dependency.
+
+This code is **not yet wired into the production Lie assembler**:
+`time_integration_2d` still passes only L1, as required by the
+two-layer gate. Integration remains a TL07/TL11 task, not a completed
+two-layer mass-exchange implementation. The single-layer algorithms
+and existing `mass_exchange` kernels are unchanged. The optimized,
+strict/debug and regression Actions must be rerun on the actual code
+commit before declaring the selector CI verified.
+
 ### 4.4 Verifica specifica della migrazione
 
 Testare le due NAMELIST single-layer ammesse (breve e `_L1`) sullo stesso oggetto canonico, il rifiuto di gruppi duplicati e di L2 prematuro, i vecchi scalari non supportati, le configurazioni termiche indipendenti e i kernel REAL/COMPLEX/ANALYTIC. La suite `TEST_SOURCE_REGISTRY` comprende ora anche i quattro casi di contatto L1/L2, single-layer wet/dry, soglia canonica e input non validi. Nessun contatto è ancora applicato nel percorso Lie.
@@ -358,7 +383,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
 | **TL09 — elutriazione L1→L2** | **Da implementare** | Inventario, co-lift, cold-start e compatibilità con i contatti. |
 | **TL10 — drag interlayer** | **Da implementare** | Momento uguale/opposto, forza nulla ai limiti, analisi stabilità. |
-| **TL11 — sorgenti esterne e basali** | **Da implementare** | Contatti calcolati da `source_terms_2d` sui candidati locali; filtro `source_mask` per erosione/deposizione/entrainment e altre leggi di esposizione, mai nei kernel né nel Lie. Audire e rendere espliciti i phase flags L1/L2; preservare limitatori e budget SHARED. Consolidazione, lofting, pore pressure e gate G6; sezione 4.3.1. |
+| **TL11 — sorgenti esterne e basali** | **Maschera locale dei contatti preparata, CI da verificare; dispatch non attivo** | Collegare il filtro pure `filter_contact_mass_exchange_mask` ai candidati L1/L2 nel percorso Lie-physics, senza indici di cella in `physics` né cambi ai kernel di mass exchange. Completare phase flags per layer, sorgenti esterne, consolidazione, lofting, pore pressure e bilanci SHARED; gate G6; sezione 4.3.1. |
 | **TL12 — validazione scientifica** | **Da implementare** | Benchmark coupled, resting states, budgets, wet/dry, OpenMP, CFL, restart, prestazioni, regressioni single-layer; gate G7. |
 | **TL13 — integrazione e rilascio** | **Da implementare** | Contratti di input/NetCDF/restart, esempi e postprocessing, documentazione delle opzioni e limiti, decisione esplicita prima di abilitare `N_LAYERS=2`. |
 

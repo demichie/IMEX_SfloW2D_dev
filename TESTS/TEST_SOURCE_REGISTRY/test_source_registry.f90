@@ -3,6 +3,7 @@ PROGRAM test_source_registry
   USE layer_contacts_2d, ONLY : layer_contacts_type, evaluate_layer_contacts
   USE source_registry_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
+    USE source_terms_2d, ONLY : filter_contact_mass_exchange_mask
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE thermal_parameters_2d, ONLY : thermal_l1, thermal_l2,                                              &
           thermal_radiative_coefficient, thermal_convective_coefficient
@@ -82,6 +83,25 @@ PROGRAM test_source_registry
        .NOT.contact_result%interlayer_contact,'invalid column has no contacts')
   CALL evaluate_layer_contacts([1.0_wp,2.0_wp,3.0_wp],contact_result,contact_valid)
   CALL require(.NOT.contact_valid,'unsupported layer count rejected')
+    ! TL07/TL11: source activation depends on the selected layer's *current*
+    ! column contacts, not on grid indices or another layer's exchange law.
+    CALL check_contact_mask([1.0_wp,2.0_wp],1,.TRUE.,.FALSE.,'both wet: lower layer')
+    CALL check_contact_mask([1.0_wp,2.0_wp],2,.FALSE.,.TRUE.,'both wet: upper layer')
+    CALL check_contact_mask([1.0_wp,0.0_wp],1,.TRUE.,.TRUE.,'L1 only: lower layer')
+    CALL check_contact_mask([1.0_wp,0.0_wp],2,.FALSE.,.FALSE.,'L1 only: upper layer')
+    CALL check_contact_mask([0.0_wp,2.0_wp],1,.FALSE.,.FALSE.,'L2 only: lower layer')
+    CALL check_contact_mask([0.0_wp,2.0_wp],2,.TRUE.,.TRUE.,'L2 only: upper layer')
+    CALL check_contact_mask([0.0_wp,0.0_wp],1,.FALSE.,.FALSE.,'both dry: lower layer')
+    CALL check_contact_mask([0.0_wp,0.0_wp],2,.FALSE.,.FALSE.,'both dry: upper layer')
+    CALL check_contact_mask([1.0_wp],1,.TRUE.,.TRUE.,'single layer wet')
+    CALL check_contact_mask([0.0_wp],1,.FALSE.,.FALSE.,'single layer dry')
+    CALL check_contact_mask([dry_thickness_tolerance,2.0_wp],1,.FALSE.,.FALSE., &
+        'canonical dry threshold')
+
+    CALL check_invalid_contact_mask([-1.0_wp,2.0_wp],1,'negative candidate thickness')
+    CALL check_invalid_contact_mask([1.0_wp,2.0_wp,3.0_wp],1,'unsupported layer count')
+    CALL check_invalid_contact_mask([1.0_wp,2.0_wp],0,'invalid zero layer index')
+    CALL check_invalid_contact_mask([1.0_wp],2,'invalid second layer of single-layer column')
   CALL require(source_catalog_names_unique(),'unique catalog names')
   CALL require(canonical_rheology_catalog_unique(),'unique rheology names')
   CALL require(ALL(source_newton_affected_equations('rheology_voellmy')==[2,3]), &
@@ -167,6 +187,64 @@ CONTAINS
     CALL require(contacts%interlayer_contact .EQV. interface_contact, &
          'interlayer contact: '//description)
   END SUBROUTINE check_contacts
+
+    !> @brief Verify the contact mask leaves only eligible physical exchange bits.
+    !> @param[in] thickness Current candidate column thicknesses, bottom-up [m].
+    !> @param[in] layer Target material layer index.
+    !> @param[in] terrain Whether this layer is exposed to terrain.
+    !> @param[in] atmosphere Whether this layer is exposed to atmosphere.
+    !> @param[in] description Regression case identifier.
+    SUBROUTINE check_contact_mask(thickness,layer,terrain,atmosphere,description)
+        REAL(wp), INTENT(IN) :: thickness(:)
+        INTEGER, INTENT(IN) :: layer
+        LOGICAL, INTENT(IN) :: terrain,atmosphere
+        CHARACTER(*), INTENT(IN) :: description
+        INTEGER :: configured_mask,active_mask,source_id
+        LOGICAL :: valid
+
+        configured_mask=IBSET(0,SOURCE_ID_THERMAL_COOLING-1)
+        DO source_id=SOURCE_ID_EXCHANGE_LAVA_DEPOSITION,SOURCE_ID_EXCHANGE_VAPORIZATION
+            configured_mask=IBSET(configured_mask,source_id-1)
+        END DO
+
+        CALL filter_contact_mass_exchange_mask(configured_mask,thickness,layer,active_mask,valid)
+        CALL require(valid,'valid mass-exchange contact mask: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_EXCHANGE_EROSION-1) .EQV. terrain, &
+            'ground erosion exposure: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1) .EQV. terrain, &
+            'ground deposition exposure: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1) .EQV. terrain, &
+            'lava deposition exposure: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1) .EQV. terrain, &
+            'deposition-dependent vaporization exposure: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1) .EQV. atmosphere, &
+            'ambient entrainment exposure: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1), &
+            'carrier liquid loss is not contact-gated: '//description)
+        CALL require(BTEST(active_mask,SOURCE_ID_THERMAL_COOLING-1), &
+            'unrelated configured source bits remain unchanged: '//description)
+        CALL require(IAND(active_mask,NOT(configured_mask))==0, &
+            'no new sources enabled by contacts: '//description)
+    END SUBROUTINE check_contact_mask
+
+
+    !> @brief Reject invalid candidate columns and target layers without stale output.
+    !> @param[in] thickness Proposed local column thicknesses [m].
+    !> @param[in] layer Proposed target layer.
+    !> @param[in] description Regression case identifier.
+    SUBROUTINE check_invalid_contact_mask(thickness,layer,description)
+        REAL(wp), INTENT(IN) :: thickness(:)
+        INTEGER, INTENT(IN) :: layer
+        CHARACTER(*), INTENT(IN) :: description
+        INTEGER :: mask
+        LOGICAL :: valid
+
+        CALL filter_contact_mass_exchange_mask(IBSET(0,SOURCE_ID_EXCHANGE_EROSION-1), &
+            thickness,layer,mask,valid)
+        CALL require(.NOT.valid,'invalid source column rejected: '//description)
+        CALL require(mask==0,'invalid source column has no active processes: '//description)
+    END SUBROUTINE check_invalid_contact_mask
+
 
   SUBROUTINE require(ok,message)
     LOGICAL,INTENT(IN) :: ok
