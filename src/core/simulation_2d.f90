@@ -122,7 +122,8 @@ CONTAINS
             pore_pressure_l1,mass_exchange_l1,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
-        CALL initialize_configured_sources(this%source_registry,source_error)
+        CALL initialize_configured_sources(this%source_registry,source_error, &
+            rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL this%state%initialize( this%model_layout )

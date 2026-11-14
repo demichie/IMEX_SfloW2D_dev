@@ -116,7 +116,7 @@ simulation-wide state.
 
 The broader source workflow is:
 
-1. **Configuration:** `source_configuration_2d.f90` translates
+1. **Configuration:** [`numerics/source_configuration_2d.f90`](../numerics/source_configuration_2d.f90) translates
    physical settings into names and validated source-group metadata.
 2. **Evaluation:** `source_terms_2d.f90` and the specialized
    submodules evaluate one cell's physical rates or analytical result.
@@ -138,7 +138,6 @@ is defined by the `state` layer.
 | File | Responsibility |
 | --- | --- |
 | `equation_terms_2d.f90` | Local inertial transport flux, hydrostatic pressure coefficient, Cartesian characteristic-speed estimates, and component-mass-flux limiting for spatial operators. |
-| `source_configuration_2d.f90` | Convert physical configuration flags and model selections into the validated source metadata used by the numerical source registry; no per-cell rate evaluation. |
 | `source_terms_2d.f90` | Assemble and dispatch physical source contributions, coupled explicit limitations, analytical source updates, REAL Newton residual rates and COMPLEX Jacobian rates. |
 
 ### `rheology_laws/` — momentum sources

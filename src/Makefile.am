@@ -22,7 +22,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
                 physics/mass_exchange/mass_exchange_parameters_2d.f90 \
-                physics/layer_contacts_2d.f90 \
+                numerics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
                 core/layer_physics_2d.f90 \
@@ -61,7 +61,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/mass_exchange/mass_exchange_vaporization_2d.f90 \
                 physics/mass_exchange/mass_exchange_entrainment_2d.f90 \
                 physics/mass_exchange/mass_exchange_2d.f90 \
-                physics/source_configuration_2d.f90 \
+                numerics/source_configuration_2d.f90 \
                 physics/mass_injection_terms/mass_injection_coefficients_2d.f90 \
                 physics/mass_injection_terms/mass_boundary_injection_2d.f90 \
                 physics/mass_injection_terms/mass_bottom_circular_injection_2d.f90 \
@@ -129,11 +129,11 @@ physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
 physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
-physics/layer_contacts_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+numerics/layer_contacts_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 numerics/time_integration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state/state_types.$(OBJEXT)
@@ -529,10 +529,10 @@ IMEX_SfloW2D.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
+numerics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
                                          numerics/source_input_2d.$(OBJEXT) \
                                          core/constitutive_parameters_2d.$(OBJEXT)
-core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT) \
+core/simulation_2d.$(OBJEXT): numerics/source_configuration_2d.$(OBJEXT) \
                                      physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
                               numerics/source_input_2d.$(OBJEXT)
 
@@ -541,7 +541,7 @@ physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                   numerics/source_registry_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): physics/source_terms_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
 
 # Remaining direct USE dependencies, audited against all production .f90 sources.
@@ -566,7 +566,7 @@ physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(O
 physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+numerics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 stochastic/stochastic_module.$(OBJEXT): physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
@@ -605,7 +605,7 @@ numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_2
     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
@@ -624,7 +624,7 @@ core/simulation_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.
 numerics/source_input_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 numerics/time_integration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)

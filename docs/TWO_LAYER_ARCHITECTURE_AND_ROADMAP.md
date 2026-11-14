@@ -190,6 +190,16 @@ q2_candidate = q2 - dt*Gamma
 ```
 Un solo limiter di disponibilità condiviso; nessun limitatore indipendente che rompa l'antisimmetria. Validazione e rollback atomici di entrambi i layer, substrato, geometria e diagnostiche. La variabile termica conservativa trasferita va contabilizzata; l'energia cinetica e la dissipazione possono avere regole ulteriori, esplicite. L'approssimazione del gas di packing è un **difetto esterno diagnosticato**, non un trasferimento fittiziamente conservativo. Non imporre un Newton globale `2*n_eqns` senza evidenza di necessità.
 
+**Pre-TL07 architecture preparation (14 November 2026, CI pending).**
+The existing contact classifier is moved unchanged from `physics/` to
+`numerics/`, with no second implementation or change to its four-case contract.
+The one-time source-registry configuration builder is also owned by `numerics/`
+and receives the selected canonical rheology, thermal, pore-pressure and
+mass-exchange configurations explicitly, rather than reading `_l1` inside
+its module. The production caller still selects L1; L2 sources and the
+per-group contact refresh remain deferred. The existing physical kernels,
+phase flags and single-layer numerical path are not changed by this step.
+
 **TL07 — contact refresh at every Lie group entry (approved contract).**
 Keep the existing cell-outer / group-inner traversal. At the start of **each**
 Lie group, use the current post-advection or previous-group accepted L1/L2

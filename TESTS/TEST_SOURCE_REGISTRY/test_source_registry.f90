@@ -10,6 +10,7 @@ PROGRAM test_source_registry
   USE source_input_2d
   USE parameters_2d
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
   TYPE(source_registry_type) :: registry
@@ -88,7 +89,8 @@ PROGRAM test_source_registry
        'rheology momentum footprint')
   CALL require(ALL(source_newton_affected_equations('thermal_cooling')==[4]), &
        'thermal footprint')
-  CALL initialize_configured_sources(registry,error)
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'configure coupled Newton group: '//TRIM(error))
   groups=registry%groups()
   CALL require(SIZE(groups)==2,'group zero plus coupled group')
@@ -109,7 +111,8 @@ PROGRAM test_source_registry
    CALL require(groups(2)%thermal_active,'cached Newton thermal term')
   CALL registry%finalize()
   thermal_l1%thermal_group=2
-  CALL initialize_configured_sources(registry,error)
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'separated Newton groups')
   groups=registry%groups()
   CALL require(SIZE(groups)==3,'three ordered Lie groups')
@@ -121,7 +124,8 @@ PROGRAM test_source_registry
         'separated Newton cooling metadata')
   CALL registry%finalize()
   thermal_l1%thermal_method='ANALYTIC'
-  CALL initialize_configured_sources(registry,error)
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'mixed Newton/analytic groups')
   groups=registry%groups()
   CALL require(groups(3)%method==SOURCE_METHOD_ANALYTIC,'analytic method preserved')
@@ -134,7 +138,8 @@ PROGRAM test_source_registry
   thermal_l1%thermal_method='NEWTON'
   thermal_l1%thermal_group=1
   bottom_fissural_source_flag=.TRUE.
-  CALL initialize_configured_sources(registry,error)
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'Etna liquid-carrier lava configuration: '//TRIM(error))
   groups=registry%groups()
   CALL require(group_contains_name(groups(1),'bottom_fissural_injection'), &

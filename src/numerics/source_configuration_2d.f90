@@ -13,17 +13,19 @@ MODULE source_configuration_2d
             bottom_fissural_source_flag, radial_source_flag,                                                           &
             liquid_flag, gas_flag, lava_flag,                                                &
             idx_pore
-    USE rheology_parameters_2d, ONLY : rheology_l1
-    USE thermal_parameters_2d, ONLY : thermal_l1
-    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
-    USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE thermal_parameters_2d, ONLY : thermal_config_type
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources
 CONTAINS
     !> Identify active physical sources exactly once for both input syntaxes.
     !> Thermal activation is determined by the physical cooling flag.
-    SUBROUTINE collect_active_source_names(include_thermal,active_names,error)
+    SUBROUTINE collect_active_source_names(rheology,mass_config,include_thermal,active_names,error)
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
         LOGICAL, INTENT(IN) :: include_thermal
         CHARACTER(LEN=64), ALLOCATABLE, INTENT(OUT) :: active_names(:)
         CHARACTER(*), INTENT(OUT) :: error
@@ -46,11 +48,11 @@ CONTAINS
         END IF
 
         IF (rheology_flag) THEN
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology_l1%rheology_model))>0)                                    &
+        IF (LEN_TRIM(canonical_rheology_source_name(rheology%rheology_model))>0)                                    &
                 active_names=[CHARACTER(LEN=64) :: active_names,                                                    &
-                    canonical_rheology_source_name(rheology_l1%rheology_model)]
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology_l1%rheology_model))==0 .AND.                              &
-                TRIM(rheology_l1%rheology_model)/='none') THEN
+                    canonical_rheology_source_name(rheology%rheology_model)]
+        IF (LEN_TRIM(canonical_rheology_source_name(rheology%rheology_model))==0 .AND.                              &
+                TRIM(rheology%rheology_model)/='none') THEN
             error='D17: unsupported configured rheology'; RETURN
 
         END IF
@@ -65,12 +67,12 @@ CONTAINS
         IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
         IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
         ! Lateral boundary injection is a spatial boundary condition, not a Lie cell source.
-        IF (mass_exchange_l1%erosion%coefficient>0.0_wp) THEN
+        IF (mass_config%erosion%coefficient>0.0_wp) THEN
                 active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
 
         END IF
 
-        IF (mass_exchange_l1%lava_deposition%flag) THEN
+        IF (mass_config%lava_deposition%flag) THEN
 
         IF (.NOT.lava_flag) THEN
             error='Lava deposition requires LAVA_FLAG=T'; RETURN
@@ -81,23 +83,27 @@ CONTAINS
 
         END IF
 
-        IF (mass_exchange_l1%deposition%settling_flag) THEN
+        IF (mass_config%deposition%settling_flag) THEN
         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
 
         END IF
 
         IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
-        IF (mass_exchange_l1%entrainment%flag) &
+        IF (mass_config%entrainment%flag) &
             active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
-        IF (gas_flag .AND. mass_exchange_l1%vaporization%liquid_vaporization_flag) &
+        IF (gas_flag .AND. mass_config%vaporization%liquid_vaporization_flag) &
             active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
         error=''
     END SUBROUTINE collect_active_source_names
 
     !> Create Lie groups directly from physical METHOD and GROUP configuration.
-    SUBROUTINE initialize_configured_sources(registry,error)
+    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config)
         TYPE(source_registry_type), INTENT(INOUT) :: registry
         CHARACTER(*), INTENT(OUT) :: error
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         TYPE(source_group_type) :: g,tmp
         TYPE(source_term_type) :: term
@@ -107,7 +113,7 @@ CONTAINS
         INTEGER, ALLOCATABLE :: affected(:)
         ! A failed reconfiguration must never leave a previous registry active.
         CALL registry%finalize()
-        CALL collect_active_source_names(thermal_l1%thermal_cooling_flag,names,error)
+        CALL collect_active_source_names(rheology,mass_config,thermal%thermal_cooling_flag,names,error)
         IF (LEN_TRIM(error)>0) RETURN
         ALLOCATE(groups(1))
         groups(1)%id=0
@@ -129,14 +135,14 @@ CONTAINS
                 'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
                 'rheology_froude','rheology_lucas','rheology_mui',                                                     &
                 'rheology_mui_voellmy','rheology_newmodel')
-            requested_method=rheology_l1%rheology_method
-            id=rheology_l1%rheology_group
+            requested_method=rheology%rheology_method
+            id=rheology%rheology_group
         CASE('thermal_cooling')
-            requested_method=thermal_l1%thermal_method
-            id=thermal_l1%thermal_group
+            requested_method=thermal%thermal_method
+            id=thermal%thermal_group
         CASE('pore_pressure_dissipation')
-            requested_method=pore_pressure_l1%pore_pressure_method
-            id=pore_pressure_l1%pore_pressure_group
+            requested_method=pore_pressure%pore_pressure_method
+            id=pore_pressure%pore_pressure_group
         CASE('bottom_circular_injection','bottom_fissural_injection',                                                  &
                 'radial_injection','geometry_curvature')
 
@@ -159,8 +165,8 @@ CONTAINS
                 'mass_exchange_deposition','mass_exchange_carrier_liquid_loss',                                        &
                 'mass_exchange_entrainment',                                                                           &
                 'mass_exchange_vaporization')
-            requested_method=mass_exchange_l1%method
-            id=mass_exchange_l1%group
+            requested_method=mass_config%method
+            id=mass_config%group
         CASE DEFAULT
         END SELECT
 
