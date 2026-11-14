@@ -256,9 +256,11 @@ CONTAINS
     !> @param[in] pore_pressure Immutable Darcy closure for the selected layer.
     !> @param[in] pore_cache Derived Pascal coefficients, passed by reference.
     !> @param[in] mass_config Immutable combined mass-exchange closure for this layer.
+    !> @param[in] transport_stochastic Selected layer stochastic transport.
+    !> @param[in] pore_enabled Selected layer pore pressure.
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
         step_start_time,q_original,qp_original,step_failed,failure_message,thermal,rheology,pore_pressure,pore_cache, &
-        mass_config)
+        mass_config,transport_stochastic,pore_enabled)
         USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, B_second_xy_geom,                    &
             B_second_yy_geom, grav_coeff, apply_local_bed_rate, B_vertex,        &
             B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
@@ -281,6 +283,7 @@ CONTAINS
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
         TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
@@ -524,7 +527,8 @@ CONTAINS
                         cell_arc_n_y(j,k),dx*dy,                                                                     &
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
-                        q_original(1:n_eqns,j,k),executor%injection_materials,thermal,rheology,mass_config)
+                        q_original(1:n_eqns,j,k),executor%injection_materials,thermal,rheology,mass_config, &
+                         transport_stochastic,pore_enabled)
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

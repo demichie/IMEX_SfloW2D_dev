@@ -19,7 +19,7 @@ MODULE time_integration_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
-    USE parameters_2d, ONLY : stochastic_flag, stoch_transport_flag
+    USE parameters_2d, ONLY : stochastic_flag, stoch_transport_flag, pore_pressure_flag
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
@@ -294,7 +294,7 @@ CONTAINS
         END IF
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
             stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal,rheology, &
-            pore_pressure,pore_cache,mass_config)
+            pore_pressure,pore_cache,mass_config,stoch_transport_flag,pore_pressure_flag)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)

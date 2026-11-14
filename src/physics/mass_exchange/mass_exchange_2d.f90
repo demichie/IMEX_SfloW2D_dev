@@ -7,7 +7,7 @@ MODULE mass_exchange_2d
                     idx_stochEqn, idx_poreEqn,                                                                         &
                     idx_solidEqn_first, idx_solidEqn_last,                                                             &
                     idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                                    &
-                    pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                                &
+                    mass_exchange_rates_type,                                &
                     reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                           &
@@ -50,9 +50,11 @@ CONTAINS
         !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
+        !> @param[in] transport_stochastic Selected layer stochastic transport.
+        !> @param[in] pore_enabled Selected layer pore pressure.
     SUBROUTINE eval_mass_exchange_explicit(config,mass_config,physical_state,B_zone,erodible,dt,source_mask, &
             total_rates,eqns_term, &
-            scratch)
+            scratch,transport_stochastic,pore_enabled)
 
             TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
@@ -60,6 +62,7 @@ CONTAINS
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
             INTEGER, INTENT(IN) :: B_zone
             INTEGER, INTENT(IN) :: source_mask
+            LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             TYPE(mass_exchange_scratch_type), TARGET, INTENT(INOUT), OPTIONAL :: scratch
@@ -157,8 +160,8 @@ CONTAINS
                 END IF
 
                 ! Scalar transport and pore-pressure sources inherit the net mass exchange.
-                IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
-                IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                                        &
+                IF (transport_stochastic) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
+                IF (pore_enabled) eqns_term(idx_poreEqn)=                                                        &
                                 eqns_term(idx_totMassEqn)*physical_state%exc_pore_pres
 
             END IF  ! gas_flag .OR. liquid_flag

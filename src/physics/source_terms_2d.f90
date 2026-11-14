@@ -75,11 +75,13 @@ CONTAINS
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
     !> @param[in] mass_config Immutable layer mass-exchange configuration.
+    !> @param[in] transport_stochastic Selected layer stochastic transport.
+    !> @param[in] pore_enabled Selected layer pore pressure.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
             non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
-            thermal,rheology,mass_config)
+            thermal,rheology,mass_config,transport_stochastic,pore_enabled)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
@@ -95,6 +97,7 @@ CONTAINS
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -125,7 +128,7 @@ CONTAINS
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
                 group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready,rheology, &
-                mass_config)
+                mass_config,transport_stochastic,pore_enabled)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -779,9 +782,11 @@ CONTAINS
     !> \param[out] topo_term Proposed bed-elevation rate.
     !> @param[in] rheology Immutable layer rheology configuration.
     !> @param[in] mass_config Immutable layer mass-exchange configuration.
+    !> @param[in] transport_stochastic Selected layer stochastic transport.
+    !> @param[in] pore_enabled Selected layer pore pressure.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
             erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready,rheology, &
-            mass_config)
+            mass_config,transport_stochastic,pore_enabled)
         REAL(wp), INTENT(IN) :: qpj(n_vars),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -793,6 +798,7 @@ CONTAINS
         LOGICAL, INTENT(IN), OPTIONAL :: physical_ready
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: exchange_state
         LOGICAL :: reuse_prepared_state
@@ -812,6 +818,6 @@ CONTAINS
         IF (.NOT.reuse_prepared_state) &
             CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
         CALL eval_mass_exchange_explicit(rheology,mass_config,exchange_state,B_zone, &
-            erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
+            erodible,dt,source_mask,rates,eqns_term,exchange_scratch,transport_stochastic,pore_enabled)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d

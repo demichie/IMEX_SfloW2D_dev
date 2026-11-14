@@ -216,6 +216,16 @@ single-layer/global flags and are **not yet migrated** to independent L2
 activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
 TL07/TL13, preserving accepted single-layer inputs and budgets.
 
+**Mass-exchange optional-component routing (14 November 2026, CI pending).**
+The combined mass-exchange kernel now receives the selected layer's
+stochastic-transport and Darcy activations through the existing numerical Lie
+and source-transaction call chain. Only the optional scalar conservative
+source components change their activation; physical rates, limiters and
+shared substrate budgets remain intact. The current single-layer caller
+supplies the unchanged input flags. No second registry, masks or layer-specific
+state indices are introduced. Per-layer input, stochastic workspaces, IC/BC
+and I/O/restart remain deferred to the coupled TL07/TL13 integration.
+
 **Stochastic transport dispatch preparation (14 November 2026, CI pending).**
 The OU/transport stage in `stochastic_module` receives the caller-selected
 `transport_enabled` value for initial burn-in and post-spatial Lie preparation,
