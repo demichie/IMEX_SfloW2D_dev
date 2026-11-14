@@ -6,8 +6,8 @@ PROGRAM test_stochastic_evolution
   USE parameters_2d, ONLY : wp, idx_stoch,             &
        n_add_gas, n_dyn_pres_levels, n_eqns, n_pore_vars, n_solid,         &
        n_stoch_vars, n_thickness_levels, n_vars, configure_canonical_state_indices, &
-       stochastic_flag, idx_u, idx_v
-  USE rheology_parameters_2d, ONLY : rheology_l1
+       idx_u, idx_v
+  USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
    USE state_fields, ONLY : state_type
   USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_config_type, &
        stochastic_l1,stochastic_l2,convolve_2d,expFormNoise,getSigmaNoise
@@ -35,7 +35,7 @@ PROGRAM test_stochastic_evolution
   n_dyn_pres_levels = 1
   T_ambient = 273.15_wp
 
-  stochastic_flag = .TRUE.
+  rheology_l1%stochastic_rheology_flag = .TRUE.
   stochastic_l1%stochastic_transport_flag = .TRUE.
   rheology_l1%rheology_model='none'
   stochastic_l1%length_spatial_corr = 0.0_wp
@@ -47,7 +47,7 @@ PROGRAM test_stochastic_evolution
   CALL model_layout%initialize(1, n_vars, n_eqns, n_solid, n_add_gas,      &
        n_stoch_vars, n_pore_vars)
   CALL state%initialize(model_layout)
-  CALL stochastic%initialize(stochastic_l1,rheology_l1,stochastic_flag)
+  CALL stochastic%initialize(stochastic_l1,rheology_l1)
 
   state%q(:,1,:,:) = 0.0_wp
   state%qp(:,1,:,:) = 0.0_wp
@@ -142,6 +142,24 @@ PROGRAM test_stochastic_evolution
   CALL assert_close('L2 OU spatial scale is independent of L1', &
        stochastic_l1%length_spatial_corr,1.0_wp)
   CALL assert_close('independent L2 OU time',stochastic_l2%tau_stochastic,4.0_wp)
+
+  ! Transport and stochastic rheology are independent properties of each layer.
+  stochastic_l1%stochastic_transport_flag=.TRUE.
+  stochastic_l2%stochastic_transport_flag=.FALSE.
+  rheology_l1%stochastic_rheology_flag=.FALSE.
+  CALL assert_true('L1 stochastic transport without stochastic rheology', &
+       stochastic_l1%stochastic_transport_flag .AND. .NOT.rheology_l1%stochastic_rheology_flag)
+  stochastic_l2%stochastic_transport_flag=.TRUE.
+  CALL assert_true('L2 transport does not change L1 transport',stochastic_l1%stochastic_transport_flag)
+  stochastic_l1%stochastic_transport_flag=.FALSE.
+  rheology_l2%stochastic_rheology_flag=.TRUE.
+  CALL assert_true('transport enabled only for L2', &
+       .NOT.stochastic_l1%stochastic_transport_flag .AND. stochastic_l2%stochastic_transport_flag)
+  CALL assert_true('stochastic rheology enabled only for L2', &
+       .NOT.rheology_l1%stochastic_rheology_flag .AND. rheology_l2%stochastic_rheology_flag)
+  CALL assert_true('L2 and L1 OU configurations remain independent', &
+       stochastic_l2%length_spatial_corr/=stochastic_l1%length_spatial_corr)
+  CALL assert_true('workspace references canonical L1 OU config',ASSOCIATED(stochastic%config,stochastic_l1))
 
   CALL stochastic%finalize
   CALL state%finalize

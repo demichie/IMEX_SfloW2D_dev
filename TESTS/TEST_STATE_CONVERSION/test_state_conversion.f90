@@ -142,8 +142,6 @@ CONTAINS
     rheology_flag = .FALSE.
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
-    stochastic_flag = .TRUE.
-    pore_pressure_flag = .TRUE.
     gas_flag = .TRUE.
 
   END SUBROUTINE initialize_test_properties

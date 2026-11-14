@@ -77,14 +77,12 @@ CONTAINS
     !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
     !> @param[in] config Stable-lifetime canonical OU configuration for this layer.
     !> @param[in] rheology Stable-lifetime canonical rheology for the same layer.
-    !> @param[in] stochastic_active Activation of the layer OU process.
 
-    SUBROUTINE initialize_stochastic_workspace(this,config,rheology,stochastic_active)
+    SUBROUTINE initialize_stochastic_workspace(this,config,rheology)
 
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         TYPE(stochastic_config_type), TARGET, INTENT(IN) :: config
         TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology
-        LOGICAL, INTENT(IN) :: stochastic_active
 
         this%config=>config
         this%rheology=>rheology
@@ -96,7 +94,8 @@ CONTAINS
         ALLOCATE(this%effective_Z(comp_cells_x,comp_cells_y))
         this%effective_Z = 0.0_wp
 
-        IF (stochastic_active) CALL initialize_stochastic_rng(config%stochastic_seed)
+        IF (rheology%stochastic_rheology_flag .OR. config%stochastic_transport_flag) &
+            CALL initialize_stochastic_rng(config%stochastic_seed)
 
     END SUBROUTINE initialize_stochastic_workspace
 

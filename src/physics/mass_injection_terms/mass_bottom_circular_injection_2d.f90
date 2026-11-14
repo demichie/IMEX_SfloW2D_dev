@@ -24,14 +24,16 @@ CONTAINS
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate,material)
-    USE parameters_2d, ONLY : vel_source, T_source, time_param, bottom_radial_source_flag, pore_pressure_flag,         &
+    !> @param[in] pore_pressure_flag Selected layer activation of pore-pressure injection.
+    SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate,material,pore_pressure_flag)
+    USE parameters_2d, ONLY : vel_source, T_source, time_param, bottom_radial_source_flag,         &
         pore_pres_fract, n_intervals, t_intervals, vel_intervals
     USE geometry_2d, ONLY : bottom_source_area_ratio
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(injection_material_type), INTENT(IN) :: material
+        LOGICAL, INTENT(IN) :: pore_pressure_flag
         REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
         REAL(wp) :: r_rho_m, r_red_grav
         REAL(wp) :: source_xs(n_solid), source_xg(n_add_gas)

@@ -25,7 +25,7 @@ MODULE simulation_2d
 
     USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
             n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, lava_flag, &
-            rheology_flag, stochastic_flag, pore_pressure_flag,                                         &
+            rheology_flag,                                         &
             configure_canonical_state_indices
 
 
@@ -119,7 +119,7 @@ CONTAINS
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL initialize_configured_sources(this%source_registry,source_error, &
-            rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
+            rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL this%state%initialize( this%model_layout )
@@ -141,7 +141,7 @@ CONTAINS
 
         CALL this%time_integration%initialize(this%source_registry)
 
-        CALL this%stochastic%initialize(stochastic_l1,rheology_l1,stochastic_flag)
+        CALL this%stochastic%initialize(stochastic_l1,rheology_l1)
 
         WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
 

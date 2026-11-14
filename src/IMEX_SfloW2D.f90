@@ -83,8 +83,9 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : verbose_level
     USE parameters_2d, ONLY : n_solid
     USE parameters_2d, ONLY : n_vars
+    USE rheology_parameters_2d, ONLY : rheology_l1
     USE parameters_2d, ONLY : radial_source_flag
-    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, stochastic_flag, cfl
+    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, cfl
     USE parameters_2d, ONLY : collapsing_volume_flag
     USE parameters_2d, ONLY : serial_flag
 
@@ -219,12 +220,16 @@ PROGRAM IMEX_SfloW2D
 
             ! In a binary restart, Z is already loaded, but we need to allocate the kernel
             ! if spatial correlation is active
-            IF (stochastic_flag .AND. simulation%stochastic%config%length_spatial_corr > 0.0_wp) THEN
+            IF ((rheology_l1%stochastic_rheology_flag .OR. &
+                simulation%stochastic%config%stochastic_transport_flag) .AND. &
+                simulation%stochastic%config%length_spatial_corr > 0.0_wp) THEN
                 CALL simulation%stochastic%generate_kernel()
 
             END IF
 
-            IF (stochastic_flag) CALL simulation%stochastic%refresh_effective()
+            IF (rheology_l1%stochastic_rheology_flag .OR. &
+                simulation%stochastic%config%stochastic_transport_flag) &
+                CALL simulation%stochastic%refresh_effective()
 
         ELSE
             ! ---------------------------------------------------------
@@ -262,7 +267,8 @@ PROGRAM IMEX_SfloW2D
     ! For a new run or a classic restart, initialize the stochastic field only
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
     ! restart already contains Z and only needs its convolution kernel above.
-    IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                                                             &
+    IF ((rheology_l1%stochastic_rheology_flag .OR. &
+            simulation%stochastic%config%stochastic_transport_flag) .AND. (.NOT.is_binary_restart)) &
             CALL simulation%stochastic%initialize_steady(                                                              &
             simulation%state, simulation%domains(1),simulation%stochastic%config%stochastic_transport_flag)
 

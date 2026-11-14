@@ -17,6 +17,7 @@ MODULE rheology_parameters_2d
     PUBLIC :: rheology_config_type
     PUBLIC :: rheology_l1, rheology_l2
     TYPE :: rheology_config_type
+        LOGICAL :: stochastic_rheology_flag=.FALSE. !< Stochastic rheology activation for this layer.
         CHARACTER(LEN=32) :: rheology_model='none'
         CHARACTER(LEN=16) :: rheology_method=''
         INTEGER :: rheology_group=1

@@ -39,7 +39,7 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 
 Layout di produzione: `q(n_variables,n_layers,nx,ny)`; `qp(n_physical_variables,n_layers,nx,ny)`. Le dimensioni di componenti, primitive ed equazioni hanno contratti distinti. `q(:,layer,j,k)` e `qp(:,layer,j,k)` sono vettori contigui per kernel monolayer. Trial, residui, snapshot fluidi e I/O seguono lo stesso layout. Topografia, geometria, `deposit_tot`, inventari di deposito/erosione e substrato **non** hanno indice layer.
 
-Gli indici delle equazioni sono comuni ai due layer. Le quantità significative soltanto in L1 (es. eccesso di pressione interstiziale) occupano slot inattivi in L2, con maschera coerente in conversioni, trasporto, IC/BC, restart e output. Ogni worklist attiva include celle wet L1 **oppure** wet L2: `dry L1/wet L2` non può scomparire.
+Gli indici delle equazioni sono comuni ai due layer. Una variabile opzionale utilizzata da un solo layer occupa lo stesso slot in entrambi: nel layer inattivo il valore, il flusso e le sorgenti devono essere zero, in conversioni, trasporto, IC/BC, restart e output. Ogni worklist attiva include celle wet L1 **oppure** wet L2: `dry L1/wet L2` non può scomparire.
 
 `deposit_tot` è lo spessore cumulativo immobilizzato (m), non il cambiamento netto della quota: in granulare è derivato dall'inventario delle classi e dalla porosità; in lava è un accumulo diretto, anche con `n_solid=0`. `dB_dt` rappresenta la modifica geometrica; non deve duplicare l'inventario. Erosione ed erodibile restano distinti. Le leggi granulari e lava sono mutuamente esclusive, anche nel single-layer.
 
@@ -197,9 +197,11 @@ q2_candidate = q2 - dt*Gamma
 Un solo limiter di disponibilità condiviso; nessun limitatore indipendente che rompa l'antisimmetria. Validazione e rollback atomici di entrambi i layer, substrato, geometria e diagnostiche. La variabile termica conservativa trasferita va contabilizzata; l'energia cinetica e la dissipazione possono avere regole ulteriori, esplicite. L'approssimazione del gas di packing è un **difetto esterno diagnosticato**, non un trasferimento fittiziamente conservativo. Non imporre un Newton globale `2*n_eqns` senza evidenza di necessità.
 
 **Per-layer optional-equation activation (approved, 14 November 2026).**
-`pore_pressure_flag` and `stoch_transport_flag` have layer-local physical
-activation: L1 and L2 may independently enable or disable Darcy and stochastic
-conservative transport. The **single** canonical component layout is unchanged:
+`pore_pressure_l1/l2%pore_pressure_flag`,
+`rheology_l1/l2%stochastic_rheology_flag` and
+`stochastic_l1/l2%stochastic_transport_flag` are the only canonical
+per-layer activation flags. Darcy, stochastic effects on rheology and
+stochastic conservative transport are independent choices. The **single** canonical component layout is unchanged:
 `n_vars`, `n_eqns`, all state indices and the first dimension of rank-4
 state/workspace arrays are shared by both layers. Optional stochastic/pore
 components are allocated once in that shared layout when **any** layer needs
@@ -207,15 +209,38 @@ them (logical OR over layer activations). A disabled layer retains its
 allocated optional component at zero, with no source or interlayer transfer
 into that component; enforce zero consistently in initialization,
 conversions, transport, boundaries, restarts and output, with regression tests.
-Do not create variable-length layer states, separate index sets, or masks that
-duplicate already authoritative source activation. `stochastic_flag`
-(OU evolution/rheology) and `stoch_transport_flag` (conservative transported
-component) are separate choices; migration must preserve this distinction.
-The Lie registry and rheology activation still require canonical
-per-layer flags; `N_LAYERS=2` stays rejected until the remaining source,
-initialization and restart paths are integrated.
+Do not create variable-length layer states, separate index sets, or masks
+duplicating already authoritative activation. OU evolution is required
+when either stochastic transport or stochastic rheology is enabled, while
+the rheology source is controlled solely by `stochastic_rheology_flag`.
+The three global activation flags were removed from physical parameter
+storage, with no synchronised runtime copies. `N_LAYERS=2` stays rejected
+until L2 parsing, shared-layout OR allocation and full state/source
+integration are validated.
 
-**Canonical layer OU coefficients and stochastic transport (14 November 2026, CI pending).**
+**Canonical per-layer stochastic rheology and Darcy activation (14 November 2026, CI pending).**
+`rheology_config_type` now owns `stochastic_rheology_flag` for each layer;
+`pore_pressure_config_type` owns `pore_pressure_flag`. The former global
+physical flags no longer exist in `parameters_2d`. The accepted legacy
+`STOCHASTIC_FLAG` and `PORE_PRESSURE_FLAG` values in
+`NEWRUN_PARAMETERS` are read/written only by the input/output parser,
+which translates them into the canonical L1 objects; typed L1
+NAMELIST fields may select the corresponding activation directly.
+The pore-pressure flag is passed through the existing source executor
+to all three injection kernels, without a global or cell-index dependency.
+The Lie registry reads Darcy activation directly from the canonical
+pore-pressure configuration rather than a second boolean argument.
+Stochastic OU evolution and restart seeding depend on the logical OR
+of the two canonical stochastic activations; the physical stochastic
+rheology equations still use only the rheology activation.
+L1/L2 configuration independence and zero optional slots are checked
+by existing and extended unit tests. The transport formulae, REAL/COMPLEX
+Jacobians, and single-layer input semantics remain unchanged for
+previously valid configurations. No L2 evolution is enabled; tests
+of complete two-layer OR allocation and inactive-slot preservation
+through all operators are still pending.
+
+**Canonical layer OU coefficients and stochastic transport (14 November 2026, CI verified on a0c8cbe).**
 The existing stochastic module owns separate `stochastic_l1` and
 `stochastic_l2` canonical configurations, including the OU damping time,
 noise bounds and transformation, spatial correlation, activation velocity,
@@ -228,19 +253,16 @@ input/output-only staging; a typed `STOCHASTIC_L1_PARAMETERS` alternative
 is exclusive with it. L2 typed input remains rejected while two-layer
 execution is disabled, consistently with other L2 NAMELIST groups.
 The former `stoch_transport_flag` and global spatial-correlation scalar
-are removed from runtime storage. The stochastic-rheology activation and
-pore-pressure activation are still legacy global flags and will be moved
-coherently to their canonical layer configurations next; no shadow copies
-of these flags have been introduced. Optional-equation OR selection over
-two layers and per-layer OU workspace execution remain pending.
+were removed from runtime storage. Optional-equation OR allocation over
+two layers and two active OU workspaces remain pending while L2 is disabled.
 
 **Rheology NEWTON/SEMI-IMPLICIT activation routing (14 November 2026, CI verified).**
 The existing Lie executor routes the selected Darcy and stochastic-rheology
 activations through the Newton solver, semi-implicit source, REAL residual
 and COMPLEX Jacobian. Physical laws and evaluation order remain unchanged.
-The single-layer caller supplies its existing flags. No new stored activation
-is introduced. Canonical rheology/pore-pressure flags, optional-equation OR selection,
-and two-layer execution/restart are not yet migrated.
+The single-layer caller now selects the canonical layer flags. No new stored
+activation is introduced. Optional-equation OR selection and two-layer
+execution/restart are not yet integrated.
 N_LAYERS=2 remains disabled.
 
 **Rheology EXPLICIT/ANALYTIC layer selection (14 November 2026, CI pending).**
@@ -263,8 +285,8 @@ present it is decoded from the supplied local state, including a zero
 component for an inactive layer. Activation and zero preservation remain
 the responsibility of the numerical state/source owners; no per-layer
 flags, metadata copies or new conversion arguments are introduced.
-The state-equivalence regression now checks REAL/COMPLEX optional slots
-with legacy global flags disabled, including zero-valued inactive slots.
+The state-equivalence regression checks REAL/COMPLEX optional slots
+without a global activation gate, including zero-valued inactive slots.
 
 **Mass-exchange optional-component routing (14 November 2026, CI pending).**
 The combined mass-exchange kernel now receives the selected layer's

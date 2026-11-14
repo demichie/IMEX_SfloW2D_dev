@@ -3,7 +3,7 @@ PROGRAM test_pore_pressure_diffusion
   USE parameters_2d, ONLY : wp, n_solid, n_eqns, n_vars, n_add_gas, &
        n_stoch_vars, n_pore_vars, configure_canonical_state_indices, &
        idx_poreEqn, idx_solidEqn_first, idx_solidEqn_last, &
-       gas_flag, pore_pressure_flag, sutherland_flag
+       gas_flag, sutherland_flag
   USE constitutive_parameters_2d, ONLY : kin_visc_c, sp_heat_a, sp_gas_const_a, pres
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
   USE geometry_2d, ONLY : pi_g
@@ -30,7 +30,7 @@ PROGRAM test_pore_pressure_diffusion
   n_stoch_vars = 0
   n_pore_vars = 1
   CALL configure_canonical_state_indices()
-  pore_pressure_flag = .TRUE.
+  pore_pressure_l1%pore_pressure_flag = .TRUE.
   ALLOCATE(solid_fractions(n_solid))
   gas_flag = .FALSE.
   sutherland_flag = .FALSE.
@@ -54,12 +54,12 @@ PROGRAM test_pore_pressure_diffusion
        flow_depth, temperature, solid_fractions, after_full)
   ! A selected layer Darcy source must not depend on a run-global activation flag.
   ! The input/registry decide which layer invokes this analytic operator.
-  pore_pressure_flag=.FALSE.
+  pore_pressure_l1%pore_pressure_flag=.FALSE.
   CALL advance_pore_pressure_diffusion(initial_pressure, integration_step,   &
        flow_depth, temperature, solid_fractions, after_short)
   CALL assert_close(after_short, after_full, 0.0_wp, &
        'selected Darcy source depends on global pore-pressure activation')
-  pore_pressure_flag=.TRUE.
+  pore_pressure_l1%pore_pressure_flag=.TRUE.
   CALL assert_close(after_full, expected_pressure, 2.0E-14_wp,               &
        'diffusion integrator disagrees with the source-derived decay rate')
 

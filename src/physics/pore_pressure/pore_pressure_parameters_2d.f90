@@ -11,6 +11,7 @@ MODULE pore_pressure_parameters_2d
 
     !> @brief Darcy material closure and source scheduling for one layer.
     TYPE :: pore_pressure_config_type
+        LOGICAL :: pore_pressure_flag=.FALSE. !< Enable pore-pressure equation for this layer.
         REAL(wp) :: hydraulic_permeability=0.0_wp  !< Fixed hydraulic permeability [m2].
         REAL(wp) :: alpha_trans=0.0_wp             !< Solid volume fraction for inhibition onset.
         INTEGER :: N_inh=2                        !< Smoothstep polynomial half order.

@@ -5,6 +5,7 @@ PROGRAM test_d17_production_newton
   USE constitutive_parameters_2d
   USE solid_transport_parameters_2d
   USE rheology_parameters_2d, ONLY : rheology_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
   USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
@@ -22,9 +23,9 @@ PROGRAM test_d17_production_newton
   idx_add_gas_first=5;idx_add_gas_last=4
   idx_pore=0;idx_poreEqn=0;idx_stoch=0;idx_u=2;idx_v=3
   rheology_flag=.TRUE.;rheology_l1%rheology_model='newmodel'
-  pore_pressure_flag=.FALSE.;thermal_l1%thermal_cooling_flag=.FALSE.
+  pore_pressure_l1%pore_pressure_flag=.FALSE.;thermal_l1%thermal_cooling_flag=.FALSE.
   slope_correction_flag=.FALSE.;curvature_term_flag=.FALSE.
-  stochastic_flag=.FALSE.
+  rheology_l1%stochastic_rheology_flag=.FALSE.
   liquid_flag=.TRUE.;gas_flag=.FALSE.;lava_flag=.FALSE.
   rho_l=1000.0_wp;inv_rho_l=1.0_wp/rho_l;sp_heat_l=4000.0_wp
   sp_heat_a=1005.0_wp;sp_gas_const_a=287.0_wp
@@ -39,7 +40,7 @@ PROGRAM test_d17_production_newton
   q=old;dt=0.2_wp
   CALL solve_backward_euler_group(group,q,dt,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
        iterations,converged,info,search_failed,thermal=thermal_l1,rheology=rheology_l1, &
-       pore_enabled=pore_pressure_flag,stochastic_enabled=stochastic_flag)
+       pore_enabled=pore_pressure_l1%pore_pressure_flag,stochastic_enabled=rheology_l1%stochastic_rheology_flag)
   IF (.NOT.converged .OR. info/=0 .OR. search_failed) &
        ERROR STOP 'Lie Newton nonlinear solve failed'
   IF (iterations<1) ERROR STOP 'Newton iterations not recorded'
@@ -47,7 +48,7 @@ PROGRAM test_d17_production_newton
        ERROR STOP 'Inactive conservative equations changed'
   CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp, &
        c_qj=CMPLX(q,0.0_wp,wp),c_nh_term_impl=rate_complex,group=group,thermal=thermal_l1,rheology=rheology_l1, &
-       stochastic_enabled=stochastic_flag)
+       stochastic_enabled=rheology_l1%stochastic_rheology_flag)
   rate=REAL(rate_complex,wp)
   residual=q-old-dt*rate
   IF (MAXVAL(ABS(residual(group%equation_ids)))>1.0E-6_wp) &

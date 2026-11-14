@@ -19,7 +19,6 @@ MODULE time_integration_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
-    USE parameters_2d, ONLY : stochastic_flag, pore_pressure_flag
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
@@ -266,7 +265,7 @@ CONTAINS
         ! are valid only on the solve worklist, so stochastic%prepare_timestep
         ! uses the published state for inactive cells. Keep both published
         ! fluid arrays untouched until the final Lie transaction commits.
-        IF (stochastic_flag) THEN
+        IF (rheology%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
             IF (.NOT.ALLOCATED(this%stochastic_Z_before)) THEN
                 ALLOCATE(this%stochastic_Z_before(comp_cells_x,comp_cells_y))
                 ALLOCATE(this%stochastic_effective_before(comp_cells_x,comp_cells_y))
@@ -295,7 +294,7 @@ CONTAINS
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
             stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal,rheology, &
             pore_pressure,pore_cache,mass_config,stochastic%config%stochastic_transport_flag, &
-            pore_pressure_flag,stochastic_flag)
+            pore_pressure%pore_pressure_flag,rheology%stochastic_rheology_flag)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -304,7 +303,7 @@ CONTAINS
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
             IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
-            IF (stochastic_flag) THEN
+            IF (rheology%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
                 stochastic%Z=this%stochastic_Z_before
                 stochastic%effective_Z=this%stochastic_effective_before
             END IF

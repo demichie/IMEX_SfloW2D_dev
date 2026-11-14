@@ -97,15 +97,13 @@ CONTAINS
     END SUBROUTINE collect_active_source_names
 
     !> Create Lie groups directly from physical METHOD and GROUP configuration.
-    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config, &
-        pore_enabled)
+    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config)
         TYPE(source_registry_type), INTENT(INOUT) :: registry
         CHARACTER(*), INTENT(OUT) :: error
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-        LOGICAL, INTENT(IN) :: pore_enabled
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         TYPE(source_group_type) :: g,tmp
         TYPE(source_term_type) :: term
@@ -116,7 +114,7 @@ CONTAINS
         ! A failed reconfiguration must never leave a previous registry active.
         CALL registry%finalize()
         CALL collect_active_source_names(rheology,mass_config,thermal%thermal_cooling_flag, &
-            pore_enabled,names,error)
+            pore_pressure%pore_pressure_flag,names,error)
         IF (LEN_TRIM(error)>0) RETURN
         ALLOCATE(groups(1))
         groups(1)%id=0
@@ -290,7 +288,7 @@ CONTAINS
         END DO
 
         pore=0
-        IF (pore_enabled) pore=idx_pore
+        IF (pore_pressure%pore_pressure_flag) pore=idx_pore
         CALL registry%initialize(n_eqns,pore,groups,error)
     END SUBROUTINE initialize_configured_sources
 

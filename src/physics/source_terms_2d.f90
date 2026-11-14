@@ -741,7 +741,7 @@ CONTAINS
             cell_fissure_fract,lat_arc_perim_jk,lat_n_x_jk,lat_n_y_jk,cell_area_jk,                                    &
             BTEST(group%source_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                            &
             BTEST(group%source_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                            &
-            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials)
+            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials,pore_enabled)
         expl_term=expl_term+injection_rate
 
         RETURN

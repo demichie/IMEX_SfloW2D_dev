@@ -50,9 +50,7 @@
                                     radial_source_flag, collapsing_volume_flag, &
                                     liquid_flag, gas_flag, lava_flag, subtract_init_flag, bottom_radial_source_flag,   &
                                     lateral_source_flag, serial_flag,                                                  &
-                                    bottom_fissural_source_flag, n_fissures,                                           &
-                                    stochastic_flag, &
-                                    pore_pressure_flag
+                                    bottom_fissural_source_flag, n_fissures
 
     USE parameters_2d, ONLY: slope_correction_flag, curvature_term_flag
 
@@ -290,6 +288,8 @@
     REAL(wp) :: noise_pow_val,noise_activation_velocity,length_spatial_corr
     INTEGER :: stochastic_seed
     LOGICAL :: stoch_transport_flag
+    LOGICAL :: stochastic_flag !< Legacy NEWRUN_PARAMETERS input/output staging only.
+    LOGICAL :: pore_pressure_flag !< Legacy NEWRUN_PARAMETERS input/output staging only.
 
 
     REAL(wp) :: thickness_levels0(10)
@@ -428,6 +428,19 @@
 
     CONTAINS
 
+    !> @brief Read an L1 rheology activation before allocating optional variables.
+    !> @details The complete rheology NAMELIST is validated later as before;
+    !>          this early read makes the typed L1 stochastic flag available
+    !>          when the common equation layout is first configured.
+    SUBROUTINE read_early_stochastic_rheology_activation()
+        INTEGER :: ios
+
+        IF (.NOT.rheology_flag) RETURN
+        REWIND(input_unit)
+        READ(input_unit,NML=rheology_l1_parameters,IOSTAT=ios)
+        REWIND(input_unit)
+    END SUBROUTINE read_early_stochastic_rheology_activation
+
     !> @brief Read the canonical stochastic configuration for the selected layer.
     !> @details Legacy scalar NAMELIST values are translated once into L1.
     !>          Never retain two physical coefficient objects.
@@ -450,7 +463,11 @@
         END DO
         REWIND(input_unit)
         IF (n_l2/=0) CALL fatal_error('STOCHASTIC_L2_PARAMETERS requires N_LAYERS=2')
-        IF (.NOT.stochastic_flag) RETURN
+        IF (n_legacy+n_l1==0) THEN
+            IF (rheology_l1%stochastic_rheology_flag) &
+                CALL fatal_error('Stochastic rheology requires a stochastic NAMELIST')
+            RETURN
+        END IF
         IF (n_legacy+n_l1/=1) &
             CALL fatal_error('Provide exactly one STOCHASTIC_PARAMETERS or STOCHASTIC_L1_PARAMETERS')
         IF (n_legacy==1) THEN
@@ -666,6 +683,10 @@
 
             END IF
 
+            rheology_l1%stochastic_rheology_flag=stochastic_flag
+            pore_pressure_l1%pore_pressure_flag=pore_pressure_flag
+            CALL read_early_stochastic_rheology_activation()
+
             IF (.NOT. bottom_fissural_source_flag) n_fissures = 0
 
             IF (n_solid .LT. 0) THEN
@@ -725,14 +746,11 @@
             ALLOCATE (sp_heat_g(n_add_gas))
             ALLOCATE (sp_gas_const_g(n_add_gas))
 
-            IF (stochastic_flag) THEN
-
-                CALL read_stochastic_layer_configuration()
-
-                IF (stochastic_l1%stochastic_transport_flag) n_stoch_vars = 1
-                idx_stoch = 5 + n_solid + n_add_gas
-                idx_stochEqn = idx_stoch
-
+            CALL read_stochastic_layer_configuration()
+            IF (stochastic_l1%stochastic_transport_flag) THEN
+                n_stoch_vars=1
+                idx_stoch=5+n_solid+n_add_gas
+                idx_stochEqn=idx_stoch
             END IF
 
             n_pore_legacy=0
@@ -750,13 +768,20 @@
             END DO
             REWIND(input_unit)
             IF (n_pore_l2/=0) CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
-            IF (pore_pressure_flag) THEN
+            IF (n_pore_legacy+n_pore_l1>1) &
+                CALL fatal_error('Duplicate L1 pore-pressure NAMELIST groups')
+            IF (n_pore_l1==1) THEN
+                READ(input_unit,NML=pore_pressure_l1_parameters,IOSTAT=ios)
+                IF (ios/=0) CALL fatal_error('Invalid L1 pore-pressure NAMELIST')
+                REWIND(input_unit)
+            END IF
+            IF (pore_pressure_l1%pore_pressure_flag) THEN
                 IF (n_pore_legacy+n_pore_l1/=1) &
                     CALL fatal_error('Provide exactly one PORE_PRESSURE_PARAMETERS or PORE_PRESSURE_L1_PARAMETERS')
                 IF (n_pore_legacy==1) THEN
                     READ(input_unit,NML=pore_pressure_parameters,IOSTAT=ios)
                 ELSE
-                    READ(input_unit,NML=pore_pressure_l1_parameters,IOSTAT=ios)
+                    ios=0 ! Typed L1 input was already read for activation.
                 END IF
                 IF (ios/=0) CALL fatal_error('Invalid L1 pore-pressure NAMELIST')
                 REWIND(input_unit)
@@ -781,7 +806,7 @@
                 END SELECT
 
             ELSE
-                IF (n_pore_legacy+n_pore_l1/=0) &
+                IF (n_pore_legacy/=0) &
                     CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
                 n_pore_vars = 0
 
@@ -1102,6 +1127,10 @@
             REWIND (input_unit)
 
         END IF
+
+        rheology_l1%stochastic_rheology_flag=stochastic_flag
+        pore_pressure_l1%pore_pressure_flag=pore_pressure_flag
+        CALL read_early_stochastic_rheology_activation()
 
         IF (n_solid .LT. 0) THEN
 
@@ -1439,21 +1468,11 @@
 
         ! ----------- READ stochastic_parameters NAMELIST --------------------------
 
-        IF (stochastic_flag) THEN
-
-            CALL read_stochastic_layer_configuration()
-
-            IF (stochastic_l1%stochastic_transport_flag) THEN
-
-                n_stoch_vars = 1
-                n_vars = n_vars + 1
-
-            END IF
-
-        ELSE
-
-            n_stoch_vars = 0
-
+        CALL read_stochastic_layer_configuration()
+        n_stoch_vars=0
+        IF (stochastic_l1%stochastic_transport_flag) THEN
+            n_stoch_vars=1
+            n_vars=n_vars+1
         END IF
 
         ! The canonical single-layer Darcy NAMELIST is selected exactly once.
@@ -1472,20 +1491,27 @@
         END DO
         REWIND(input_unit)
         IF (n_pore_l2/=0) CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
-        IF (pore_pressure_flag) THEN
+        IF (n_pore_legacy+n_pore_l1>1) &
+            CALL fatal_error('Duplicate L1 pore-pressure NAMELIST groups')
+        IF (n_pore_l1==1) THEN
+            READ(input_unit,NML=pore_pressure_l1_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('Invalid L1 pore-pressure NAMELIST')
+            REWIND(input_unit)
+        END IF
+        IF (pore_pressure_l1%pore_pressure_flag) THEN
             IF (n_pore_legacy+n_pore_l1/=1) &
                 CALL fatal_error('Provide exactly one PORE_PRESSURE_PARAMETERS or PORE_PRESSURE_L1_PARAMETERS')
             IF (n_pore_legacy==1) THEN
                 READ(input_unit,NML=pore_pressure_parameters,IOSTAT=ios)
             ELSE
-                READ(input_unit,NML=pore_pressure_l1_parameters,IOSTAT=ios)
+                ios=0 ! Typed L1 input was already read for activation.
             END IF
             IF (ios/=0) CALL fatal_error('ERROR: invalid L1 pore-pressure NAMELIST')
             REWIND(input_unit)
             n_pore_vars=1
             n_vars=n_vars+1
         ELSE
-            IF (n_pore_legacy+n_pore_l1/=0) &
+            IF (n_pore_legacy/=0) &
                 CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
             n_pore_vars=0
         END IF
@@ -2395,7 +2421,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
+            IF (stochastic_l1%stochastic_transport_flag) THEN
 
                 IF (ANY(stoch_bcW(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2410,7 +2436,7 @@
 
             END IF
 
-            IF (pore_pressure_flag) THEN
+            IF (pore_pressure_l1%pore_pressure_flag) THEN
 
                 IF (ANY(pore_bcW(1:n_pore_vars)%flag .EQ. -1)) THEN
 
@@ -2525,7 +2551,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
+            IF (stochastic_l1%stochastic_transport_flag) THEN
 
                 IF (ANY(stoch_bcE(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2540,7 +2566,7 @@
 
             END IF
 
-            IF (pore_pressure_flag) THEN
+            IF (pore_pressure_l1%pore_pressure_flag) THEN
 
                 IF (ANY(pore_bcE(1:n_pore_vars)%flag .EQ. -1)) THEN
 
@@ -2657,7 +2683,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
+            IF (stochastic_l1%stochastic_transport_flag) THEN
 
                 IF (ANY(stoch_bcS(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2672,7 +2698,7 @@
 
             END IF
 
-            IF (pore_pressure_flag) THEN
+            IF (pore_pressure_l1%pore_pressure_flag) THEN
 
                 IF (ANY(pore_bcS(1:n_pore_vars)%flag .EQ. -1)) THEN
 
@@ -2785,7 +2811,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
+            IF (stochastic_l1%stochastic_transport_flag) THEN
 
                 IF (ANY(stoch_bcN(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2800,7 +2826,7 @@
 
             END IF
 
-            IF (pore_pressure_flag) THEN
+            IF (pore_pressure_l1%pore_pressure_flag) THEN
 
                 IF (ANY(pore_bcN(1:n_pore_vars)%flag .EQ. -1)) THEN
 
@@ -2845,7 +2871,7 @@
         bcS(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcS(1:n_add_gas)
         bcN(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcN(1:n_add_gas)
 
-        IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
+        IF (stochastic_l1%stochastic_transport_flag) THEN
 
             bcW(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcW(1:n_stoch_vars)
             bcE(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcE(1:n_stoch_vars)
@@ -2854,7 +2880,7 @@
 
         END IF
 
-        IF (pore_pressure_flag) THEN
+        IF (pore_pressure_l1%pore_pressure_flag) THEN
 
             bcW(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
                     n_pore_vars) = pore_bcW(1:n_pore_vars)
@@ -3835,7 +3861,7 @@
                 REWIND (input_unit)
 
                 ! Pore-pressure production belongs to the active injection source.
-                IF (pore_pressure_flag .AND. &
+                IF (pore_pressure_l1%pore_pressure_flag .AND. &
                     (radial_source_flag .OR. bottom_radial_source_flag .OR. bottom_fissural_source_flag)) THEN
                     IF (pore_pres_fract <= 0.0_wp) THEN
                         WRITE (*, *) 'ERROR: problem with namelist ', TRIM(source_name)
@@ -4707,7 +4733,7 @@
         ! ------- READ stochastic_parameters NAMELIST ---------------------------------
         REWIND (input_unit)
 
-        IF (stochastic_flag) THEN
+        IF (rheology_l1%stochastic_rheology_flag .OR. stochastic_l1%stochastic_transport_flag) THEN
 
             WRITE (*, *) ' '
             WRITE (*, *) 'START PARSING THE STOCASTIC PARAMETERS...'
@@ -4862,6 +4888,8 @@
 
         OPEN (backup_unit, file=bak_name, status='replace', delim='quote')
 
+        stochastic_flag=rheology_l1%stochastic_rheology_flag
+        pore_pressure_flag=pore_pressure_l1%pore_pressure_flag
         WRITE (backup_unit, run_parameters)
 
         IF (restart) THEN
@@ -4927,7 +4955,7 @@
             WRITE (backup_unit, radial_source_parameters)
         IF (bottom_fissural_source_flag) WRITE (backup_unit, fissural_source_parameters)
 
-        IF (stochastic_flag) THEN
+        IF (rheology_l1%stochastic_rheology_flag .OR. stochastic_l1%stochastic_transport_flag) THEN
             sym_noise=stochastic_l1%sym_noise
             std_max=stochastic_l1%std_max
             tau_stochastic=stochastic_l1%tau_stochastic
@@ -4939,7 +4967,7 @@
             WRITE(backup_unit,stochastic_parameters)
         END IF
 
-        IF (pore_pressure_flag) WRITE (backup_unit, pore_pressure_parameters)
+        IF (pore_pressure_l1%pore_pressure_flag) WRITE (backup_unit, pore_pressure_parameters)
 
         IF (output_runout_flag) WRITE (backup_unit, runout_parameters)
 
@@ -8005,7 +8033,7 @@
         USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                             &
                                             n_pore_vars
         USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
-        USE parameters_2d, ONLY: stochastic_flag, gas_flag, liquid_flag, lava_flag
+        USE parameters_2d, ONLY: gas_flag, liquid_flag, lava_flag
 
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN) :: filename
@@ -8033,7 +8061,8 @@
             comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars,                                                    &
             n_pore_vars, n_thickness_levels, n_dyn_pres_levels
         CALL check_restart_io(ierr, io_message, 'writing dimensions to', filename)
-        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_flag,                                               &
+        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) &
+            (rheology_l1%stochastic_rheology_flag .OR. stochastic_l1%stochastic_transport_flag), &
             substrate%topo_change_flag, gas_flag, liquid_flag, lava_flag
         CALL check_restart_io(ierr, io_message, 'writing model flags to', filename)
 
@@ -8072,7 +8101,8 @@
         CALL check_restart_io(ierr, io_message, 'writing stochastic field to', filename)
 
         seed_size = 0
-        IF (stochastic_flag) CALL random_seed(SIZE=seed_size)
+        IF (rheology_l1%stochastic_rheology_flag .OR. &
+            stochastic_l1%stochastic_transport_flag) CALL random_seed(SIZE=seed_size)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
         CALL check_restart_io(ierr, io_message, 'writing random-seed size to', filename)
 
@@ -8139,7 +8169,7 @@
         USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,                                             &
                                             n_pore_vars
         USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
-        USE parameters_2d, ONLY: stochastic_flag, gas_flag, liquid_flag, lava_flag
+        USE parameters_2d, ONLY: gas_flag, liquid_flag, lava_flag
         USE geometry_2d, ONLY: refresh_topography_geometry
 
         IMPLICIT NONE
@@ -8206,7 +8236,8 @@
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_check,                                               &
             topo_change_check, gas_check, liquid_check, lava_check
         CALL check_restart_io(ierr, io_message, 'reading model flags from', filename)
-        IF ((stochastic_check .NEQV. stochastic_flag) .OR.                                                             &
+        IF ((stochastic_check .NEQV. &
+                (rheology_l1%stochastic_rheology_flag .OR. stochastic_l1%stochastic_transport_flag)) .OR. &
             (topo_change_check .NEQV. substrate%topo_change_flag) .OR. &
             (gas_check .NEQV. gas_flag) .OR.                                                                           &
             (liquid_check .NEQV. liquid_flag) .OR.                                                                     &
@@ -8255,8 +8286,10 @@
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
         CALL check_restart_io(ierr, io_message, 'reading random-seed size from', filename)
-        IF ((stochastic_flag .AND. seed_size <= 0) .OR.                                                                &
-            ((.NOT. stochastic_flag) .AND. seed_size /= 0)) THEN
+        IF (((rheology_l1%stochastic_rheology_flag .OR. &
+            stochastic_l1%stochastic_transport_flag) .AND. seed_size <= 0) .OR. &
+            ((.NOT.(rheology_l1%stochastic_rheology_flag .OR. &
+            stochastic_l1%stochastic_transport_flag)) .AND. seed_size /= 0)) THEN
             WRITE(*,*) 'ERROR: Invalid random-seed state in restart:', seed_size
             ERROR STOP 1
 

@@ -44,7 +44,7 @@ PROGRAM test_state_equivalence
     CALL check_dry_decoder_limits
     CALL check_settling_trace_equivalence
     CALL check_volume_conversion_equivalence
-    CALL check_optional_slots_independent_of_global_flags
+    CALL check_optional_slots_without_activation_gate
     WRITE(*,'(A)') 'PASS: state equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
@@ -250,12 +250,11 @@ CONTAINS
 
     !> Both layers use the same structural slots, even when a particular layer
     !> has its stochastic transport or Darcy physics disabled.
-    SUBROUTINE check_optional_slots_independent_of_global_flags
+    SUBROUTINE check_optional_slots_without_activation_gate
         COMPLEX(wp) :: cqp(n_vars),cq_local(n_vars),cdecoded(n_vars)
         LOGICAL :: accepted
 
         CALL make_qp(2.0_wp,350.0_wp,1.5_wp,-0.25_wp,0.15_wp,0.10_wp,0.05_wp,qp)
-        pore_pressure_flag=.FALSE.
         CALL primitive_to_conservative(qp,q,accepted)
         IF (.NOT.accepted) ERROR STOP 'inactive optional-slot REAL encoding rejected'
         CALL conservative_to_primitive(q,qp_new,accepted)
@@ -292,8 +291,7 @@ CONTAINS
         IF (.NOT.accepted) ERROR STOP 'zero optional slots rejected'
         IF (q(idx_stoch)/=0.0_wp .OR. q(idx_pore)/=0.0_wp) &
             ERROR STOP 'inactive optional slots failed to remain zero'
-        pore_pressure_flag=.TRUE.
-    END SUBROUTINE check_optional_slots_independent_of_global_flags
+    END SUBROUTINE check_optional_slots_without_activation_gate
 
     SUBROUTINE make_qp(h,T,u,v,xs1,xs2,xg1,out)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1

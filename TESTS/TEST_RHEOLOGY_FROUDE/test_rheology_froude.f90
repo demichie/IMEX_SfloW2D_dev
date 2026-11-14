@@ -40,7 +40,7 @@ PROGRAM test_rheology_froude
   rho_a_amb = rho_m
 
   DO mode = 0, 1
-     stochastic_flag = mode == 1
+     rheo_config%stochastic_rheology_flag = mode == 1
      CALL make_state(1.0_wp, T_ambient, 0.0_wp, 3.0_wp, -4.0_wp)
      CALL assert_zero_source('moving neutral gas', 0.0_wp, 0.0_wp)
 
@@ -80,7 +80,7 @@ PROGRAM test_rheology_froude
   IF (g_reduced <= 0.0_wp) ERROR STOP 'dense fixture has no buoyancy load'
   DO mode = 0, 5
      slope_correction_flag = MOD(mode, 2) == 1
-     stochastic_flag = mode >= 2
+     rheo_config%stochastic_rheology_flag = mode >= 2
      slope_x = 0.35_wp
      slope_y = -0.22_wp
      G = 1.0_wp
@@ -92,14 +92,14 @@ PROGRAM test_rheology_froude
      z = 0.2_wp
      IF (mode >= 4) z = -100.0_wp
      Fr = speed/SQRT(g_reduced*qp(1))
-     IF (stochastic_flag) Fr = MAX(0.0_wp, Fr + z)
+     IF (rheo_config%stochastic_rheology_flag) Fr = MAX(0.0_wp, Fr + z)
      friction = rho_m*qp(1)*G*g_reduced                              &
           * (rheo_config%mu_inf + (rheo_config%mu_0 - rheo_config%mu_inf)*EXP(-Fr/rheo_config%Fr_0))
      expected = 0.0_wp
      expected(2:3) = -friction*[3.0_wp, -4.0_wp]/5.0_wp
      source=0.0_wp
      CALL build_physical_state_from_qp(qp,local_state,slope_x,slope_y,0.0_wp,0.0_wp,0.0_wp)
-     CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,G,stochastic_flag,z, &
+     CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,G,rheo_config%stochastic_rheology_flag,z, &
           source(2),source(3))
      CALL assert_finite(source)
      IF (MAXVAL(ABS(source-expected)) >                             &
@@ -172,7 +172,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: bx, by
     source=0.0_wp
     CALL build_physical_state_from_qp(qp,local_state,bx,by,0.0_wp,0.0_wp,0.0_wp)
-    CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,1.0_wp,stochastic_flag, &
+    CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,1.0_wp,rheo_config%stochastic_rheology_flag, &
          0.2_wp,source(2),source(3))
     CALL assert_finite(source)
     IF (ANY(source /= 0.0_wp)) THEN

@@ -3,14 +3,14 @@ PROGRAM test_source_registry
   USE layer_contacts_2d, ONLY : layer_contacts_type, evaluate_layer_contacts
   USE source_registry_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
-  USE rheology_parameters_2d, ONLY : rheology_l1
+  USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
   USE thermal_parameters_2d, ONLY : thermal_l1, thermal_l2,                                              &
           thermal_radiative_coefficient, thermal_convective_coefficient
   USE thermal_laws_2d, ONLY : eval_thermal_implicit_temperature
   USE source_input_2d
   USE parameters_2d
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
-  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
   TYPE(source_registry_type) :: registry
@@ -24,7 +24,7 @@ PROGRAM test_source_registry
   idx_totMassEqn=1;idx_uEqn=2;idx_vEqn=3;idx_engyEqn=4
   idx_pore=0;idx_poreEqn=0
   rheology_flag=.TRUE.;rheology_l1%rheology_model='voellmy'
-  thermal_l1%thermal_cooling_flag=.TRUE.;pore_pressure_flag=.FALSE.
+  thermal_l1%thermal_cooling_flag=.TRUE.;pore_pressure_l1%pore_pressure_flag=.FALSE.
   curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
   bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
   lateral_source_flag=.FALSE.;mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
@@ -34,6 +34,11 @@ PROGRAM test_source_registry
   mass_exchange_l1%erosion%coefficient=-1.0_wp
   rheology_l1%rheology_method='NEWTON';thermal_l1%thermal_method='NEWTON'
   rheology_l1%rheology_group=1;thermal_l1%thermal_group=1
+  ! The layer-specific rheology stochastic switches are independent.
+  rheology_l1%stochastic_rheology_flag=.FALSE.
+  rheology_l2%stochastic_rheology_flag=.TRUE.
+  CALL require(.NOT.rheology_l1%stochastic_rheology_flag .AND. rheology_l2%stochastic_rheology_flag, &
+       'independent stochastic rheology activation per layer')
   ! Keep the automatically active liquid-loss source in explicit GROUP 0.
   ! This fixture tests only coupling/separation of the Newton source groups.
   mass_exchange_l1%method='EXPLICIT';mass_exchange_l1%group=0
@@ -90,7 +95,7 @@ PROGRAM test_source_registry
   CALL require(ALL(source_newton_affected_equations('thermal_cooling')==[4]), &
        'thermal footprint')
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'configure coupled Newton group: '//TRIM(error))
   groups=registry%groups()
   CALL require(SIZE(groups)==2,'group zero plus coupled group')
@@ -112,7 +117,7 @@ PROGRAM test_source_registry
   CALL registry%finalize()
   thermal_l1%thermal_group=2
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'separated Newton groups')
   groups=registry%groups()
   CALL require(SIZE(groups)==3,'three ordered Lie groups')
@@ -125,7 +130,7 @@ PROGRAM test_source_registry
   CALL registry%finalize()
   thermal_l1%thermal_method='ANALYTIC'
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'mixed Newton/analytic groups')
   groups=registry%groups()
   CALL require(groups(3)%method==SOURCE_METHOD_ANALYTIC,'analytic method preserved')
@@ -139,7 +144,7 @@ PROGRAM test_source_registry
   thermal_l1%thermal_group=1
   bottom_fissural_source_flag=.TRUE.
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'Etna liquid-carrier lava configuration: '//TRIM(error))
   groups=registry%groups()
   CALL require(group_contains_name(groups(1),'bottom_fissural_injection'), &
@@ -149,25 +154,30 @@ PROGRAM test_source_registry
   CALL require(group_contains_name(groups(2),'thermal_cooling'), &
        'Etna thermal cooling in Newton group')
   CALL registry%finalize()
-  ! Darcy selection is independent of the global flag when the shared layout
-  ! already contains the pore-pressure equation.
+  ! The selected L1 configuration alone determines Darcy registration,
+  ! even if L2 enables Darcy in the common structural layout.
   rheology_flag=.FALSE.
   thermal_l1%thermal_cooling_flag=.FALSE.
   bottom_fissural_source_flag=.FALSE.
   n_eqns=5; n_vars=5; idx_pore=5; idx_poreEqn=5
-  pore_pressure_flag=.FALSE.
+  pore_pressure_l1%pore_pressure_flag=.TRUE.
+  pore_pressure_l2%pore_pressure_flag=.FALSE.
   pore_pressure_l1%pore_pressure_method='ANALYTIC'
   pore_pressure_l1%pore_pressure_group=3
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,.TRUE.)
-  CALL require(LEN_TRIM(error)==0,'selected Darcy source with global flag off: '//TRIM(error))
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+  CALL require(LEN_TRIM(error)==0,'selected L1 Darcy source: '//TRIM(error))
   groups=registry%groups()
   CALL require(SIZE(groups)==2,'Darcy source added to shared layout')
   CALL require(group_contains_name(groups(2),'pore_pressure_dissipation'), &
-       'local Darcy source registered independently of global flag')
+       'local Darcy source registered from L1 configuration')
   CALL registry%finalize()
+  pore_pressure_l1%pore_pressure_flag=.FALSE.
+  pore_pressure_l2%pore_pressure_flag=.TRUE.
+  CALL require(.NOT.pore_pressure_l1%pore_pressure_flag .AND. pore_pressure_l2%pore_pressure_flag, &
+       'independent Darcy activation per layer')
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,.FALSE.)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
   CALL require(LEN_TRIM(error)==0,'unselected Darcy in shared layout: '//TRIM(error))
   groups=registry%groups()
   CALL require(SIZE(groups)==1,'unselected Darcy has no source group')

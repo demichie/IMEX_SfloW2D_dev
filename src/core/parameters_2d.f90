@@ -107,14 +107,6 @@ MODULE parameters_2d
     !> Remove transported flow material entering the identified sea zone.
     LOGICAL :: sea_mass_removal_flag = .FALSE.
 
-    LOGICAL :: pore_pressure_flag
-
-    !> Flag for stochastic friction model
-    !> - T      => we use stochastic friction model
-    !> - F      => we use deterministic friction model
-    !> .
-    LOGICAL :: stochastic_flag
-
     !> Flag to use the Sutherland's law for gas viscosity
     !> - T     => use Sutherland's law
     !> - F     => do not use

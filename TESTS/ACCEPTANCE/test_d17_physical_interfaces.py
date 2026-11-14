@@ -125,7 +125,7 @@ def main() -> int:
             "failed source reconfiguration may retain the previous registry", failures)
     require("SUM(q_cell(idx_add_gas_first:idx_add_gas_last))" in state,
             "missing additional-gas fraction admissibility", failures)
-    require("stochastic_flag, stochastic_value, rheology_rate" in assembly,
+    require("stochastic_enabled, stochastic_value, rheology_rate" in assembly,
             "explicit rheology must receive cell stochastic value", failures)
 
     removed = (

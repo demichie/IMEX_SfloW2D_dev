@@ -178,7 +178,7 @@ PROGRAM test_spatial_operator
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &
              0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp,materials=materials,thermal=thermal_l1, &
              rheology=rheology_l1, &
-             pore_enabled=pore_pressure_flag,stochastic_enabled=stochastic_flag)
+             pore_enabled=pore_pressure_l1%pore_pressure_flag,stochastic_enabled=rheology_l1%stochastic_rheology_flag)
      END DO
   END DO
   IF (.NOT.ALL(ieee_is_finite(cell_sources))) ERROR STOP 'nonfinite local source'
@@ -435,7 +435,7 @@ CONTAINS
     CALL configure_canonical_state_indices()
     liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
-    stochastic_flag=.FALSE.; pore_pressure_flag=.FALSE.
+    rheology_l1%stochastic_rheology_flag=.FALSE.; pore_pressure_l1%pore_pressure_flag=.FALSE.
     pore_pressure_l1%gas_loss_flag=.FALSE.
     mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
     mass_exchange_l1%entrainment%flag=.FALSE.
