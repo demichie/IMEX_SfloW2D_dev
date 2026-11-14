@@ -10,7 +10,6 @@ MODULE state_conversions
     USE parameters_2d, ONLY : idx_add_gas_first, idx_add_gas_last, idx_u, idx_v
     USE parameters_2d, ONLY : idx_stoch, idx_pore
     USE parameters_2d, ONLY : eps_sing, eps_sing4
-    USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag
     USE state_mixture, ONLY : evaluate_mixture, evaluate_mixture_heat_capacity, evaluate_mixture_density
     USE constitutive_parameters_2d, ONLY : T_ambient
     USE state_composition, ONLY : close_composition
@@ -73,8 +72,8 @@ CONTAINS
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=xs
         qp(idx_add_gas_first:idx_add_gas_last)=xg
-        IF (stoch_transport_flag) qp(idx_stoch)=q(idx_stoch)/mass
-        IF (pore_pressure_flag) qp(idx_pore)=q(idx_pore)/mass
+        IF (idx_stoch>0) qp(idx_stoch)=q(idx_stoch)/mass
+        IF (idx_pore>0) qp(idx_pore)=q(idx_pore)/mass
         qp(idx_u)=u
         qp(idx_v)=v
         IF (PRESENT(p_dyn)) p_dyn=0.5_wp*rho_m*(u*u+v*v)
@@ -122,8 +121,8 @@ CONTAINS
         qp(idx_T)=T
         qp(idx_solid_first:idx_solid_last)=xs
         qp(idx_add_gas_first:idx_add_gas_last)=xg
-        IF (stoch_transport_flag) qp(idx_stoch)=q(idx_stoch)/mass
-        IF (pore_pressure_flag) qp(idx_pore)=q(idx_pore)/mass
+        IF (idx_stoch>0) qp(idx_stoch)=q(idx_stoch)/mass
+        IF (idx_pore>0) qp(idx_pore)=q(idx_pore)/mass
         qp(idx_u)=u
         qp(idx_v)=v
         IF (PRESENT(p_dyn)) p_dyn=0.5_wp*rho_m*(u*u+v*v)

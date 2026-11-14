@@ -216,6 +216,19 @@ single-layer/global flags and are **not yet migrated** to independent L2
 activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
 TL07/TL13, preserving accepted single-layer inputs and budgets.
 
+**Optional-slot state conversion (14 November 2026, CI pending).**
+The canonical REAL/COMPLEX conservative-to-primitive, primitive-to-
+conservative and physical-state constructors read optional stochastic and
+pore-pressure components based only on their canonical nonzero indices.
+The global single-layer activation flags no longer gate these cell-local
+conversions. When a slot is absent (index zero) it is not accessed; when
+present it is decoded from the supplied local state, including a zero
+component for an inactive layer. Activation and zero preservation remain
+the responsibility of the numerical state/source owners; no per-layer
+flags, metadata copies or new conversion arguments are introduced.
+The state-equivalence regression now checks REAL/COMPLEX optional slots
+with legacy global flags disabled, including zero-valued inactive slots.
+
 **Mass-exchange optional-component routing (14 November 2026, CI pending).**
 The combined mass-exchange kernel now receives the selected layer's
 stochastic-transport and Darcy activations through the existing numerical Lie

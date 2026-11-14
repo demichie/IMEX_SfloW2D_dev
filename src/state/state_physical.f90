@@ -8,7 +8,7 @@ MODULE state_physical
     USE parameters_2d, ONLY : idx_h, idx_T, idx_solid_first, idx_solid_last
     USE parameters_2d, ONLY : idx_add_gas_first, idx_add_gas_last, idx_u, idx_v
     USE parameters_2d, ONLY : idx_stoch, idx_pore
-    USE parameters_2d, ONLY : stoch_transport_flag, pore_pressure_flag, liquid_flag, lava_flag
+    USE parameters_2d, ONLY : liquid_flag, lava_flag
     USE parameters_2d, ONLY : slope_correction_flag, curvature_term_flag
     USE parameters_2d, ONLY : eps_sing, eps_sing4, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE constitutive_parameters_2d, ONLY : rho_a_amb, sp_heat_a, sp_heat_l, grav, T_ambient
@@ -110,8 +110,8 @@ CONTAINS
         state%xs=xs; state%xg=xg; state%rho_m=rho_m; state%inv_rhom=inv_rho_m
         state%rho_c=rho_c; state%inv_rho_c=inv_rho_c; state%cp_m=cp_m; state%cp_c=cp_c
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
-        IF (stoch_transport_flag) state%Zs=q(idx_stoch)/mass
-        IF (pore_pressure_flag) state%exc_pore_pres=q(idx_pore)/mass
+        IF (idx_stoch>0) state%Zs=q(idx_stoch)/mass
+        IF (idx_pore>0) state%exc_pore_pres=q(idx_pore)/mass
         state%red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         geometry=0.0_wp
         IF (PRESENT(bx)) geometry(1)=bx; IF (PRESENT(by)) geometry(2)=by
@@ -146,8 +146,8 @@ CONTAINS
         mass=q(1); state%xs=0.0_wp; state%xg=0.0_wp
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (REAL(mass,wp) < 0.0_wp) RETURN
-        IF (stoch_transport_flag .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%Zs=q(idx_stoch)/mass
-        IF (pore_pressure_flag .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%exc_pore_pres=q(idx_pore)/mass
+        IF (idx_stoch>0 .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%Zs=q(idx_stoch)/mass
+        IF (idx_pore>0 .AND. REAL(mass,wp)>EPSILON(1.0_wp)) state%exc_pore_pres=q(idx_pore)/mass
 
         IF (REAL(mass,wp)>EPSILON(1.0_wp)) THEN
             IF (REAL(q(idx_engyEqn),wp)<=0.0_wp) RETURN
@@ -204,8 +204,8 @@ CONTAINS
         state%xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (state%h < 0.0_wp) RETURN
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
-        IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
-        IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
+        IF (idx_stoch>0) state%Zs=qp(idx_stoch)
+        IF (idx_pore>0) state%exc_pore_pres=qp(idx_pore)
 
         IF (state%h <= EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
@@ -257,8 +257,8 @@ CONTAINS
         state%xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (REAL(state%h,wp) < 0.0_wp) RETURN
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
-        IF (stoch_transport_flag) state%Zs=qp(idx_stoch)
-        IF (pore_pressure_flag) state%exc_pore_pres=qp(idx_pore)
+        IF (idx_stoch>0) state%Zs=qp(idx_stoch)
+        IF (idx_pore>0) state%exc_pore_pres=qp(idx_pore)
 
         IF (REAL(state%h,wp) <= EPSILON(1.0_wp)) THEN
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
