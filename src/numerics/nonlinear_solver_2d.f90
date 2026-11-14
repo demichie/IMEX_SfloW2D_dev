@@ -40,10 +40,11 @@ CONTAINS
     !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
         stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace,            &
-        real_workspace,thermal,rheology)
+        real_workspace,thermal,rheology,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,grav_correction,stochastic_value
         INTEGER, INTENT(OUT) :: iterations_used,linear_info
@@ -84,7 +85,7 @@ CONTAINS
             CALL initialize_physical_state_real(local_real_workspace)
         END IF
         CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y,grav_correction,stochastic_value, &
-            semi_rate,active_real_workspace,rheology)
+            semi_rate,active_real_workspace,rheology,pore_enabled,stochastic_enabled)
         semi_scale=1.0_wp
 
         DO i=2,3
@@ -118,7 +119,7 @@ CONTAINS
         END IF
         CALL solve_newton_group(source_group, source_group%equation_ids, q_cell, q_si, dt, Bprime_x, Bprime_y,         &
             stochastic_value, coeff_f, tol_abs, tol_rel, iterations_used, converged, linear_info, line_search_failed,  &
-            active_workspace,active_real_workspace,thermal,rheology)
+            active_workspace,active_real_workspace,thermal,rheology,stochastic_enabled)
         IF (.NOT.converged) q_cell=q_in
     END SUBROUTINE solve_backward_euler_group
 
@@ -142,7 +143,7 @@ CONTAINS
     !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE solve_newton_group(source_group, group_equations, qj, q_group_input, dt_step, Bprimej_x, Bprimej_y, Zij,&
         coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed,           &
-        implicit_scratch, real_scratch,thermal,rheology)
+        implicit_scratch, real_scratch,thermal,rheology,stochastic_enabled)
 
 
     IMPLICIT NONE
@@ -150,6 +151,7 @@ CONTAINS
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         INTEGER, INTENT(IN) :: group_equations(:)
         REAL(wp), INTENT(INOUT) :: qj(n_vars)
         REAL(wp), INTENT(IN) :: q_group_input(n_vars), dt_step
@@ -189,7 +191,7 @@ CONTAINS
             iterations_used = iterations_used + 1
             IF (.NOT.residual_ready) THEN
                 CALL eval_f(qj, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,        &
-                    group_equations, source_group, real_scratch, evaluation_ok,thermal,rheology)
+                    group_equations, source_group, real_scratch, evaluation_ok,thermal,rheology,stochastic_enabled)
                 IF (.NOT.evaluation_ok) THEN
                     line_search_failed=.TRUE.
                     RETURN
@@ -207,7 +209,7 @@ CONTAINS
             END IF
 
             CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,               &
-                group_equations, source_group, implicit_scratch, evaluation_ok,thermal,rheology)
+                group_equations, source_group, implicit_scratch, evaluation_ok,thermal,rheology,stochastic_enabled)
             IF (.NOT.evaluation_ok) THEN
                 line_search_failed=.TRUE.
                 RETURN
@@ -254,7 +256,7 @@ CONTAINS
                 stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
                 CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,      &
                     scal_f, right_term, stpmax, check, dt_step, Bprimej_x, Bprimej_y, Zij, group_equations,            &
-                    source_group, implicit_scratch, real_scratch,thermal,rheology)
+                    source_group, implicit_scratch, real_scratch,thermal,rheology,stochastic_enabled)
 
                 IF (check) THEN
                     line_search_failed = .TRUE.
@@ -272,7 +274,7 @@ CONTAINS
                 END DO
 
                 CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,  &
-                    group_equations, source_group, real_scratch, evaluation_ok,thermal,rheology)
+                    group_equations, source_group, real_scratch, evaluation_ok,thermal,rheology,stochastic_enabled)
                 IF (.NOT.evaluation_ok) THEN
                     line_search_failed=.TRUE.
                     RETURN
@@ -577,7 +579,7 @@ CONTAINS
     !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE lnsrch(qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,   &
         scal_f, right_term, stpmax, check, dt_step , Bprimej_x , Bprimej_y, Zij, active_equations, source_group, &
-        implicit_scratch, real_scratch,thermal,rheology)
+        implicit_scratch, real_scratch,thermal,rheology,stochastic_enabled)
 
     IMPLICIT NONE
 
@@ -629,6 +631,7 @@ CONTAINS
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
         TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
         REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
@@ -712,7 +715,7 @@ CONTAINS
             END DO
 
             CALL eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,      &
-                active_equations, source_group, real_scratch, evaluation_ok,thermal,rheology)
+                active_equations, source_group, real_scratch, evaluation_ok,thermal,rheology,stochastic_enabled)
 
             ! An invalid thermal or physical reconstruction is not an Armijo
             ! value. Retry a shorter step without using the fallback rate.
@@ -844,7 +847,7 @@ CONTAINS
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y , f_nl , scal_f, Zij,             &
-        active_equations, source_group, real_scratch, accepted,thermal,rheology)
+        active_equations, source_group, real_scratch, accepted,thermal,rheology,stochastic_enabled)
 
 
     IMPLICIT NONE
@@ -865,6 +868,7 @@ CONTAINS
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         TYPE(physical_state_real), INTENT(INOUT) :: real_scratch
         LOGICAL, INTENT(OUT) :: accepted
 
@@ -877,7 +881,7 @@ CONTAINS
         REAL(wp), VOLATILE :: delta_q(n_vars)
 
         CALL eval_source_implicit_real(Bprimej_x,Bprimej_y,Zij,qj,nh_term_impl,source_group, &
-            real_scratch,accepted,thermal,rheology)
+            real_scratch,accepted,thermal,rheology,stochastic_enabled)
         f_nl=0.0_wp
         scal_f=0.0_wp
         IF (.NOT.accepted) RETURN
@@ -928,7 +932,7 @@ CONTAINS
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
     SUBROUTINE eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,                 &
-        active_equations, source_group, implicit_scratch, accepted,thermal,rheology)
+        active_equations, source_group, implicit_scratch, accepted,thermal,rheology,stochastic_enabled)
 
 
     IMPLICIT NONE
@@ -948,6 +952,7 @@ CONTAINS
         TYPE(source_group_type), INTENT(IN) :: source_group
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         TYPE(physical_state_complex), INTENT(INOUT) :: implicit_scratch
         LOGICAL, INTENT(OUT) :: accepted
 
@@ -987,7 +992,7 @@ CONTAINS
 
             CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij, c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,    &
                 group=source_group, physical_scratch=implicit_scratch, accepted=accepted,thermal=thermal, &
-                    rheology=rheology)
+                    rheology=rheology,stochastic_enabled=stochastic_enabled)
             IF (.NOT.accepted) RETURN
 
             ! Assemble only the active Jacobian rows; inactive rows remain zero.

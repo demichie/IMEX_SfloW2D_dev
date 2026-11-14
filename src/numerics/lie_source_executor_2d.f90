@@ -647,7 +647,7 @@ CONTAINS
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
                         cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
                         iterations, ok, linear_info, failed, executor%source_complex_scratch(tid),                    &
-                        executor%source_physical_scratch(tid),thermal,rheology)
+                        executor%source_physical_scratch(tid),thermal,rheology,pore_enabled,stochastic_enabled)
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

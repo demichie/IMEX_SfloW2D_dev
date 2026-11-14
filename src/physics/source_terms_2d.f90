@@ -452,14 +452,17 @@ CONTAINS
     !> Evaluate the frozen semi-implicit contribution of one Newton Lie group.
     !> All inputs refer to one cell; no domain indices or shared-state writes.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] pore_enabled Selected layer Darcy activation.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE eval_source_semi_implicit(group,q_cell,Bprime_x,Bprime_y,                                               &
-            grav_correction,stochastic_value,rate,physical_scratch,rheology)
+            grav_correction,stochastic_value,rate,physical_scratch,rheology,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(physical_state_real), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
 
@@ -479,15 +482,16 @@ CONTAINS
         CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                      &
             0.0_wp,0.0_wp,0.0_wp)
         CALL eval_rheology_semi_implicit_id(rheology,group%rheology_id,physical_state, &
-            grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
+            grav_correction,pore_enabled,stochastic_enabled,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
 
     !> Evaluate the REAL implicit source directly for Newton residuals.
     !> The source formulas are identical to those used by COMPLEX Jacobians.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted, &
-            thermal,rheology)
+            thermal,rheology,stochastic_enabled)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,Zij,q_cell(n_vars)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
@@ -498,6 +502,7 @@ CONTAINS
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -530,7 +535,7 @@ CONTAINS
         END IF
         IF (group%rheology_implicit) THEN
             CALL eval_rheology_implicit_real_id(rheology,group%rheology_id,physical_state, &
-                stochastic_flag,Zij,rate(2:3))
+                stochastic_enabled,Zij,rate(2:3))
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit_real(SOURCE_ID_THERMAL_COOLING,physical_state, &
@@ -543,8 +548,9 @@ CONTAINS
     !> The real residual uses the distinct eval_source_implicit_real contract.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
     SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted, &
-            thermal,rheology)
+            thermal,rheology,stochastic_enabled)
         REAL(wp), INTENT(IN) :: Bprimej_x,Bprimej_y,Zij
         COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
         COMPLEX(wp), INTENT(OUT) :: c_nh_term_impl(n_eqns)
@@ -556,6 +562,7 @@ CONTAINS
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -589,7 +596,7 @@ CONTAINS
         END IF
         IF (group%rheology_implicit) THEN
             CALL eval_rheology_implicit_id(rheology,group%rheology_id,physical_state, &
-                stochastic_flag,Zij,c_nh_term_impl(2:3))
+                stochastic_enabled,Zij,c_nh_term_impl(2:3))
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state, &

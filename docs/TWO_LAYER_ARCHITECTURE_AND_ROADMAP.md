@@ -216,6 +216,15 @@ single-layer/global flags and are **not yet migrated** to independent L2
 activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
 TL07/TL13, preserving accepted single-layer inputs and budgets.
 
+**Rheology NEWTON/SEMI-IMPLICIT activation routing (14 November 2026, CI pending).**
+The existing Lie executor routes the selected Darcy and stochastic-rheology
+activations through the Newton solver, semi-implicit source, REAL residual
+and COMPLEX Jacobian. Physical laws and evaluation order remain unchanged.
+The single-layer caller supplies its existing flags. No new stored activation
+is introduced. Canonical per-layer flags, independent OU parameter storage,
+common optional-equation selection and I/O/restart are not yet migrated.
+N_LAYERS=2 remains disabled.
+
 **Rheology EXPLICIT/ANALYTIC layer selection (14 November 2026, CI pending).**
 The existing Lie executor passes selected layer Darcy and stochastic-rheology
 activations to EXPLICIT and ANALYTIC source dispatchers, removing their
