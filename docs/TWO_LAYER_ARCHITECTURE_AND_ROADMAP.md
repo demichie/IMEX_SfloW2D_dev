@@ -275,6 +275,16 @@ standalone explicit test callers supply their existing input flags.
 NEWTON/SEMI-IMPLICIT residuals and the complex Jacobian now receive the same
 selected activation explicitly, as documented above.
 
+**Opposite per-layer optional-slot regression (14 November 2026, CI pending).**
+The existing `TEST_STATE_EQUIVALENCE` now exercises one shared layout
+with pore pressure active in L1 only and conservative stochastic transport
+active in L2 only. Independent canonical layer flags are selected directly;
+both REAL primitive/conservative conversion paths must preserve the
+nonzero active slot and the exactly zero inactive slot. No second
+component-index representation or production two-layer activation is added.
+The complete two-layer input OR allocation, flux/source zero invariants,
+and coupled integration remain open.
+
 **Optional-slot state conversion (14 November 2026, CI pending).**
 The canonical REAL/COMPLEX conservative-to-primitive, primitive-to-
 conservative and physical-state constructors read optional stochastic and
@@ -497,7 +507,7 @@ coupled pressure, L2 sources, paired positivity or two-layer CFL.
 Both Actions are verified on `9427826`; extended EXAMPLES and full
 scientific gates are still open.
 
-**TL05-C2 — isolated L2 transport invariants (CI pending, 14 November 2026).**
+**TL05-C2 — isolated L2 transport invariants (implemented; regression CI verified on 8806bd9).**
 Extend `TEST_SPATIAL_OPERATOR` in place, without adding production
 modules, numerical kernels or a second integrator. Starting from a
 fully wet dense gas/solid L2 and dry L1, use the existing per-slot
@@ -509,6 +519,10 @@ solid mass and thermal-energy variable. The moving dense case must
 produce nonzero transport on the reference 2D grid; L1 and the
 single-layer reference arrays must remain unchanged. The existing
 buoyant-gas zero-force and identical-layer bitwise tests are retained.
+The existing `TEST_SPATIAL_OPERATOR` runs this Euler update on isolated L2,
+including nonzero moving transport, admissibility, closed-collar mass/solid/
+thermal-energy balances, and bitwise unchanged dry L1. This is verified by
+the successful cell-physics regression workflow on `8806bd9`.
 These isolated tests **do not** activate L2 in production or prove
 the coupled two-layer CFL, source transfers, shared substrate budgets,
 or curved-bed stratified well-balancing.
@@ -519,7 +533,7 @@ or curved-bed stratified well-balancing.
 - **Elutriazione L1→L2 (TL09):** `SHEAR_POWER`/`LINEAR_USTAR`, Rouse/Shields, disponibilità `Apack`, co-lift e densità target, cold-start di L2, limiti per classe. Presenza geometrica di interfaccia non è prerequisito assoluto per il cold-start.
 - **Drag (TL10):** forza di coppia vettoriale tipo Chézy con contributi opposti ai momenti, nulla per velocità coincidenti/layer assente; separare dissipazione dell'energia cinetica da trasporto della variabile termica.
 - **Scambi esterni (TL11):** entrainment atmosfera→layer esposto, deposito/erosione sul terreno per layer a contatto, consolidazione L1 con `ALPHA_PACKING_L1`, gas burial, `d32`, pressione efficace e pore pressure; lofting L2 e budget plume. Non duplicare contributi se entrambi i layer sono presenti. Preservare ramo lava single-layer (non accoppiarlo come granular+lava).
-- **Pressione interstiziale:** attiva soltanto in L1; slot L2 inattivo; seeding e dissipazione da validare.
+- **Pressione interstiziale:** flag canonico indipendente per L1/L2; la scelta di attivare Darcy in L2 richiede validazione scientifica del seeding e della dissipazione. Il layout deve mantenere zero lo slot del layer inattivo.
 - **Coefficiente packing:** distinguere packing L1, jamming dello hindered settling e massimo packing di ammissibilità.
 - **Termica:** riusare cooling atmosferico e sue varianti già presenti; eventuale conduzione col terreno o scambio termico interlayer **fuori ambito della migrazione attuale**, richiede decisione e gate fisici autonomi.
 
@@ -545,7 +559,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL04-R — rheology configuration** | **Implemented; CI verified on `662e796`** | Explicit canonical L1 configuration propagated through source assembly, Lie, REAL/COMPLEX and analytic callers; both single-layer NAMELIST names intentionally retained. L2 production selection and complete scientific gate remain open. |
 | **TL04-T — thermal configuration** | **Implemented; CI verified on `662e796`** | Canonical L1/L2 cooling configs and explicit propagation; TL04-C1 relocated shared ground temperature. Both single-layer NAMELIST names intentionally retained; extended thermal scientific gate open. |
 | **TL04-C — remaining configurations and contacts** | **C1–C4 implemented; both CI workflows green on `32e4e33`; C5/G3 open** | Preserve one combined mass-exchange assembler and the approved single-layer NAMELIST aliases. Complete deferred EXAMPLES, extended physics, restart and OpenMP verification before certifying C5. |
-| **TL05 — HP-PCCU indipendente per slot** | **A/B/C1 CI verificata su `9427826`; C2 test Euler in verifica, C aperto** | Uno stesso HP-PCCU serve entrambi gli slot. L2 usa `max(gprime2,0)` e i test gas isolati includono un aggiornamento conservativo CFL-limited con bilanci di massa, solidi ed energia. CI C2 e completamento fisico L2 ancora aperti, prima di TL06. |
+| **TL05 — HP-PCCU indipendente per slot** | **A/B/C1 verificati su `9427826`; C2 presente e coperto da regressione su `8806bd9`; accoppiamento ancora aperto** | Uno stesso HP-PCCU serve entrambi gli slot. L2 usa `max(gprime2,0)` e i test gas isolati includono un aggiornamento conservativo CFL-limited con bilanci di massa, solidi ed energia. CI C2 e completamento fisico L2 ancora aperti, prima di TL06. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
 | **TL07 — Lie con scope** | **Da implementare; contratto contatti tra gruppi definito** | Registro unico L1/L2/INTERLAYER, candidati cell-local e rollback atomico; loop esterno celle, interno gruppi. All'ingresso di ogni gruppo: rimozione buoyancy L2 gia' esistente, poi classificazione dei quattro contatti sui candidati correnti **fuori da `physics`**; esposizioni passate alle leggi locali. Non interrompere i gruppi L1 se L2 scompare; preservare gruppo 0, `Gamma` di coppia e OpenMP; gate G5. |
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
@@ -564,7 +578,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **M0** | TL00: baseline e specifiche | **Da certificare** | G0: tag, audit e benchmark riproducibile, branch protetto verificato. |
 | **M1** | TL00a: deposito unico | **Implementata, non certificata** | G1: deposizione lava/granulare, restart, topografia e output. |
 | **M2** | TL01–TL03: rank-4 single-layer validato | **Parziale, non certificata** | G2: full EXAMPLES, confronto baseline, NetCDF/restart, OpenMP e numerica. |
-| **M3** | TL04–TL05: isolated L1/L2 infrastructure | **Shared substrate, solids, L1/L2 exchange configs and spatial operators/domains per slot CI-verified on `d901609`; isolated physical L2 transport and C5 remain open** | G3: single authoritative SHARED properties, two canonical per-layer exchange configs, one mass-exchange assembler, tests, OpenMP, inactive L2 and isolated L2 transport. |
+| **M3** | TL04–TL05: isolated L1/L2 infrastructure | **Configurazioni L1/L2 e operatori indipendenti predisposti; il test isolato Euler L2 è verificato su `8806bd9`, mentre C5 e l'allocazione OR two-layer restano aperti** | G3: single authoritative SHARED properties, two canonical per-layer exchange configs, one mass-exchange assembler, tests, OpenMP, inactive L2 and isolated L2 transport. |
 | **M4** | TL06: operatore spaziale accoppiato | **Non iniziata** | G4: path, pressione completa, topografia, CFL, wet/dry, clamp e iperbolicità. |
 | **M5** | TL07–TL11: Lie coppia e chiusure | **Non iniziata** | G5/G6: rate per-layer, coppia conservativa, budget esterni, rollback, contatti fisici e tutti i processi verificati. |
 | **M6** | TL12–TL13: modello disponibile | **Non iniziata** | G7: benchmark scientifici, prestazioni, I/O e restart, approvazione esplicita all'attivazione. |
