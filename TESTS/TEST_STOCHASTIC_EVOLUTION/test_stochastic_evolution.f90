@@ -56,7 +56,7 @@ PROGRAM test_stochastic_evolution
   state%q(idx_stoch,1,1,1) = 6.0_wp
   stochastic%Z = 4.0_wp
 
-  CALL stochastic%prepare_timestep(state, 0.5_wp)
+  CALL stochastic%prepare_timestep(state, 0.5_wp, .TRUE.)
 
   CALL assert_close('wet cell starts from transported hZ/h',               &
        stochastic%Z(1,1), 2.25_wp)
@@ -69,9 +69,28 @@ PROGRAM test_stochastic_evolution
   CALL assert_close('nonlinear map is applied only to friction field',     &
        stochastic%effective_Z(1,1), 2.25_wp**2)
 
-  CALL stochastic%prepare_timestep(state, 0.5_wp)
+  CALL stochastic%prepare_timestep(state, 0.5_wp, .TRUE.)
   CALL assert_close('effective field is not fed back into OU state',       &
        stochastic%Z(1,1), 1.6875_wp)
+
+  ! The common optional slot exists even for a layer without transport.
+  state%q(idx_stoch,1,1,1)=8.0_wp
+  state%qp(idx_stoch,1,1,1)=4.0_wp
+  stoch_transport_flag=.TRUE.
+  CALL stochastic%prepare_timestep(state,0.5_wp,.FALSE.)
+  CALL assert_close('disabled layer clears conservative stochastic slot', &
+       state%q(idx_stoch,1,1,1),0.0_wp)
+  CALL assert_close('disabled layer clears primitive stochastic slot', &
+       state%qp(idx_stoch,1,1,1),0.0_wp)
+
+  ! Enabled transport follows the argument, not the legacy global flag.
+  stoch_transport_flag=.FALSE.
+  state%q(idx_stoch,1,1,1)=6.0_wp
+  stochastic%Z=4.0_wp
+  CALL stochastic%prepare_timestep(state,0.5_wp,.TRUE.)
+  CALL assert_close('selected transport ignores legacy global flag', &
+       state%q(idx_stoch,1,1,1),4.5_wp)
+  stoch_transport_flag=.TRUE.
 
   std_min = 2.0_wp
   std_max = 10.0_wp

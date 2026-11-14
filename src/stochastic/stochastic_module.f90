@@ -21,7 +21,7 @@ MODULE stochastic_module
     USE domain_2d, ONLY: domain_type
     USE state_fields, ONLY: state_type
     USE parameters_2d, ONLY : length_spatial_corr,                                                                     &
-            stochastic_flag, stoch_transport_flag
+            stochastic_flag
     USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
     USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
 
@@ -121,17 +121,19 @@ CONTAINS
     !> burn-in
     !>                      when transport is enabled.
     !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+    !> \param[in] transport_enabled Selected layer stochastic transport activation.
     !>
     !> \note This is a finite burn-in, not a proof of statistical stationarity when the
     !>       velocity-dependent noise intensity changes.
 
-    SUBROUTINE getSteadyStateZ(this, state, domain)
+    SUBROUTINE getSteadyStateZ(this, state, domain, transport_enabled)
     ! should find a better way to understand when the process is stable.
     ! Since sigma is varing in space and time, the process may never be stable.
     IMPLICIT none
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         CLASS(domain_type), INTENT(IN) :: domain
+        LOGICAL, INTENT(IN) :: transport_enabled
         INTEGER :: j, k , l
         INTEGER :: i, n_iter
         REAL(wp) :: dt
@@ -157,7 +159,7 @@ CONTAINS
 
         END DO
 
-        IF (stoch_transport_flag) THEN
+        IF (transport_enabled) THEN
 
             !$OMP PARALLEL DO private(j,k)
 
@@ -175,6 +177,10 @@ CONTAINS
             !$OMP END PARALLEL DO
 
             WRITE(*,*) 'end stochastic initialization'
+
+        ELSEIF (idx_stoch>0) THEN
+            state%q(idx_stoch,1,:,:)=0.0_wp
+            state%qp(idx_stoch,1,:,:)=0.0_wp
 
         END IF
 
@@ -319,20 +325,22 @@ CONTAINS
     !> after
     !>                      the OU step.
     !> \param[in] dt Time increment [s].
+    !> \param[in] transport_enabled Selected layer stochastic transport activation.
 
-    SUBROUTINE prepare_stochastic_timestep(this,state,dt,trial_q,trial_qp,domain)
+    SUBROUTINE prepare_stochastic_timestep(this,state,dt,transport_enabled,trial_q,trial_qp,domain)
         ! In the production Lie path, evolve OU after the spatial transport,
         ! using post-spatial candidates without publishing the fluid state.
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: dt
+        LOGICAL, INTENT(IN) :: transport_enabled
         REAL(wp), INTENT(INOUT), OPTIONAL :: trial_q(:,:,:),trial_qp(:,:,:)
         CLASS(domain_type), INTENT(IN), OPTIONAL :: domain
         INTEGER :: l,j,k
         LOGICAL :: use_trial
 
         use_trial=PRESENT(trial_q) .AND. PRESENT(trial_qp) .AND. PRESENT(domain)
-        IF (stoch_transport_flag) THEN
+        IF (transport_enabled) THEN
             ! The transported conservative scalar determines Z in wet cells.
             ! Outside the active solve set its published state is authoritative.
             WHERE (state%q(idx_totMassEqn,1,:,:) > EPSILON(1.0_wp))
@@ -354,7 +362,7 @@ CONTAINS
             CALL this%update(state,dt)
         END IF
 
-        IF (stoch_transport_flag) THEN
+        IF (transport_enabled) THEN
             IF (use_trial) THEN
                 ! Modify only candidate cells, not the published state.
                 DO l=1,domain%solve_cells
@@ -377,6 +385,19 @@ CONTAINS
                     state%q(idx_stoch,1,:,:)=0.0_wp
                     state%qp(idx_stoch,1,:,:)=0.0_wp
                 END WHERE
+            END IF
+        ELSEIF (idx_stoch>0) THEN
+            ! An allocated optional component remains zero without layer transport.
+            IF (use_trial) THEN
+                DO l=1,domain%solve_cells
+                    j=domain%j_cent(l)
+                    k=domain%k_cent(l)
+                    trial_q(idx_stoch,j,k)=0.0_wp
+                    trial_qp(idx_stoch,j,k)=0.0_wp
+                END DO
+            ELSE
+                state%q(idx_stoch,1,:,:)=0.0_wp
+                state%qp(idx_stoch,1,:,:)=0.0_wp
             END IF
         END IF
     END SUBROUTINE prepare_stochastic_timestep

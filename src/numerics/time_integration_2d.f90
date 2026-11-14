@@ -19,7 +19,7 @@ MODULE time_integration_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
-    USE parameters_2d, ONLY : stochastic_flag
+    USE parameters_2d, ONLY : stochastic_flag, stoch_transport_flag
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
@@ -273,7 +273,8 @@ CONTAINS
             END IF
             this%stochastic_Z_before=stochastic%Z
             this%stochastic_effective_before=stochastic%effective_Z
-            CALL stochastic%prepare_timestep(state,dt,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),domain)
+            CALL stochastic%prepare_timestep(state,dt,stoch_transport_flag, &
+                this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),domain)
         END IF
         IF (PRESENT(stochastic_prepared_hook)) CALL stochastic_prepared_hook()
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.

@@ -216,6 +216,18 @@ single-layer/global flags and are **not yet migrated** to independent L2
 activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
 TL07/TL13, preserving accepted single-layer inputs and budgets.
 
+**Stochastic transport dispatch preparation (14 November 2026, CI pending).**
+The OU/transport stage in `stochastic_module` receives the caller-selected
+`transport_enabled` value for initial burn-in and post-spatial Lie preparation,
+with no persistent duplicate of a configuration flag. An optional stochastic
+component already present in the common layout is zeroed for a layer that
+disables its transport. OU evolution and conservative stochastic transport
+remain distinct: disabling the latter does not disable the former. Current
+production callers pass the same single-layer input flag, preserving behavior.
+Paired stochastic workspaces, layer-local noise/reology selection, mass-exchange
+scalar transport, IC/BC and restart/NetCDF remain deferred to TL07/TL13.
+This step does not enable `N_LAYERS=2`.
+
 **Source registry layer-local Darcy selection (14 November 2026, CI pending).**
 The source registry builder now receives Darcy activation for the selected
 layer as an explicit argument, controlling Darcy group scheduling and pore
