@@ -1,6 +1,6 @@
 # IMEX-SfloW2D — Audit tecnico del branch two-layer
 
-**Verifica statica:** 14 novembre 2026. **Branch:** `feature/two-layer`; baseline CI [`d901609`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d9016093a4b1f5c790e083a7d137a055c890a66e) con TL05-A/B operatori e worklist per slot. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md). **Scopo corrente:** preselezione fisica cell-local dei processi mass exchange in vista di TL07/TL11, senza attivazione di L2. La sezione TL04-C0 in fondo conserva la fotografia storica precedente.
+**Verifica statica:** 14 novembre 2026. **Branch:** `feature/two-layer`; baseline CI [`d901609`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d9016093a4b1f5c790e083a7d137a055c890a66e) con TL05-A/B operatori e worklist per slot. **Piano vigente:** [roadmap two-layer](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md). **Scopo corrente:** applicare il principio di semplicità ai contatti: usare il classificatore puro esistente, senza filtro aggiuntivo o attivazione di L2. La sezione TL04-C0 in fondo conserva la fotografia storica precedente.
 
 ## Evidenze verificate
 
@@ -19,7 +19,7 @@
 | **A04 — Namelist termica e substrato** | `thermal_l1/l2` possiedono il cooling; `thermal => thermal_l1` mantiene intenzionalmente il nome breve in `N_LAYERS=1`. Il solo `substrate%T_ground` descrive il terreno; non esistono più copie termiche della temperatura del suolo. | Tenere indipendenti proprietà shared e closure per-layer. Validare i casi fisici dove i precedenti input avevano temperature del terreno differenti. |
 | **A05 — Temperatura atmosferica** | `T_ambient` è l'unica temperatura atmosferica letta dalla namelist GAS; `T_env` non esiste più nella produzione. TL04-T1 è stata verificata in CI. | Restano verifiche integrate del delta termico autorizzato e degli esempi, in particolare lava. |
 | **A06 — Termica fisica** | TL04-T3 usa configurazione read-only dal coordinamento single-layer fino al dispatcher termico, senza duplicazioni di coefficienti; cooling REAL/COMPLEX/analitico invariato nelle formule. | Validare esempi integrati lava/dry e futuro scope L2. |
-| **A07 — Contatti** | `layer_contacts_2d.f90` classifica senza indici di cella gli spessori candidati. `source_terms_2d` prepara un selettore puro del mask mass exchange: terreno per erosione/deposizione/lava/vaporizzazione, atmosfera per entrainment; altri bit invariati. Test wet/wet, layer singolo, dry/dry, input invalidi aggiunti a `TEST_SOURCE_REGISTRY`. | Nuovo selettore da certificare in CI, ancora **non chiamato** dal Lie produttivo. Integrarlo solo su candidati accoppiati TL07/TL11, senza cambiare kernel né gating single-layer; fase portante L2 richiede audit separato. |
+| **A07 — Contatti** | `layer_contacts_2d.f90` è l'unica classificazione canonica dei quattro stati L1/L2; `TEST_SOURCE_REGISTRY` verifica già tutti i casi, le soglie e gli input invalidi. La routine ridondante `filter_contact_mass_exchange_mask` del commit `e4ef157` è stata rimossa. | TL07/TL11: usare direttamente `evaluate_layer_contacts` dentro l'assemblaggio cell-local `source_terms_2d`, senza helper o API aggiuntivi. Lie e kernel mass exchange rimangono invariati, L2 non attivo. |
 | **A08 — Registro/integrazione Lie** | `source_registry_2d.f90:source_group_type` contiene id, method, source_names, equation_ids, cache; nessun `scope`. `lie_source_executor_2d.f90:execute_lie_source_groups` riceve array rank-3 di L1 ed esegue gruppi cell-outer. | Scope L1/L2/INTERLAYER, coppia candidati e trasferimento unico, rollback atomico; kernel monolayer ricevono solo q/qp e rate del layer bersaglio. |
 | **A09 — HP-PCCU/path** | Workspace HP-PCCU `spatial_operators(:)` e domini attivi `domains(:)` indipendenti, CI verificata su `d901609`. | TL05-C: closure fisica e trasporto L2 isolato; TL06: path accoppiati `B,eta_1,eta_tot`, wet/dry e CFL coupled. Non riutilizzare globali di fase L1 per un falso L2. |
 | **A10 — Deposito e substrato** | `deposit_tot` canonico e ramo lava/granulare distinti; scratch e transazioni del Lie aggiornati. | Prove end-to-end (lava `n_solid=0`, erosione, topografia, restart v7, NetCDF) ancora non certificate dall'evidenza disponibile. |
@@ -90,12 +90,31 @@
 
 **Verifica:** compilazione/esecuzione dell'intero repository e regressioni sul futuro commit non ancora effettuate. La prova isolata con `gfortran` di array allocatable di tipi derivati e procedure di inizializzazione/finalizzazione è riuscita, ma non sostituisce la build o i benchmark. Rimangono differiti gli EXAMPLES come richiesto. `N_LAYERS=2` resta esplicitamente rifiutato in produzione e G3/G4 non sono chiusi.
 
-## TL07/TL11 — preselezione cell-local degli scambi fisici (14 novembre 2026)
+## TL07/TL11 — contatti diretti, senza nuove sovrastrutture (14 novembre 2026)
 
-**Confine approvato:** `lie_source_executor_2d` conosce la griglia `j,k`, gestisce i candidati, l'inventario e le transazioni; `source_terms_2d` sceglie l'ammissibilità fisica dai contatti dei due layer nella singola colonna; `mass_exchange_2d` e le sei leggi restano locali, senza indici di griglia o duplicazione della fisica. Si usa una maschera derivata per cella, senza mutare la configurazione o il registro.
+I quattro casi fisici (entrambi presenti, nessuno, solo L1, solo L2)
+sono già rappresentati interamente in `layer_contacts_2d` e testati in
+`TEST_SOURCE_REGISTRY`. `source_terms_2d` resta l'assemblatore locale:
+quando TL07 fornirà entrambi i candidati di colonna, chiamerà direttamente
+`evaluate_layer_contacts` e, se necessario, disabiliterà i bit dei
+processi incompatibili nel `source_mask` **locale** già esistente.
+Nessuna nuova routine di filtraggio o seconda rappresentazione dei
+contatti. `lie_source_executor_2d` mantiene `j,k`, gestione dei
+candidati, transazioni e rollback senza decidere quali leggi fisiche
+attivare. Nessun kernel di `mass_exchange` deve accedere a indici di
+cella o essere riscritto.
 
-**Implementazione predisposta:** `filter_contact_mass_exchange_mask(configured_mask,thickness,layer,active_mask,valid)` è una routine `PURE` in `source_terms_2d`: valida il target e la colonna tramite il classificatore canonico; spegne i bit di erosione, deposizione, immobilizzazione lava e vaporizzazione connessa al deposito quando manca il contatto col terreno, e l'entrainment senza esposizione atmosferica. Lascia invariata la perdita di carrier liquido e i bit esterni al mass exchange. `src/Makefile.am` dichiara la dipendenza dai moduli `layer_contacts_2d` e `source_catalog_2d`. `TEST_SOURCE_REGISTRY` verifica indipendentemente le maschere per L1/L2 in quattro stati, single-layer e input non validi.
+**Correzione del commit `e4ef157`:** il selettore aggiunto allora,
+`filter_contact_mass_exchange_mask`, è stato rimosso con i suoi test
+dedicati e la dipendenza extra in `src/Makefile.am`. Rimangono
+invariati il classificatore e le verifiche dei quattro stati che
+esistevano prima di quel commit. Questa correzione elimina soltanto
+codice non utilizzato nel percorso produttivo: non attiva L2 e non
+modifica rate o formule single-layer.
 
-**Prova effettiva:** harness isolato con `gfortran` in compilazione debug con `-fcheck=all` e ottimizzata: tutti i casi di contatto superati. Non costituisce compilazione del repository o CI. Sul nuovo commit restano da eseguire entrambe le Actions e da verificare la documentazione e i test della suite reale.
-
-**Limite fondamentale:** il selettore non viene ancora chiamato dal Lie di produzione e `N_LAYERS=2` resta disabilitato. TL07 deve introdurre i candidati condivisi L1/L2 e il rollback atomico; TL11 collegherà il filtro ai rate reali e testerà i bilanci e il gate di contatto. Inoltre `mass_exchange_2d`, erosione, deposizione e alcuni kernel di stato usano ancora `gas_flag`/`liquid_flag` globali; i flag riferiti alla fase del layer devono diventare argomenti espliciti attraverso la catena reale dei caller, senza riscrivere le leggi o alterare L1. TL05-C richiede una valutazione coerente delle closure del trasporto L2 prima di aggiungere un percorso produttivo.
+**Lavori ancora aperti:** TL05-C (trasporto L2 fisicamente coerente),
+TL07 (candidati accoppiati e rollback atomico), TL11 (applicazione
+diretta delle esposizioni fisiche e test dei rate/budget) e le
+dipendenze di alcuni kernel da `gas_flag`/`liquid_flag` globali.
+Il commit di semplificazione necessita di verifica statica;
+nessuna CI nuova è implicita nella pubblicazione.

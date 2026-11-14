@@ -161,9 +161,7 @@ physics/source_terms_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
-    physics/layer_contacts_2d.$(OBJEXT) \
-    numerics/source_catalog_2d.$(OBJEXT)
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)

@@ -32,14 +32,10 @@ MODULE source_terms_2d
     USE source_registry_2d, ONLY : source_group_type
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_BOTTOM_CIRCULAR_INJECTION,                   &
         SOURCE_ID_BOTTOM_FISSURAL_INJECTION, SOURCE_ID_RADIAL_INJECTION, SOURCE_ID_THERMAL_COOLING
-    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                           &
-        SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_ENTRAINMENT, SOURCE_ID_EXCHANGE_VAPORIZATION
-    USE layer_contacts_2d, ONLY : layer_contacts_type, evaluate_layer_contacts
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_source_explicit
     PUBLIC :: limit_explicit_source_rates,assemble_lie_explicit_transaction
-    PUBLIC :: filter_contact_mass_exchange_mask
     ! Explicit physical-source evaluation provides distinct cell/geometry
     ! and mass-exchange signatures, independent of time-integration stages.
     INTERFACE eval_source_explicit
@@ -56,48 +52,6 @@ MODULE source_terms_2d
         REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
     END TYPE source_cell_context_type
 CONTAINS
-
-
-    !> @brief Select mass-exchange processes eligible at one layer's current contacts.
-    !> @details Uses only the candidate column thicknesses and an immutable configured mask.
-    !>          Terrain processes need ground exposure; entrainment needs atmosphere exposure.
-    !>          Carrier-liquid loss and unrelated source bits are left unchanged. Vaporization
-    !>          depends on actual terrain deposition and is disabled together with it.
-    !>          This local selector does not mutate registry metadata or evaluate physical rates.
-    !>          It is prepared for TL07/TL11 and is not called by production Lie until paired
-    !>          layer candidates and atomic rollback are available.
-    !> @param[in] configured_mask Validated source bitset for this layer and Lie group.
-    !> @param[in] thickness Current candidate column thicknesses (m), L1 then optional L2.
-    !> @param[in] layer Target layer index (1 or 2, within thickness).
-    !> @param[out] active_mask Locally eligible bits; zero when the input is invalid.
-    !> @param[out] valid Whether thickness and layer identify a valid column/target.
-    PURE SUBROUTINE filter_contact_mass_exchange_mask(configured_mask,thickness,layer,active_mask,valid)
-        INTEGER, INTENT(IN) :: configured_mask,layer
-        REAL(wp), INTENT(IN) :: thickness(:)
-        INTEGER, INTENT(OUT) :: active_mask
-        LOGICAL, INTENT(OUT) :: valid
-        TYPE(layer_contacts_type) :: contacts
-
-        active_mask=0
-        valid=.FALSE.
-        IF (layer<1 .OR. layer>SIZE(thickness)) RETURN
-
-        CALL evaluate_layer_contacts(thickness,contacts,valid)
-        IF (.NOT.valid) RETURN
-
-        active_mask=configured_mask
-
-        IF (.NOT.contacts%terrain_exposed(layer)) THEN
-            active_mask=IBCLR(active_mask,SOURCE_ID_EXCHANGE_EROSION-1)
-            active_mask=IBCLR(active_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
-            active_mask=IBCLR(active_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1)
-            active_mask=IBCLR(active_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
-        END IF
-
-        IF (.NOT.contacts%atmosphere_exposed(layer)) THEN
-            active_mask=IBCLR(active_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
-        END IF
-    END SUBROUTINE filter_contact_mass_exchange_mask
 
 
     !> Apply a uniform physical factor to all coupled exchange rates.
