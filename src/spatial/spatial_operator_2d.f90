@@ -58,10 +58,13 @@ CONTAINS
     !> \brief Initialize the reconstruction and KT flux workspace.
     !>
     !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
+    !> @param[in] layer Optional material layer slot (1 or 2); omitted means legacy L1 behavior.
 
-    SUBROUTINE initialize_spatial_operator( this )
+    SUBROUTINE initialize_spatial_operator( this, layer )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
+        INTEGER, INTENT(IN), OPTIONAL :: layer
+        INTEGER :: selected_layer
 
         BLOCK
             CHARACTER(LEN=8) :: value
@@ -70,8 +73,12 @@ CONTAINS
             CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
             this%profile_enabled=status==0 .AND. TRIM(value)=='1'
         END BLOCK
+        selected_layer=1
+        IF (PRESENT(layer)) selected_layer=layer
+        IF (selected_layer<1 .OR. selected_layer>2) CALL fatal_error('Invalid spatial layer slot')
+
         CALL this%reconstruction%initialize
-        CALL this%hp_pccu%initialize
+        CALL this%hp_pccu%initialize(clamp_buoyant_pressure=selected_layer==2)
 
     END SUBROUTINE initialize_spatial_operator
 

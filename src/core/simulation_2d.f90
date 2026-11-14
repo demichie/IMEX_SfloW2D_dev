@@ -132,7 +132,7 @@ CONTAINS
         ALLOCATE(this%spatial_operators(this%model_layout%n_layers))
 
         DO layer=1,SIZE(this%spatial_operators)
-            CALL this%spatial_operators(layer)%initialize
+            CALL this%spatial_operators(layer)%initialize(layer)
         END DO
 
         ! Keep active-cell, face and reconstruction worklists independent.

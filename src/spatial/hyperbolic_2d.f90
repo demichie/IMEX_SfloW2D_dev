@@ -50,6 +50,8 @@ MODULE hyperbolic_2d
         REAL(wp), ALLOCATABLE :: G_interface_yT(:,:,:)
         REAL(wp), ALLOCATABLE :: P_cell_x(:,:,:)
         REAL(wp), ALLOCATABLE :: P_cell_y(:,:,:)
+        !> For L2 only, suppress negative reduced gravity in hydrostatic pressure.
+        LOGICAL :: clamp_buoyant_pressure=.FALSE.
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_reconstruction=0.0_wp,profile_flux=0.0_wp,profile_assembly=0.0_wp
@@ -112,10 +114,12 @@ CONTAINS
     !> \brief Allocate and zero wave-speed and oriented KT work arrays.
     !>
     !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+    !> @param[in] clamp_buoyant_pressure Suppress negative hydrostatic pressure for the dilute upper layer.
 
-    SUBROUTINE initialize_hyperbolic( this )
+    SUBROUTINE initialize_hyperbolic( this, clamp_buoyant_pressure )
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+        LOGICAL, INTENT(IN), OPTIONAL :: clamp_buoyant_pressure
 
         BLOCK
             CHARACTER(LEN=8) :: value
@@ -124,6 +128,8 @@ CONTAINS
             CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
             this%profile_enabled=status==0 .AND. TRIM(value)=='1'
         END BLOCK
+        this%clamp_buoyant_pressure=.FALSE.
+        IF (PRESENT(clamp_buoyant_pressure)) this%clamp_buoyant_pressure=clamp_buoyant_pressure
         ALLOCATE( this%a_interface_xNeg(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_xPos(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_yNeg(comp_cells_x,comp_interfaces_y) )
@@ -350,31 +356,39 @@ CONTAINS
             scale = MAX(                                                                                               &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j,k),                                           &
                 recon%eta_interfaceL(j,k),grav_coeff_stag_x(j,k),                                                     &
-                this%gamma_interface_xL(j,k),recon%h_selected_interfaceL(j,k)),                                       &
+                this%gamma_interface_xL(j,k),recon%h_selected_interfaceL(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j,k),                                           &
                 recon%eta_interfaceR(j,k),grav_coeff_stag_x(j,k),                                                     &
-                this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k)),                                       &
+                this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j+1,k),                                         &
                 recon%eta_interfaceL(j+1,k),grav_coeff_stag_x(j+1,k),                                                 &
-                this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k)),                                   &
+                this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k),                                     &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j+1,k),                                         &
                 recon%eta_interfaceR(j+1,k),grav_coeff_stag_x(j+1,k),                                                 &
-                this%gamma_interface_xR(j+1,k),recon%h_selected_interfaceR(j+1,k)) )
+                this%gamma_interface_xR(j+1,k),recon%h_selected_interfaceR(j+1,k),                                     &
+                this%clamp_buoyant_pressure) )
             inverse_spacing = one_by_dx
         ELSE
             scale = MAX(                                                                                               &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k),                                           &
                 recon%eta_interfaceB(j,k),grav_coeff_stag_y(j,k),                                                     &
-                this%gamma_interface_yB(j,k),recon%h_selected_interfaceB(j,k)),                                       &
+                this%gamma_interface_yB(j,k),recon%h_selected_interfaceB(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k),                                           &
                 recon%eta_interfaceT(j,k),grav_coeff_stag_y(j,k),                                                     &
-                this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k)),                                       &
+                this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k+1),                                         &
                 recon%eta_interfaceB(j,k+1),grav_coeff_stag_y(j,k+1),                                                 &
-                this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1)),                                   &
+                this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1),                                     &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k+1),                                         &
                 recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1),                                                 &
-                this%gamma_interface_yT(j,k+1),recon%h_selected_interfaceT(j,k+1)) )
+                this%gamma_interface_yT(j,k+1),recon%h_selected_interfaceT(j,k+1),                                     &
+                this%clamp_buoyant_pressure) )
             inverse_spacing = one_by_dy
 
         END IF
@@ -387,9 +401,18 @@ CONTAINS
     !> The cached coefficient comes from the selected-depth CFL trace and uses
     !> identical temperature and mass fractions. Only the depth can differ.
     !> If it changes the wet/dry branch, retain the original evaluation.
-    FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h) RESULT(scale)
+    !> @param[in] qp_face Final primitive face state.
+    !> @param[in] eta Reconstructed free-surface elevation.
+    !> @param[in] gravity_factor Terrain large-slope metric.
+    !> @param[in] cached_gamma Hydrostatic coefficient from the CFL face trace.
+    !> @param[in] selected_h Depth at which cached_gamma was evaluated.
+    !> @param[in] clamp_buoyant_pressure Apply the upper-layer nonnegative-pressure condition.
+    !> @return Absolute pressure scale used only for stationary-roundoff cancellation.
+    FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h,                          &
+        clamp_buoyant_pressure) RESULT(scale)
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
         REAL(wp), INTENT(IN) :: qp_face(:),eta,gravity_factor,cached_gamma,selected_h
+        LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         REAL(wp) :: scale,gamma,reduced_gravity,h
 
         h = MAX(0.0_wp,qp_face(1))
@@ -402,6 +425,7 @@ CONTAINS
         ELSE
             CALL eval_hydrostatic_coefficient(qp_face,reduced_gravity,gamma)
         END IF
+        IF (clamp_buoyant_pressure) gamma=MAX(gamma,0.0_wp)
         scale = ABS(gravity_factor*gamma)*h*MAX(h,ABS(eta))
     END FUNCTION hydrostatic_arithmetic_scale
 
@@ -1024,7 +1048,8 @@ CONTAINS
                     qp_path_plus,recon%eta_cellE(j,k),                                                                 &
                     grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k),                                      &
                     this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k),                                   &
-                    this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k) )
+                    this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k),                            &
+                    this%clamp_buoyant_pressure )
 
             END IF
 
@@ -1039,7 +1064,8 @@ CONTAINS
                     qp_path_plus,recon%eta_cellN(j,k),                                                                 &
                     grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k),                                      &
                     this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k),                                   &
-                    this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1) )
+                    this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1),                            &
+                    this%clamp_buoyant_pressure )
 
             END IF
 
@@ -1061,8 +1087,13 @@ CONTAINS
     !> \param[in] grav_plus Large-slope gravity factor at the positive endpoint.
     !> \param[in] direction Cartesian path orientation.
     !> \param[out] path Hydrostatic path contribution across the cell.
+    !> @param[in] cached_gamma_minus Face pressure coefficient from the CFL pass.
+    !> @param[in] selected_h_minus Final face depth used for its cached coefficient.
+    !> @param[in] cached_gamma_plus Corresponding positive-side pressure coefficient.
+    !> @param[in] selected_h_plus Final face depth of the positive side.
+    !> @param[in] clamp_buoyant_pressure Suppress negative pressure at buoyant L2 endpoints.
     SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path, &
-        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus)
+        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus,clamp_buoyant_pressure)
 
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE pccu_2d, ONLY : eval_hydrostatic_path
@@ -1072,6 +1103,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp_minus(:),eta_minus,grav_minus
         REAL(wp), INTENT(IN) :: qp_plus(:),eta_plus,grav_plus
         REAL(wp), INTENT(IN) :: cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus
+        LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(OUT) :: path(:)
 
@@ -1092,6 +1124,10 @@ CONTAINS
             gamma_plus=cached_gamma_plus
         ELSE
             CALL eval_hydrostatic_coefficient(qp_plus,reduced_gravity_plus,gamma_plus)
+        END IF
+        IF (clamp_buoyant_pressure) THEN
+            gamma_minus=MAX(gamma_minus,0.0_wp)
+            gamma_plus=MAX(gamma_plus,0.0_wp)
         END IF
         CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1), gamma_plus)
         CALL eval_hydrostatic_path(direction,qp_minus(1),gamma_minus,eta_minus,                                        &
@@ -1197,7 +1233,7 @@ CONTAINS
 
 
                 CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,grav_coeff_stag_x(j,k),idx_u,min_r,max_r, &
-                    this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k))
+                    this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),this%clamp_buoyant_pressure)
 
                 this%a_interface_xNeg(j,k) = min_r
                 this%a_interface_xPos(j,k) = max_r
@@ -1231,7 +1267,7 @@ CONTAINS
 
 
                 CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,grav_coeff_stag_y(j,k),idx_v,min_r,max_r, &
-                    this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k))
+                    this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k),this%clamp_buoyant_pressure)
 
                 this%a_interface_yNeg(j,k) = min_r
                 this%a_interface_yPos(j,k) = max_r
@@ -1268,8 +1304,11 @@ CONTAINS
     !> @param[in] normal_velocity_index Primitive normal-velocity component index.
     !> @param[out] speed_minus Lower characteristic bound.
     !> @param[out] speed_plus Upper characteristic bound.
+    !> @param[out] gamma_minus Hydrostatic coefficient of the negative trace.
+    !> @param[out] gamma_plus Hydrostatic coefficient of the positive trace.
+    !> @param[in] clamp_buoyant_pressure Suppress negative L2 hydrostatic coefficients.
     SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff, normal_velocity_index,speed_minus,speed_plus,  &
-        gamma_minus,gamma_plus)
+        gamma_minus,gamma_plus,clamp_buoyant_pressure)
 
     USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
@@ -1279,10 +1318,18 @@ CONTAINS
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: speed_minus,speed_plus
         REAL(wp), INTENT(OUT) :: gamma_minus,gamma_plus
+        LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         REAL(wp) :: minus_min,minus_max,plus_min,plus_max
 
         CALL eval_local_speeds_direction(qp_minus,grav_coeff,normal_velocity_index,minus_min,minus_max,gamma_minus)
         CALL eval_local_speeds_direction(qp_plus,grav_coeff,normal_velocity_index,plus_min,plus_max,gamma_plus)
+
+        ! The celerity already vanishes for negative g'; the cached pressure
+        ! coefficient must obey the same L2 clamp at both face and cell paths.
+        IF (clamp_buoyant_pressure) THEN
+            gamma_minus=MAX(gamma_minus,0.0_wp)
+            gamma_plus=MAX(gamma_plus,0.0_wp)
+        END IF
 
         speed_minus = MIN(minus_min,plus_min,0.0_wp)
         speed_plus = MAX(minus_max,plus_max,0.0_wp)

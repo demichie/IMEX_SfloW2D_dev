@@ -15,6 +15,7 @@ PROGRAM test_spatial_operator
   USE state_conversions, ONLY : primitive_to_conservative
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE source_terms_2d, ONLY : eval_source_explicit
+  USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
   USE mass_injection_coefficients_2d, ONLY : injection_material_set_type, prepare_injection_materials
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_group_type
@@ -117,7 +118,7 @@ PROGRAM test_spatial_operator
     IF (slot2_domain%solve_cells/=domain%solve_cells) ERROR STOP 'identical layer worksets differ'
     IF (ANY(slot2_domain%solve_mask .NEQV. domain%solve_mask)) ERROR STOP 'L2 mask differs for same state'
     slot2_qp=qp
-    CALL slot2_spatial%initialize
+    CALL slot2_spatial%initialize(2)
     CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain)
     CALL same_bits('slot-local CFL matches L1',[slot2_dt],[dt])
     CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
@@ -159,6 +160,7 @@ PROGRAM test_spatial_operator
     slot2_domain%solve_mask_time(1,1)=12.5_wp
     IF (domain%solve_mask_time(1,1)==slot2_domain%solve_mask_time(1,1)) &
         ERROR STOP 'L2 domain workset aliases the L1 domain'
+    CALL check_isolated_gas_l2
     CALL slot2_spatial%finalize
     CALL slot2_domain%finalize
     DEALLOCATE(slot2_qp,slot2_term,slot_q,l1_solve_mask_before)
@@ -299,6 +301,92 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> @brief Exercise actual isolated dilute gas transport on the existing upper-layer HP-PCCU.
+    !> @details First a quiescent buoyant plume must have zero hydrostatic momentum
+    !>          residual even on nonflat shared terrain. Next a dense gas-solid layer
+    !>          must retain positive pressure, finite transport and a valid CFL.
+    !>          L1 is dry and remains untouched; production two-layer is still disabled.
+    SUBROUTINE check_isolated_gas_l2
+        REAL(wp) :: primitive(n_vars),reduced_gravity,gamma
+        REAL(wp) :: isolated_dt
+        LOGICAL :: conversion_ok
+        INTEGER :: j,k,l
+
+        gas_flag=.TRUE.
+        liquid_flag=.FALSE.
+        slot_q(:,1,:,:)=0.0_wp
+        slot2_domain%solve_mask_time(1,1)=0.0_wp
+
+        primitive=0.0_wp
+        primitive(idx_h)=0.7_wp
+        primitive(idx_T)=600.0_wp
+        primitive(idx_solid_first)=0.01_wp
+        CALL eval_hydrostatic_coefficient(primitive,reduced_gravity,gamma)
+        IF (reduced_gravity>=0.0_wp .OR. gamma>=0.0_wp) &
+            ERROR STOP 'Expected a positively buoyant dilute gas layer'
+
+        ! Vary depth at rest: without the L2 pressure clamp even a flat-bed
+        ! case would create a nonzero signed-gravity hydrostatic residual.
+        DO k=1,ny
+            DO j=1,nx
+                primitive(idx_h)=0.5_wp+0.01_wp*REAL(j+k,wp)
+                CALL primitive_to_conservative(primitive,slot_q(:,2,j,k),accepted=conversion_ok)
+                IF (.NOT.conversion_ok) ERROR STOP 'Rejected buoyant L2 gas composition'
+            END DO
+        END DO
+
+        CALL slot2_domain%check_solve(slot_q(:,2,:,:),0.0_wp,.FALSE.)
+        slot2_qp=0.0_wp
+        CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,isolated_dt,slot2_domain)
+        IF (.NOT.ieee_is_finite(isolated_dt) .OR. isolated_dt<=0.0_wp) &
+            ERROR STOP 'Invalid buoyant L2 timestep'
+        CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
+
+        DO l=1,slot2_domain%solve_cells
+            j=slot2_domain%j_cent(l)
+            k=slot2_domain%k_cent(l)
+            IF (ANY(slot2_term(:,j,k)/=0.0_wp)) &
+                ERROR STOP 'Buoyant L2 created hydrostatic or transport forces at rest'
+        END DO
+
+        ! Reuse the same L2 operator and geometry for a dense, moving ash cloud.
+        primitive(idx_T)=330.0_wp
+        primitive(idx_solid_first)=0.30_wp
+        CALL eval_hydrostatic_coefficient(primitive,reduced_gravity,gamma)
+        IF (reduced_gravity<=0.0_wp .OR. gamma<=0.0_wp) &
+            ERROR STOP 'Expected positive reduced gravity for dense gas-solid L2'
+
+        DO k=1,ny
+            DO j=1,nx
+                primitive(idx_h)=0.5_wp+0.01_wp*REAL(j+k,wp)
+                primitive(idx_u)=0.1_wp+0.01_wp*REAL(j,wp)
+                primitive(idx_v)=-0.1_wp-0.01_wp*REAL(k,wp)
+                CALL primitive_to_conservative(primitive,slot_q(:,2,j,k),accepted=conversion_ok)
+                IF (.NOT.conversion_ok) ERROR STOP 'Rejected dense L2 gas composition'
+            END DO
+        END DO
+
+        CALL slot2_domain%check_solve(slot_q(:,2,:,:),0.0_wp,.FALSE.)
+        slot2_qp=0.0_wp
+        CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,isolated_dt,slot2_domain)
+        IF (.NOT.ieee_is_finite(isolated_dt) .OR. isolated_dt<=0.0_wp) &
+            ERROR STOP 'Invalid dense L2 CFL'
+        CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
+        DO l=1,slot2_domain%solve_cells
+            j=slot2_domain%j_cent(l)
+            k=slot2_domain%k_cent(l)
+            IF (.NOT.ALL(ieee_is_finite(slot2_term(:,j,k)))) &
+                ERROR STOP 'Non-finite moving L2 gas transport'
+        END DO
+
+        IF (ANY(slot_q(:,1,:,:)/=0.0_wp)) ERROR STOP 'Isolated L2 modified dry L1'
+        CALL same_bits('L2 gas evaluation does not modify L1',RESHAPE(q,[SIZE(q)]),RESHAPE(q0,[SIZE(q0)]))
+        gas_flag=.FALSE.
+        liquid_flag=.TRUE.
+        WRITE(*,*) 'PASS: isolated buoyant/dense L2 gas pressure and transport'
+    END SUBROUTINE check_isolated_gas_l2
+
 
   !> \brief Configure a one-solid liquid model with zero solid fraction and no physical source except curvature.
   !> \details Initializes shared read-only configuration and owns all fixture arrays;

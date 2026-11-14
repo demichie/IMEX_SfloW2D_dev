@@ -28,7 +28,7 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Substrate | TL04-C1 owns ground temperature, porosity, erodible inventory settings and topography setup in `substrate_parameters_2d`; code, input fixtures and generators were migrated. | Extended scientific checks on terrain energy, inventory/restart and formerly distinct ground temperatures remain part of G3. |
 | Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
 | Physical sources | The registry remains single-layer; the existing pure `layer_contacts_2d` already describes all four possible L1/L2 contact states. Canonical L1/L2 mass-exchange configurations and the combined rate/limiter backend are CI verified on `32e4e33`. | At TL07/TL11, use the existing contacts directly in `source_terms_2d`; do not add a contact-mask API or change the physical kernels. Complete source scopes, candidate-state integration and phase-selection audit; C5/EXAMPLES verification remains open. |
-| Spaziale | `nonconservative_2d` resta l'integratore di percorso HP-PCCU. Gli operatori `spatial_operators(:)` e le worklist `domains(:)` sono indipendenti per slot; entrambe le Actions sono verdi su `d901609`. Il driver usa ancora solo L1. | Implementare il trasporto L2 isolato con la sua closure fisica e poi `eta_1`/`eta_tot`, pressione accoppiata, CFL coupled, wet/dry e iperbolicità, secondo il contratto geometrico di sezione 6. |
+| Spaziale | `nonconservative_2d` resta il solo integratore HP-PCCU; `spatial_operators(:)` e `domains(:)` sono indipendenti (CI su `d901609`). TL05-C1 predispone direttamente nell'operatore L2 il clamp `max(gprime2,0)` dei coefficienti idrostatici, senza un secondo solutore; test gas L2 isolato aggiunto, CI ancora da verificare. | Il driver evolve ancora solo L1. Completare TL05-C e poi `eta_1`/`eta_tot`, pressione accoppiata, CFL coupled, wet/dry e iperbolicità in TL06; test scientifici e produzione L2 ancora non abilitati. |
 | I/O | NetCDF single-layer `(x,y,time)`, restart v7 with L1 plus shared inventories, current `.asc/.q_2d` outputs and diagnostics. | Define one authoritative schema when I/O changes, update reader/writer/tests together and verify scientifically meaningful single-layer continuation; no superseded-format reader or backward-compatibility requirement. |
 
 **CI evidence:** [Build (optimized and debug) #43505177703](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43505177703) and [Cell physics and numerical regressions #43505283197](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/43505283197) both succeeded on [`d901609`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d9016093a4b1f5c790e083a7d137a055c890a66e), covering TL04-C3/C4 and TL05-A/B workspaces and worklists. The user deferred EXAMPLES after the mass-exchange migration; earlier examples do not certify these changes. NetCDF/restart, OpenMP, conservation and two-layer scientific gates remain open.
@@ -284,6 +284,32 @@ Le velocità `u ± sqrt(G*gprime*h)` dei due layer separati **non** garantiscono
 
 **TL05-B — workset attivi per slot (CI verificata su `d901609`):** il contesto possiede `domains(:)` dimensionato sul layout canonico, anziché un solo `domain`. Ciascun dominio mantiene separatamente maschere wet/dry, liste di celle e facce, aloni e workset HP, aggiornati da `domain_type%check_solve`. Il driver, il Lie, lo stochastic e I/O/restarter selezionano esplicitamente `domains(1)` per preservare il single-layer. In `TEST_SPATIAL_OPERATOR`, una coppia di stati conservativi rank-4 e due domini/operatori indipendenti verifica l'identità per input uguali e l'assenza di interferenze quando cambia il wet/dry dello slot 2. `TEST_WORKSPACE_LIFECYCLE` verifica allocazione/finalizzazione ripetuta delle coppie. Il test usa ancora il kernel monolayer sulla stessa closure solo come prova di isolamento numerico, **non** come validazione della fisica L2. La futura selezione per-layer delle sorgenti e della fase, i path `eta_1`/`eta_tot` e il trasporto L2 fisicamente corretto restano aperti. TL05 e i gate scientifici non sono conclusi.
 
+**TL05-C1 — L2 isolated gas hydrostatic pressure (code pending CI, 14 November 2026).**
+The existing `spatial_operator_type%initialize(layer)` accepts the material
+slot (1 by default; 2 for the upper dilute layer). It passes a single
+nonnegative-pressure choice to its owned `hyperbolic_workspace_type`.
+For L2, the face CFL calculation stores
+`Gamma2 = rho_m2*max(gprime2,0)` instead of a negative `Gamma2`;
+the same value is used in face hydrostatic paths, in-cell paths and
+stationary-pressure roundoff scaling. For L1 the existing sequence,
+formula and signed `Gamma1` are unchanged. Negative `gprime2` already
+produced zero celerity in the existing speed bounds, so no new
+characteristic-speed calculation or second physics kernel is introduced.
+The canonical mixture and shared terrain derivatives are reused.
+
+`simulation_2d` passes its existing loop index at spatial-workspace
+initialization. `TEST_SPATIAL_OPERATOR` keeps its positive-gravity
+bitwise L1/slot-2 comparison and additionally exercises a gas L2-only
+state: hot buoyant gas at rest (zero pressure/transport residual)
+and dense moving gas/solids (positive reduced gravity, finite spatial
+term and CFL). The single-layer liquid fixture is preserved for the
+reference comparison, and no producer enables `N_LAYERS=2`.
+This is a **partial TL05-C implementation**, not certification of
+coupled pressure, gas/solid L2 source closures, paired positivity,
+two-layer CFL or physical accuracy. Both Actions, the appropriate
+spatial regressions and extended examples must be verified on the
+actual code commit.
+
 ## 7. Chiusure fisiche da implementare
 
 - **Settling L2→L1 (TL08):** classi, velocità terminali comuni, `u_Gamma`, entalpia del donatore, `CHI_XFER_L2`, `H_PLUG_XFER_L2`, `XFER_U2_AMP_CAP`; cap su inventario senza distruggere il momento. **Non** è deposito al terreno e non modifica `deposit_tot`.
@@ -316,7 +342,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL04-R — rheology configuration** | **Implemented; CI verified on `662e796`** | Explicit canonical L1 configuration propagated through source assembly, Lie, REAL/COMPLEX and analytic callers; both single-layer NAMELIST names intentionally retained. L2 production selection and complete scientific gate remain open. |
 | **TL04-T — thermal configuration** | **Implemented; CI verified on `662e796`** | Canonical L1/L2 cooling configs and explicit propagation; TL04-C1 relocated shared ground temperature. Both single-layer NAMELIST names intentionally retained; extended thermal scientific gate open. |
 | **TL04-C — remaining configurations and contacts** | **C1–C4 implemented; both CI workflows green on `32e4e33`; C5/G3 open** | Preserve one combined mass-exchange assembler and the approved single-layer NAMELIST aliases. Complete deferred EXAMPLES, extended physics, restart and OpenMP verification before certifying C5. |
-| **TL05 — HP-PCCU indipendente per slot** | **A/B: operatori e domain worklists per slot, CI verificata su `d901609`; C aperto** | Ogni slot ha workspace HP-PCCU e workset di celle/facce separati; il calcolo produttivo resta L1. Implementare L2 isolato rispettando la geometria condivisa di sezione 6; successivamente `eta_1`/`eta_tot`, pressione coupled e riduzione single-layer. |
+| **TL05 — HP-PCCU indipendente per slot** | **A/B CI verificata su `d901609`; C1 implementato ma CI pendente, C aperto** | Un unico backend HP-PCCU serve entrambi gli slot. Il coefficiente idrostatico L2 usa `max(gprime2,0)` nei percorsi, senza mutare il single-layer; `TEST_SPATIAL_OPERATOR` prova L2 gassoso isolato e L1 bitwise. Completa certificazione TL05-C ancora aperta, prima di TL06. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
 | **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local e snapshot coerenti; Lie proprietario di `j,k`, transazioni e commit/rollback atomico, ma nessuna scelta fisica dei contatti nel Lie. Rate monolayer isolati, `Gamma` di coppia, gruppo 0 e OpenMP; sezione 4.3.1, gate G5. |
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
