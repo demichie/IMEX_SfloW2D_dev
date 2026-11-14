@@ -723,7 +723,7 @@ CONTAINS
         sp_heat_l=4180.0_wp; rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l
         pres=101325.0_wp; inv_pres=1.0_wp/pres; T_ambient=300.0_wp
         rho_a_amb=pres/(sp_gas_const_a*T_ambient); grav=9.81_wp
-        gas_flag=.TRUE.; liquid_flag=.FALSE.; stoch_transport_flag=.TRUE.; pore_pressure_flag=.TRUE.
+        gas_flag=.TRUE.; liquid_flag=.FALSE.; pore_pressure_flag=.TRUE.
         slope_correction_flag=.TRUE.; curvature_term_flag=.TRUE.
     END SUBROUTINE initialize_case
 

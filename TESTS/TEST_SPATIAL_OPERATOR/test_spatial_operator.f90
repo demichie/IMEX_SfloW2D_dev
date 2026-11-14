@@ -435,7 +435,7 @@ CONTAINS
     CALL configure_canonical_state_indices()
     liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
-    stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
+    stochastic_flag=.FALSE.; pore_pressure_flag=.FALSE.
     pore_pressure_l1%gas_loss_flag=.FALSE.
     mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
     mass_exchange_l1%entrainment%flag=.FALSE.

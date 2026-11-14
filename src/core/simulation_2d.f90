@@ -34,7 +34,7 @@ MODULE simulation_2d
     USE domain_2d, ONLY : domain_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE time_integration_2d, ONLY : time_integration_workspace_type
-    USE stochastic_module, ONLY : stochastic_workspace_type
+    USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1
 
     IMPLICIT NONE
 
@@ -141,7 +141,7 @@ CONTAINS
 
         CALL this%time_integration%initialize(this%source_registry)
 
-        CALL this%stochastic%initialize
+        CALL this%stochastic%initialize(stochastic_l1,rheology_l1,stochastic_flag)
 
         WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
 

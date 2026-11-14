@@ -2,13 +2,12 @@ PROGRAM test_stochastic_random
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE parameters_2d, ONLY : wp
-  USE stochastic_random_2d, ONLY : stochastic_seed,                         &
-       initialize_stochastic_rng, gaussian_noise
+  USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
 
   IMPLICIT NONE
 
   INTEGER, PARAMETER :: sample_size = 64
-  INTEGER :: seed_size
+  INTEGER :: seed_size,stochastic_seed
   INTEGER, ALLOCATABLE :: saved_state(:)
   REAL(wp) :: first_sample(sample_size)
   REAL(wp) :: second_sample(sample_size)
@@ -16,7 +15,7 @@ PROGRAM test_stochastic_random
   REAL(wp) :: restored_sample(sample_size)
 
   stochastic_seed = 24681357
-  CALL initialize_stochastic_rng
+  CALL initialize_stochastic_rng(stochastic_seed)
   first_sample = gaussian_noise(sample_size)
 
   CALL random_seed(SIZE=seed_size)
@@ -28,7 +27,7 @@ PROGRAM test_stochastic_random
        ERROR STOP 'successive samples unexpectedly repeat'
 
   stochastic_seed = 24681357
-  CALL initialize_stochastic_rng
+  CALL initialize_stochastic_rng(stochastic_seed)
   repeated_sample = gaussian_noise(sample_size)
 
   IF (.NOT. bitwise_equal(first_sample, repeated_sample))                   &

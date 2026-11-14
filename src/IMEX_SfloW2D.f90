@@ -88,7 +88,6 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : collapsing_volume_flag
     USE parameters_2d, ONLY : serial_flag
 
-    USE parameters_2d, ONLY : stochastic_flag, stoch_transport_flag, length_spatial_corr
 
     USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,                                                 &
         thickness_levels , dyn_pres_levels
@@ -220,7 +219,7 @@ PROGRAM IMEX_SfloW2D
 
             ! In a binary restart, Z is already loaded, but we need to allocate the kernel
             ! if spatial correlation is active
-            IF (stochastic_flag .AND. length_spatial_corr > 0.0_wp) THEN
+            IF (stochastic_flag .AND. simulation%stochastic%config%length_spatial_corr > 0.0_wp) THEN
                 CALL simulation%stochastic%generate_kernel()
 
             END IF
@@ -265,7 +264,7 @@ PROGRAM IMEX_SfloW2D
     ! restart already contains Z and only needs its convolution kernel above.
     IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                                                             &
             CALL simulation%stochastic%initialize_steady(                                                              &
-            simulation%state, simulation%domains(1),stoch_transport_flag)
+            simulation%state, simulation%domains(1),simulation%stochastic%config%stochastic_transport_flag)
 
     IF ( substrate%topo_change_flag ) CALL refresh_topography_geometry
 

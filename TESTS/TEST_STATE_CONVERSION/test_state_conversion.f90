@@ -143,7 +143,6 @@ CONTAINS
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
     stochastic_flag = .TRUE.
-    stoch_transport_flag = .TRUE.
     pore_pressure_flag = .TRUE.
     gas_flag = .TRUE.
 

@@ -144,7 +144,6 @@ CONTAINS
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
     pore_pressure_flag = .FALSE.
-    stoch_transport_flag = .TRUE.
     rheo_config%mu_0 = 0.1_wp
     rheo_config%mu_inf = 0.5_wp
     rheo_config%Fr_0 = 1.0_wp

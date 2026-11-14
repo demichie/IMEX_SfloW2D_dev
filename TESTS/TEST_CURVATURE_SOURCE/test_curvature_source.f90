@@ -81,7 +81,7 @@ PROGRAM test_curvature_source
   liquid_flag=.TRUE.; gas_flag=.FALSE.; curvature_term_flag=.TRUE.
   bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.FALSE.
   radial_source_flag=.FALSE.; pore_pressure_flag=.FALSE.
-  stoch_transport_flag=.FALSE.; n_intervals=0
+  n_intervals=0
   rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; rho_a_amb=1.2_wp; grav=9.81_wp
   sp_heat_l=4180.0_wp
   ALLOCATE(inv_rho_s(1),sp_heat_s(1),sp_heat_g(0),sp_gas_const_g(0))

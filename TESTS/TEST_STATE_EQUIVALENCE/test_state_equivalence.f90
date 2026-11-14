@@ -255,7 +255,6 @@ CONTAINS
         LOGICAL :: accepted
 
         CALL make_qp(2.0_wp,350.0_wp,1.5_wp,-0.25_wp,0.15_wp,0.10_wp,0.05_wp,qp)
-        stoch_transport_flag=.FALSE.
         pore_pressure_flag=.FALSE.
         CALL primitive_to_conservative(qp,q,accepted)
         IF (.NOT.accepted) ERROR STOP 'inactive optional-slot REAL encoding rejected'
@@ -293,7 +292,6 @@ CONTAINS
         IF (.NOT.accepted) ERROR STOP 'zero optional slots rejected'
         IF (q(idx_stoch)/=0.0_wp .OR. q(idx_pore)/=0.0_wp) &
             ERROR STOP 'inactive optional slots failed to remain zero'
-        stoch_transport_flag=.TRUE.
         pore_pressure_flag=.TRUE.
     END SUBROUTINE check_optional_slots_independent_of_global_flags
 
@@ -312,7 +310,7 @@ CONTAINS
         sp_heat_a=1005.0_wp; sp_gas_const_a=287.05_wp; sp_heat_g=[1850.0_wp]; sp_gas_const_g=[461.5_wp]
         sp_heat_l=4180.0_wp; rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; pres=101325.0_wp; inv_pres=1.0_wp/pres
         T_ambient=300.0_wp; rho_a_amb=pres/(sp_gas_const_a*T_ambient); grav=9.81_wp; eps_sing=1.0E-8_wp; eps_sing4=eps_sing**4
-        gas_flag=.TRUE.; liquid_flag=.FALSE.; stoch_transport_flag=.TRUE.
+        gas_flag=.TRUE.; liquid_flag=.FALSE.
         pore_pressure_flag=.TRUE.; slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
     END SUBROUTINE initialize_case
     SUBROUTINE assert_scalar(label,a,b,tol)

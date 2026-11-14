@@ -51,7 +51,7 @@
                                     liquid_flag, gas_flag, lava_flag, subtract_init_flag, bottom_radial_source_flag,   &
                                     lateral_source_flag, serial_flag,                                                  &
                                     bottom_fissural_source_flag, n_fissures,                                           &
-                                    stochastic_flag, stoch_transport_flag,                                             &
+                                    stochastic_flag, &
                                     pore_pressure_flag
 
     USE parameters_2d, ONLY: slope_correction_flag, curvature_term_flag
@@ -140,11 +140,7 @@
                                     thickness_levels, dyn_pres_levels
 
     ! --- Variables for the namelist STOCHASTIC_PARAMETERS
-    USE stochastic_module, ONLY: sym_noise,                                                                            &
-                                            std_min, std_max, std_slope_factor, tau_stochastic, noise_pow_val,         &
-                                            noise_activation_velocity
-    USE stochastic_random_2d, ONLY: stochastic_seed
-    USE parameters_2d, ONLY: length_spatial_corr
+    USE stochastic_module, ONLY: stochastic_config_type,stochastic_l1,stochastic_l2
 
     ! Darcy configuration and its Pascal cache have canonical layer-local owners.
     USE parameters_2d, ONLY: pore_pres_fract
@@ -288,6 +284,13 @@
     TYPE(thermal_config_type), POINTER :: thermal => thermal_l1
     TYPE(pore_pressure_config_type), POINTER :: pore_pressure => pore_pressure_l1
 
+    ! Scalar names exist only for the accepted legacy STOCHASTIC_PARAMETERS I/O.
+    ! The sole runtime parameter owner is stochastic_l1 (or stochastic_l2).
+    REAL(wp) :: sym_noise,std_min,std_max,std_slope_factor,tau_stochastic
+    REAL(wp) :: noise_pow_val,noise_activation_velocity,length_spatial_corr
+    INTEGER :: stochastic_seed
+    LOGICAL :: stoch_transport_flag
+
 
     REAL(wp) :: thickness_levels0(10)
     REAL(wp) :: dyn_pres_levels0(10)
@@ -400,6 +403,9 @@
         tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag,                                      &
         stochastic_seed, noise_activation_velocity
 
+    NAMELIST /stochastic_l1_parameters/ stochastic_l1
+    NAMELIST /stochastic_l2_parameters/ stochastic_l2
+
     NAMELIST /pore_pressure_parameters/ pore_pressure
     NAMELIST /pore_pressure_l1_parameters/ pore_pressure_l1
     NAMELIST /pore_pressure_l2_parameters/ pore_pressure_l2
@@ -421,6 +427,49 @@
         Tref_Suth, muRef_Suth, S_mu
 
     CONTAINS
+
+    !> @brief Read the canonical stochastic configuration for the selected layer.
+    !> @details Legacy scalar NAMELIST values are translated once into L1.
+    !>          Never retain two physical coefficient objects.
+    SUBROUTINE read_stochastic_layer_configuration()
+        INTEGER :: ios,n_legacy,n_l1,n_l2
+        CHARACTER(LEN=2048) :: input_line
+
+        n_legacy=0
+        n_l1=0
+        n_l2=0
+        REWIND(input_unit)
+        DO
+            READ(input_unit,'(A)',IOSTAT=ios) input_line
+            IF (ios<0) EXIT
+            IF (ios/=0) CALL fatal_error('Unable to scan stochastic namelists')
+            input_line=uppercase_source_text(ADJUSTL(input_line))
+            IF (INDEX(input_line,'&STOCHASTIC_PARAMETERS')==1) n_legacy=n_legacy+1
+            IF (INDEX(input_line,'&STOCHASTIC_L1_PARAMETERS')==1) n_l1=n_l1+1
+            IF (INDEX(input_line,'&STOCHASTIC_L2_PARAMETERS')==1) n_l2=n_l2+1
+        END DO
+        REWIND(input_unit)
+        IF (n_l2/=0) CALL fatal_error('STOCHASTIC_L2_PARAMETERS requires N_LAYERS=2')
+        IF (.NOT.stochastic_flag) RETURN
+        IF (n_legacy+n_l1/=1) &
+            CALL fatal_error('Provide exactly one STOCHASTIC_PARAMETERS or STOCHASTIC_L1_PARAMETERS')
+        IF (n_legacy==1) THEN
+            READ(input_unit,NML=stochastic_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('Invalid legacy STOCHASTIC_PARAMETERS')
+            stochastic_l1%sym_noise=sym_noise
+            stochastic_l1%std_max=std_max
+            stochastic_l1%tau_stochastic=tau_stochastic
+            stochastic_l1%length_spatial_corr=length_spatial_corr
+            stochastic_l1%noise_pow_val=noise_pow_val
+            stochastic_l1%stochastic_seed=stochastic_seed
+            stochastic_l1%noise_activation_velocity=noise_activation_velocity
+            stochastic_l1%stochastic_transport_flag=stoch_transport_flag
+        ELSE
+            READ(input_unit,NML=stochastic_l1_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('Invalid STOCHASTIC_L1_PARAMETERS')
+        END IF
+        REWIND(input_unit)
+    END SUBROUTINE read_stochastic_layer_configuration
 
     !> \brief Check finiteness of a configured IEEE binary32/binary64 real.
     !> \param[in] value Input coefficient, which may contain NaN or infinity.
@@ -569,6 +618,9 @@
         eps_stop = 0.0_wp
         alphas_threshold = 0.0_wp
 
+        stochastic_l1=stochastic_config_type()
+        stochastic_l2=stochastic_config_type()
+
         !-- Inizialization of the Variables for the namelist STOCHASTIC_PARAMETERS
         sym_noise = 0.0_wp
         std_min = -1.0_wp
@@ -675,10 +727,9 @@
 
             IF (stochastic_flag) THEN
 
-                READ (input_unit, stochastic_parameters, IOSTAT=ios)
-                REWIND (input_unit)
+                CALL read_stochastic_layer_configuration()
 
-                IF (stoch_transport_flag) n_stoch_vars = 1
+                IF (stochastic_l1%stochastic_transport_flag) n_stoch_vars = 1
                 idx_stoch = 5 + n_solid + n_add_gas
                 idx_stochEqn = idx_stoch
 
@@ -1390,10 +1441,9 @@
 
         IF (stochastic_flag) THEN
 
-            READ (input_unit, stochastic_parameters, IOSTAT=ios)
-            REWIND (input_unit)
+            CALL read_stochastic_layer_configuration()
 
-            IF (stoch_transport_flag) THEN
+            IF (stochastic_l1%stochastic_transport_flag) THEN
 
                 n_stoch_vars = 1
                 n_vars = n_vars + 1
@@ -2345,7 +2395,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
+            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
 
                 IF (ANY(stoch_bcW(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2475,7 +2525,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
+            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
 
                 IF (ANY(stoch_bcE(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2607,7 +2657,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
+            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
 
                 IF (ANY(stoch_bcS(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2735,7 +2785,7 @@
             END IF
 
 
-            IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
+            IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
 
                 IF (ANY(stoch_bcN(1:n_stoch_vars)%flag .EQ. -1)) THEN
 
@@ -2795,7 +2845,7 @@
         bcS(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcS(1:n_add_gas)
         bcN(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcN(1:n_add_gas)
 
-        IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
+        IF ((stochastic_flag) .AND. (stochastic_l1%stochastic_transport_flag)) THEN
 
             bcW(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcW(1:n_stoch_vars)
             bcE(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcE(1:n_stoch_vars)
@@ -4659,40 +4709,26 @@
 
         IF (stochastic_flag) THEN
 
-            READ (input_unit, stochastic_parameters, IOSTAT=ios)
-
-            IF (ios .NE. 0) THEN
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist STOCHASTIC_PARAMETERS'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, stochastic_parameters)
-                STOP
-                REWIND (input_unit)
-            ELSE
-                REWIND (input_unit)
-
-            END IF
-
             WRITE (*, *) ' '
             WRITE (*, *) 'START PARSING THE STOCASTIC PARAMETERS...'
 
-            IF ((std_max < 0.0_wp) .OR. (tau_stochastic <= 0.0_wp)) THEN
+            IF ((stochastic_l1%std_max < 0.0_wp) .OR. (stochastic_l1%tau_stochastic <= 0.0_wp)) THEN
                 CALL fatal_error('STOCHASTIC_PARAMETERS requires std_max >= 0 and '// 'tau_stochastic > 0')
 
             END IF
 
-            IF ((sym_noise /= 0.0_wp) .AND. (noise_pow_val <= 0.0_wp)) THEN
+            IF ((stochastic_l1%sym_noise /= 0.0_wp) .AND. (stochastic_l1%noise_pow_val <= 0.0_wp)) THEN
                 CALL fatal_error('asymmetric stochastic noise requires '// 'noise_pow_val > 0')
 
             END IF
 
-            IF ((sym_noise /= -1.0_wp) .AND. (sym_noise /= 0.0_wp) .AND.                                               &
-                    (sym_noise /= 1.0_wp)) THEN
+            IF ((stochastic_l1%sym_noise /= -1.0_wp) .AND. (stochastic_l1%sym_noise /= 0.0_wp) .AND. &
+                    (stochastic_l1%sym_noise /= 1.0_wp)) THEN
                 CALL fatal_error('sym_noise must be -1, 0, or 1')
 
             END IF
 
-            IF (length_spatial_corr < 0.0_wp) THEN
+            IF (stochastic_l1%length_spatial_corr < 0.0_wp) THEN
                 CALL fatal_error('length_spatial_corr must be >= 0')
 
             END IF
@@ -4703,32 +4739,32 @@
             WRITE (*, *) 'Setting stochastic intensity parameters...'
 
             if (TRIM(rheology_l1%rheology_model) .EQ. 'froude') THEN
-                std_min = 0.0_wp !std_max * (rheology_l1%mu_0/rheology_l1%mu_inf) ! mu_0 < mu_inf in mu(Fr)
-                IF (noise_activation_velocity <= 0.0_wp)                                                               &
-                        noise_activation_velocity = rheology_l1%Fr_0
-                std_slope_factor = noise_activation_velocity**2
+                stochastic_l1%std_min = 0.0_wp ! Froude noise transition
+                IF (stochastic_l1%noise_activation_velocity <= 0.0_wp) &
+                        stochastic_l1%noise_activation_velocity = rheology_l1%Fr_0
+                stochastic_l1%std_slope_factor = stochastic_l1%noise_activation_velocity**2
             ELSEIF (TRIM(rheology_l1%rheology_model) .EQ. 'lucas') THEN
-                std_min = std_max*(rheology_l1%mu_inf/rheology_l1%mu_0) ! mu_0 > mu_inf in mu(U)
-                IF (noise_activation_velocity <= 0.0_wp)                                                               &
-                        noise_activation_velocity = rheology_l1%U_w
-                std_slope_factor = noise_activation_velocity**2
+                stochastic_l1%std_min = stochastic_l1%std_max*(rheology_l1%mu_inf/rheology_l1%mu_0)
+                IF (stochastic_l1%noise_activation_velocity <= 0.0_wp) &
+                        stochastic_l1%noise_activation_velocity = rheology_l1%U_w
+                stochastic_l1%std_slope_factor = stochastic_l1%noise_activation_velocity**2
 
             END IF
 
             IF (((TRIM(rheology_l1%rheology_model) == 'froude') .OR.                                                   &
                     (TRIM(rheology_l1%rheology_model) == 'lucas')) .AND.                                               &
-                    (noise_activation_velocity <= 0.0_wp)) THEN
+                    (stochastic_l1%noise_activation_velocity <= 0.0_wp)) THEN
                 CALL fatal_error('noise_activation_velocity must be > 0')
 
             END IF
 
             ! Stop the program if std_min > std_max
-            IF (std_min .GT. std_max) THEN
+            IF (stochastic_l1%std_min .GT. stochastic_l1%std_max) THEN
                 ! Stop the program if the parameters are not positive double-precision floating-point numbers
                 ! (real numbers).
                 WRITE (*, *) 'ERROR: problem with namelist STOCHASTIC_PARAMETERS'
-                WRITE (*, *) 'std_min =', std_min, 'std_max =', std_max,                                               &
-                    'std_slope_factor = ', std_slope_factor
+                WRITE (*, *) 'std_min =', stochastic_l1%std_min, 'std_max =', stochastic_l1%std_max, &
+                    'std_slope_factor = ', stochastic_l1%std_slope_factor
                 WRITE (*, *) 'st_min <= std_max required  ! Please correct the input file'
                 STOP
 
@@ -4736,32 +4772,33 @@
 
             ! Write values variable loaded after having performed all checks
             WRITE (*, *) 'IMPUT PARAMETERS FOR THE STOCHASTIC MODEL :'
-            WRITE (*, *) 'std_min =', std_min, 'std_max =', std_max,                                                   &
-                'std_slope_factor = ', std_slope_factor, 'tau_stochastic = ', tau_stochastic,                          &
-                'length_spatial_corr = ', length_spatial_corr
-            WRITE (*, *) 'noise_activation_velocity =', noise_activation_velocity
-            write (*, *) 'sym_noise =', sym_noise, 'noise_pow_val =', noise_pow_val
+            WRITE (*, *) 'std_min =', stochastic_l1%std_min, 'std_max =', stochastic_l1%std_max, &
+                'std_slope_factor = ', stochastic_l1%std_slope_factor, &
+                'tau_stochastic = ', stochastic_l1%tau_stochastic, &
+                'length_spatial_corr = ', stochastic_l1%length_spatial_corr
+            WRITE (*, *) 'noise_activation_velocity =', stochastic_l1%noise_activation_velocity
+            write (*, *) 'sym_noise =', stochastic_l1%sym_noise, 'noise_pow_val =', stochastic_l1%noise_pow_val
 
             ! Say if noise is symmetric or not
-            IF (sym_noise == 1.0_wp) THEN
+            IF (stochastic_l1%sym_noise == 1.0_wp) THEN
                 WRITE (*, *) 'The noise will asymmetric and positive!'
-            ELSEIF (sym_noise == -1.0_wp) THEN
+            ELSEIF (stochastic_l1%sym_noise == -1.0_wp) THEN
                 WRITE (*, *) 'The noise will asymmetric and negative!'
-            ELSEIF (sym_noise == 0.0_wp) THEN
+            ELSEIF (stochastic_l1%sym_noise == 0.0_wp) THEN
                 WRITE (*, *) 'The noise will symmetric (positive and negative)!'
 
             END IF
 
             ! Say if noise is transported or not
-            IF (stoch_transport_flag) THEN
+            IF (stochastic_l1%stochastic_transport_flag) THEN
                 WRITE (*, *) 'The noise will be transported by the flow!'
             ELSE
                 WRITE (*, *) 'The noise will not be transported by the flow!'
 
             END IF
 
-            IF (stochastic_seed >= 0) THEN
-                WRITE (*, *) 'Using reproducible stochastic seed:', stochastic_seed
+            IF (stochastic_l1%stochastic_seed >= 0) THEN
+                WRITE (*, *) 'Using reproducible stochastic seed:', stochastic_l1%stochastic_seed
             ELSE
                 WRITE (*, *) 'Using processor-generated stochastic seed'
 
@@ -4890,7 +4927,17 @@
             WRITE (backup_unit, radial_source_parameters)
         IF (bottom_fissural_source_flag) WRITE (backup_unit, fissural_source_parameters)
 
-        IF (stochastic_flag) WRITE (backup_unit, stochastic_parameters)
+        IF (stochastic_flag) THEN
+            sym_noise=stochastic_l1%sym_noise
+            std_max=stochastic_l1%std_max
+            tau_stochastic=stochastic_l1%tau_stochastic
+            length_spatial_corr=stochastic_l1%length_spatial_corr
+            noise_pow_val=stochastic_l1%noise_pow_val
+            noise_activation_velocity=stochastic_l1%noise_activation_velocity
+            stochastic_seed=stochastic_l1%stochastic_seed
+            stoch_transport_flag=stochastic_l1%stochastic_transport_flag
+            WRITE(backup_unit,stochastic_parameters)
+        END IF
 
         IF (pore_pressure_flag) WRITE (backup_unit, pore_pressure_parameters)
 

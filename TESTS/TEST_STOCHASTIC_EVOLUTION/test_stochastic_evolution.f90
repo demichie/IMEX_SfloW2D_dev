@@ -3,15 +3,14 @@ PROGRAM test_stochastic_evolution
   USE constitutive_parameters_2d, ONLY : T_ambient
   USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
   USE model_layout_2d, ONLY : model_layout_type
-  USE parameters_2d, ONLY : wp, idx_stoch, length_spatial_corr,             &
+  USE parameters_2d, ONLY : wp, idx_stoch,             &
        n_add_gas, n_dyn_pres_levels, n_eqns, n_pore_vars, n_solid,         &
        n_stoch_vars, n_thickness_levels, n_vars, configure_canonical_state_indices, &
-       stochastic_flag, stoch_transport_flag, idx_u, idx_v
+       stochastic_flag, idx_u, idx_v
   USE rheology_parameters_2d, ONLY : rheology_l1
    USE state_fields, ONLY : state_type
-  USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise,     &
-       noise_pow_val, std_max, std_min, std_slope_factor, tau_stochastic, &
-       convolve_2d, expFormNoise, getSigmaNoise
+  USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_config_type, &
+       stochastic_l1,stochastic_l2,convolve_2d,expFormNoise,getSigmaNoise
 
   IMPLICIT NONE
 
@@ -37,18 +36,18 @@ PROGRAM test_stochastic_evolution
   T_ambient = 273.15_wp
 
   stochastic_flag = .TRUE.
-  stoch_transport_flag = .TRUE.
+  stochastic_l1%stochastic_transport_flag = .TRUE.
   rheology_l1%rheology_model='none'
-  length_spatial_corr = 0.0_wp
-  tau_stochastic = 2.0_wp
-  std_max = 0.0_wp
-  sym_noise = 1.0_wp
-  noise_pow_val = 2.0_wp
+  stochastic_l1%length_spatial_corr = 0.0_wp
+  stochastic_l1%tau_stochastic = 2.0_wp
+  stochastic_l1%std_max = 0.0_wp
+  stochastic_l1%sym_noise = 1.0_wp
+  stochastic_l1%noise_pow_val = 2.0_wp
 
   CALL model_layout%initialize(1, n_vars, n_eqns, n_solid, n_add_gas,      &
        n_stoch_vars, n_pore_vars)
   CALL state%initialize(model_layout)
-  CALL stochastic%initialize
+  CALL stochastic%initialize(stochastic_l1,rheology_l1,stochastic_flag)
 
   state%q(:,1,:,:) = 0.0_wp
   state%qp(:,1,:,:) = 0.0_wp
@@ -76,7 +75,7 @@ PROGRAM test_stochastic_evolution
   ! The common optional slot exists even for a layer without transport.
   state%q(idx_stoch,1,1,1)=8.0_wp
   state%qp(idx_stoch,1,1,1)=4.0_wp
-  stoch_transport_flag=.TRUE.
+  stochastic_l1%stochastic_transport_flag=.TRUE.
   CALL stochastic%prepare_timestep(state,0.5_wp,.FALSE.)
   CALL assert_close('disabled layer clears conservative stochastic slot', &
        state%q(idx_stoch,1,1,1),0.0_wp)
@@ -84,21 +83,21 @@ PROGRAM test_stochastic_evolution
        state%qp(idx_stoch,1,1,1),0.0_wp)
 
   ! Enabled transport follows the argument, not the legacy global flag.
-  stoch_transport_flag=.FALSE.
+  stochastic_l1%stochastic_transport_flag=.FALSE.
   state%q(idx_stoch,1,1,1)=6.0_wp
   stochastic%Z=4.0_wp
   CALL stochastic%prepare_timestep(state,0.5_wp,.TRUE.)
   CALL assert_close('selected transport ignores legacy global flag', &
        state%q(idx_stoch,1,1,1),4.5_wp)
-  stoch_transport_flag=.TRUE.
+  stochastic_l1%stochastic_transport_flag=.TRUE.
 
-  std_min = 2.0_wp
-  std_max = 10.0_wp
-  std_slope_factor = 25.0_wp
-  CALL assert_close('sigma at zero velocity', expFormNoise(0.0_wp),        &
-       std_min)
-  expected_sigma = std_max + (std_min - std_max) * EXP(-1.0_wp)
-  CALL assert_close('sigma at activation velocity', expFormNoise(25.0_wp), &
+  stochastic_l1%std_min = 2.0_wp
+  stochastic_l1%std_max = 10.0_wp
+  stochastic_l1%std_slope_factor = 25.0_wp
+  CALL assert_close('sigma at zero velocity', expFormNoise(0.0_wp,stochastic_l1),        &
+       stochastic_l1%std_min)
+  expected_sigma = stochastic_l1%std_max + (stochastic_l1%std_min - stochastic_l1%std_max) * EXP(-1.0_wp)
+  CALL assert_close('sigma at activation velocity', expFormNoise(25.0_wp,stochastic_l1), &
        expected_sigma)
 
   state%q(1,1,1,1) = 1.0_wp
@@ -106,14 +105,14 @@ PROGRAM test_stochastic_evolution
   state%qp(idx_v,1,1,1) = 4.0_wp
   rheology_l1%rheology_model='froude'
   CALL assert_close('sigma uses squared physical speed',                  &
-       getSigmaNoise(state,1,1), expected_sigma)
+       getSigmaNoise(state,1,1,stochastic_l1,rheology_l1), expected_sigma)
 
   state%q(1,1,2,1) = 0.0_wp
-  CALL assert_close('dry cells use sigma_max', getSigmaNoise(state,2,1),   &
-       std_max)
+  CALL assert_close('dry cells use sigma_max', getSigmaNoise(state,2,1,stochastic_l1,rheology_l1),   &
+       stochastic_l1%std_max)
 
   cell_size = 1.0_wp
-  length_spatial_corr = 1.0_wp
+  stochastic_l1%length_spatial_corr = 1.0_wp
   CALL stochastic%generate_kernel
   CALL assert_true('kernel size is odd',                                   &
        MOD(SIZE(stochastic%conv_kernel,1), 2) == 1 .AND.                    &
@@ -134,6 +133,15 @@ PROGRAM test_stochastic_evolution
   CALL convolve_2d(rectangular_field, identity_kernel, convolution_result)
   CALL assert_true('convolution preserves rectangular (x,y) layout',      &
        MAXVAL(ABS(convolution_result - rectangular_field)) <= tolerance)
+
+  ! Independent layer coefficients are not aliased by the live L1 workspace.
+  stochastic_l2=stochastic_config_type()
+  stochastic_l2%tau_stochastic=4.0_wp
+  stochastic_l2%length_spatial_corr=3.0_wp
+  CALL assert_close('L2 OU time is independent of L1',stochastic_l1%tau_stochastic,2.0_wp)
+  CALL assert_close('L2 OU spatial scale is independent of L1', &
+       stochastic_l1%length_spatial_corr,1.0_wp)
+  CALL assert_close('independent L2 OU time',stochastic_l2%tau_stochastic,4.0_wp)
 
   CALL stochastic%finalize
   CALL state%finalize

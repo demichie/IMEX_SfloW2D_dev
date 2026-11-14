@@ -211,18 +211,36 @@ Do not create variable-length layer states, separate index sets, or masks that
 duplicate already authoritative source activation. `stochastic_flag`
 (OU evolution/rheology) and `stoch_transport_flag` (conservative transported
 component) are separate choices; migration must preserve this distinction.
-The input parser, Lie registry, stochastic workspace and I/O currently use
-single-layer/global flags and are **not yet migrated** to independent L2
-activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
-TL07/TL13, preserving accepted single-layer inputs and budgets.
+The Lie registry and rheology activation still require canonical
+per-layer flags; `N_LAYERS=2` stays rejected until the remaining source,
+initialization and restart paths are integrated.
 
-**Rheology NEWTON/SEMI-IMPLICIT activation routing (14 November 2026, CI pending).**
+**Canonical layer OU coefficients and stochastic transport (14 November 2026, CI pending).**
+The existing stochastic module owns separate `stochastic_l1` and
+`stochastic_l2` canonical configurations, including the OU damping time,
+noise bounds and transformation, spatial correlation, activation velocity,
+seed and conservative stochastic-transport flag. The OU workspace holds
+non-owning references to the chosen stochastic and rheology configurations;
+its physical kernels no longer read L1 global OU coefficients or hardcode
+`rheology_l1`. The intrinsic RNG receives the selected seed directly.
+The old scalar `STOCHASTIC_PARAMETERS` NAMELIST remains accepted through
+input/output-only staging; a typed `STOCHASTIC_L1_PARAMETERS` alternative
+is exclusive with it. L2 typed input remains rejected while two-layer
+execution is disabled, consistently with other L2 NAMELIST groups.
+The former `stoch_transport_flag` and global spatial-correlation scalar
+are removed from runtime storage. The stochastic-rheology activation and
+pore-pressure activation are still legacy global flags and will be moved
+coherently to their canonical layer configurations next; no shadow copies
+of these flags have been introduced. Optional-equation OR selection over
+two layers and per-layer OU workspace execution remain pending.
+
+**Rheology NEWTON/SEMI-IMPLICIT activation routing (14 November 2026, CI verified).**
 The existing Lie executor routes the selected Darcy and stochastic-rheology
 activations through the Newton solver, semi-implicit source, REAL residual
 and COMPLEX Jacobian. Physical laws and evaluation order remain unchanged.
 The single-layer caller supplies its existing flags. No new stored activation
-is introduced. Canonical per-layer flags, independent OU parameter storage,
-common optional-equation selection and I/O/restart are not yet migrated.
+is introduced. Canonical rheology/pore-pressure flags, optional-equation OR selection,
+and two-layer execution/restart are not yet migrated.
 N_LAYERS=2 remains disabled.
 
 **Rheology EXPLICIT/ANALYTIC layer selection (14 November 2026, CI pending).**
@@ -232,8 +250,8 @@ dependency on global activation flags. Stochastic rheology remains distinct
 from the conservative stochastic transport flag. Physical rheology laws,
 formulas and the common variable layout are unchanged. Production L1 and
 standalone explicit test callers supply their existing input flags.
-NEWTON/SEMI-IMPLICIT residuals and the complex Jacobian still read globals
-and require a coherent migration before L2 can execute.
+NEWTON/SEMI-IMPLICIT residuals and the complex Jacobian now receive the same
+selected activation explicitly, as documented above.
 
 **Optional-slot state conversion (14 November 2026, CI pending).**
 The canonical REAL/COMPLEX conservative-to-primitive, primitive-to-

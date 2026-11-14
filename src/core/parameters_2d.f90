@@ -107,8 +107,6 @@ MODULE parameters_2d
     !> Remove transported flow material entering the identified sea zone.
     LOGICAL :: sea_mass_removal_flag = .FALSE.
 
-    LOGICAL :: stoch_transport_flag
-
     LOGICAL :: pore_pressure_flag
 
     !> Flag for stochastic friction model
@@ -122,9 +120,6 @@ MODULE parameters_2d
     !> - F     => do not use
     !> .
     LOGICAL :: sutherland_flag
-
-    !> Scale of spatial correlation for stochastic model
-    REAL(wp) :: length_spatial_corr
 
     !> Elevation of the water level in the DEM file
     REAL(wp) :: water_level

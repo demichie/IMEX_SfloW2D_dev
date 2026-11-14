@@ -24,7 +24,7 @@ PROGRAM test_d17_production_newton
   rheology_flag=.TRUE.;rheology_l1%rheology_model='newmodel'
   pore_pressure_flag=.FALSE.;thermal_l1%thermal_cooling_flag=.FALSE.
   slope_correction_flag=.FALSE.;curvature_term_flag=.FALSE.
-  stochastic_flag=.FALSE.;stoch_transport_flag=.FALSE.
+  stochastic_flag=.FALSE.
   liquid_flag=.TRUE.;gas_flag=.FALSE.;lava_flag=.FALSE.
   rho_l=1000.0_wp;inv_rho_l=1.0_wp/rho_l;sp_heat_l=4000.0_wp
   sp_heat_a=1005.0_wp;sp_gas_const_a=287.0_wp
