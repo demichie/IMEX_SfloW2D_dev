@@ -1,7 +1,6 @@
-!> @brief Validated, per-layer phase and rheology selection.
-!> @details Phase and rheology selection are validated before grid/worker allocation.
-!>          A descriptor is read via queries and is never used to switch
-!>          module-global phase/rheology parameters inside OpenMP loops.
+!> @brief Validated, per-layer rheology and source configurations.
+!> @details The shared carrier phase is read from canonical global flags during validation.
+!>          No per-layer phase copy is stored or switched inside OpenMP loops.
 !>          Rheology and thermal configurations are referenced without persistent copies.
 !>          Two-layer activation remains a later step.
 MODULE layer_physics_2d
@@ -9,18 +8,15 @@ MODULE layer_physics_2d
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE parameters_2d, ONLY : gas_flag, liquid_flag, lava_flag
     USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
         canonical_rheology_source_name, rheology_source_id, RHEOLOGY_ID_NONE
     IMPLICIT NONE
     PRIVATE
-    INTEGER, PARAMETER, PUBLIC :: LAYER_PHASE_GAS=1
-    INTEGER, PARAMETER, PUBLIC :: LAYER_PHASE_LIQUID=2
-    INTEGER, PARAMETER, PUBLIC :: LAYER_PHASE_LAVA=3
     PUBLIC :: layer_physics_type
 
     TYPE :: layer_physics_type
         PRIVATE
-        INTEGER :: carrier_phase=0
         INTEGER :: rheology_id=RHEOLOGY_ID_NONE
         CHARACTER(LEN=64) :: rheology_source=''
         !> Non-owning canonical rheology configuration.
@@ -36,7 +32,6 @@ MODULE layer_physics_2d
         PROCEDURE :: initialize => initialize_layer_physics
         PROCEDURE :: finalize => finalize_layer_physics
         PROCEDURE :: is_initialized => layer_physics_initialized
-        PROCEDURE :: phase => layer_physics_phase
         PROCEDURE :: selected_rheology => layer_physics_rheology
         PROCEDURE :: selected_rheology_id => layer_physics_rheology_id
         PROCEDURE :: rheology_configuration => layer_physics_configuration
@@ -49,17 +44,15 @@ CONTAINS
 
     !> @brief Initialize the validated layer descriptor and bind canonical thermal settings.
     !> @param[in,out] this Layer descriptor to initialize.
-    !> @param[in] phase Material carrier phase identifier.
     !> @param[in] rheology_enabled Rheology activation for this layer.
     !> @param[in] rheology_config Stable-lifetime canonical rheology settings.
     !> @param[in] thermal_config Stable-lifetime canonical thermal settings.
     !> @param[in] pore_config Stable-lifetime canonical Darcy settings.
     !> @param[in] mass_config Stable-lifetime mass-exchange settings.
     !> @param[out] error Empty on success; diagnostic on failure.
-    SUBROUTINE initialize_layer_physics(this,phase,rheology_enabled,rheology_config,thermal_config,pore_config, &
+    SUBROUTINE initialize_layer_physics(this,rheology_enabled,rheology_config,thermal_config,pore_config, &
         mass_config,error)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
-        INTEGER, INTENT(IN) :: phase
         LOGICAL, INTENT(IN) :: rheology_enabled
         TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology_config
         TYPE(thermal_config_type), TARGET, INTENT(IN) :: thermal_config
@@ -70,8 +63,8 @@ CONTAINS
         TYPE(source_term_type) :: term
         CALL this%finalize()
         error=''
-        IF (phase<LAYER_PHASE_GAS .OR. phase>LAYER_PHASE_LAVA) THEN
-            error='TL04: invalid layer carrier phase'
+        IF (COUNT([gas_flag,liquid_flag,lava_flag])/=1) THEN
+            error='TL04: invalid global carrier phase'
             RETURN
         END IF
         source=''
@@ -83,14 +76,9 @@ CONTAINS
                     RETURN
                 END IF
                 term=source_term_descriptor_by_name(source)
-                SELECT CASE(phase)
-                CASE(LAYER_PHASE_GAS)
-                    IF (.NOT.term%allows_gas) error='TL04: rheology incompatible with gas'
-                CASE(LAYER_PHASE_LIQUID)
-                    IF (.NOT.term%allows_liquid) error='TL04: rheology incompatible with liquid'
-                CASE(LAYER_PHASE_LAVA)
-                    IF (.NOT.term%allows_lava) error='TL04: rheology incompatible with lava'
-                END SELECT
+                IF (gas_flag .AND. .NOT.term%allows_gas) error='TL04: rheology incompatible with gas'
+                IF (liquid_flag .AND. .NOT.term%allows_liquid) error='TL04: rheology incompatible with liquid'
+                IF (lava_flag .AND. .NOT.term%allows_lava) error='TL04: rheology incompatible with lava'
                 IF (LEN_TRIM(error)>0) RETURN
             END IF
         END IF
@@ -98,7 +86,6 @@ CONTAINS
         this%thermal=>thermal_config
         this%pore_pressure=>pore_config
         this%mass_exchange=>mass_config
-        this%carrier_phase=phase
         this%rheology_source=source
         this%rheology_id=RHEOLOGY_ID_NONE
         IF (LEN_TRIM(source)>0) this%rheology_id=rheology_source_id(source)
@@ -111,7 +98,6 @@ CONTAINS
         NULLIFY(this%thermal)
         NULLIFY(this%pore_pressure)
         NULLIFY(this%mass_exchange)
-        this%carrier_phase=0
         this%rheology_id=RHEOLOGY_ID_NONE
         this%rheology_source=''
         this%initialized=.FALSE.
@@ -121,11 +107,6 @@ CONTAINS
         CLASS(layer_physics_type), INTENT(IN) :: this
         layer_physics_initialized=this%initialized
     END FUNCTION layer_physics_initialized
-
-    PURE INTEGER FUNCTION layer_physics_phase(this)
-        CLASS(layer_physics_type), INTENT(IN) :: this
-        layer_physics_phase=this%carrier_phase
-    END FUNCTION layer_physics_phase
 
     PURE FUNCTION layer_physics_rheology(this) RESULT(name)
         CLASS(layer_physics_type), INTENT(IN) :: this

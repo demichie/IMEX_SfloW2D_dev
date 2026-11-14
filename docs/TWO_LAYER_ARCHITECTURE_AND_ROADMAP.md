@@ -22,7 +22,7 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Layout | `model_layout_2d` contiene `n_layers`; `state_type%q/qp` e workspace di integrazione sono rank-4 `(componente,layer,x,y)`; i consumer di produzione selezionano esplicitamente L1. | `supported_layer_count` accetta solo 1; evoluzione L2, maschere inattive e test coupled. |
 | Deposito | `deposit_tot` è l'inventario canonico dello spessore; ramo lava distinto dal granulare, senza inventario autonomo `lava_deposit`; rollback e percorsi v7 sono stati adeguati. | Gate G1 completo: casi granulari/lava, `n_solid=0`, topografia on/off, I/O e restart round-trip documentati. |
 | Rheology | Canonical L1/L2 rheology and explicit REAL/COMPLEX/analytic source propagation are implemented and CI-verified on `23beb9c`. | L2 production scopes remain disabled; extended scientific gates are open. |
-| Contesto per layer | `simulation_2d%layer_physics(:)` conserva fase e reologia; il contesto referenzia ora la configurazione termica canonica senza una seconda copia persistente. La vista read-only viene passata al passo Lie. | Completare le altre configurazioni SHARED/L1/L2 e gli scope fisici solo nei gate dedicati; nessuna sincronizzazione fra copie. |
+| Contesto per layer | `simulation_2d%layer_physics(:)` conserva le configurazioni e la selezione reologica per layer, ma non la fase portante, che resta globale. Il contesto referenzia la configurazione termica canonica senza copie persistenti. La vista read-only viene passata al passo Lie. | Completare le altre configurazioni SHARED/L1/L2 e gli scope fisici solo nei gate dedicati; nessuna sincronizzazione fra copie. |
 | Lie | Un solo Lie primo ordine, cell-outer/OpenMP, gruppi numerici ordinati, trial e rollback; chiamata corrente `execute_lie_source_groups(...q_trial(:,1,:,:),qp_trial(:,1,:,:)...)`. | Supportare gruppi con scope `L1`, `L2`, `INTERLAYER`, candidati entrambi i layer e commit atomico senza fisica nel driver. |
 | Thermal | Canonical L1/L2 cooling configurations and explicit kernel propagation are implemented; `T_ground` has moved out of thermal configs into the single shared `substrate%T_ground`. The accepted single-layer NAMELIST names both resolve to L1. | Extended single-layer thermal verification remains open; no new thermal law is activated. |
 | Substrate | TL04-C1 owns ground temperature, porosity, erodible inventory settings and topography setup in `substrate_parameters_2d`; code, input fixtures and generators were migrated. | Extended scientific checks on terrain energy, inventory/restart and formerly distinct ground temperatures remain part of G3. |
@@ -156,8 +156,14 @@ accetta gia' `source_mask`, il suo filtro locale sara' applicato
 pubblica, wrapper, ulteriore tipo o secondo coordinatore.
 `mass_exchange_2d` e le sei leggi fisiche restano invariati.
 
-Per L2 restano da rimuovere le dipendenze dalla fase globale
-(`gas_flag`/`liquid_flag`) dove la fase e' specifica del layer.
+La fase portante e' una sola per l'intera simulazione: `gas_flag`,
+`liquid_flag` e `lava_flag` restano globali e SHARED. L1 e L2 possono
+avere stati, composizioni, temperature, concentrazioni solide, reologie
+e configurazioni delle sorgenti differenti, ma non fasi portanti
+differenti. L'uso dei flag di fase globali nei kernel fisici e' quindi
+corretto e non richiede argomenti o flag per layer. Restano distinti
+i contatti cell-local e le attivazioni Darcy/stochastic, il cui scope
+va verificato separatamente prima di modificare i kernel.
 Il registro resta single-layer e i controlli per L2 non si attivano
 prima dei candidati accoppiati e rollback atomico di TL07/TL11.
 Test richiesti in quella fase: quattro stati, cambi di esposizione tra
@@ -189,6 +195,17 @@ q1_candidate = q1 + dt*Gamma
 q2_candidate = q2 - dt*Gamma
 ```
 Un solo limiter di disponibilità condiviso; nessun limitatore indipendente che rompa l'antisimmetria. Validazione e rollback atomici di entrambi i layer, substrato, geometria e diagnostiche. La variabile termica conservativa trasferita va contabilizzata; l'energia cinetica e la dissipazione possono avere regole ulteriori, esplicite. L'approssimazione del gas di packing è un **difetto esterno diagnosticato**, non un trasferimento fittiziamente conservativo. Non imporre un Newton globale `2*n_eqns` senza evidenza di necessità.
+
+**Global carrier-phase decision (14 November 2026).**
+`gas_flag`, `liquid_flag`, `lava_flag` and shared carrier properties belong to
+the simulation, never to the individual layer. Exactly one phase is selected
+for the run. L1 and L2 can differ in thermodynamic/composition state,
+rheology, Darcy and mass-exchange configurations, but cannot select different
+carrier phases. `layer_physics_type` therefore validates rheology against
+the canonical global flags without retaining a `carrier_phase` field or a
+`phase()` query. Keep existing global-flag use inside physics unchanged;
+revisit pore-pressure and stochastic activation separately only after an
+explicit ownership audit. This does not enable `N_LAYERS=2`.
 
 **Pre-TL07 architecture preparation (14 November 2026, CI pending).**
 The existing contact classifier is moved unchanged from `physics/` to
@@ -400,7 +417,7 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
 | **TL09 — elutriazione L1→L2** | **Da implementare** | Inventario, co-lift, cold-start e compatibilità con i contatti. |
 | **TL10 — drag interlayer** | **Da implementare** | Momento uguale/opposto, forza nulla ai limiti, analisi stabilità. |
-| **TL11 — sorgenti esterne e basali** | **Da implementare; classificatore dei contatti esistente** | Usare i contatti aggiornati dal Lie all'ingresso di ogni gruppo e passarli a `source_terms_2d`, filtrando i bit del `source_mask` nell'assemblaggio gia' presente, senza una nuova API. Mantenere i kernel di mass exchange invariati, completare le dipendenze di fase per layer, sorgenti esterne e bilanci SHARED; gate G6, sezione 4.3.1. |
+| **TL11 — sorgenti esterne e basali** | **Da implementare; classificatore dei contatti esistente** | Usare i contatti aggiornati dal Lie all'ingresso di ogni gruppo e passarli a `source_terms_2d`, filtrando i bit del `source_mask` nell'assemblaggio gia' presente, senza una nuova API. Mantenere i kernel di mass exchange invariati, mantenere la fase portante globale, sorgenti esterne e bilanci SHARED; gate G6, sezione 4.3.1. |
 | **TL12 — validazione scientifica** | **Da implementare** | Benchmark coupled, resting states, budgets, wet/dry, OpenMP, CFL, restart, prestazioni, regressioni single-layer; gate G7. |
 | **TL13 — integrazione e rilascio** | **Da implementare** | Contratti di input/NetCDF/restart, esempi e postprocessing, documentazione delle opzioni e limiti, decisione esplicita prima di abilitare `N_LAYERS=2`. |
 

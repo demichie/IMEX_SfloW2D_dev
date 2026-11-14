@@ -21,8 +21,7 @@ MODULE simulation_2d
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
     USE model_layout_2d, ONLY : model_layout_type
-    USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
-        LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
+    USE layer_physics_2d, ONLY : layer_physics_type
 
     USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
             n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, lava_flag, &
@@ -101,7 +100,7 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
 
         CHARACTER(LEN=256) :: source_error
-        INTEGER :: carrier_phase,layer
+        INTEGER :: layer
 
         ! Canonical state indices must be available before any initial-condition
         ! conversion, including collapsing-volume initialization.
@@ -115,10 +114,7 @@ CONTAINS
         ! is non-owning; this descriptor never caches another coefficient copy.
         IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
         ALLOCATE(this%layer_physics(this%model_layout%n_layers))
-        carrier_phase=LAYER_PHASE_GAS
-        IF (liquid_flag) carrier_phase=LAYER_PHASE_LIQUID
-        IF (lava_flag) carrier_phase=LAYER_PHASE_LAVA
-        CALL this%layer_physics(1)%initialize(carrier_phase,rheology_flag,rheology_l1,thermal_l1, &
+        CALL this%layer_physics(1)%initialize(rheology_flag,rheology_l1,thermal_l1, &
             pore_pressure_l1,mass_exchange_l1,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 

@@ -1,11 +1,10 @@
 PROGRAM test_layer_physics
-    USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp, gas_flag, liquid_flag, lava_flag
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE layer_physics_2d, ONLY : layer_physics_type, LAYER_PHASE_GAS, &
-        LAYER_PHASE_LIQUID, LAYER_PHASE_LAVA
+    USE layer_physics_2d, ONLY : layer_physics_type
     IMPLICIT NONE
     TYPE(layer_physics_type) :: l1,l2
     TYPE(rheology_config_type), TARGET :: config1,config2
@@ -22,15 +21,16 @@ PROGRAM test_layer_physics
     config1%rheology_model='voellmy'
     config1%mu=0.3_wp
     config1%xi=300.0_wp
-    CALL l1%initialize(LAYER_PHASE_LIQUID,.TRUE.,config1,thermal1,pore1,mass1,err)
+    gas_flag=.FALSE.
+    liquid_flag=.TRUE.
+    lava_flag=.FALSE.
+    CALL l1%initialize(.TRUE.,config1,thermal1,pore1,mass1,err)
     CALL require(LEN_TRIM(err)==0,'liquid voellmy accepted')
     CALL require(l1%is_initialized(),'liquid initialized')
-    CALL require(l1%phase()==LAYER_PHASE_LIQUID,'liquid phase retained')
     CALL require(l1%selected_rheology()=='rheology_voellmy','canonical rheology')
     CALL require(l1%selected_rheology_id()>0,'cached dispatch id')
-    CALL l2%initialize(LAYER_PHASE_GAS,.FALSE.,config2,thermal2,pore2,mass2,err)
-    CALL require(LEN_TRIM(err)==0,'independent gas initialized')
-    CALL require(l2%phase()==LAYER_PHASE_GAS,'second phase retained')
+    CALL l2%initialize(.FALSE.,config2,thermal2,pore2,mass2,err)
+    CALL require(LEN_TRIM(err)==0,'independent layer initialized with shared liquid phase')
     CALL require(l2%selected_rheology_id()==0,'none dispatch id')
     CALL require(l1%selected_rheology_id()>0,'first layer unchanged')
     returned=l1%rheology_configuration()
@@ -77,19 +77,29 @@ PROGRAM test_layer_physics
         'mass-exchange L2 configuration independent')
     config2%rheology_model='lava'
     config2%nu_ref=0.02_wp
-    CALL l2%initialize(LAYER_PHASE_LAVA,.TRUE.,config2,thermal2,pore2,mass2,err)
-    CALL require(LEN_TRIM(err)==0,'lava rheology allowed')
-    CALL l2%initialize(LAYER_PHASE_GAS,.TRUE.,config2,thermal2,pore2,mass2,err)
-    CALL require(LEN_TRIM(err)>0,'lava rheology rejected for gas')
+    liquid_flag=.FALSE.
+    lava_flag=.TRUE.
+    CALL l2%initialize(.TRUE.,config2,thermal2,pore2,mass2,err)
+    CALL require(LEN_TRIM(err)==0,'lava rheology allowed for shared lava phase')
+    lava_flag=.FALSE.
+    gas_flag=.TRUE.
+    CALL l2%initialize(.TRUE.,config2,thermal2,pore2,mass2,err)
+    CALL require(LEN_TRIM(err)>0,'lava rheology rejected for shared gas phase')
     CALL require(.NOT.l2%is_initialized(),'invalid reconfiguration clears state')
-    CALL l2%initialize(0,.FALSE.,config2,thermal2,pore2,mass2,err)
-    CALL require(LEN_TRIM(err)>0,'invalid phase rejected')
+    gas_flag=.FALSE.
+    CALL l2%initialize(.FALSE.,config2,thermal2,pore2,mass2,err)
+    CALL require(LEN_TRIM(err)>0,'missing global phase rejected')
+    gas_flag=.TRUE.
+    liquid_flag=.TRUE.
+    CALL l2%initialize(.FALSE.,config2,thermal2,pore2,mass2,err)
+    CALL require(LEN_TRIM(err)>0,'multiple global phases rejected')
+    liquid_flag=.FALSE.
     config2%rheology_model='unknown'
-    CALL l2%initialize(LAYER_PHASE_GAS,.TRUE.,config2,thermal2,pore2,mass2,err)
+    CALL l2%initialize(.TRUE.,config2,thermal2,pore2,mass2,err)
     CALL require(LEN_TRIM(err)>0,'unknown rheology rejected')
     CALL l1%finalize()
     CALL require(.NOT.l1%is_initialized(),'finalize resets configuration')
-    PRINT *, 'PASS: independent per-layer rheology/phase descriptors'
+    PRINT *, 'PASS: per-layer closures use one global carrier phase'
 CONTAINS
     SUBROUTINE require(ok,label)
         LOGICAL, INTENT(IN) :: ok
