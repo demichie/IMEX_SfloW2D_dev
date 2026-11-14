@@ -747,8 +747,10 @@
             ALLOCATE (sp_gas_const_g(n_add_gas))
 
             CALL read_stochastic_layer_configuration()
-            IF (stochastic_l1%stochastic_transport_flag) THEN
-                n_stoch_vars=1
+            ! The same optional component index serves every material layer.
+            n_stoch_vars=MERGE(1,0,stochastic_l1%stochastic_transport_flag .OR. &
+                stochastic_l2%stochastic_transport_flag)
+            IF (n_stoch_vars==1) THEN
                 idx_stoch=5+n_solid+n_add_gas
                 idx_stochEqn=idx_stoch
             END IF
@@ -785,11 +787,6 @@
                 END IF
                 IF (ios/=0) CALL fatal_error('Invalid L1 pore-pressure NAMELIST')
                 REWIND(input_unit)
-                n_pore_vars = 1
-
-                idx_pore = 5 + n_solid + n_add_gas + n_stoch_vars
-                idx_poreEqn = idx_pore
-
                 ! Validate the canonical layer object before initializing the Lie worker pool.
                 pore_pressure_l1%f_inhibit_mode=TRIM(ADJUSTL(pore_pressure_l1%f_inhibit_mode))
                 SELECT CASE(TRIM(pore_pressure_l1%f_inhibit_mode))
@@ -808,13 +805,18 @@
             ELSE
                 IF (n_pore_legacy/=0) &
                     CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
-                n_pore_vars = 0
-
                 WRITE (*, *) 'NOTE: PORE_PRESSURE_FLAG is FALSE. Pore pressure equation will not be solved.'
                 WRITE (*, *) 'HYDRAULIC_PERMEABILITY, F_INHIBIT_MODE, ALPHA_TRANS, '//                                 &
                     'and PORE_PRESSURE_FRACTION will not be accounted for.'
                 WRITE (*, *) 'GAS_LOSS_FLAG and DYNAMIC_PERMEABILITY_FLAG will be set to FALSE.'
 
+            END IF
+
+            n_pore_vars=MERGE(1,0,pore_pressure_l1%pore_pressure_flag .OR. &
+                pore_pressure_l2%pore_pressure_flag)
+            IF (n_pore_vars==1) THEN
+                idx_pore=5+n_solid+n_add_gas+n_stoch_vars
+                idx_poreEqn=idx_pore
             END IF
 
             ALLOCATE (stoch_bcW(n_stoch_vars))
@@ -1469,11 +1471,9 @@
         ! ----------- READ stochastic_parameters NAMELIST --------------------------
 
         CALL read_stochastic_layer_configuration()
-        n_stoch_vars=0
-        IF (stochastic_l1%stochastic_transport_flag) THEN
-            n_stoch_vars=1
-            n_vars=n_vars+1
-        END IF
+        n_stoch_vars=MERGE(1,0,stochastic_l1%stochastic_transport_flag .OR. &
+            stochastic_l2%stochastic_transport_flag)
+        n_vars=n_vars+n_stoch_vars
 
         ! The canonical single-layer Darcy NAMELIST is selected exactly once.
         n_pore_legacy=0
@@ -1508,13 +1508,14 @@
             END IF
             IF (ios/=0) CALL fatal_error('ERROR: invalid L1 pore-pressure NAMELIST')
             REWIND(input_unit)
-            n_pore_vars=1
-            n_vars=n_vars+1
         ELSE
             IF (n_pore_legacy/=0) &
                 CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
-            n_pore_vars=0
         END IF
+
+        n_pore_vars=MERGE(1,0,pore_pressure_l1%pore_pressure_flag .OR. &
+            pore_pressure_l2%pore_pressure_flag)
+        n_vars=n_vars+n_pore_vars
 
         ! Layer rheology must be read for gas, liquid and lava carriers.
         ! Select the input form once and reject duplicates before reading.

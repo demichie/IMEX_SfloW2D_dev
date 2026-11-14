@@ -46,6 +46,7 @@ PROGRAM test_state
     CALL assert_close('round-trip T',qp_roundtrip(idx_T),qp(idx_T),1.0E-11_wp)
     CALL assert_close('round-trip u',qp_roundtrip(idx_u),qp(idx_u),1.0E-11_wp)
     CALL check_admissibility(qp,q)
+    CALL check_opposite_optional_state_slots
 
     CALL build_physical_state_from_qp(qp,real_workspace,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
     cqp=CMPLX(qp,0.0_wp,wp)
@@ -709,6 +710,52 @@ CONTAINS
         IF (.NOT.accepted) ERROR STOP 'valid conservative state rejected'
         IF (p_dyn<=0.0_wp) ERROR STOP 'dynamic pressure was not computed'
     END SUBROUTINE check_admissibility
+
+    !> @brief Test common conservative indices with opposite active slots in two local states.
+    !> @details L1 carries pore pressure only; L2 carries stochastic transport
+    !>          only. The flags are independently tested by physical source
+    !>          tests; here only REAL/COMPLEX conversion and exact zeros matter.
+    SUBROUTINE check_opposite_optional_state_slots
+        REAL(wp) :: layer_primitive(n_vars,2),layer_conservative(n_vars,2),decoded(n_vars)
+        COMPLEX(wp) :: complex_primitive(n_vars),complex_conservative(n_vars),complex_decoded(n_vars)
+        INTEGER :: layer
+
+        IF (idx_stoch==0 .OR. idx_pore==0 .OR. idx_stoch==idx_pore) &
+            ERROR STOP 'shared optional component indices are missing'
+        DO layer=1,2
+            layer_primitive(:,layer)=qp
+        END DO
+        layer_primitive(idx_stoch,1)=0.0_wp
+        layer_primitive(idx_pore,2)=0.0_wp
+
+        DO layer=1,2
+            CALL primitive_to_conservative(layer_primitive(:,layer),layer_conservative(:,layer))
+            CALL conservative_to_primitive(layer_conservative(:,layer),decoded)
+            CALL assert_close('common stochastic slot',decoded(idx_stoch), &
+                layer_primitive(idx_stoch,layer),1.0E-12_wp)
+            CALL assert_close('common Darcy slot',decoded(idx_pore), &
+                layer_primitive(idx_pore,layer),1.0E-12_wp)
+        END DO
+
+        IF (layer_conservative(idx_stoch,1)/=0.0_wp .OR. layer_conservative(idx_pore,2)/=0.0_wp) &
+            ERROR STOP 'inactive optional conservative component is not zero'
+        IF (layer_conservative(idx_pore,1)==0.0_wp .OR. layer_conservative(idx_stoch,2)==0.0_wp) &
+            ERROR STOP 'active optional conservative component was lost'
+
+        DO layer=1,2
+            complex_primitive=CMPLX(layer_primitive(:,layer),0.0_wp,wp)
+            IF (layer==1) complex_primitive(idx_pore)= &
+                CMPLX(layer_primitive(idx_pore,layer),1.0E-25_wp,wp)
+            IF (layer==2) complex_primitive(idx_stoch)= &
+                CMPLX(layer_primitive(idx_stoch,layer),1.0E-25_wp,wp)
+            CALL primitive_to_conservative(complex_primitive,complex_conservative)
+            CALL conservative_to_primitive(complex_conservative,complex_decoded)
+            IF (ABS(complex_decoded(idx_stoch)-complex_primitive(idx_stoch))>1.0E-24_wp) &
+                ERROR STOP 'COMPLEX stochastic slot not preserved'
+            IF (ABS(complex_decoded(idx_pore)-complex_primitive(idx_pore))>1.0E-24_wp) &
+                ERROR STOP 'COMPLEX pore-pressure slot not preserved'
+        END DO
+    END SUBROUTINE check_opposite_optional_state_slots
 
     SUBROUTINE initialize_case
         n_solid=2; n_add_gas=1; n_stoch_vars=1; n_pore_vars=1

@@ -2,9 +2,6 @@ PROGRAM test_state_equivalence
     USE parameters_2d
     USE constitutive_parameters_2d
     USE solid_transport_parameters_2d
-    USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
-    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
-    USE stochastic_module, ONLY : stochastic_l1,stochastic_l2
     USE state_conversion_2d, ONLY : old_qc_to_qp=>qc_to_qp, old_qp_to_qc=>qp_to_qc, &
         old_state_qp=>physical_state_from_qp, old_state_cq=>physical_state_from_q, &
         physical_state_type, complex_physical_state_type, old_mixture=>mixt_var, &
@@ -48,7 +45,6 @@ PROGRAM test_state_equivalence
     CALL check_settling_trace_equivalence
     CALL check_volume_conversion_equivalence
     CALL check_optional_slots_without_activation_gate
-    CALL check_opposite_layer_optional_slots
     WRITE(*,'(A)') 'PASS: state equivalence cases verified'
 CONTAINS
     SUBROUTINE compare_case(h,T,u,v,xs1,xs2,xg1,label)
@@ -296,55 +292,6 @@ CONTAINS
         IF (q(idx_stoch)/=0.0_wp .OR. q(idx_pore)/=0.0_wp) &
             ERROR STOP 'inactive optional slots failed to remain zero'
     END SUBROUTINE check_optional_slots_without_activation_gate
-
-    !> @brief Verify shared optional indices with opposite physical layer selections.
-    !> @details The shared layout contains both components; each inactive slot
-    !>          must encode and decode as zero, without consulting the other
-    !>          layer's activation. This does not exercise coupled transport.
-    SUBROUTINE check_opposite_layer_optional_slots
-        REAL(wp) :: layer_q(n_vars,2),layer_qp(n_vars,2),decoded(n_vars)
-        LOGICAL :: accepted
-        INTEGER :: layer
-
-        pore_pressure_l1%pore_pressure_flag=.TRUE.
-        pore_pressure_l2%pore_pressure_flag=.FALSE.
-        stochastic_l1%stochastic_transport_flag=.FALSE.
-        stochastic_l2%stochastic_transport_flag=.TRUE.
-        rheology_l1%stochastic_rheology_flag=.FALSE.
-        rheology_l2%stochastic_rheology_flag=.TRUE.
-
-        IF (.NOT.(pore_pressure_l1%pore_pressure_flag .AND. &
-            stochastic_l2%stochastic_transport_flag)) ERROR STOP 'opposite optional layer activation'
-        IF (pore_pressure_l2%pore_pressure_flag .OR. &
-            stochastic_l1%stochastic_transport_flag) ERROR STOP 'inactive optional layer activation'
-        IF (idx_stoch==0 .OR. idx_pore==0 .OR. idx_stoch==idx_pore) &
-            ERROR STOP 'common optional state indices are missing'
-
-        DO layer=1,2
-            CALL make_qp(2.0_wp,350.0_wp,1.5_wp,-0.25_wp,0.15_wp,0.10_wp,0.05_wp, &
-                layer_qp(:,layer))
-        END DO
-        layer_qp(idx_stoch,1)=0.0_wp
-        layer_qp(idx_pore,2)=0.0_wp
-
-        DO layer=1,2
-            CALL primitive_to_conservative(layer_qp(:,layer),layer_q(:,layer),accepted)
-            IF (.NOT.accepted) ERROR STOP 'opposite-layer optional encoding rejected'
-            CALL conservative_to_primitive(layer_q(:,layer),decoded,accepted)
-            IF (.NOT.accepted) ERROR STOP 'opposite-layer optional decoding rejected'
-            CALL assert_scalar('layer stochastic slot',decoded(idx_stoch),layer_qp(idx_stoch,layer),1.0E-12_wp)
-            CALL assert_scalar('layer pore slot',decoded(idx_pore),layer_qp(idx_pore,layer),1.0E-12_wp)
-        END DO
-
-        IF (layer_q(idx_stoch,1)/=0.0_wp .OR. layer_q(idx_pore,2)/=0.0_wp) &
-            ERROR STOP 'inactive optional conservative component is not zero'
-        IF (layer_q(idx_pore,1)==0.0_wp .OR. layer_q(idx_stoch,2)==0.0_wp) &
-            ERROR STOP 'active optional conservative component was lost'
-        IF (layer_q(idx_stoch,1)==layer_q(idx_stoch,2)) &
-            ERROR STOP 'stochastic optional states are not independent'
-        IF (layer_q(idx_pore,1)==layer_q(idx_pore,2)) &
-            ERROR STOP 'pore-pressure optional states are not independent'
-    END SUBROUTINE check_opposite_layer_optional_slots
 
     SUBROUTINE make_qp(h,T,u,v,xs1,xs2,xg1,out)
         REAL(wp), INTENT(IN) :: h,T,u,v,xs1,xs2,xg1

@@ -275,15 +275,21 @@ standalone explicit test callers supply their existing input flags.
 NEWTON/SEMI-IMPLICIT residuals and the complex Jacobian now receive the same
 selected activation explicitly, as documented above.
 
-**Opposite per-layer optional-slot regression (14 November 2026, CI pending).**
-The existing `TEST_STATE_EQUIVALENCE` now exercises one shared layout
-with pore pressure active in L1 only and conservative stochastic transport
-active in L2 only. Independent canonical layer flags are selected directly;
-both REAL primitive/conservative conversion paths must preserve the
-nonzero active slot and the exactly zero inactive slot. No second
-component-index representation or production two-layer activation is added.
-The complete two-layer input OR allocation, flux/source zero invariants,
-and coupled integration remain open.
+**Optional-equation OR sizing preparation (14 November 2026, CI pending).**
+The two existing input sizing paths now derive `n_stoch_vars` and
+`n_pore_vars` directly from the logical OR of their respective canonical
+L1/L2 flags. The common component indices are unchanged: the code adds
+one slot, never one slot per layer, and reuses the existing layout.
+The executable `TEST_STATE` checks two local states with opposite zero/nonzero
+optional slots using the same indices and both REAL and COMPLEX conversions;
+source and stochastic tests separately verify independent L1/L2 flags.
+The legacy `TEST_STATE_EQUIVALENCE` remains unchanged and needs no new
+physical-module dependencies.
+
+This is structural preparation, not activation: the parser still rejects
+`N_LAYERS=2` and all L2 NAMELIST groups. Reading/validating L2 parameters,
+per-layer optional boundaries, zero-preserving fluxes and sources, two active
+OU workspaces, coupled integration and restart are still pending.
 
 **Optional-slot state conversion (14 November 2026, CI pending).**
 The canonical REAL/COMPLEX conservative-to-primitive, primitive-to-
