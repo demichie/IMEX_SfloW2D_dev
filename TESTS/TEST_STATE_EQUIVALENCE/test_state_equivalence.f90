@@ -309,7 +309,7 @@ CONTAINS
         sp_heat_l=4180.0_wp; rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; pres=101325.0_wp; inv_pres=1.0_wp/pres
         T_ambient=300.0_wp; rho_a_amb=pres/(sp_gas_const_a*T_ambient); grav=9.81_wp; eps_sing=1.0E-8_wp; eps_sing4=eps_sing**4
         gas_flag=.TRUE.; liquid_flag=.FALSE.
-        pore_pressure_flag=.TRUE.; slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
+        slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
     END SUBROUTINE initialize_case
     SUBROUTINE assert_scalar(label,a,b,tol)
         CHARACTER(*), INTENT(IN) :: label; REAL(wp), INTENT(IN) :: a,b,tol

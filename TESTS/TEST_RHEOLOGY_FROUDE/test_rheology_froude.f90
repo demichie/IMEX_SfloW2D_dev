@@ -143,7 +143,6 @@ CONTAINS
     rheo_config%rheology_model='froude'
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
-    pore_pressure_flag = .FALSE.
     rheo_config%mu_0 = 0.1_wp
     rheo_config%mu_inf = 0.5_wp
     rheo_config%Fr_0 = 1.0_wp
