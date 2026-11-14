@@ -216,6 +216,16 @@ single-layer/global flags and are **not yet migrated** to independent L2
 activation; `N_LAYERS=2` stays rejected. Complete those pathways together in
 TL07/TL13, preserving accepted single-layer inputs and budgets.
 
+**Source registry layer-local Darcy selection (14 November 2026, CI pending).**
+The source registry builder now receives Darcy activation for the selected
+layer as an explicit argument, controlling Darcy group scheduling and pore
+equation selection without consulting the run-global `pore_pressure_flag`.
+The production single-layer caller passes the existing input flag unchanged;
+the source registry test also selects Darcy while that global flag is false
+and a common pore-pressure component remains allocated. No separate
+activation state or layer-specific indices are introduced. Full two-layer
+input, stochastic, boundary, restart and output integration remain deferred.
+
 **Initial Darcy analytic decoupling (14 November 2026, CI pending).**
 The existing analytic Darcy dispatcher and Darcy kernel no longer treat the
 run-global `pore_pressure_flag` as an internal activation switch. They are

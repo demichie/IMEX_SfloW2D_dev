@@ -9,7 +9,7 @@ MODULE source_configuration_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
     USE source_input_2d
     USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                                               &
-            pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag,                                        &
+            curvature_term_flag, bottom_radial_source_flag,                                        &
             bottom_fissural_source_flag, radial_source_flag,                                                           &
             liquid_flag, gas_flag, lava_flag,                                                &
             idx_pore
@@ -23,10 +23,10 @@ MODULE source_configuration_2d
 CONTAINS
     !> Identify active physical sources exactly once for both input syntaxes.
     !> Thermal activation is determined by the physical cooling flag.
-    SUBROUTINE collect_active_source_names(rheology,mass_config,include_thermal,active_names,error)
+    SUBROUTINE collect_active_source_names(rheology,mass_config,include_thermal,include_pore,active_names,error)
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-        LOGICAL, INTENT(IN) :: include_thermal
+        LOGICAL, INTENT(IN) :: include_thermal,include_pore
         CHARACTER(LEN=64), ALLOCATABLE, INTENT(OUT) :: active_names(:)
         CHARACTER(*), INTENT(OUT) :: error
         ALLOCATE(active_names(0))
@@ -61,7 +61,7 @@ CONTAINS
 
         IF (include_thermal) active_names=[CHARACTER(LEN=64) :: active_names,                                          &
             'thermal_cooling']
-        IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
+        IF (include_pore) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
         IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
         IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
         IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
@@ -97,13 +97,15 @@ CONTAINS
     END SUBROUTINE collect_active_source_names
 
     !> Create Lie groups directly from physical METHOD and GROUP configuration.
-    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config)
+    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config, &
+        pore_enabled)
         TYPE(source_registry_type), INTENT(INOUT) :: registry
         CHARACTER(*), INTENT(OUT) :: error
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        LOGICAL, INTENT(IN) :: pore_enabled
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         TYPE(source_group_type) :: g,tmp
         TYPE(source_term_type) :: term
@@ -113,7 +115,8 @@ CONTAINS
         INTEGER, ALLOCATABLE :: affected(:)
         ! A failed reconfiguration must never leave a previous registry active.
         CALL registry%finalize()
-        CALL collect_active_source_names(rheology,mass_config,thermal%thermal_cooling_flag,names,error)
+        CALL collect_active_source_names(rheology,mass_config,thermal%thermal_cooling_flag, &
+            pore_enabled,names,error)
         IF (LEN_TRIM(error)>0) RETURN
         ALLOCATE(groups(1))
         groups(1)%id=0
@@ -287,7 +290,7 @@ CONTAINS
         END DO
 
         pore=0
-        IF (pore_pressure_flag) pore=idx_pore
+        IF (pore_enabled) pore=idx_pore
         CALL registry%initialize(n_eqns,pore,groups,error)
     END SUBROUTINE initialize_configured_sources
 

@@ -90,7 +90,7 @@ PROGRAM test_source_registry
   CALL require(ALL(source_newton_affected_equations('thermal_cooling')==[4]), &
        'thermal footprint')
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
   CALL require(LEN_TRIM(error)==0,'configure coupled Newton group: '//TRIM(error))
   groups=registry%groups()
   CALL require(SIZE(groups)==2,'group zero plus coupled group')
@@ -112,7 +112,7 @@ PROGRAM test_source_registry
   CALL registry%finalize()
   thermal_l1%thermal_group=2
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
   CALL require(LEN_TRIM(error)==0,'separated Newton groups')
   groups=registry%groups()
   CALL require(SIZE(groups)==3,'three ordered Lie groups')
@@ -125,7 +125,7 @@ PROGRAM test_source_registry
   CALL registry%finalize()
   thermal_l1%thermal_method='ANALYTIC'
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
   CALL require(LEN_TRIM(error)==0,'mixed Newton/analytic groups')
   groups=registry%groups()
   CALL require(groups(3)%method==SOURCE_METHOD_ANALYTIC,'analytic method preserved')
@@ -139,7 +139,7 @@ PROGRAM test_source_registry
   thermal_l1%thermal_group=1
   bottom_fissural_source_flag=.TRUE.
   CALL initialize_configured_sources(registry,error, &
-       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,pore_pressure_flag)
   CALL require(LEN_TRIM(error)==0,'Etna liquid-carrier lava configuration: '//TRIM(error))
   groups=registry%groups()
   CALL require(group_contains_name(groups(1),'bottom_fissural_injection'), &
@@ -148,6 +148,31 @@ PROGRAM test_source_registry
        'Etna lava rheology in Newton group')
   CALL require(group_contains_name(groups(2),'thermal_cooling'), &
        'Etna thermal cooling in Newton group')
+  CALL registry%finalize()
+  ! Darcy selection is independent of the global flag when the shared layout
+  ! already contains the pore-pressure equation.
+  rheology_flag=.FALSE.
+  thermal_l1%thermal_cooling_flag=.FALSE.
+  bottom_fissural_source_flag=.FALSE.
+  n_eqns=5; n_vars=5; idx_pore=5; idx_poreEqn=5
+  pore_pressure_flag=.FALSE.
+  pore_pressure_l1%pore_pressure_method='ANALYTIC'
+  pore_pressure_l1%pore_pressure_group=3
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,.TRUE.)
+  CALL require(LEN_TRIM(error)==0,'selected Darcy source with global flag off: '//TRIM(error))
+  groups=registry%groups()
+  CALL require(SIZE(groups)==2,'Darcy source added to shared layout')
+  CALL require(group_contains_name(groups(2),'pore_pressure_dissipation'), &
+       'local Darcy source registered independently of global flag')
+  CALL registry%finalize()
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,.FALSE.)
+  CALL require(LEN_TRIM(error)==0,'unselected Darcy in shared layout: '//TRIM(error))
+  groups=registry%groups()
+  CALL require(SIZE(groups)==1,'unselected Darcy has no source group')
+  CALL require(.NOT.group_contains_name(groups(1),'pore_pressure_dissipation'), &
+       'unselected Darcy does not register an active source')
   CALL registry%finalize()
   PRINT *, 'PASS Lie registry complete Newton footprints, ordering and methods'
 CONTAINS
