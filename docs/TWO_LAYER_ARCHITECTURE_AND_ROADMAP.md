@@ -27,7 +27,7 @@ Il modello ha due sole modalità: `N_LAYERS=1` (solutore attuale) e, **solo dopo
 | Thermal | Canonical L1/L2 cooling configurations and explicit kernel propagation are implemented; `T_ground` has moved out of thermal configs into the single shared `substrate%T_ground`. The accepted single-layer NAMELIST names both resolve to L1. | Extended single-layer thermal verification remains open; no new thermal law is activated. |
 | Substrate | TL04-C1 owns ground temperature, porosity, erodible inventory settings and topography setup in `substrate_parameters_2d`; code, input fixtures and generators were migrated. | Extended scientific checks on terrain energy, inventory/restart and formerly distinct ground temperatures remain part of G3. |
 | Ambiente | `T_ambient` è letta esclusivamente da `GAS_TRANSPORT_PARAMETERS`, validata finita e positiva prima degli utilizzi; `T_env` e gli ingressi INITIAL/RESTART sono rimossi. | Certificare parser, casi senza fase gas e delta termico autorizzato sul nuovo commit. |
-| Physical sources | The registry remains single-layer; the existing pure `layer_contacts_2d` already describes all four possible L1/L2 contact states. Canonical L1/L2 mass-exchange configurations and the combined rate/limiter backend are CI verified on `32e4e33`. | At TL07/TL11, use the existing contacts directly in `source_terms_2d`; do not add a contact-mask API or change the physical kernels. Complete source scopes, candidate-state integration and phase-selection audit; C5/EXAMPLES verification remains open. |
+| Physical sources | The registry remains single-layer; the existing pure `layer_contacts_2d` already describes all four possible L1/L2 contact states. Canonical L1/L2 mass-exchange configurations and the combined rate/limiter backend are CI verified on `32e4e33`. | At TL07/TL11, determine contacts outside `physics` at each Lie group entry from current candidates, after existing buoyancy removal; pass only the resulting local exposures to physics. Do not add a contact-mask API or duplicate physical kernels. Complete source scopes, candidate-state integration and phase-selection audit; C5/EXAMPLES verification remains open. |
 | Spaziale | Un solo motore HP-PCCU; `spatial_operators(:)` e `domains(:)` indipendenti (CI su `d901609`). Clamp idrostatico di L2 TL05-C1 verificato dalle due Actions su `9427826`. TL05-C2 estende direttamente il test esistente a un passo Euler CFL-limited L2 gas/solidi, con controlli di ammissibilità e budget, CI da verificare. | Il driver evolve ancora solo L1. TL05-C resta aperto; seguono interfacce `eta_1`/`eta_tot`, pressione accoppiata, CFL two-layer e wet/dry in TL06. |
 | I/O | NetCDF single-layer `(x,y,time)`, restart v7 with L1 plus shared inventories, current `.asc/.q_2d` outputs and diagnostics. | Define one authoritative schema when I/O changes, update reader/writer/tests together and verify scientifically meaningful single-layer continuation; no superseded-format reader or backward-compatibility requirement. |
 
@@ -74,7 +74,7 @@ Gli indici delle equazioni sono comuni ai due layer. Le quantità significative 
 4. **TL04-C3 — per-layer composite mass-exchange configuration.** Introduce `mass_exchange_parameters_2d.f90` with one `mass_exchange_config_type` per layer (`mass_exchange_l1/l2`), owning nested erosion/deposition/entrainment/liquid-loss/vaporization/lava-deposition configs and a **single METHOD/GROUP per layer**. In `N_LAYERS=1`, support **either** `MASS_EXCHANGE_PARAMETERS` (short single-layer name with `mass_exchange%...` fields) **or** `MASS_EXCHANGE_L1_PARAMETERS` (explicit `mass_exchange_l1%...` fields), never both; each reads the **same canonical L1 instance**, e.g. via a NAMELIST pointer alias, without separate coefficients, copy-back or conversion. When `N_LAYERS=2` is enabled, require both `MASS_EXCHANGE_L1_PARAMETERS` and `MASS_EXCHANGE_L2_PARAMETERS` and reject `MASS_EXCHANGE_PARAMETERS`; reject any L2 group while two-layer production is disabled. Retire the old flat scalar entries in `MASS_EXCHANGE_PARAMETERS`, not the approved group name; migrate all EXAMPLES/TESTS inputs, generators and documentation to derived-type components using the two supported single-layer spellings. Check Fortran NAMELIST allocatable-component behavior before committing to the type layout. Preserve current rheology-dependent deposition selection until a separate model-selection decision and validation.
 5. **TL04-C4 — reuse the existing combined assembler.** Thread config read-only through `simulation_2d/layer_physics_2d`, source configuration, source terms, Lie/Newton interfaces and the existing `mass_exchange_2d.f90`; each distinct physical law stays in its current file. Keep common inventory limiters and rate aggregation inside this one assembler; no additional coordinator and no separately integrated Lie source per child law. Preserve unsupported NEWTON/ANALYTIC behavior until genuinely coupled algorithms for **all selected processes** exist.
 6. **TL04-C5 — verification of single-layer preparation.** Check acceptance of either short or `_L1` single-layer group (but never both), rejection of `_L2` in single-layer and rejection of the short group in two-layer input; reject retired scalar syntax and conversion wrappers; verify both spellings share the exact L1 configuration, plus updated EXAMPLES/TESTS fixtures and generators, SHARED ownership, default temperatures, solid packing and sediment packing separation, source order, wet/dry, mass/momentum/energy and substrate inventory accounting; compile strict/debug and optimized; run `TEST_MASS_EXCHANGE`, `TEST_SOURCE_REGISTRY`, pertinent REAL/COMPLEX suites, `EXAMPLE_TAAL`, `EXAMPLE_TAAL_BOTTOM`, `EXAMPLE_CF`, pore-pressure, lava and liquid examples, plus restart/NetCDF and OpenMP reproducibility where affected. Record evidence against the actual commit; no CI from older commits validates these edits.
-7. **TL07/TL11 — deferred layer activation.** Add L1/L2/INTERLAYER scheduling and paired candidate-state/atomic rollback infrastructure first; only then connect `layer_contacts_2d` inside physics to select the applicable layer-specific external exchange. Exercise wet/wet, wet/dry, dry/wet and dry/dry, including L2-only bed erosion/deposition and L1-only atmospheric entrainment; no double counting of common terrain/atmosphere resources. Interlayer transfers remain separate pair operators under TL08–TL10, with coherent global budgets.
+7. **TL07/TL11 — deferred layer activation.** Add L1/L2/INTERLAYER scheduling and paired candidate-state/atomic rollback infrastructure first; then call the existing contact classifier from the numerical cell/group loop, outside `physics`, and pass the resulting local exposures to layer-specific external exchange. Exercise wet/wet, wet/dry, dry/wet and dry/dry, including L2-only bed erosion/deposition and L1-only atmospheric entrainment; no double counting of common terrain/atmosphere resources. Interlayer transfers remain separate pair operators under TL08–TL10, with coherent global budgets.
 
 ### 3.4 Rheology input: current state and required cleanup
 
@@ -136,9 +136,9 @@ presente (L2 con entrambi). La tabella in sezione 4.2 e' il riferimento
 autorevole; non introdurre altre classificazioni o rappresentazioni.
 
 Quando TL07 rendera' disponibili i candidati L1/L2 della stessa cella,
-`source_terms_2d` chiamera' **direttamente**
-`evaluate_layer_contacts` per decidere quali processi siano
-ammissibili per il layer bersaglio. Erosione e deposizione sul terreno
+il Lie chiamera' **direttamente** `evaluate_layer_contacts` fuori da
+`physics`, dopo il controllo di buoyancy e all'inizio di ogni gruppo,
+per decidere quali processi siano ammissibili per il layer bersaglio. Erosione e deposizione sul terreno
 richiedono `terrain_exposed(i)`; entrainment atmosferico richiede
 `atmosphere_exposed(i)`. Gli altri processi conservano le rispettive
 condizioni fisiche; la vaporizzazione legata al deposito dipende
@@ -146,9 +146,11 @@ dalla deposizione effettiva. Contatto necessario non significa
 attivazione automatica: valgono ancora configurazione, fase, inventari,
 limitatori e condizioni di wet/dry.
 
-`lie_source_executor_2d` conserva indici di griglia, scheduling,
-stati candidati e rollback. In `physics` si lavora solo con dati
-**cell-local**, senza indici `j,k`. Poiche' `mass_exchange_2d`
+`lie_source_executor_2d` conserva indici di griglia, scelta del layer,
+scheduling, stati candidati, classificazione dei contatti e rollback.
+In `physics` si lavora solo con dati **cell-local**, senza indici `j,k`,
+identita' del layer o calcolo di `exposed`: la fisica riceve i contatti
+gia' determinati all'esterno. Poiche' `mass_exchange_2d`
 accetta gia' `source_mask`, il suo filtro locale sara' applicato
 **direttamente nell'assemblaggio esistente**, senza nuova routine
 pubblica, wrapper, ulteriore tipo o secondo coordinatore.
@@ -181,12 +183,37 @@ dq2/dt = H2(q1,q2,B) + S_local2(q2;C2,E2) - Gamma(q1,q2) + S_external2
 
 **Un unico integratore Lie globale**, con un solo timestep, ordinamento e rollback. Il registro usa `(source_identity,scope)` per l'unicità; ogni gruppo dichiara `L1`, `L2` o `INTERLAYER`, metodo, ordine e footprint, compresa la gestione delle risorse condivise. La stessa legge può comparire in L1 e L2. L'attuale `source_group_type` **non** dispone ancora di `scope`, e `time_integration_2d` passa al Lie soltanto `q_trial(:,1,:,:)`, `qp_trial(:,1,:,:)`: non dichiarare completata TL07.
 
-Il Lie gestisce candidati e snapshot pre-spatial del gruppo 0, transazioni dello stato e substrato, geometria, stochastic, buone proprietà numeriche e rollback. Il livello `physics` gestisce contatti, abilitazione delle leggi, rate e trasferimenti. Con gruppi `INTERLAYER` si acquisisce uno **stesso snapshot pre-gruppo** di L1 e L2, si calcola un solo `Gamma(n_eqns)` con convenzione positiva L2→L1 e si costruiscono contemporaneamente:
+Il Lie gestisce candidati e snapshot pre-spatial del gruppo 0, transazioni dello stato e substrato, geometria, stochastic, buone proprietà numeriche e rollback. Il livello numerico determina i contatti; `physics` riceve l'esposizione locale gia' selezionata e valuta leggi, rate e trasferimenti. Con gruppi `INTERLAYER` si acquisisce uno **stesso snapshot pre-gruppo** di L1 e L2, si calcola un solo `Gamma(n_eqns)` con convenzione positiva L2→L1 e si costruiscono contemporaneamente:
 ```text
 q1_candidate = q1 + dt*Gamma
 q2_candidate = q2 - dt*Gamma
 ```
 Un solo limiter di disponibilità condiviso; nessun limitatore indipendente che rompa l'antisimmetria. Validazione e rollback atomici di entrambi i layer, substrato, geometria e diagnostiche. La variabile termica conservativa trasferita va contabilizzata; l'energia cinetica e la dissipazione possono avere regole ulteriori, esplicite. L'approssimazione del gas di packing è un **difetto esterno diagnosticato**, non un trasferimento fittiziamente conservativo. Non imporre un Newton globale `2*n_eqns` senza evidenza di necessità.
+
+**TL07 — contact refresh at every Lie group entry (approved contract).**
+Keep the existing cell-outer / group-inner traversal. At the start of **each**
+Lie group, use the current post-advection or previous-group accepted L1/L2
+candidate states. First apply the already implemented L2 buoyancy-removal
+criterion (`gprime2 <= 0`): clear L2's conservative and primitive local
+candidate, not only its thickness. This is the existing physical sink, not
+an additional limiter or a newly invented conservation transfer. Unlike the
+single-layer early exit, removal of L2 must not terminate the cell's Lie
+sequence while L1 may still require source updates. Next invoke the **existing**
+`evaluate_layer_contacts` on the two current candidate thicknesses,
+**outside** `physics`, then pass the resulting terrain/atmosphere
+exposure and interface-contact information to the relevant cell-local physics.
+No previous-contact cache, change-detection flag, duplicate classifier,
+extra wrapper, or additional runtime contact representation is needed.
+
+Contacts are fixed during evaluation of one group and refreshed before the
+next; accepted deposition, entrainment, cold-start, loss of a layer and the
+post-advection state therefore affect the subsequent group automatically.
+Apply final buoyancy removal after the last group as in the current Lie.
+Preserve group-0 pre-spatial input semantics, strict candidate validation,
+shared-substrate budgets and atomic rollback. A source treatment requiring
+contact changes *inside* one implicit group needs a separate documented
+numerical treatment; do not silently reinterpret group semantics. This is
+a TL07/TL11 design decision, **not implemented**; `N_LAYERS=2` remains disabled.
 
 Preservare esattamente la semantica del gruppo 0 e delle celle inizialmente asciutte, i quattro trattamenti numerici, la struttura cell-outer e gli scratch per worker; nessuna allocazione per cella o modifica di globali nell'OpenMP.
 
@@ -359,11 +386,11 @@ Ogni task produce codice definitivo, test e documentazione coerenti. **Implement
 | **TL04-C — remaining configurations and contacts** | **C1–C4 implemented; both CI workflows green on `32e4e33`; C5/G3 open** | Preserve one combined mass-exchange assembler and the approved single-layer NAMELIST aliases. Complete deferred EXAMPLES, extended physics, restart and OpenMP verification before certifying C5. |
 | **TL05 — HP-PCCU indipendente per slot** | **A/B/C1 CI verificata su `9427826`; C2 test Euler in verifica, C aperto** | Uno stesso HP-PCCU serve entrambi gli slot. L2 usa `max(gprime2,0)` e i test gas isolati includono un aggiornamento conservativo CFL-limited con bilanci di massa, solidi ed energia. CI C2 e completamento fisico L2 ancora aperti, prima di TL06. |
 | **TL06 — HP-PCCU accoppiato** | **Da implementare** | Percorsi coppia, clamp, topografia, identità, CFL e iperbolicità; gate G4. |
-| **TL07 — Lie con scope** | **Da implementare** | Registro unico con L1/L2/INTERLAYER, due candidati cell-local e snapshot coerenti; Lie proprietario di `j,k`, transazioni e commit/rollback atomico, ma nessuna scelta fisica dei contatti nel Lie. Rate monolayer isolati, `Gamma` di coppia, gruppo 0 e OpenMP; sezione 4.3.1, gate G5. |
+| **TL07 — Lie con scope** | **Da implementare; contratto contatti tra gruppi definito** | Registro unico L1/L2/INTERLAYER, candidati cell-local e rollback atomico; loop esterno celle, interno gruppi. All'ingresso di ogni gruppo: rimozione buoyancy L2 gia' esistente, poi classificazione dei quattro contatti sui candidati correnti **fuori da `physics`**; esposizioni passate alle leggi locali. Non interrompere i gruppi L1 se L2 scompare; preservare gruppo 0, `Gamma` di coppia e OpenMP; gate G5. |
 | **TL08 — settling L2→L1** | **Da implementare** | Conservazione di masse/specie/momento/termica e nessun deposito terreno. |
 | **TL09 — elutriazione L1→L2** | **Da implementare** | Inventario, co-lift, cold-start e compatibilità con i contatti. |
 | **TL10 — drag interlayer** | **Da implementare** | Momento uguale/opposto, forza nulla ai limiti, analisi stabilità. |
-| **TL11 — sorgenti esterne e basali** | **Da implementare; classificatore dei contatti esistente** | Usare direttamente `evaluate_layer_contacts` in `source_terms_2d` sui candidati L1/L2, filtrando i bit del `source_mask` locale nell'assemblaggio gia' presente, senza una nuova API. Mantenere i kernel di mass exchange invariati, completare le dipendenze di fase per layer, sorgenti esterne e bilanci SHARED; gate G6, sezione 4.3.1. |
+| **TL11 — sorgenti esterne e basali** | **Da implementare; classificatore dei contatti esistente** | Usare i contatti aggiornati dal Lie all'ingresso di ogni gruppo e passarli a `source_terms_2d`, filtrando i bit del `source_mask` nell'assemblaggio gia' presente, senza una nuova API. Mantenere i kernel di mass exchange invariati, completare le dipendenze di fase per layer, sorgenti esterne e bilanci SHARED; gate G6, sezione 4.3.1. |
 | **TL12 — validazione scientifica** | **Da implementare** | Benchmark coupled, resting states, budgets, wet/dry, OpenMP, CFL, restart, prestazioni, regressioni single-layer; gate G7. |
 | **TL13 — integrazione e rilascio** | **Da implementare** | Contratti di input/NetCDF/restart, esempi e postprocessing, documentazione delle opzioni e limiti, decisione esplicita prima di abilitare `N_LAYERS=2`. |
 
