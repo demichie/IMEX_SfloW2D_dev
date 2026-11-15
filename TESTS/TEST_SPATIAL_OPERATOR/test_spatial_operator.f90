@@ -846,6 +846,7 @@ CONTAINS
   SUBROUTINE check_optional_layer_spatial_slots
     TYPE(domain_type) :: test_domain
     TYPE(reconstruction_workspace_type) :: test_reconstruction
+    TYPE(reconstruction_workspace_type) :: lower_reconstruction
     TYPE(hyperbolic_workspace_type) :: test_hyperbolic
     TYPE(state_type) :: empty_state
     TYPE(source_group_type) :: geometric_group
@@ -925,6 +926,26 @@ CONTAINS
         CALL test_reconstruction%initialize(layer)
         CALL test_reconstruction%prepare_hp_workset( &
             test_domain%hp_eta_cells,test_domain%hp_eta_j,test_domain%hp_eta_k)
+        IF (layer==2) THEN
+            ! Reuse the existing HP reconstruction with the completed L1 traces.
+            ! The ordinary L1 reference run above never supplies these arguments.
+            CALL lower_reconstruction%initialize(1)
+            CALL lower_reconstruction%prepare_hp_workset( &
+                test_domain%hp_eta_cells,test_domain%hp_eta_j,test_domain%hp_eta_k)
+            CALL lower_reconstruction%reconstruct(primitive,0.0_wp,test_domain%solve_cells, &
+                test_domain%j_cent,test_domain%k_cent,.TRUE.)
+            CALL lower_reconstruction%reconstruct_kt_eta(primitive)
+            CALL test_reconstruction%reconstruct(primitive,0.0_wp,test_domain%solve_cells, &
+                test_domain%j_cent,test_domain%k_cent,.TRUE., &
+                lower_recon=lower_reconstruction,h_lower=primitive(idx_h,:,:))
+            CALL test_reconstruction%reconstruct_kt_eta(primitive,lower_recon=lower_reconstruction)
+            IF (ANY(test_reconstruction%eta_cellW(2:3,2:3) < &
+                lower_reconstruction%eta_cellW(2:3,2:3))) &
+                ERROR STOP 'Upper surface fell below lower-layer reconstructed interface'
+            IF (ANY(test_reconstruction%h_selected_interfaceR(2:3,2:3)<0.0_wp)) &
+                ERROR STOP 'Upper layer reconstructed negative depth'
+            CALL lower_reconstruction%finalize
+        END IF
         CALL test_hyperbolic%initialize(clamp_buoyant_pressure=layer==2)
         CALL test_hyperbolic%evaluate_terms(test_reconstruction,primitive,residual,0.0_wp, &
             test_domain%solve_cells,test_domain%j_cent,test_domain%k_cent, &
