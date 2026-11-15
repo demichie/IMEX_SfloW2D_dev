@@ -157,8 +157,10 @@ CONTAINS
     !> \param[in] t Current simulation or stage time [s].
     !> \param[in] solve_all When true, include the complete domain instead of only flow/source cells
     !>                      and halos.
+    !> @param[in] q_other Optional second-layer conservative state for a shared
+    !>                  coupled workset. Omitted preserves the original domain.
 
-    SUBROUTINE check_solve(this, q, t, solve_all)
+    SUBROUTINE check_solve(this, q, t, solve_all, q_other)
 
     IMPLICIT NONE
 
@@ -166,8 +168,15 @@ CONTAINS
         REAL(wp), INTENT(IN) :: q(:,:,:)
         REAL(wp), INTENT(IN) :: t
         LOGICAL, INTENT(IN) :: solve_all
+        REAL(wp), INTENT(IN), OPTIONAL :: q_other(:,:,:)
 
         INTEGER :: i,j,k
+
+        IF (PRESENT(q_other)) THEN
+            IF (SIZE(q_other,1)<idx_totMassEqn .OR. &
+                SIZE(q_other,2)/=comp_cells_x .OR. SIZE(q_other,3)/=comp_cells_y) &
+                CALL fatal_error('Coupled workset: invalid second-layer state shape')
+        END IF
 
         !$OMP PARALLEL
 
@@ -191,6 +200,16 @@ CONTAINS
             ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )                                       &
             this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
         !$OMP END WORKSHARE
+
+        ! Include cells wet in either layer before the existing halo and face
+        ! construction. The independent single-layer path is untouched.
+        IF (PRESENT(q_other)) THEN
+            !$OMP WORKSHARE
+            WHERE ((q_other(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1)>0.0_wp) .AND. &
+                (this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1)<=t)) &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1)=.TRUE.
+            !$OMP END WORKSHARE
+        END IF
 
         !$OMP BARRIER
 

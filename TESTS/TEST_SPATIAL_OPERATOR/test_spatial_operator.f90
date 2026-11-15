@@ -82,6 +82,7 @@ PROGRAM test_spatial_operator
   CLOSE(input_unit)
   q0=q
   CALL refresh_topography_geometry
+  CALL check_two_layer_union_workset
   CALL check_dry_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
   IF (domain%solve_cells<=0 .OR. domain%reconstruction_cells<domain%solve_cells) &
@@ -328,6 +329,53 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> @brief Validate the shared workset as the union of independent L1/L2 masks.
+    !> @details Checks active cells, faces and HP reconstruction halo without
+    !> allocating any persistent two-layer domain or enabling coupled physics.
+    SUBROUTINE check_two_layer_union_workset
+        TYPE(domain_type) :: lower,upper,coupled
+        REAL(wp) :: lower_q(n_vars,nx,ny),upper_q(n_vars,nx,ny)
+        REAL(wp) :: lower_q_before(n_vars,nx,ny),upper_q_before(n_vars,nx,ny)
+
+        lower_q=0.0_wp
+        upper_q=0.0_wp
+        lower_q(idx_totMassEqn,2,2)=1.0_wp
+        upper_q(idx_totMassEqn,nx-1,ny-1)=2.0_wp
+        lower_q_before=lower_q
+        upper_q_before=upper_q
+
+        CALL lower%initialize
+        CALL upper%initialize
+        CALL coupled%initialize
+        CALL lower%check_solve(lower_q,0.0_wp,.FALSE.)
+        CALL upper%check_solve(upper_q,0.0_wp,.FALSE.)
+        CALL coupled%check_solve(lower_q,0.0_wp,.FALSE.,q_other=upper_q)
+
+        IF (ANY(coupled%solve_mask .NEQV. (lower%solve_mask .OR. upper%solve_mask))) &
+            ERROR STOP 'Coupled active cells differ from layer union'
+        IF (ANY(coupled%solve_mask_x .NEQV. (lower%solve_mask_x .OR. upper%solve_mask_x))) &
+            ERROR STOP 'Coupled x faces differ from layer union'
+        IF (ANY(coupled%solve_mask_y .NEQV. (lower%solve_mask_y .OR. upper%solve_mask_y))) &
+            ERROR STOP 'Coupled y faces differ from layer union'
+        IF (ANY(coupled%hp_eta_mask .NEQV. (lower%hp_eta_mask .OR. upper%hp_eta_mask))) &
+            ERROR STOP 'Coupled HP cells differ from layer union'
+        IF (ANY(coupled%reconstruction_mask .NEQV. &
+            (lower%reconstruction_mask .OR. upper%reconstruction_mask))) &
+            ERROR STOP 'Coupled reconstruction halo differs from layer union'
+        IF (coupled%solve_cells/=COUNT(coupled%solve_mask) .OR. &
+            coupled%hp_eta_cells/=COUNT(coupled%hp_eta_mask) .OR. &
+            coupled%solve_interfaces_x/=COUNT(coupled%solve_mask_x) .OR. &
+            coupled%solve_interfaces_y/=COUNT(coupled%solve_mask_y)) &
+            ERROR STOP 'Coupled workset contains duplicate or missing entries'
+        IF (ANY(lower_q/=lower_q_before) .OR. ANY(upper_q/=upper_q_before)) &
+            ERROR STOP 'Coupled workset modified layer state'
+
+        CALL lower%finalize
+        CALL upper%finalize
+        CALL coupled%finalize
+        WRITE(*,*) 'PASS: two-layer union workset, HP halo, faces and read-only states'
+    END SUBROUTINE check_two_layer_union_workset
 
     !> Verify the common interlayer pressure quadrature and its conservative sum.
     !> This exercises the path algebra only; the full coupled operator remains gated.
