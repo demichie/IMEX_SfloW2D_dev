@@ -132,9 +132,14 @@ CONTAINS
     !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
     !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL
     !> evaluation.
+    !> @param[in] lower_operator Optional prepared L1 spatial operator; L2 reconstruction only.
+    !> @param[in] h_lower Optional lower-layer thickness, paired with lower_operator.
+    !> @note The returned CFL still uses isolated-layer characteristic bounds;
+    !>       it is not a validated coupled two-layer stability bound.
     !******************************************************************************
 
-    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled )
+    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled, &
+        lower_operator, h_lower )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -143,6 +148,8 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: dt
         CLASS(domain_type), INTENT(IN) :: domain
         LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
+        CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower_operator
+        REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
 
         INTEGER :: j, k, l
         REAL(wp) :: max_a_x, max_a_y, cfl_spatial
@@ -187,14 +194,28 @@ CONTAINS
         !$OMP END PARALLEL DO
         IF (conversion_failed) CALL fatal_error('CFL reconstruction conversion rejected')
 
-        ! CFL speeds must use the same selected advective traces as the spatial operator.
-        CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,                                            &
-            domain%j_cent, domain%k_cent,                                                                              &
-            .TRUE., source_boundary_enabled=boundary_source_enabled )
+        ! Preserve the existing single-layer reconstruction path unchanged.
+        ! Upper-layer traces use the already prepared L1 HP surfaces as local
+        ! cell-side bases; this does not yet implement coupled eigenvalues.
+        IF (PRESENT(lower_operator) .NEQV. PRESENT(h_lower)) &
+            ERROR STOP 'Upper-layer CFL requires lower operator and thickness'
+        IF (PRESENT(lower_operator)) THEN
+            IF (this%reconstruction%layer/=2 .OR. lower_operator%reconstruction%layer/=1) &
+                ERROR STOP 'Invalid layer pairing in upper-layer CFL'
+            CALL this%reconstruction%reconstruct(qp,time,domain%solve_cells, &
+                domain%j_cent,domain%k_cent,.TRUE.,source_boundary_enabled=boundary_source_enabled, &
+                lower_recon=lower_operator%reconstruction,h_lower=h_lower)
+            CALL this%reconstruction%reconstruct_kt_eta(qp,lower_recon=lower_operator%reconstruction)
+        ELSE
+            ! CFL speeds must use the same selected advective traces as the spatial operator.
+            CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,                                        &
+                domain%j_cent, domain%k_cent,                                                                          &
+                .TRUE., source_boundary_enabled=boundary_source_enabled )
 
-        ! Match the KT face depths and desingularized velocities used by the
-        ! spatial operator before evaluating the CFL wave speeds.
-        CALL this%reconstruction%reconstruct_kt_eta( qp )
+            ! Match the KT face depths and desingularized velocities used by the
+            ! spatial operator before evaluating the CFL wave speeds.
+            CALL this%reconstruction%reconstruct_kt_eta( qp )
+        END IF
 
         CALL this%hp_pccu%evaluate_speeds( this%reconstruction,                                                        &
             domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &

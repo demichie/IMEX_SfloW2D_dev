@@ -129,6 +129,16 @@ PROGRAM test_spatial_operator
     CALL slot2_spatial%initialize(2)
     CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain)
     CALL same_bits('slot-local CFL matches L1',[slot2_dt],[dt])
+
+    ! Exercise the model-facing optional L2 geometry path without enabling
+    ! coupled dynamics. L1 was prepared by the production CFL pass above.
+    CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain, &
+        lower_operator=spatial,h_lower=qp(1,:,:))
+    IF (.NOT.ieee_is_finite(slot2_dt) .OR. slot2_dt<=0.0_wp) &
+        ERROR STOP 'Invalid L2 reconstructed isolated CFL'
+    ! Restore independent-layer traces for the existing bitwise regression.
+    CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain)
+    CALL same_bits('slot-local CFL survives optional L2 geometry',[slot2_dt],[dt])
     CALL slot2_spatial%evaluate(slot2_qp,slot2_term,0.0_wp,slot2_domain)
 
     DO k=1,ny
