@@ -305,6 +305,7 @@ PROGRAM test_spatial_operator
   CALL hyperbolic%finalize
   CALL reconstruction%finalize
   CALL domain%finalize
+  CALL check_optional_layer_spatial_slots
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
@@ -698,6 +699,117 @@ CONTAINS
     CALL reconstruction%initialize
     WRITE(*,*) 'PASS: layer-local Dirichlet inlet and independent HP traces'
   END SUBROUTINE check_layer_local_dirichlet_inlet
+
+  !> Verify disabled optional slots in the complete reconstructed HP-PCCU operator.
+  !> Each isolated layer uses the same seven-component layout: L1 has only pore
+  !> pressure and L2 has only stochastic transport. The production N_LAYERS=2
+  !> execution gate remains unchanged.
+  SUBROUTINE check_optional_layer_spatial_slots
+    TYPE(domain_type) :: test_domain
+    TYPE(reconstruction_workspace_type) :: test_reconstruction
+    TYPE(hyperbolic_workspace_type) :: test_hyperbolic
+    REAL(wp), ALLOCATABLE :: primitive(:,:,:),conservative(:,:,:),residual(:,:,:)
+    INTEGER :: layer,active_index,inactive_index,ix,iy
+    LOGICAL :: accepted,active_flux_found
+    REAL(wp) :: amplitude
+
+    ! Some reference fixtures collapse one axis; only use an actual 2-D case.
+    IF (nx<3 .OR. ny<3) RETURN
+
+    n_stoch_vars=1
+    n_pore_vars=1
+    n_vars=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars
+    n_eqns=n_vars
+    CALL configure_canonical_state_indices()
+    IF (idx_stoch==0 .OR. idx_pore==0) ERROR STOP 'Optional layout indices missing'
+
+    DEALLOCATE(bcW,bcE,bcS,bcN)
+    ALLOCATE(bcW(n_vars,2),bcE(n_vars,2),bcS(n_vars,2),bcN(n_vars,2))
+    bcW%flag=1; bcW%value=0.0_wp
+    bcE%flag=1; bcE%value=0.0_wp
+    bcS%flag=1; bcS%value=0.0_wp
+    bcN%flag=1; bcN%value=0.0_wp
+
+    ALLOCATE(primitive(n_vars,nx,ny),conservative(n_vars,nx,ny),residual(n_eqns,nx,ny))
+    DO layer=1,2
+        active_index=idx_pore
+        inactive_index=idx_stoch
+        IF (layer==2) THEN
+            active_index=idx_stoch
+            inactive_index=idx_pore
+        END IF
+
+        primitive=0.0_wp
+        primitive(idx_h,:,:)=0.8_wp
+        primitive(idx_u,:,:)=0.3_wp
+        primitive(idx_v,:,:)=0.1_wp
+        primitive(idx_T,:,:)=T_ambient
+        DO iy=1,ny
+            DO ix=1,nx
+                amplitude=0.1_wp+0.01_wp*REAL(ix,wp)
+                primitive(active_index,ix,iy)=amplitude
+                CALL primitive_to_conservative(primitive(:,ix,iy),conservative(:,ix,iy),accepted)
+                IF (.NOT.accepted) ERROR STOP 'Optional layer state conversion rejected'
+            END DO
+        END DO
+        IF (ANY(conservative(inactive_index,:,:)/=0.0_wp)) &
+            ERROR STOP 'Inactive optional conservative state is nonzero'
+
+        CALL test_domain%initialize
+        CALL test_domain%check_solve(conservative,0.0_wp,.TRUE.)
+        CALL test_reconstruction%initialize(layer)
+        CALL test_reconstruction%prepare_hp_workset( &
+            test_domain%hp_eta_cells,test_domain%hp_eta_j,test_domain%hp_eta_k)
+        CALL test_hyperbolic%initialize(clamp_buoyant_pressure=layer==2)
+        CALL test_hyperbolic%evaluate_terms(test_reconstruction,primitive,residual,0.0_wp, &
+            test_domain%solve_cells,test_domain%j_cent,test_domain%k_cent, &
+            test_domain%solve_interfaces_x,test_domain%j_stag_x,test_domain%k_stag_x, &
+            test_domain%solve_interfaces_y,test_domain%j_stag_y,test_domain%k_stag_y)
+
+        ! Inspect only active faces: unvisited scratch is outside the operator contract.
+        active_flux_found=.FALSE.
+        DO iy=1,ny
+            DO ix=1,nx+1
+                IF (.NOT.test_domain%solve_mask_x(ix,iy)) CYCLE
+                IF (test_reconstruction%qp_adv_interfaceL(inactive_index,ix,iy)/=0.0_wp .OR. &
+                    test_reconstruction%qp_adv_interfaceR(inactive_index,ix,iy)/=0.0_wp) &
+                    ERROR STOP 'Inactive optional x trace is nonzero'
+                IF (test_hyperbolic%G_interface_xL(inactive_index,ix,iy)/=0.0_wp .OR. &
+                    test_hyperbolic%G_interface_xR(inactive_index,ix,iy)/=0.0_wp) &
+                    ERROR STOP 'Inactive optional x flux is nonzero'
+                IF (ABS(test_hyperbolic%G_interface_xL(active_index,ix,iy))>0.0_wp) active_flux_found=.TRUE.
+            END DO
+        END DO
+        DO iy=1,ny+1
+            DO ix=1,nx
+                IF (.NOT.test_domain%solve_mask_y(ix,iy)) CYCLE
+                IF (test_reconstruction%qp_adv_interfaceB(inactive_index,ix,iy)/=0.0_wp .OR. &
+                    test_reconstruction%qp_adv_interfaceT(inactive_index,ix,iy)/=0.0_wp) &
+                    ERROR STOP 'Inactive optional y trace is nonzero'
+                IF (test_hyperbolic%G_interface_yB(inactive_index,ix,iy)/=0.0_wp .OR. &
+                    test_hyperbolic%G_interface_yT(inactive_index,ix,iy)/=0.0_wp) &
+                    ERROR STOP 'Inactive optional y flux is nonzero'
+            END DO
+        END DO
+        IF (.NOT.active_flux_found) ERROR STOP 'Active optional component not transported'
+        DO iy=1,ny
+            DO ix=1,nx
+                IF (.NOT.test_domain%solve_mask(ix,iy)) CYCLE
+                IF (residual(inactive_index,ix,iy)/=0.0_wp) &
+                    ERROR STOP 'Inactive optional spatial residual is nonzero'
+                IF (test_hyperbolic%P_cell_x(inactive_index,ix,iy)/=0.0_wp .OR. &
+                    test_hyperbolic%P_cell_y(inactive_index,ix,iy)/=0.0_wp) &
+                    ERROR STOP 'Inactive optional spatial path is nonzero'
+            END DO
+        END DO
+
+        CALL test_hyperbolic%finalize
+        CALL test_reconstruction%finalize
+        CALL test_domain%finalize
+    END DO
+    DEALLOCATE(primitive,conservative,residual)
+    WRITE(*,*) 'PASS: inactive optional L1/L2 traces, fluxes, paths and residuals are exactly zero'
+  END SUBROUTINE check_optional_layer_spatial_slots
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.
   !> \details Uses mixed-sign and near-zero component stencils with a
