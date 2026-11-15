@@ -2354,45 +2354,65 @@
 
         END IF
 
+        ! A single-layer file must not contain any L2 boundary group, even on inactive axes.
+        IF (n_layers==1) THEN
+            READ (input_unit, west_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+            REWIND (input_unit)
+            IF (ios_bc_l2==0) &
+                CALL fatal_error('WEST_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+            READ (input_unit, east_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+            REWIND (input_unit)
+            IF (ios_bc_l2==0) &
+                CALL fatal_error('EAST_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+            READ (input_unit, south_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+            REWIND (input_unit)
+            IF (ios_bc_l2==0) &
+                CALL fatal_error('SOUTH_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+            READ (input_unit, north_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+            REWIND (input_unit)
+            IF (ios_bc_l2==0) &
+                CALL fatal_error('NORTH_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+        END IF
+
         ! One parsing and validation path for both layer-specific BC sets.
         DO layer=1,n_layers
             IF (layer==2) THEN
-                    h_bcW%flag=-1
-                    hu_bcW%flag=-1
-                    hv_bcW%flag=-1
-                    T_bcW%flag=-1
-                    xs_bcW%flag=-1
-                    xg_bcW%flag=-1
-                    xl_bcW%flag=-1
-                    stoch_bcW%flag=-1
-                    pore_bcW%flag=-1
-                    h_bcE%flag=-1
-                    hu_bcE%flag=-1
-                    hv_bcE%flag=-1
-                    T_bcE%flag=-1
-                    xs_bcE%flag=-1
-                    xg_bcE%flag=-1
-                    xl_bcE%flag=-1
-                    stoch_bcE%flag=-1
-                    pore_bcE%flag=-1
-                    h_bcS%flag=-1
-                    hu_bcS%flag=-1
-                    hv_bcS%flag=-1
-                    T_bcS%flag=-1
-                    xs_bcS%flag=-1
-                    xg_bcS%flag=-1
-                    xl_bcS%flag=-1
-                    stoch_bcS%flag=-1
-                    pore_bcS%flag=-1
-                    h_bcN%flag=-1
-                    hu_bcN%flag=-1
-                    hv_bcN%flag=-1
-                    T_bcN%flag=-1
-                    xs_bcN%flag=-1
-                    xg_bcN%flag=-1
-                    xl_bcN%flag=-1
-                    stoch_bcN%flag=-1
-                    pore_bcN%flag=-1
+                h_bcW%flag=-1
+                hu_bcW%flag=-1
+                hv_bcW%flag=-1
+                T_bcW%flag=-1
+                xs_bcW%flag=-1
+                xg_bcW%flag=-1
+                xl_bcW%flag=-1
+                stoch_bcW%flag=-1
+                pore_bcW%flag=-1
+                h_bcE%flag=-1
+                hu_bcE%flag=-1
+                hv_bcE%flag=-1
+                T_bcE%flag=-1
+                xs_bcE%flag=-1
+                xg_bcE%flag=-1
+                xl_bcE%flag=-1
+                stoch_bcE%flag=-1
+                pore_bcE%flag=-1
+                h_bcS%flag=-1
+                hu_bcS%flag=-1
+                hv_bcS%flag=-1
+                T_bcS%flag=-1
+                xs_bcS%flag=-1
+                xg_bcS%flag=-1
+                xl_bcS%flag=-1
+                stoch_bcS%flag=-1
+                pore_bcS%flag=-1
+                h_bcN%flag=-1
+                hu_bcN%flag=-1
+                hv_bcN%flag=-1
+                T_bcN%flag=-1
+                xs_bcN%flag=-1
+                xg_bcN%flag=-1
+                xl_bcN%flag=-1
+                stoch_bcN%flag=-1
+                pore_bcN%flag=-1
             END IF
 
             boundary_stochastic_enabled=stochastic_l1%stochastic_transport_flag
@@ -2418,10 +2438,6 @@
                     IF (n_layers==2 .AND. ios==0) &
                         CALL fatal_error('N_LAYERS=2 requires explicit WEST_L1 boundary namelist')
                     IF (ios/=0) ios=ios_bc_l1
-                    READ (input_unit, west_l2_boundary_conditions, IOSTAT=ios_bc_l2)
-                    REWIND (input_unit)
-                    IF (ios_bc_l2==0 .AND. n_layers==1) &
-                        CALL fatal_error('WEST_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
                 ELSE
                     READ (input_unit, west_l2_boundary_conditions, IOSTAT=ios)
                     REWIND (input_unit)
@@ -2561,10 +2577,6 @@
                     IF (n_layers==2 .AND. ios==0) &
                         CALL fatal_error('N_LAYERS=2 requires explicit EAST_L1 boundary namelist')
                     IF (ios/=0) ios=ios_bc_l1
-                    READ (input_unit, east_l2_boundary_conditions, IOSTAT=ios_bc_l2)
-                    REWIND (input_unit)
-                    IF (ios_bc_l2==0 .AND. n_layers==1) &
-                        CALL fatal_error('EAST_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
                 ELSE
                     READ (input_unit, east_l2_boundary_conditions, IOSTAT=ios)
                     REWIND (input_unit)
@@ -2710,10 +2722,6 @@
                     IF (n_layers==2 .AND. ios==0) &
                         CALL fatal_error('N_LAYERS=2 requires explicit SOUTH_L1 boundary namelist')
                     IF (ios/=0) ios=ios_bc_l1
-                    READ (input_unit, south_l2_boundary_conditions, IOSTAT=ios_bc_l2)
-                    REWIND (input_unit)
-                    IF (ios_bc_l2==0 .AND. n_layers==1) &
-                        CALL fatal_error('SOUTH_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
                 ELSE
                     READ (input_unit, south_l2_boundary_conditions, IOSTAT=ios)
                     REWIND (input_unit)
@@ -2855,10 +2863,6 @@
                     IF (n_layers==2 .AND. ios==0) &
                         CALL fatal_error('N_LAYERS=2 requires explicit NORTH_L1 boundary namelist')
                     IF (ios/=0) ios=ios_bc_l1
-                    READ (input_unit, north_l2_boundary_conditions, IOSTAT=ios_bc_l2)
-                    REWIND (input_unit)
-                    IF (ios_bc_l2==0 .AND. n_layers==1) &
-                        CALL fatal_error('NORTH_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
                 ELSE
                     READ (input_unit, north_l2_boundary_conditions, IOSTAT=ios)
                     REWIND (input_unit)
@@ -2990,7 +2994,7 @@
 
             END IF
 
-            IF (.NOT.boundary_stochastic_enabled) THEN
+            IF (layer==2 .AND. .NOT.boundary_stochastic_enabled) THEN
                 IF (comp_cells_x>1 .AND. ANY(stoch_bcW%flag/=-1)) &
                     CALL fatal_error('Inactive stoch BC specified for this layer')
                 IF (comp_cells_x>1 .AND. ANY(stoch_bcE%flag/=-1)) &
@@ -3001,7 +3005,7 @@
                     CALL fatal_error('Inactive stoch BC specified for this layer')
             END IF
 
-            IF (.NOT.boundary_pore_enabled) THEN
+            IF (layer==2 .AND. .NOT.boundary_pore_enabled) THEN
                 IF (comp_cells_x>1 .AND. ANY(pore_bcW%flag/=-1)) &
                     CALL fatal_error('Inactive pore BC specified for this layer')
                 IF (comp_cells_x>1 .AND. ANY(pore_bcE%flag/=-1)) &
