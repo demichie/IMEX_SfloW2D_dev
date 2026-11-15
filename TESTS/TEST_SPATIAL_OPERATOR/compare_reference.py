@@ -333,7 +333,17 @@ def main():
                 if threads == 1:
                     payloads[(name, slope, curvature)] = read_payload(paths[-1])
             if paths[0].read_bytes() != paths[1].read_bytes():
-                raise AssertionError(f"{tag}: production 1/4-thread payloads differ")
+                first = read_payload(paths[0])
+                second = read_payload(paths[1])
+                differing = [key for key in first if first[key].tobytes() != second[key].tobytes()]
+                details = []
+                for key in differing:
+                    left, right = first[key], second[key]
+                    positions = np.argwhere(left.view(np.uint64) != right.view(np.uint64))
+                    position = tuple(int(i) for i in positions[0])
+                    details.append(f"{key}{position}: 1-thread={left[position]!r}, 4-thread={right[position]!r}")
+                raise AssertionError(f"{tag}: production 1/4-thread payloads differ: "
+                                     + "; ".join(details))
             print(f"PASS: {args.profile} {tag}, complete residual/geometry/traces/directional CFL, actual 1/4 threads", flush=True)
             for record in results:
                 print("N7_SPATIAL_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)

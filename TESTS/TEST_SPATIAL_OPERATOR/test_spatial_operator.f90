@@ -74,7 +74,6 @@ PROGRAM test_spatial_operator
   q0=q
   CALL refresh_topography_geometry
   CALL check_dry_dirichlet_inlet
-  CALL check_layer_local_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
   IF (domain%solve_cells<=0 .OR. domain%reconstruction_cells<domain%solve_cells) &
        ERROR STOP 'invalid production worksets'
@@ -298,6 +297,9 @@ PROGRAM test_spatial_operator
        reconstruction%h_froude_interfaceR, reconstruction%h_froude_interfaceB, &
        reconstruction%h_froude_interfaceT
   CLOSE(output_unit)
+  ! Keep this state-mutating BC fixture separate from the reference payload.
+  ! It runs after serialization so it cannot perturb the measured spatial fields.
+  CALL check_layer_local_dirichlet_inlet
   WRITE(*,*) 'Production worksets:',domain%solve_cells,domain%reconstruction_cells
   CALL spatial%finalize
   CALL hyperbolic%finalize
