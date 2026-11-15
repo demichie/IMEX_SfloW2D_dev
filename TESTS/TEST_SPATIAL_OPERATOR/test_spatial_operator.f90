@@ -66,6 +66,7 @@ PROGRAM test_spatial_operator
   CALL check_uniform_minmod_kernel
   CALL check_optional_pccu_flux_slots
   CALL check_interlayer_pressure_path
+  CALL check_interlayer_metric_no_double_count
   CALL check_interlayer_oriented_face_pair
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
@@ -383,6 +384,80 @@ CONTAINS
         END DO
         WRITE(*,*) 'PASS: interlayer pressure path product balance, dry limit and reversal'
     END SUBROUTINE check_interlayer_pressure_path
+
+    !> @brief Verify that using eta2=B+h1+h2 does not count -G*L*dh1 twice.
+    !> @details With constant Gamma2, both the standard hydrostatic path and
+    !> the interlayer path interpolate the same L=Gamma2*h2. Their difference
+    !> must equal the embedded lower-surface contribution; only -h1*L*dG
+    !> remains to be added to the L2 momentum equation.
+    SUBROUTINE check_interlayer_metric_no_double_count
+        REAL(wp) :: full_l1(5),full_l2(5),metric_l2(5),reverse_metric(5)
+        REAL(wp) :: hydro_total(5),hydro_without_h1(5)
+        REAL(wp) :: h1_l,h1_r,h2_l,h2_r,load_l,load_r,g_l,g_r,gamma
+        REAL(wp) :: eta_l,eta_r,expected,tolerance,scale,embedded
+        INTEGER :: direction,normal_momentum,case_number
+
+        gamma=4.25_wp
+        DO direction=1,2
+            normal_momentum=direction+1
+            DO case_number=1,4
+                h1_l=1.4_wp
+                h1_r=2.0_wp
+                h2_l=0.7_wp
+                h2_r=1.1_wp
+                g_l=0.72_wp
+                g_r=0.91_wp
+                SELECT CASE(case_number)
+                CASE(1)
+                    ! Both thicknesses and terrain metric vary.
+                CASE(2)
+                    ! A shared face metric has no explicit L2 correction.
+                    g_r=g_l
+                CASE(3)
+                    ! Dry upper endpoint and unequal lower-layer thickness.
+                    h2_r=0.0_wp
+                CASE(4)
+                    ! Entire upper layer dry.
+                    h2_l=0.0_wp
+                    h2_r=0.0_wp
+                END SELECT
+                load_l=gamma*h2_l
+                load_r=gamma*h2_r
+                CALL eval_interlayer_pressure_path(direction,h1_l,load_l,g_l, &
+                    h1_r,load_r,g_r,full_l1,full_l2,metric_l2)
+                ! Integral of -h1(s)*L(s)*dG with linear h1,L,G.
+                expected=-(g_r-g_l)*(h1_l*load_l &
+                    +0.5_wp*(h1_l*(load_r-load_l)+load_l*(h1_r-h1_l)) &
+                    +(h1_r-h1_l)*(load_r-load_l)/3.0_wp)
+                scale=MAX(1.0_wp,ABS(g_l*h1_l*load_l),ABS(g_r*h1_r*load_r))
+                tolerance=128.0_wp*EPSILON(1.0_wp)*scale
+                IF (ABS(metric_l2(normal_momentum)-expected)>tolerance) &
+                    ERROR STOP 'Metric-only L2 path has incorrect quadrature'
+                IF (ANY(metric_l2(:normal_momentum-1)/=0.0_wp) .OR. &
+                    ANY(metric_l2(normal_momentum+1:)/=0.0_wp)) &
+                    ERROR STOP 'Metric-only L2 path contaminated other components'
+                IF (case_number==2 .AND. ANY(metric_l2/=0.0_wp)) &
+                    ERROR STOP 'Shared metric created duplicate L2 face pressure'
+
+                ! B is constant in this identity; total eta includes h1.
+                eta_l=h1_l+h2_l
+                eta_r=h1_r+h2_r
+                CALL eval_hydrostatic_path(direction,h2_l,gamma,eta_l,g_l, &
+                    h2_r,gamma,eta_r,g_r,hydro_total)
+                CALL eval_hydrostatic_path(direction,h2_l,gamma,eta_l-h1_l,g_l, &
+                    h2_r,gamma,eta_r-h1_r,g_r,hydro_without_h1)
+                embedded=hydro_total(normal_momentum)-hydro_without_h1(normal_momentum)
+                IF (ABS(embedded-(full_l2(normal_momentum)-metric_l2(normal_momentum)))>tolerance) &
+                    ERROR STOP 'L2 hydrostatic path already contains inconsistent interlayer pressure'
+
+                CALL eval_interlayer_pressure_path(direction,h1_r,load_r,g_r, &
+                    h1_l,load_l,g_l,full_l1,full_l2,reverse_metric)
+                IF (ABS(metric_l2(normal_momentum)+reverse_metric(normal_momentum))>tolerance) &
+                    ERROR STOP 'Metric-only L2 pressure is not path-antisymmetric'
+            END DO
+        END DO
+        WRITE(*,*) 'PASS: L2 embedded h1 pressure and metric-only interlayer correction'
+    END SUBROUTINE check_interlayer_metric_no_double_count
 
     !> @brief Check interlayer path splitting into the two oriented PCCU face values.
     !> @details The numerical flux is set to zero to isolate the nonconservative

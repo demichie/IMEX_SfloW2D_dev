@@ -87,14 +87,19 @@ CONTAINS
     !> @param[in] h1_left,h1_right Lower-layer depths [m].
     !> @param[in] load_left,load_right Upper-layer loads [Pa].
     !> @param[in] metric_left,metric_right Shared large-slope factors G.
-    !> @param[out] path_l1,path_l2 Momentum-vector path contributions by layer.
+    !> @param[out] path_l1,path_l2 Full nonconservative momentum paths by layer.
+    !> @param[out] path_l2_metric Optional -h1*L*dG path. When the L2 hydrostatic
+    !>             operator uses eta2=B+h1+h2, its -G*L*dh1 term is already present;
+    !>             only this metric component can be added without double counting.
+    !>             This decomposition assumes a common straight path in (h1,L,G).
     SUBROUTINE eval_interlayer_pressure_path(direction,h1_left,load_left,metric_left, &
-        h1_right,load_right,metric_right,path_l1,path_l2)
+        h1_right,load_right,metric_right,path_l1,path_l2,path_l2_metric)
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(IN) :: h1_left,load_left,metric_left
         REAL(wp), INTENT(IN) :: h1_right,load_right,metric_right
         REAL(wp), INTENT(OUT) :: path_l1(:),path_l2(:)
-        REAL(wp) :: state_left(3),state_right(3),contribution(2)
+        REAL(wp), INTENT(OUT), OPTIONAL :: path_l2_metric(:)
+        REAL(wp) :: state_left(3),state_right(3),contribution(3)
         INTEGER :: normal_momentum
 
         SELECT CASE(direction)
@@ -108,6 +113,10 @@ CONTAINS
 
         IF (SIZE(path_l1)<normal_momentum .OR. SIZE(path_l2)<normal_momentum) &
             ERROR STOP 'eval_interlayer_pressure_path: missing momentum component'
+        IF (PRESENT(path_l2_metric)) THEN
+            IF (SIZE(path_l2_metric)<normal_momentum) &
+                ERROR STOP 'eval_interlayer_pressure_path: missing metric path component'
+        END IF
 
         state_left=[h1_left,load_left,metric_left]
         state_right=[h1_right,load_right,metric_right]
@@ -118,6 +127,10 @@ CONTAINS
         path_l2=0.0_wp
         path_l1(normal_momentum)=contribution(1)
         path_l2(normal_momentum)=contribution(2)
+        IF (PRESENT(path_l2_metric)) THEN
+            path_l2_metric=0.0_wp
+            path_l2_metric(normal_momentum)=contribution(3)
+        END IF
     END SUBROUTINE eval_interlayer_pressure_path
 
     !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
@@ -129,7 +142,7 @@ CONTAINS
 
         IF (direction/=PATH_DIR_X .AND. direction/=PATH_DIR_Y) &
             ERROR STOP 'interlayer_pressure_integrand: invalid direction'
-        IF (SIZE(path_state)/=3 .OR. SIZE(dstate_ds)/=3 .OR. SIZE(integrand)/=2) &
+        IF (SIZE(path_state)/=3 .OR. SIZE(dstate_ds)/=3 .OR. SIZE(integrand)/=3) &
             ERROR STOP 'interlayer_pressure_integrand: inconsistent path sizes'
 
         h1=path_state(1)
@@ -137,6 +150,7 @@ CONTAINS
         metric=path_state(3)
         integrand(1)=-metric*h1*dstate_ds(2)
         integrand(2)=-load*(metric*dstate_ds(1)+h1*dstate_ds(3))
+        integrand(3)=-load*h1*dstate_ds(3)
     END SUBROUTINE interlayer_pressure_integrand
 
     !******************************************************************************
