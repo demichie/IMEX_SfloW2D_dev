@@ -24,6 +24,7 @@ MODULE pccu_2d
 
     PUBLIC :: eval_hydrostatic_path
     PUBLIC :: eval_interlayer_pressure_path
+    PUBLIC :: eval_interlayer_pressure_correction
     PUBLIC :: eval_central_upwind_flux
     PUBLIC :: eval_pccu_advective_flux
     PUBLIC :: eval_oriented_pccu_pair
@@ -132,6 +133,44 @@ CONTAINS
             path_l2_metric(normal_momentum)=contribution(3)
         END IF
     END SUBROUTINE eval_interlayer_pressure_path
+
+    !> @brief Return the interlayer paths to add when L2 already uses eta2=B+h1+h2.
+    !> @details The existing L2 hydrostatic path already contains the pressure
+    !> from the variation of h1 in eta2. Its exact discrete contribution is
+    !> computed by evaluating that SAME hydrostatic path with and without h1
+    !> in eta, using unchanged endpoint h2,Gamma2,G. Subtracting it from the
+    !> full S_inter2 avoids double counting even when Gamma2 varies along the
+    !> straight hydrostatic path differently from the linearly interpolated
+    !> interlayer load L=Gamma2*h2.
+    !> @param[in] direction Cartesian direction.
+    !> @param[in] h1_left,h1_right Lower-layer endpoint depths.
+    !> @param[in] h2_left,h2_right Upper-layer endpoint depths.
+    !> @param[in] gamma_left,gamma_right Upper hydrostatic coefficients.
+    !> @param[in] eta2_left,eta2_right Upper-surface endpoint elevations.
+    !> @param[in] metric_left,metric_right Shared large-slope factors.
+    !> @param[out] path_l1 Full L1 interlayer contribution.
+    !> @param[out] correction_l2 L2 contribution not already in hydrostatic path.
+    SUBROUTINE eval_interlayer_pressure_correction(direction, &
+        h1_left,h2_left,gamma_left,eta2_left,metric_left, &
+        h1_right,h2_right,gamma_right,eta2_right,metric_right, &
+        path_l1,correction_l2)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: h1_left,h2_left,gamma_left,eta2_left,metric_left
+        REAL(wp), INTENT(IN) :: h1_right,h2_right,gamma_right,eta2_right,metric_right
+        REAL(wp), INTENT(OUT) :: path_l1(:),correction_l2(:)
+        REAL(wp) :: full_l2(SIZE(correction_l2))
+        REAL(wp) :: hydro_total(SIZE(correction_l2)),hydro_without_h1(SIZE(correction_l2))
+
+        CALL eval_interlayer_pressure_path(direction, &
+            h1_left,gamma_left*h2_left,metric_left, &
+            h1_right,gamma_right*h2_right,metric_right,path_l1,full_l2)
+
+        CALL eval_hydrostatic_path(direction,h2_left,gamma_left,eta2_left,metric_left, &
+            h2_right,gamma_right,eta2_right,metric_right,hydro_total)
+        CALL eval_hydrostatic_path(direction,h2_left,gamma_left,eta2_left-h1_left,metric_left, &
+            h2_right,gamma_right,eta2_right-h1_right,metric_right,hydro_without_h1)
+        correction_l2=full_l2-(hydro_total-hydro_without_h1)
+    END SUBROUTINE eval_interlayer_pressure_correction
 
     !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
     SUBROUTINE interlayer_pressure_integrand(direction,path_state,dstate_ds,integrand)

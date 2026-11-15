@@ -17,7 +17,7 @@ PROGRAM test_spatial_operator
   USE init_2d, ONLY : init_empty
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair, &
-      eval_interlayer_pressure_path
+      eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path
   USE source_terms_2d, ONLY : eval_source_explicit
   USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
   USE state_composition, ONLY : conservative_mass_admissible
@@ -67,6 +67,7 @@ PROGRAM test_spatial_operator
   CALL check_optional_pccu_flux_slots
   CALL check_interlayer_pressure_path
   CALL check_interlayer_metric_no_double_count
+  CALL check_interlayer_variable_gamma_overlap
   CALL check_interlayer_oriented_face_pair
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
@@ -410,6 +411,7 @@ CONTAINS
                 SELECT CASE(case_number)
                 CASE(1)
                     ! Both thicknesses and terrain metric vary.
+                    CONTINUE
                 CASE(2)
                     ! A shared face metric has no explicit L2 correction.
                     g_r=g_l
@@ -458,6 +460,59 @@ CONTAINS
         END DO
         WRITE(*,*) 'PASS: L2 embedded h1 pressure and metric-only interlayer correction'
     END SUBROUTINE check_interlayer_metric_no_double_count
+
+    !> @brief Verify the exact discrete overlap for variable upper pressure coefficient.
+    !> @details The interlayer path is straight in L=Gamma*h2, whereas the
+    !> existing hydrostatic path is straight in Gamma and h2 separately.
+    SUBROUTINE check_interlayer_variable_gamma_overlap
+        REAL(wp) :: path_l1(5),correction_l2(5),full_l1(5),full_l2(5)
+        REAL(wp) :: hydro_total(5),hydro_without_h1(5)
+        REAL(wp) :: h1_l,h1_r,h2_l,h2_r,gamma_l,gamma_r,eta_l,eta_r,g_l,g_r
+        REAL(wp) :: balance,scale,tolerance
+        INTEGER :: direction,normal_momentum,case_number
+
+        h1_l=1.3_wp
+        h1_r=1.9_wp
+        h2_l=0.6_wp
+        gamma_l=4.0_wp
+        gamma_r=7.0_wp
+        g_l=0.7_wp
+        g_r=0.9_wp
+        DO direction=1,2
+            normal_momentum=direction+1
+            DO case_number=1,3
+                h2_r=1.2_wp
+                IF (case_number==2) h2_r=0.0_wp
+                IF (case_number==3) THEN
+                    h2_r=0.0_wp
+                    h2_l=0.0_wp
+                END IF
+                eta_l=0.4_wp+h1_l+h2_l
+                eta_r=0.4_wp+h1_r+h2_r
+                CALL eval_interlayer_pressure_correction(direction, &
+                    h1_l,h2_l,gamma_l,eta_l,g_l, &
+                    h1_r,h2_r,gamma_r,eta_r,g_r,path_l1,correction_l2)
+                CALL eval_interlayer_pressure_path(direction, &
+                    h1_l,gamma_l*h2_l,g_l,h1_r,gamma_r*h2_r,g_r,full_l1,full_l2)
+                CALL eval_hydrostatic_path(direction,h2_l,gamma_l,eta_l,g_l, &
+                    h2_r,gamma_r,eta_r,g_r,hydro_total)
+                CALL eval_hydrostatic_path(direction,h2_l,gamma_l,eta_l-h1_l,g_l, &
+                    h2_r,gamma_r,eta_r-h1_r,g_r,hydro_without_h1)
+                scale=MAX(1.0_wp,ABS(g_l*h1_l*gamma_l*h2_l),ABS(g_r*h1_r*gamma_r*h2_r))
+                tolerance=128.0_wp*EPSILON(1.0_wp)*scale
+                IF (ANY(ABS(path_l1-full_l1)>tolerance)) &
+                    ERROR STOP 'Upper pressure correction modified L1 path'
+                IF (ANY(ABS(correction_l2+hydro_total-hydro_without_h1-full_l2)>tolerance)) &
+                    ERROR STOP 'Variable Gamma L2 pressure was counted twice'
+                balance=path_l1(normal_momentum)+full_l2(normal_momentum) &
+                    +g_r*h1_r*gamma_r*h2_r-g_l*h1_l*gamma_l*h2_l
+                IF (ABS(balance)>tolerance) &
+                    ERROR STOP 'Variable Gamma interlayer pressure product is unbalanced'
+            END DO
+            h2_l=0.6_wp
+        END DO
+        WRITE(*,*) 'PASS: variable Gamma L2 pressure overlap and dry upper layer'
+    END SUBROUTINE check_interlayer_variable_gamma_overlap
 
     !> @brief Check interlayer path splitting into the two oriented PCCU face values.
     !> @details The numerical flux is set to zero to isolate the nonconservative
