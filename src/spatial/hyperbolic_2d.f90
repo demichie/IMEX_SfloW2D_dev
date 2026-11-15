@@ -30,7 +30,7 @@ MODULE hyperbolic_2d
 
     PRIVATE
 
-    PUBLIC :: add_interlayer_face_terms
+    PUBLIC :: add_interlayer_terms
 
     !> \brief Persistent wave speeds, oriented face contributions and cell paths.
     !> \details Face arrays distinguish the contribution seen by either adjacent
@@ -67,27 +67,36 @@ MODULE hyperbolic_2d
 
 CONTAINS
 
-    !> @brief Accumulate coupled oriented interlayer face pressure in L1 and L2 residuals.
+    !> @brief Accumulate coupled interlayer face and within-cell pressure in both residuals.
     !> @details Reuses the common pressure kernel and requires validated coupled
-    !> wave bounds on the shared OR workset. The cell path is assembled separately.
+    !> wave bounds on the shared OR workset. Subtract within-cell paths with
+    !> the exact Gamma2 selected by the existing L2 hydrostatic cell kernel.
     !> @param[in] l1,l2 Reconstructed layer traces on the shared workset.
     !> @param[in] hp2 Upper-layer pressure coefficients from the same traces.
     !> @param[in,out] r1,r2 Existing layer spatial residuals.
     !> @param[in] active Shared active-cell mask.
+    !> @param[in] nc,jc,kc Shared active cell count and coordinates.
+    !> @param[in] qp2 Upper-layer primitive state for dry-cell treatment.
     !> @param[in] nx,ny Shared face counts by Cartesian direction.
     !> @param[in] jx,kx,jy,ky Shared compact face coordinates.
     !> @param[in] axn,axp,ayn,ayp Validated coupled face-speed bounds.
-    SUBROUTINE add_interlayer_face_terms(l1,l2,hp2,r1,r2,active,nx,jx,kx,ny,jy,ky,axn,axp,ayn,ayp)
+    SUBROUTINE add_interlayer_terms(l1,l2,hp2,r1,r2,active,nc,jc,kc,qp2, &
+        nx,jx,kx,ny,jy,ky,axn,axp,ayn,ayp)
         USE nonconservative_2d, ONLY : PATH_DIR_X,PATH_DIR_Y
-        USE pccu_2d, ONLY : eval_interlayer_oriented_face
+        USE pccu_2d, ONLY : eval_interlayer_oriented_face,eval_interlayer_pressure_correction
         CLASS(reconstruction_workspace_type), INTENT(IN) :: l1,l2
         CLASS(hyperbolic_workspace_type), INTENT(IN) :: hp2
         REAL(wp), INTENT(INOUT) :: r1(n_eqns,comp_cells_x,comp_cells_y),r2(n_eqns,comp_cells_x,comp_cells_y)
         LOGICAL, INTENT(IN) :: active(comp_cells_x,comp_cells_y)
+        INTEGER, INTENT(IN) :: nc,jc(:),kc(:)
+        REAL(wp), INTENT(IN) :: qp2(n_vars,comp_cells_x,comp_cells_y)
         INTEGER, INTENT(IN) :: nx,ny,jx(:),kx(:),jy(:),ky(:)
         REAL(wp), INTENT(IN) :: axn(:,:),axp(:,:),ayn(:,:),ayp(:,:)
         REAL(wp) :: fl1(n_eqns),fr1(n_eqns),fl2(n_eqns),fr2(n_eqns)
+        REAL(wp) :: path1(n_eqns),path2(n_eqns),hydro_path(n_eqns)
+        REAL(wp) :: qp_a(n_vars),qp_b(n_vars)
         REAL(wp) :: h1a,h1b,h2a,h2b,gamma_a,gamma_b,eta_a,eta_b,metric,am,ap,spacing
+        REAL(wp) :: metric_a,metric_b,selected_a,selected_b,cached_a,cached_b
         INTEGER :: direction,l,j,k,prev_j,prev_k,nfaces
 
         IF (l1%layer/=1 .OR. l2%layer/=2) ERROR STOP 'Invalid interlayer face ordering'
@@ -152,7 +161,73 @@ CONTAINS
                 END IF
             END DO
         END DO
-    END SUBROUTINE add_interlayer_face_terms
+
+        ! Keep the same west/east and south/north endpoint ordering as P_cell.
+        ! The Gamma2 outputs include the L2 dry-endpoint regularization.
+        DO l=1,nc
+            j=jc(l)
+            k=kc(l)
+
+            IF (.NOT.active(j,k)) ERROR STOP 'Interlayer cell outside shared workset'
+            IF (qp2(1,j,k)<=dry_thickness_tolerance) CYCLE
+
+            DO direction=PATH_DIR_X,PATH_DIR_Y
+                IF (direction==PATH_DIR_X .AND. comp_cells_x<=1) CYCLE
+                IF (direction==PATH_DIR_Y .AND. comp_cells_y<=1) CYCLE
+
+                IF (direction==PATH_DIR_X) THEN
+                    h1a=MAX(l1%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
+                    h1b=MAX(l1%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
+                    h2a=MAX(l2%eta_cellW(j,k)-l1%eta_cellW(j,k),0.0_wp)
+                    h2b=MAX(l2%eta_cellE(j,k)-l1%eta_cellE(j,k),0.0_wp)
+                    eta_a=l2%eta_cellW(j,k)
+                    eta_b=l2%eta_cellE(j,k)
+                    metric_a=grav_coeff_stag_x(j,k)
+                    metric_b=grav_coeff_stag_x(j+1,k)
+                    selected_a=l2%h_selected_interfaceR(j,k)
+                    selected_b=l2%h_selected_interfaceL(j+1,k)
+                    gamma_a=hp2%gamma_interface_xR(j,k)
+                    gamma_b=hp2%gamma_interface_xL(j+1,k)
+                    qp_a=l2%qp_adv_interfaceR(:,j,k)
+                    qp_b=l2%qp_adv_interfaceL(:,j+1,k)
+                    spacing=one_by_dx
+                ELSE
+                    h1a=MAX(l1%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
+                    h1b=MAX(l1%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
+                    h2a=MAX(l2%eta_cellS(j,k)-l1%eta_cellS(j,k),0.0_wp)
+                    h2b=MAX(l2%eta_cellN(j,k)-l1%eta_cellN(j,k),0.0_wp)
+                    eta_a=l2%eta_cellS(j,k)
+                    eta_b=l2%eta_cellN(j,k)
+                    metric_a=grav_coeff_stag_y(j,k)
+                    metric_b=grav_coeff_stag_y(j,k+1)
+                    selected_a=l2%h_selected_interfaceT(j,k)
+                    selected_b=l2%h_selected_interfaceB(j,k+1)
+                    gamma_a=hp2%gamma_interface_yT(j,k)
+                    gamma_b=hp2%gamma_interface_yB(j,k+1)
+                    qp_a=l2%qp_adv_interfaceT(:,j,k)
+                    qp_b=l2%qp_adv_interfaceB(:,j,k+1)
+                    spacing=one_by_dy
+                END IF
+
+                qp_a(1)=h2a
+                qp_b(1)=h2b
+                IF (h2a<=dry_thickness_tolerance) qp_a(2:3)=0.0_wp
+                IF (h2b<=dry_thickness_tolerance) qp_b(2:3)=0.0_wp
+
+                ! Return exactly the pressure coefficients used by the L2 path.
+                cached_a=gamma_a
+                cached_b=gamma_b
+                CALL eval_cell_hydrostatic_path(qp_a,eta_a,metric_a,qp_b,eta_b,metric_b, &
+                    direction,hydro_path,cached_a,selected_a,cached_b,selected_b, &
+                    hp2%clamp_buoyant_pressure,gamma_minus_out=gamma_a,gamma_plus_out=gamma_b)
+                CALL eval_interlayer_pressure_correction(direction, &
+                    h1a,h2a,gamma_a,eta_a,metric_a, &
+                    h1b,h2b,gamma_b,eta_b,metric_b,path1,path2)
+                r1(:,j,k)=r1(:,j,k)-path1*spacing
+                r2(:,j,k)=r2(:,j,k)-path2*spacing
+            END DO
+        END DO
+    END SUBROUTINE add_interlayer_terms
 
     !> @brief Report the resolved face contributions to one conservative residual.
     !> @param[in] this Face-oriented HP-PCCU workspace.
@@ -1258,8 +1333,10 @@ CONTAINS
     !> @param[in] cached_gamma_plus Corresponding positive-side pressure coefficient.
     !> @param[in] selected_h_plus Final face depth of the positive side.
     !> @param[in] clamp_buoyant_pressure Suppress negative pressure at buoyant L2 endpoints.
+    !> @param[out] gamma_minus_out,gamma_plus_out Optional resolved pressure coefficients.
     SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path, &
-        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus,clamp_buoyant_pressure)
+        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus,clamp_buoyant_pressure, &
+        gamma_minus_out,gamma_plus_out)
 
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE pccu_2d, ONLY : eval_hydrostatic_path
@@ -1272,6 +1349,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(OUT) :: path(:)
+        REAL(wp), INTENT(OUT), OPTIONAL :: gamma_minus_out,gamma_plus_out
 
         REAL(wp) :: gamma_minus,gamma_plus
         REAL(wp) :: reduced_gravity_minus,reduced_gravity_plus
@@ -1296,6 +1374,8 @@ CONTAINS
             gamma_plus=MAX(gamma_plus,0.0_wp)
         END IF
         CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1), gamma_plus)
+        IF (PRESENT(gamma_minus_out)) gamma_minus_out=gamma_minus
+        IF (PRESENT(gamma_plus_out)) gamma_plus_out=gamma_plus
         CALL eval_hydrostatic_path(direction,qp_minus(1),gamma_minus,eta_minus,                                        &
             grav_minus,qp_plus(1),gamma_plus,eta_plus,grav_plus,path)
 

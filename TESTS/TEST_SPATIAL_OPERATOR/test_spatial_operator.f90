@@ -15,7 +15,7 @@ PROGRAM test_spatial_operator
   USE state_conversions, ONLY : primitive_to_conservative
   USE state_fields, ONLY : state_type
   USE init_2d, ONLY : init_empty
-  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_face_terms
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_terms
   USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair, &
       eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path, &
       eval_interlayer_oriented_face
@@ -84,6 +84,7 @@ PROGRAM test_spatial_operator
   q0=q
   CALL refresh_topography_geometry
   CALL check_interlayer_face_residual
+  CALL check_interlayer_cell_assembly
   CALL check_two_layer_union_workset
   CALL check_dry_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
@@ -367,7 +368,7 @@ CONTAINS
         CALL eval_interlayer_oriented_face(1, &
             1.2_wp,0.8_wp,4.0_wp,2.0_wp,1.4_wp,0.6_wp,6.0_wp,2.0_wp, &
             grav_coeff_stag_x(2,2),-2.0_wp,3.0_wp,fl1,fr1,fl2,fr2)
-        CALL add_interlayer_face_terms(l1,l2,hp2,r1,r2,active, &
+        CALL add_interlayer_terms(l1,l2,hp2,r1,r2,active,0,[INTEGER::],[INTEGER::],qp, &
             1,[2],[2],0,[INTEGER::],[INTEGER::], &
             hp2%a_interface_xNeg,hp2%a_interface_xPos, &
             hp2%a_interface_yNeg,hp2%a_interface_yPos)
@@ -390,6 +391,80 @@ CONTAINS
         CALL l2%finalize
         WRITE(*,*) 'PASS: shared interlayer face residual and sparse workset'
     END SUBROUTINE check_interlayer_face_residual
+
+    !> @brief Check within-cell pressure assembly without any active coupling face.
+    !> @details Uses two wet endpoints and variable Gamma2 and metric. It
+    !> compares the L1/L2 residuals with the same nonconservative path kernel.
+    SUBROUTINE check_interlayer_cell_assembly
+        TYPE(reconstruction_workspace_type) :: lower,upper
+        TYPE(hyperbolic_workspace_type) :: upper_hp
+        REAL(wp) :: r1(n_eqns,nx,ny),r2(n_eqns,nx,ny),qp_upper(n_vars,nx,ny)
+        REAL(wp) :: path1(n_eqns),path2(n_eqns),tol,scale
+        LOGICAL :: active(nx,ny)
+        INTEGER, PARAMETER :: j=2,k=2
+
+        IF (nx<3 .OR. ny<3) RETURN
+
+        CALL lower%initialize(layer=1)
+        CALL upper%initialize(layer=2)
+        CALL upper_hp%initialize(clamp_buoyant_pressure=.TRUE.)
+        r1=0.0_wp
+        r2=0.0_wp
+        qp_upper=0.0_wp
+        qp_upper(1,j,k)=1.0_wp
+        active=.FALSE.
+        active(j,k)=.TRUE.
+
+        ! No face jumps: isolate the within-cell x path only.
+        lower%eta_cellW(j,k)=B_face_x(j,k)+1.2_wp
+        lower%eta_cellE(j,k)=B_face_x(j+1,k)+1.7_wp
+        upper%eta_cellW(j,k)=lower%eta_cellW(j,k)+0.8_wp
+        upper%eta_cellE(j,k)=lower%eta_cellE(j,k)+1.1_wp
+        upper%qp_adv_interfaceR(:,j,k)=0.0_wp
+        upper%qp_adv_interfaceL(:,j+1,k)=0.0_wp
+        upper%h_selected_interfaceR(j,k)=0.8_wp
+        upper%h_selected_interfaceL(j+1,k)=1.1_wp
+        upper_hp%gamma_interface_xR(j,k)=4.0_wp
+        upper_hp%gamma_interface_xL(j+1,k)=6.0_wp
+        upper%qp_adv_interfaceR(1,j,k)=0.8_wp
+        upper%qp_adv_interfaceL(1,j+1,k)=1.1_wp
+
+        CALL eval_interlayer_pressure_correction(1, &
+            1.2_wp,0.8_wp,4.0_wp,upper%eta_cellW(j,k),grav_coeff_stag_x(j,k), &
+            1.7_wp,1.1_wp,6.0_wp,upper%eta_cellE(j,k),grav_coeff_stag_x(j+1,k),path1,path2)
+
+        ! Keep y dimensionality active but use a dry, constant y cell path.
+        lower%eta_cellS(j,k)=B_face_y(j,k)+1.2_wp
+        lower%eta_cellN(j,k)=B_face_y(j,k+1)+1.2_wp
+        upper%eta_cellS(j,k)=lower%eta_cellS(j,k)
+        upper%eta_cellN(j,k)=lower%eta_cellN(j,k)
+        upper%qp_adv_interfaceT(:,j,k)=0.0_wp
+        upper%qp_adv_interfaceB(:,j,k+1)=0.0_wp
+        upper%h_selected_interfaceT(j,k)=0.0_wp
+        upper%h_selected_interfaceB(j,k+1)=0.0_wp
+        upper_hp%gamma_interface_yT(j,k)=0.0_wp
+        upper_hp%gamma_interface_yB(j,k+1)=0.0_wp
+
+        CALL add_interlayer_terms(lower,upper,upper_hp,r1,r2,active,1,[j],[k],qp_upper, &
+            0,[INTEGER::],[INTEGER::],0,[INTEGER::],[INTEGER::], &
+            upper_hp%a_interface_xNeg,upper_hp%a_interface_xPos, &
+            upper_hp%a_interface_yNeg,upper_hp%a_interface_yPos)
+
+        scale=MAX(1.0_wp,MAXVAL(ABS(path1)),MAXVAL(ABS(path2)))
+        tol=128.0_wp*EPSILON(1.0_wp)*scale*one_by_dx
+        IF (ANY(ABS(r1(:,j,k)+path1*one_by_dx)>tol) .OR. &
+            ANY(ABS(r2(:,j,k)+path2*one_by_dx)>tol)) &
+            ERROR STOP 'Within-cell interlayer path has wrong residual sign'
+        r1(:,j,k)=0.0_wp
+        r2(:,j,k)=0.0_wp
+        IF (ANY(r1/=0.0_wp) .OR. ANY(r2/=0.0_wp)) &
+            ERROR STOP 'Within-cell interlayer path touched inactive cells'
+
+        CALL upper_hp%finalize
+        CALL upper%finalize
+        CALL lower%finalize
+        WRITE(*,*) 'PASS: within-cell interlayer pressure residual and active mask'
+    END SUBROUTINE check_interlayer_cell_assembly
 
     !> @brief Validate the shared workset as the union of independent L1/L2 masks.
     !> @details Checks active cells, faces and HP reconstruction halo without
