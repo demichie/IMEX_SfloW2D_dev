@@ -195,6 +195,8 @@ CONTAINS
     !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
     !> \param[in] use_kt_direct Use direct KT traces instead of the HP dry-state projection.
     !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
+    !> @param[in] lower_recon Optional L1 HP workspace supplying L2 side bases.
+    !> @param[in] h_lower Optional L1 cell depths; required with lower_recon.
 
 
     SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, &
@@ -782,6 +784,8 @@ CONTAINS
     !> @param[in] qp_expl Cell-centered primitive states including stencil halo.
     !> @param[in] j X index of the workset cell.
     !> @param[in] k Y index of the workset cell.
+    !> @param[in] lower_recon Optional L1 HP traces; provided only for L2.
+    !> @param[in] h_lower Optional L1 cell depths; required with lower_recon.
     SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k,lower_recon,h_lower)
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
@@ -1376,6 +1380,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @details Applies the configured trace reconstruction to prepared HP cells.
     !> @param[in,out] this Reconstruction workspace and output face traces.
     !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
+    !> @param[in] lower_recon Optional L1 HP workspace defining the L2 side bases.
     SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl,lower_recon)
     USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
 
@@ -1540,30 +1545,34 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                     lower_recon%eta_cellW(j,k),this%eta_interfaceR(j,k),this%h_minmod_interfaceR(j,k), &
                     this%h_froude_interfaceR(j,k))
                 IF (j==comp_cells_x) CALL preserve_dirichlet_hp_depth(bcE(idx_h,this%layer),                           &
-                    this%qp_adv_interfaceL(:,j+1,k),lower_recon%eta_cellE(j,k),this%eta_interfaceL(j+1,k),                        &
+                    this%qp_adv_interfaceL(:,j+1,k),lower_recon%eta_cellE(j,k), &
+                    this%eta_interfaceL(j+1,k), &
                     this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k))
                 IF (k==1) CALL preserve_dirichlet_hp_depth(bcS(idx_h,this%layer),this%qp_adv_interfaceT(:,j,k),        &
                     lower_recon%eta_cellS(j,k),this%eta_interfaceT(j,k),this%h_minmod_interfaceT(j,k), &
                     this%h_froude_interfaceT(j,k))
                 IF (k==comp_cells_y) CALL preserve_dirichlet_hp_depth(bcN(idx_h,this%layer),                           &
-                    this%qp_adv_interfaceB(:,j,k+1),lower_recon%eta_cellN(j,k),this%eta_interfaceB(j,k+1),                        &
+                    this%qp_adv_interfaceB(:,j,k+1),lower_recon%eta_cellN(j,k), &
+                    this%eta_interfaceB(j,k+1), &
                     this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1))
             END IF
-            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), this%eta_interfaceR(j,k),lower_recon%eta_cellW(j,k),   &
+            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), &
+                this%eta_interfaceR(j,k),lower_recon%eta_cellW(j,k), &
                 this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k),                                           &
                 lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2,                                              &
                 this%h_selected_interfaceR(j,k),'KT reconstruction west',kt_mode)
             CALL select_final_transport_trace(this%qp_adv_interfaceL(:,j+1,k),                                         &
-                this%eta_interfaceL(j+1,k),lower_recon%eta_cellE(j,k),                                                            &
+                this%eta_interfaceL(j+1,k),lower_recon%eta_cellE(j,k), &
                 this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k),                                       &
                 lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2,                                   &
                 this%h_selected_interfaceL(j+1,k),'KT reconstruction east',kt_mode)
-            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), this%eta_interfaceT(j,k),lower_recon%eta_cellS(j,k),   &
+            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), &
+                this%eta_interfaceT(j,k),lower_recon%eta_cellS(j,k), &
                 this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k),                                           &
                 lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2,                                              &
                 this%h_selected_interfaceT(j,k),'KT reconstruction south',kt_mode)
             CALL select_final_transport_trace(this%qp_adv_interfaceB(:,j,k+1),                                         &
-                this%eta_interfaceB(j,k+1),lower_recon%eta_cellN(j,k),                                                            &
+                this%eta_interfaceB(j,k+1),lower_recon%eta_cellN(j,k), &
                 this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1),                                       &
                 lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2,                                   &
                 this%h_selected_interfaceB(j,k+1),'KT reconstruction north',kt_mode)
