@@ -61,7 +61,7 @@ Questo documento è l'unica roadmap operativa vigente. Descrive l'architettura o
 
 ## 3. Stato di avanzamento
 
-La parola **completato** indica implementazione preparatoria disponibile, non certificazione dell'intero modello. **Avviato** significa codice o test parziali e gate aperti. Le evidenze CI note coprono le verifiche antecedenti all'ultimo intervento sugli slot opzionali; su quest'ultimo manca ancora la certificazione CI.
+La parola **completato** indica implementazione preparatoria disponibile, non certificazione dell'intero modello. **Avviato** significa codice o test parziali e gate aperti. Build e regressioni sono state confermate sullo stato precedente; il nuovo controllo degli slot COMPLEX inattivi richiede ancora CI sul commit che lo introduce.
 
 | Ambito | Stato | Risultato e limite |
 |---|---|---|
@@ -70,7 +70,7 @@ La parola **completato** indica implementazione preparatoria disponibile, non ce
 | Configurazioni reologiche, termiche, Darcy, stochastic/OU e mass exchange L1/L2 | **Completato (preparazione)** | Ownership per layer e selezione nei percorsi locali/REAL/COMPLEX predisposte; L2 non selezionabile in produzione. |
 | Classificazione dei quattro contatti | **Completato (isolato)** | Riutilizzabile senza nuove strutture; aggiornamento per gruppo con candidati accoppiati da realizzare. |
 | HP-PCCU e domini indipendenti per L1/L2 | **Completato (isolato)** | Clamp idrostatico L2, test di trasporto Euler CFL-limited isolato e bilanci dedicati; nessuna pressione accoppiata. |
-| Conteggio OR degli slot opzionali e conversioni REAL/COMPLEX | **Avviato** | Dimensionamento condiviso implementato nei due percorsi input e test locale in `TEST_STATE`; CI sul codice più recente e invarianti di flussi/sorgenti/IC/BC ancora aperti. |
+| Conteggio OR degli slot opzionali e conversioni REAL/COMPLEX | **Avviato** | Dimensionamento condiviso e conversioni REAL/COMPLEX verificati in CI; ulteriore controllo degli zeri COMPLEX inattivi aggiunto. Restano da verificare flussi, sorgenti, IC/BC e restart sul layout opzionale comune. |
 | Certificazione single-layer completa | **Avviato** | Build/regressioni e vari EXAMPLES già verificati; matrice scientifica, I/O/restart, OpenMP e confronto quantitativo non interamente chiusi. |
 | HP-PCCU accoppiato e CFL two-layer | **Da fare** | Pressione di coppia, path, wet/dry, topografia, stratified rest e iperbolicità. |
 | Lie L1/L2/INTERLAYER | **Da fare** | Scope, candidato doppio, contatti aggiornati per gruppo, transazioni condivise e rollback atomico. |
@@ -84,7 +84,7 @@ La parola **completato** indica implementazione preparatoria disponibile, non ce
 |---|---|---|
 | **A — Fondazioni single-layer** (TL00–TL03) | **Avviata, preparazione sostanzialmente realizzata** | Chiudere baseline riproducibile, matrice deposito/lava/dry, EXAMPLES, restart/NetCDF, verifiche quantitative e OpenMP; assicurare equivalenza L1 salvo delta termici approvati. |
 | **B — Proprietà e fisica per layer** (TL04) | **Avviata, implementazione principale completata** | Certificare parsing/alias, tutte le configurazioni e combinazioni opzionali, budget dei processi e regressioni; nessuna attivazione L2 in produzione. |
-| **C — Operatori L2 indipendenti** (TL05) | **Avviata, test isolati realizzati** | Verificare l'ultimo dimensionamento OR, zeri degli slot inattivi in ogni operatore e nelle condizioni iniziali/al contorno; consolidare i test di trasporto e le prove CI. |
+| **C — Operatori L2 indipendenti** (TL05) | **Avviata, test isolati realizzati** | Verificare zeri degli slot inattivi in flussi spaziali, sorgenti, condizioni iniziali/al contorno e restart; eseguire regressioni con componenti opzionali condivise e attivazioni L1/L2 opposte. |
 | **D — Spaziale accoppiato** (TL06) | **Da fare** | Completare path e pressioni di coppia, topografia condivisa, test di riduzione, wet/dry, well-balancing previsto e CFL/iperbolicità; gate spaziale. |
 | **E — Lie accoppiato** (TL07) | **Da fare** | Scope dei gruppi, doppio candidato, gruppo 0, refresh dei contatti, buoyancy L2 e transazioni/rollback atomici, mantenendo cell-outer/OpenMP. |
 | **F — Chiusure fisiche** (TL08–TL11) | **Da fare** | Settling L2→L1; elutriazione L1→L2 con cold-start; drag di coppia; scambi esterni e basali per layer esposto. Verificare risorse SHARED, disponibilità, bilanci e limiti. |

@@ -750,6 +750,18 @@ CONTAINS
                 CMPLX(layer_primitive(idx_stoch,layer),1.0E-25_wp,wp)
             CALL primitive_to_conservative(complex_primitive,complex_conservative)
             CALL conservative_to_primitive(complex_conservative,complex_decoded)
+
+            ! An inactive scalar must remain exactly zero, including its imaginary component.
+            IF (layer==1) THEN
+                IF (ABS(complex_conservative(idx_stoch))>0.0_wp .OR. &
+                    ABS(complex_decoded(idx_stoch))>0.0_wp) &
+                    ERROR STOP 'Inactive L1 COMPLEX stochastic slot changed'
+            ELSE
+                IF (ABS(complex_conservative(idx_pore))>0.0_wp .OR. &
+                    ABS(complex_decoded(idx_pore))>0.0_wp) &
+                    ERROR STOP 'Inactive L2 COMPLEX pore-pressure slot changed'
+            END IF
+
             ! Roundoff in the REAL part must not mask preservation of a tiny complex-step perturbation.
             CALL assert_close('COMPLEX stochastic real slot',REAL(complex_decoded(idx_stoch),wp), &
                 REAL(complex_primitive(idx_stoch),wp),1.0E-12_wp)
