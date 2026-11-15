@@ -16,7 +16,8 @@ PROGRAM test_spatial_operator
   USE state_fields, ONLY : state_type
   USE init_2d, ONLY : init_empty
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
-  USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair
+  USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair, &
+      eval_interlayer_pressure_path
   USE source_terms_2d, ONLY : eval_source_explicit
   USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
   USE state_composition, ONLY : conservative_mass_admissible
@@ -64,6 +65,7 @@ PROGRAM test_spatial_operator
   CALL initialize_fixture
   CALL check_uniform_minmod_kernel
   CALL check_optional_pccu_flux_slots
+  CALL check_interlayer_pressure_path
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) THEN
@@ -311,6 +313,65 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> Verify the common interlayer pressure quadrature and its conservative sum.
+    !> This exercises the path algebra only; the full coupled operator remains gated.
+    SUBROUTINE check_interlayer_pressure_path
+        REAL(wp) :: path_l1(5),path_l2(5),reverse_l1(5),reverse_l2(5)
+        REAL(wp) :: h_left,h_right,load_left,load_right,metric_left,metric_right
+        REAL(wp) :: expected,scale,tolerance
+        INTEGER :: direction,normal_momentum,case_number
+
+        DO direction=1,2
+            normal_momentum=direction+1
+            DO case_number=1,4
+                SELECT CASE(case_number)
+                CASE(1)
+                    ! Vary every field, including G across a cell-internal path.
+                    h_left=2.0_wp; h_right=3.0_wp
+                    load_left=5.0_wp; load_right=7.0_wp
+                    metric_left=0.7_wp; metric_right=0.9_wp
+                CASE(2)
+                    ! Shared metric on an interface, load gradient only.
+                    h_left=2.0_wp; h_right=2.0_wp
+                    load_left=5.0_wp; load_right=7.0_wp
+                    metric_left=0.8_wp; metric_right=0.8_wp
+                CASE(3)
+                    ! Upper layer disappears at the right endpoint.
+                    h_left=2.0_wp; h_right=1.0_wp
+                    load_left=5.0_wp; load_right=0.0_wp
+                    metric_left=0.6_wp; metric_right=0.7_wp
+                CASE(4)
+                    ! Zero interlayer load: no pressure force in either layer.
+                    h_left=2.0_wp; h_right=3.0_wp
+                    load_left=0.0_wp; load_right=0.0_wp
+                    metric_left=0.7_wp; metric_right=0.9_wp
+                END SELECT
+
+                CALL eval_interlayer_pressure_path(direction,h_left,load_left,metric_left, &
+                    h_right,load_right,metric_right,path_l1,path_l2)
+                expected=metric_left*h_left*load_left-metric_right*h_right*load_right
+                scale=MAX(1.0_wp,ABS(metric_left*h_left*load_left),ABS(metric_right*h_right*load_right))
+                tolerance=128.0_wp*EPSILON(1.0_wp)*scale
+                IF (ABS(path_l1(normal_momentum)+path_l2(normal_momentum)-expected)>tolerance) &
+                    ERROR STOP 'Interlayer pressure path violates product balance'
+                IF (ANY(path_l1(1:normal_momentum-1)/=0.0_wp) .OR. &
+                    ANY(path_l2(1:normal_momentum-1)/=0.0_wp) .OR. &
+                    ANY(path_l1(normal_momentum+1:)/=0.0_wp) .OR. &
+                    ANY(path_l2(normal_momentum+1:)/=0.0_wp)) &
+                    ERROR STOP 'Interlayer path introduced a non-momentum source'
+
+                CALL eval_interlayer_pressure_path(direction,h_right,load_right,metric_right, &
+                    h_left,load_left,metric_left,reverse_l1,reverse_l2)
+                IF (ABS(path_l1(normal_momentum)+reverse_l1(normal_momentum))>tolerance .OR. &
+                    ABS(path_l2(normal_momentum)+reverse_l2(normal_momentum))>tolerance) &
+                    ERROR STOP 'Interlayer pressure path is not antisymmetric'
+                IF (case_number==4 .AND. (ANY(path_l1/=0.0_wp) .OR. ANY(path_l2/=0.0_wp))) &
+                    ERROR STOP 'Zero upper-layer load created interlayer pressure'
+            END DO
+        END DO
+        WRITE(*,*) 'PASS: interlayer pressure path product balance, dry limit and reversal'
+    END SUBROUTINE check_interlayer_pressure_path
 
     !> @brief Verify inactive optional components remain zero in the production PCCU algebra.
     !> @details Both layer vectors use the same seven component positions. L1 carries only

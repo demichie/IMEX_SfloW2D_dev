@@ -23,6 +23,7 @@ MODULE pccu_2d
     REAL(wp), PARAMETER, PUBLIC :: pccu_speed_tolerance = 1.0E-14_wp
 
     PUBLIC :: eval_hydrostatic_path
+    PUBLIC :: eval_interlayer_pressure_path
     PUBLIC :: eval_central_upwind_flux
     PUBLIC :: eval_pccu_advective_flux
     PUBLIC :: eval_oriented_pccu_pair
@@ -73,6 +74,70 @@ CONTAINS
             hydrostatic_integrand, path_contribution, n_quad=3 )
 
     END SUBROUTINE eval_hydrostatic_path
+
+    !> @brief Integrate the two interlayer pressure products on the same spatial path.
+    !> @details The inputs are the lower-layer depth h1, upper-layer load
+    !> L=rho_m2*gprime2*h2 and shared bed-slope metric G at each endpoint.
+    !> Along a straight path, the two contributions are
+    !> S1=-G*h1*dL and S2=-L*d(G*h1). The common quadrature preserves
+    !> S1+S2=-d(G*h1*L) in the absence of buoyancy clamping.
+    !> The caller supplies the already selected load; this kernel does not
+    !> choose a buoyancy regularization or inspect global layer states.
+    !> @param[in] direction Cartesian path direction.
+    !> @param[in] h1_left,h1_right Lower-layer depths [m].
+    !> @param[in] load_left,load_right Upper-layer loads [Pa].
+    !> @param[in] metric_left,metric_right Shared large-slope factors G.
+    !> @param[out] path_l1,path_l2 Momentum-vector path contributions by layer.
+    SUBROUTINE eval_interlayer_pressure_path(direction,h1_left,load_left,metric_left, &
+        h1_right,load_right,metric_right,path_l1,path_l2)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: h1_left,load_left,metric_left
+        REAL(wp), INTENT(IN) :: h1_right,load_right,metric_right
+        REAL(wp), INTENT(OUT) :: path_l1(:),path_l2(:)
+        REAL(wp) :: state_left(3),state_right(3),contribution(2)
+        INTEGER :: normal_momentum
+
+        SELECT CASE(direction)
+        CASE(PATH_DIR_X)
+            normal_momentum=2
+        CASE(PATH_DIR_Y)
+            normal_momentum=3
+        CASE DEFAULT
+            ERROR STOP 'eval_interlayer_pressure_path: invalid direction'
+        END SELECT
+
+        IF (SIZE(path_l1)<normal_momentum .OR. SIZE(path_l2)<normal_momentum) &
+            ERROR STOP 'eval_interlayer_pressure_path: missing momentum component'
+
+        state_left=[h1_left,load_left,metric_left]
+        state_right=[h1_right,load_right,metric_right]
+        CALL eval_path_contribution(direction,state_left,state_right, &
+            interlayer_pressure_integrand,contribution,n_quad=3)
+
+        path_l1=0.0_wp
+        path_l2=0.0_wp
+        path_l1(normal_momentum)=contribution(1)
+        path_l2(normal_momentum)=contribution(2)
+    END SUBROUTINE eval_interlayer_pressure_path
+
+    !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
+    SUBROUTINE interlayer_pressure_integrand(direction,path_state,dstate_ds,integrand)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: path_state(:),dstate_ds(:)
+        REAL(wp), INTENT(OUT) :: integrand(:)
+        REAL(wp) :: h1,load,metric
+
+        IF (direction/=PATH_DIR_X .AND. direction/=PATH_DIR_Y) &
+            ERROR STOP 'interlayer_pressure_integrand: invalid direction'
+        IF (SIZE(path_state)/=3 .OR. SIZE(dstate_ds)/=3 .OR. SIZE(integrand)/=2) &
+            ERROR STOP 'interlayer_pressure_integrand: inconsistent path sizes'
+
+        h1=path_state(1)
+        load=path_state(2)
+        metric=path_state(3)
+        integrand(1)=-metric*h1*dstate_ds(2)
+        integrand(2)=-load*(metric*dstate_ds(1)+h1*dstate_ds(3))
+    END SUBROUTINE interlayer_pressure_integrand
 
     !******************************************************************************
     !> @brief Split a numerical flux and path jump into the two cell-facing values.
