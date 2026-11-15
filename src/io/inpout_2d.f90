@@ -414,17 +414,25 @@
         xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
     NAMELIST /west_l1_boundary_conditions/ h_bcW, hu_bcW, hv_bcW,                                                      &
         xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
+    NAMELIST /west_l2_boundary_conditions/ h_bcW, hu_bcW, hv_bcW,                                                      &
+        xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
     NAMELIST /east_boundary_conditions/ h_bcE, hu_bcE, hv_bcE,                                                         &
         xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
     NAMELIST /east_l1_boundary_conditions/ h_bcE, hu_bcE, hv_bcE,                                                      &
+        xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
+    NAMELIST /east_l2_boundary_conditions/ h_bcE, hu_bcE, hv_bcE,                                                      &
         xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
     NAMELIST /south_boundary_conditions/ h_bcS, hu_bcS, hv_bcS,                                                        &
         xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
     NAMELIST /south_l1_boundary_conditions/ h_bcS, hu_bcS, hv_bcS,                                                     &
         xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
+    NAMELIST /south_l2_boundary_conditions/ h_bcS, hu_bcS, hv_bcS,                                                     &
+        xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
     NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                        &
         xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
     NAMELIST /north_l1_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                     &
+        xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
+    NAMELIST /north_l2_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                     &
         xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
     NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s,                                                 &
         sp_heat_s, alphastot_min, maximum_solid_packing, vonK
@@ -1060,11 +1068,12 @@
 
         CHARACTER(LEN=15) :: chara
 
-        INTEGER :: ios, ios_bc_l1, n_rheology_legacy, n_rheology_l1, n_rheology_l2
+        INTEGER :: ios, ios_bc_l1, ios_bc_l2, layer, n_rheology_legacy, n_rheology_l1, n_rheology_l2
         INTEGER :: n_thermal_legacy, n_thermal_l1, n_thermal_l2
         INTEGER :: n_pore_legacy, n_pore_l1, n_pore_l2
         CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line
         CHARACTER(LEN=256) :: source_input_error
+        LOGICAL :: boundary_stochastic_enabled, boundary_pore_enabled
 
         REAL(wp) :: expA, expB, Tc
 
@@ -2345,590 +2354,725 @@
 
         END IF
 
-        ! ------- READ boundary_conditions NAMELISTS --------------------------------
-
-        IF (COMP_CELLS_X .GT. 1) THEN
-
-            ! --------- West boundary conditions -------------------------------------
-
-            READ (input_unit, west_boundary_conditions, IOSTAT=ios)
-            REWIND (input_unit)
-            READ (input_unit, west_l1_boundary_conditions, IOSTAT=ios_bc_l1)
-            REWIND (input_unit)
-            IF (ios==0 .AND. ios_bc_l1==0) &
-                CALL fatal_error('Both WEST and WEST_L1 boundary namelists supplied')
-            IF (n_layers==2 .AND. ios==0) &
-                CALL fatal_error('N_LAYERS=2 requires explicit WEST_L1 boundary namelist')
-
-            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
-
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, west_boundary_conditions)
-                STOP
-
-            ELSE
-
-                REWIND (input_unit)
-
+        ! One parsing and validation path for both layer-specific BC sets.
+        DO layer=1,n_layers
+            IF (layer==2) THEN
+                    h_bcW%flag=-1
+                    hu_bcW%flag=-1
+                    hv_bcW%flag=-1
+                    T_bcW%flag=-1
+                    xs_bcW%flag=-1
+                    xg_bcW%flag=-1
+                    xl_bcW%flag=-1
+                    stoch_bcW%flag=-1
+                    pore_bcW%flag=-1
+                    h_bcE%flag=-1
+                    hu_bcE%flag=-1
+                    hv_bcE%flag=-1
+                    T_bcE%flag=-1
+                    xs_bcE%flag=-1
+                    xg_bcE%flag=-1
+                    xl_bcE%flag=-1
+                    stoch_bcE%flag=-1
+                    pore_bcE%flag=-1
+                    h_bcS%flag=-1
+                    hu_bcS%flag=-1
+                    hv_bcS%flag=-1
+                    T_bcS%flag=-1
+                    xs_bcS%flag=-1
+                    xg_bcS%flag=-1
+                    xl_bcS%flag=-1
+                    stoch_bcS%flag=-1
+                    pore_bcS%flag=-1
+                    h_bcN%flag=-1
+                    hu_bcN%flag=-1
+                    hv_bcN%flag=-1
+                    T_bcN%flag=-1
+                    xs_bcN%flag=-1
+                    xg_bcN%flag=-1
+                    xl_bcN%flag=-1
+                    stoch_bcN%flag=-1
+                    pore_bcN%flag=-1
             END IF
 
-            IF ((h_bcW%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for h not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
+            boundary_stochastic_enabled=stochastic_l1%stochastic_transport_flag
+            boundary_pore_enabled=pore_pressure_l1%pore_pressure_flag
+            IF (layer==2) THEN
+                boundary_stochastic_enabled=stochastic_l2%stochastic_transport_flag
+                boundary_pore_enabled=pore_pressure_l2%pore_pressure_flag
             END IF
 
-            IF (comp_cells_x .GT. 1) THEN
+            ! ------- READ boundary_conditions NAMELISTS --------------------------------
 
-                IF (hu_bcW%flag .EQ. -1) THEN
+            IF (COMP_CELLS_X .GT. 1) THEN
+
+                ! --------- West boundary conditions -------------------------------------
+
+                IF (layer==1) THEN
+                    READ (input_unit, west_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                    READ (input_unit, west_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+                    REWIND (input_unit)
+                    IF (ios==0 .AND. ios_bc_l1==0) &
+                        CALL fatal_error('Both WEST and WEST_L1 boundary namelists supplied')
+                    IF (n_layers==2 .AND. ios==0) &
+                        CALL fatal_error('N_LAYERS=2 requires explicit WEST_L1 boundary namelist')
+                    IF (ios/=0) ios=ios_bc_l1
+                    READ (input_unit, west_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+                    REWIND (input_unit)
+                    IF (ios_bc_l2==0 .AND. n_layers==1) &
+                        CALL fatal_error('WEST_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+                ELSE
+                    READ (input_unit, west_l2_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                END IF
+
+                IF (ios .NE. 0) THEN
+
+                    WRITE (*, *) 'IOSTAT=', ios
+                    WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'Please check the input file'
+                    WRITE (*, west_boundary_conditions)
+                    STOP
+
+                ELSE
+
+                    REWIND (input_unit)
+
+                END IF
+
+                IF ((h_bcW%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hu not set properly'
+                    WRITE (*, *) 'B.C. for h not set properly'
                     WRITE (*, *) 'Please check the input file'
                     STOP
 
                 END IF
 
-            END IF
+                IF (comp_cells_x .GT. 1) THEN
 
-            IF (comp_cells_y .GT. 1) THEN
+                    IF (hu_bcW%flag .EQ. -1) THEN
 
-                IF (hv_bcW%flag .EQ. -1) THEN
+                        WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hu not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (comp_cells_y .GT. 1) THEN
+
+                    IF (hv_bcW%flag .EQ. -1) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hv not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    ELSE
+
+                        hv_bcW%flag = 1
+                        hv_bcW%value = 0.0_wp
+
+                    END IF
+
+                END IF
+
+                IF (ANY(xs_bcW(1:n_solid)%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hv not set properly'
+                    WRITE (*, *) 'B.C. for solid mass fractions not set properly'
+                    WRITE (*, *) 'Please check the input file'
+                    WRITE (*, *) 'xs_bcW'
+                    WRITE (*, *) xs_bcW(1:n_solid)
+                    STOP
+
+                END IF
+
+                IF (ANY(xg_bcW(1:n_add_gas)%flag .EQ. -1)) THEN
+
+                    WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'B.C. for additional-gas mass fractions not set properly'
+                    WRITE (*, *) 'Please check the input file'
+                    WRITE (*, *) 'xg_bcW'
+                    WRITE (*, *) xg_bcW(1:n_add_gas)
+                    STOP
+
+                END IF
+
+
+                IF (boundary_stochastic_enabled) THEN
+
+                    IF (ANY(stoch_bcW(1:n_stoch_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for stochastic variable not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'stoch_bcW'
+                        WRITE (*, *) stoch_bcW(1:n_solid)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (boundary_pore_enabled) THEN
+
+                    IF (ANY(pore_bcW(1:n_pore_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for pore pressure not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'pore_bcW'
+                        WRITE (*, *) pore_bcW(1:n_solid)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (T_bcW%flag .EQ. -1) THEN
+
+                    WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'B.C. for temperature not set properly'
+                    WRITE (*, *) 'Please check the input file'
+                    STOP
+
+                END IF
+
+                ! set the approriate boundary conditions
+
+                bcW(1,layer) = h_bcW
+                bcW(2,layer) = hu_bcW
+                bcW(3,layer) = hv_bcW
+
+                ! ------------- East boundary conditions --------------------------------
+
+                IF (layer==1) THEN
+                    READ (input_unit, east_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                    READ (input_unit, east_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+                    REWIND (input_unit)
+                    IF (ios==0 .AND. ios_bc_l1==0) &
+                        CALL fatal_error('Both EAST and EAST_L1 boundary namelists supplied')
+                    IF (n_layers==2 .AND. ios==0) &
+                        CALL fatal_error('N_LAYERS=2 requires explicit EAST_L1 boundary namelist')
+                    IF (ios/=0) ios=ios_bc_l1
+                    READ (input_unit, east_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+                    REWIND (input_unit)
+                    IF (ios_bc_l2==0 .AND. n_layers==1) &
+                        CALL fatal_error('EAST_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+                ELSE
+                    READ (input_unit, east_l2_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                END IF
+
+                IF (ios .NE. 0) THEN
+
+                    WRITE (*, *) 'IOSTAT=', ios
+                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
                     WRITE (*, *) 'Please check the input file'
                     STOP
 
                 ELSE
 
-                    hv_bcW%flag = 1
-                    hv_bcW%value = 0.0_wp
+                    REWIND (input_unit)
 
                 END IF
 
-            END IF
-
-            IF (ANY(xs_bcW(1:n_solid)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for solid mass fractions not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xs_bcW'
-                WRITE (*, *) xs_bcW(1:n_solid)
-                STOP
-
-            END IF
-
-            IF (ANY(xg_bcW(1:n_add_gas)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for additional-gas mass fractions not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xg_bcW'
-                WRITE (*, *) xg_bcW(1:n_add_gas)
-                STOP
-
-            END IF
-
-
-            IF (stochastic_l1%stochastic_transport_flag) THEN
-
-                IF (ANY(stoch_bcW(1:n_stoch_vars)%flag .EQ. -1)) THEN
-
-                    WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for stochastic variable not set properly'
-                    WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'stoch_bcW'
-                    WRITE (*, *) stoch_bcW(1:n_solid)
-                    STOP
-
-                END IF
-
-            END IF
-
-            IF (pore_pressure_l1%pore_pressure_flag) THEN
-
-                IF (ANY(pore_bcW(1:n_pore_vars)%flag .EQ. -1)) THEN
-
-                    WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for pore pressure not set properly'
-                    WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'pore_bcW'
-                    WRITE (*, *) pore_bcW(1:n_solid)
-                    STOP
-
-                END IF
-
-            END IF
-
-            IF (T_bcW%flag .EQ. -1) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for temperature not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            END IF
-
-            ! set the approriate boundary conditions
-
-            bcW(1,1) = h_bcW
-            bcW(2,1) = hu_bcW
-            bcW(3,1) = hv_bcW
-
-            ! ------------- East boundary conditions --------------------------------
-
-            READ (input_unit, east_boundary_conditions, IOSTAT=ios)
-            REWIND (input_unit)
-            READ (input_unit, east_l1_boundary_conditions, IOSTAT=ios_bc_l1)
-            REWIND (input_unit)
-            IF (ios==0 .AND. ios_bc_l1==0) &
-                CALL fatal_error('Both EAST and EAST_L1 boundary namelists supplied')
-            IF (n_layers==2 .AND. ios==0) &
-                CALL fatal_error('N_LAYERS=2 requires explicit EAST_L1 boundary namelist')
-
-            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
-
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            ELSE
-
-                REWIND (input_unit)
-
-            END IF
-
-            IF ((h_bcE%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for h not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            END IF
-
-            IF (comp_cells_x .GT. 1) THEN
-
-                IF (hu_bcE%flag .EQ. -1) THEN
+                IF ((h_bcE%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hu not set properly'
+                    WRITE (*, *) 'B.C. for h not set properly'
                     WRITE (*, *) 'Please check the input file'
                     STOP
 
                 END IF
 
-            ELSE
+                IF (comp_cells_x .GT. 1) THEN
 
-                hu_bcE%flag = 1
-                hu_bcE%value = 0.0_wp
+                    IF (hu_bcE%flag .EQ. -1) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hu not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                ELSE
+
+                    hu_bcE%flag = 1
+                    hu_bcE%value = 0.0_wp
+
+                END IF
+
+                IF (comp_cells_y .GT. 1) THEN
+
+                    IF (hv_bcE%flag .EQ. -1) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hv not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                ELSE
+
+                    hv_bcE%flag = 1
+                    hv_bcE%value = 0.0_wp
+
+                END IF
+
+                IF (ANY(xs_bcE(1:n_solid)%flag .EQ. -1)) THEN
+
+                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'B.C. for sediment concentration not set properly'
+                    WRITE (*, *) 'Please check the input file'
+                    WRITE (*, *) 'xs_bcE'
+                    WRITE (*, *) xs_bcE(1:n_solid)
+                    STOP
+
+                END IF
+
+                IF (ANY(xg_bcE(1:n_add_gas)%flag .EQ. -1)) THEN
+
+                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'B.C. for additional gas components not set properly'
+                    WRITE (*, *) 'Please check the input file'
+                    WRITE (*, *) 'xg_bcE'
+                    WRITE (*, *) xg_bcE(1:n_add_gas)
+                    STOP
+
+                END IF
+
+
+                IF (boundary_stochastic_enabled) THEN
+
+                    IF (ANY(stoch_bcE(1:n_stoch_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for stochastic variable not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'stoch_bcE'
+                        WRITE (*, *) stoch_bcE(1:n_solid)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (boundary_pore_enabled) THEN
+
+                    IF (ANY(pore_bcE(1:n_pore_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for pore pressure not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'pore_bcE'
+                        WRITE (*, *) pore_bcE(1:n_pore_vars)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (T_bcE%flag .EQ. -1) THEN
+
+                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'B.C. for temperature not set properly'
+                    WRITE (*, *) 'Please check the input file'
+                    STOP
+
+                END IF
+
+                bcE(1,layer) = h_bcE
+                bcE(2,layer) = hu_bcE
+                bcE(3,layer) = hv_bcE
 
             END IF
 
             IF (comp_cells_y .GT. 1) THEN
 
-                IF (hv_bcE%flag .EQ. -1) THEN
+                ! --------------- South boundary conditions ------------------------------
 
-                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hv not set properly'
+                IF (layer==1) THEN
+                    READ (input_unit, south_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                    READ (input_unit, south_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+                    REWIND (input_unit)
+                    IF (ios==0 .AND. ios_bc_l1==0) &
+                        CALL fatal_error('Both SOUTH and SOUTH_L1 boundary namelists supplied')
+                    IF (n_layers==2 .AND. ios==0) &
+                        CALL fatal_error('N_LAYERS=2 requires explicit SOUTH_L1 boundary namelist')
+                    IF (ios/=0) ios=ios_bc_l1
+                    READ (input_unit, south_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+                    REWIND (input_unit)
+                    IF (ios_bc_l2==0 .AND. n_layers==1) &
+                        CALL fatal_error('SOUTH_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+                ELSE
+                    READ (input_unit, south_l2_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                END IF
+
+                IF (ios .NE. 0) THEN
+
+                    WRITE (*, *) 'IOSTAT=', ios
+                    WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
                     WRITE (*, *) 'Please check the input file'
                     STOP
 
-                END IF
+                ELSE
 
-            ELSE
-
-                hv_bcE%flag = 1
-                hv_bcE%value = 0.0_wp
-
-            END IF
-
-            IF (ANY(xs_bcE(1:n_solid)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for sediment concentration not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xs_bcE'
-                WRITE (*, *) xs_bcE(1:n_solid)
-                STOP
-
-            END IF
-
-            IF (ANY(xg_bcE(1:n_add_gas)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for additional gas components not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xg_bcE'
-                WRITE (*, *) xg_bcE(1:n_add_gas)
-                STOP
-
-            END IF
-
-
-            IF (stochastic_l1%stochastic_transport_flag) THEN
-
-                IF (ANY(stoch_bcE(1:n_stoch_vars)%flag .EQ. -1)) THEN
-
-                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for stochastic variable not set properly'
-                    WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'stoch_bcE'
-                    WRITE (*, *) stoch_bcE(1:n_solid)
-                    STOP
+                    REWIND (input_unit)
 
                 END IF
 
-            END IF
-
-            IF (pore_pressure_l1%pore_pressure_flag) THEN
-
-                IF (ANY(pore_bcE(1:n_pore_vars)%flag .EQ. -1)) THEN
-
-                    WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for pore pressure not set properly'
-                    WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'pore_bcE'
-                    WRITE (*, *) pore_bcE(1:n_pore_vars)
-                    STOP
-
-                END IF
-
-            END IF
-
-            IF (T_bcE%flag .EQ. -1) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for temperature not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            END IF
-
-            bcE(1,1) = h_bcE
-            bcE(2,1) = hu_bcE
-            bcE(3,1) = hv_bcE
-
-        END IF
-
-        IF (comp_cells_y .GT. 1) THEN
-
-            ! --------------- South boundary conditions ------------------------------
-
-            READ (input_unit, south_boundary_conditions, IOSTAT=ios)
-            REWIND (input_unit)
-            READ (input_unit, south_l1_boundary_conditions, IOSTAT=ios_bc_l1)
-            REWIND (input_unit)
-            IF (ios==0 .AND. ios_bc_l1==0) &
-                CALL fatal_error('Both SOUTH and SOUTH_L1 boundary namelists supplied')
-            IF (n_layers==2 .AND. ios==0) &
-                CALL fatal_error('N_LAYERS=2 requires explicit SOUTH_L1 boundary namelist')
-
-            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
-
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            ELSE
-
-                REWIND (input_unit)
-
-            END IF
-
-            IF ((h_bcS%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for h not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            END IF
-
-            IF (comp_cells_x .GT. 1) THEN
-
-                IF (hu_bcS%flag .EQ. -1) THEN
+                IF ((h_bcS%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hu not set properly'
+                    WRITE (*, *) 'B.C. for h not set properly'
                     WRITE (*, *) 'Please check the input file'
                     STOP
 
                 END IF
 
-            ELSE
+                IF (comp_cells_x .GT. 1) THEN
 
-                hu_bcS%flag = 1
-                hu_bcS%value = 0.0_wp
+                    IF (hu_bcS%flag .EQ. -1) THEN
 
-            END IF
+                        WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hu not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
 
-            IF (comp_cells_y .GT. 1) THEN
+                    END IF
 
-                IF (hv_bcS%flag .EQ. -1) THEN
+                ELSE
+
+                    hu_bcS%flag = 1
+                    hu_bcS%value = 0.0_wp
+
+                END IF
+
+                IF (comp_cells_y .GT. 1) THEN
+
+                    IF (hv_bcS%flag .EQ. -1) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hv not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                ELSE
+
+                    hv_bcS%flag = 1
+                    hv_bcS%value = 0.0_wp
+
+                END IF
+
+                IF (ANY(xs_bcS(1:n_solid)%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hv not set properly'
+                    WRITE (*, *) 'B.C. for sediment concentrations not set properly'
                     WRITE (*, *) 'Please check the input file'
+                    WRITE (*, *) 'xs_bcS'
+                    WRITE (*, *) xs_bcS(1:n_solid)
                     STOP
 
                 END IF
 
-            ELSE
-
-                hv_bcS%flag = 1
-                hv_bcS%value = 0.0_wp
-
-            END IF
-
-            IF (ANY(xs_bcS(1:n_solid)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for sediment concentrations not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xs_bcS'
-                WRITE (*, *) xs_bcS(1:n_solid)
-                STOP
-
-            END IF
-
-            IF (ANY(xg_bcS(1:n_add_gas)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for additional gas components not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xg_bcS'
-                WRITE (*, *) xg_bcS(1:n_add_gas)
-                STOP
-
-            END IF
-
-
-            IF (stochastic_l1%stochastic_transport_flag) THEN
-
-                IF (ANY(stoch_bcS(1:n_stoch_vars)%flag .EQ. -1)) THEN
+                IF (ANY(xg_bcS(1:n_add_gas)%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for stochastic variable not set properly'
+                    WRITE (*, *) 'B.C. for additional gas components not set properly'
                     WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'stoch_bcS'
-                    WRITE (*, *) stoch_bcS(1:n_stoch_vars)
+                    WRITE (*, *) 'xg_bcS'
+                    WRITE (*, *) xg_bcS(1:n_add_gas)
                     STOP
 
                 END IF
 
-            END IF
 
-            IF (pore_pressure_l1%pore_pressure_flag) THEN
+                IF (boundary_stochastic_enabled) THEN
 
-                IF (ANY(pore_bcS(1:n_pore_vars)%flag .EQ. -1)) THEN
+                    IF (ANY(stoch_bcS(1:n_stoch_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for stochastic variable not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'stoch_bcS'
+                        WRITE (*, *) stoch_bcS(1:n_stoch_vars)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (boundary_pore_enabled) THEN
+
+                    IF (ANY(pore_bcS(1:n_pore_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for pore pressure not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'pore_bcS'
+                        WRITE (*, *) pore_bcS(1::n_pore_vars)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (T_bcS%flag .EQ. -1) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for pore pressure not set properly'
+                    WRITE (*, *) 'B.C. for temperature not set properly'
                     WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'pore_bcS'
-                    WRITE (*, *) pore_bcS(1::n_pore_vars)
                     STOP
 
                 END IF
 
-            END IF
+                bcS(1,layer) = h_bcS
+                bcS(2,layer) = hu_bcS
+                bcS(3,layer) = hv_bcS
 
-            IF (T_bcS%flag .EQ. -1) THEN
+                ! ---------------- North boundary conditions ----------------------------
 
-                WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for temperature not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
+                IF (layer==1) THEN
+                    READ (input_unit, north_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                    READ (input_unit, north_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+                    REWIND (input_unit)
+                    IF (ios==0 .AND. ios_bc_l1==0) &
+                        CALL fatal_error('Both NORTH and NORTH_L1 boundary namelists supplied')
+                    IF (n_layers==2 .AND. ios==0) &
+                        CALL fatal_error('N_LAYERS=2 requires explicit NORTH_L1 boundary namelist')
+                    IF (ios/=0) ios=ios_bc_l1
+                    READ (input_unit, north_l2_boundary_conditions, IOSTAT=ios_bc_l2)
+                    REWIND (input_unit)
+                    IF (ios_bc_l2==0 .AND. n_layers==1) &
+                        CALL fatal_error('NORTH_L2_BOUNDARY_CONDITIONS requires N_LAYERS=2')
+                ELSE
+                    READ (input_unit, north_l2_boundary_conditions, IOSTAT=ios)
+                    REWIND (input_unit)
+                END IF
 
-            END IF
+                IF (ios .NE. 0) THEN
 
-            bcS(1,1) = h_bcS
-            bcS(2,1) = hu_bcS
-            bcS(3,1) = hv_bcS
+                    WRITE (*, *) 'IOSTAT=', ios
+                    WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
+                    WRITE (*, *) 'Please check the input file'
+                    STOP
 
-            ! ---------------- North boundary conditions ----------------------------
+                ELSE
 
-            READ (input_unit, north_boundary_conditions, IOSTAT=ios)
-            REWIND (input_unit)
-            READ (input_unit, north_l1_boundary_conditions, IOSTAT=ios_bc_l1)
-            REWIND (input_unit)
-            IF (ios==0 .AND. ios_bc_l1==0) &
-                CALL fatal_error('Both NORTH and NORTH_L1 boundary namelists supplied')
-            IF (n_layers==2 .AND. ios==0) &
-                CALL fatal_error('N_LAYERS=2 requires explicit NORTH_L1 boundary namelist')
+                    REWIND (input_unit)
 
-            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
+                END IF
 
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            ELSE
-
-                REWIND (input_unit)
-
-            END IF
-
-            IF ((h_bcN%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for h not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
-            END IF
-
-            IF (comp_cells_x .GT. 1) THEN
-
-                IF (hu_bcN%flag .EQ. -1) THEN
+                IF ((h_bcN%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hu not set properly'
+                    WRITE (*, *) 'B.C. for h not set properly'
                     WRITE (*, *) 'Please check the input file'
                     STOP
 
                 END IF
 
-            ELSE
+                IF (comp_cells_x .GT. 1) THEN
 
-                hu_bcN%flag = 1
-                hu_bcN%value = 0.0_wp
+                    IF (hu_bcN%flag .EQ. -1) THEN
 
-            END IF
+                        WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hu not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
 
-            IF (comp_cells_y .GT. 1) THEN
+                    END IF
 
-                IF (hv_bcN%flag .EQ. -1) THEN
+                ELSE
+
+                    hu_bcN%flag = 1
+                    hu_bcN%value = 0.0_wp
+
+                END IF
+
+                IF (comp_cells_y .GT. 1) THEN
+
+                    IF (hv_bcN%flag .EQ. -1) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for hv not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        STOP
+
+                    END IF
+
+                ELSE
+
+                    hv_bcN%flag = 1
+                    hv_bcN%value = 0.0_wp
+
+                END IF
+
+                IF (ANY(xs_bcN(1:n_solid)%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for hv not set properly'
+                    WRITE (*, *) 'B.C. for sediment concentrations not set properly'
                     WRITE (*, *) 'Please check the input file'
+                    WRITE (*, *) 'xs_bcN'
+                    WRITE (*, *) xs_bcN(1:n_solid)
                     STOP
 
                 END IF
 
-            ELSE
-
-                hv_bcN%flag = 1
-                hv_bcN%value = 0.0_wp
-
-            END IF
-
-            IF (ANY(xs_bcN(1:n_solid)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for sediment concentrations not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xs_bcN'
-                WRITE (*, *) xs_bcN(1:n_solid)
-                STOP
-
-            END IF
-
-            IF (ANY(xg_bcN(1:n_add_gas)%flag .EQ. -1)) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for additional gas components not set properly'
-                WRITE (*, *) 'Please check the input file'
-                WRITE (*, *) 'xg_bcN'
-                WRITE (*, *) xg_bcN(1:n_add_gas)
-                STOP
-
-            END IF
-
-
-            IF (stochastic_l1%stochastic_transport_flag) THEN
-
-                IF (ANY(stoch_bcN(1:n_stoch_vars)%flag .EQ. -1)) THEN
+                IF (ANY(xg_bcN(1:n_add_gas)%flag .EQ. -1)) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for stochastic variable not set properly'
+                    WRITE (*, *) 'B.C. for additional gas components not set properly'
                     WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'stoch_bcN'
-                    WRITE (*, *) stoch_bcN(1:n_solid)
+                    WRITE (*, *) 'xg_bcN'
+                    WRITE (*, *) xg_bcN(1:n_add_gas)
                     STOP
 
                 END IF
 
-            END IF
 
-            IF (pore_pressure_l1%pore_pressure_flag) THEN
+                IF (boundary_stochastic_enabled) THEN
 
-                IF (ANY(pore_bcN(1:n_pore_vars)%flag .EQ. -1)) THEN
+                    IF (ANY(stoch_bcN(1:n_stoch_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for stochastic variable not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'stoch_bcN'
+                        WRITE (*, *) stoch_bcN(1:n_solid)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (boundary_pore_enabled) THEN
+
+                    IF (ANY(pore_bcN(1:n_pore_vars)%flag .EQ. -1)) THEN
+
+                        WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
+                        WRITE (*, *) 'B.C. for pore pressure not set properly'
+                        WRITE (*, *) 'Please check the input file'
+                        WRITE (*, *) 'pore_bcN'
+                        WRITE (*, *) pore_bcN(1:n_solid)
+                        STOP
+
+                    END IF
+
+                END IF
+
+                IF (T_bcN%flag .EQ. -1) THEN
 
                     WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                    WRITE (*, *) 'B.C. for pore pressure not set properly'
+                    WRITE (*, *) 'B.C. for temperature not set properly'
                     WRITE (*, *) 'Please check the input file'
-                    WRITE (*, *) 'pore_bcN'
-                    WRITE (*, *) pore_bcN(1:n_solid)
                     STOP
 
                 END IF
 
-            END IF
-
-            IF (T_bcN%flag .EQ. -1) THEN
-
-                WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-                WRITE (*, *) 'B.C. for temperature not set properly'
-                WRITE (*, *) 'Please check the input file'
-                STOP
+                bcN(1,layer) = h_bcN
+                bcN(2,layer) = hu_bcN
+                bcN(3,layer) = hv_bcN
 
             END IF
 
-            bcN(1,1) = h_bcN
-            bcN(2,1) = hu_bcN
-            bcN(3,1) = hv_bcN
+            IF (.NOT.boundary_stochastic_enabled) THEN
+                IF (comp_cells_x>1 .AND. ANY(stoch_bcW%flag/=-1)) &
+                    CALL fatal_error('Inactive stoch BC specified for this layer')
+                IF (comp_cells_x>1 .AND. ANY(stoch_bcE%flag/=-1)) &
+                    CALL fatal_error('Inactive stoch BC specified for this layer')
+                IF (comp_cells_y>1 .AND. ANY(stoch_bcS%flag/=-1)) &
+                    CALL fatal_error('Inactive stoch BC specified for this layer')
+                IF (comp_cells_y>1 .AND. ANY(stoch_bcN%flag/=-1)) &
+                    CALL fatal_error('Inactive stoch BC specified for this layer')
+            END IF
 
-        END IF
+            IF (.NOT.boundary_pore_enabled) THEN
+                IF (comp_cells_x>1 .AND. ANY(pore_bcW%flag/=-1)) &
+                    CALL fatal_error('Inactive pore BC specified for this layer')
+                IF (comp_cells_x>1 .AND. ANY(pore_bcE%flag/=-1)) &
+                    CALL fatal_error('Inactive pore BC specified for this layer')
+                IF (comp_cells_y>1 .AND. ANY(pore_bcS%flag/=-1)) &
+                    CALL fatal_error('Inactive pore BC specified for this layer')
+                IF (comp_cells_y>1 .AND. ANY(pore_bcN%flag/=-1)) &
+                    CALL fatal_error('Inactive pore BC specified for this layer')
+            END IF
 
-        bcW(4,1) = T_bcW
-        bcE(4,1) = T_bcE
-        bcS(4,1) = T_bcS
-        bcN(4,1) = T_bcN
+            bcW(4,layer) = T_bcW
+            bcE(4,layer) = T_bcE
+            bcS(4,layer) = T_bcS
+            bcN(4,layer) = T_bcN
 
-        bcW(5:4 + n_solid,1) = xs_bcW(1:n_solid)
-        bcE(5:4 + n_solid,1) = xs_bcE(1:n_solid)
-        bcS(5:4 + n_solid,1) = xs_bcS(1:n_solid)
-        bcN(5:4 + n_solid,1) = xs_bcN(1:n_solid)
+            bcW(5:4 + n_solid,layer) = xs_bcW(1:n_solid)
+            bcE(5:4 + n_solid,layer) = xs_bcE(1:n_solid)
+            bcS(5:4 + n_solid,layer) = xs_bcS(1:n_solid)
+            bcN(5:4 + n_solid,layer) = xs_bcN(1:n_solid)
 
-        bcW(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcW(1:n_add_gas)
-        bcE(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcE(1:n_add_gas)
-        bcS(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcS(1:n_add_gas)
-        bcN(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcN(1:n_add_gas)
+            bcW(4 + n_solid + 1:4 + n_solid + n_add_gas,layer) = xg_bcW(1:n_add_gas)
+            bcE(4 + n_solid + 1:4 + n_solid + n_add_gas,layer) = xg_bcE(1:n_add_gas)
+            bcS(4 + n_solid + 1:4 + n_solid + n_add_gas,layer) = xg_bcS(1:n_add_gas)
+            bcN(4 + n_solid + 1:4 + n_solid + n_add_gas,layer) = xg_bcN(1:n_add_gas)
 
-        IF (stochastic_l1%stochastic_transport_flag) THEN
+            IF (boundary_stochastic_enabled) THEN
 
-            bcW(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcW(1:n_stoch_vars)
-            bcE(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcE(1:n_stoch_vars)
-            bcS(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcS(1:n_stoch_vars)
-            bcN(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcN(1:n_stoch_vars)
+                bcW(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,layer) = stoch_bcW(1:n_stoch_vars)
+                bcE(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,layer) = stoch_bcE(1:n_stoch_vars)
+                bcS(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,layer) = stoch_bcS(1:n_stoch_vars)
+                bcN(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,layer) = stoch_bcN(1:n_stoch_vars)
 
-        END IF
+            END IF
 
-        IF (pore_pressure_l1%pore_pressure_flag) THEN
+            IF (boundary_pore_enabled) THEN
 
-            bcW(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars,1) = pore_bcW(1:n_pore_vars)
-            bcE(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars,1) = pore_bcE(1:n_pore_vars)
-            bcS(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars,1) = pore_bcS(1:n_pore_vars)
-            bcN(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars,1) = pore_bcN(1:n_pore_vars)
+                bcW(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                    &
+                        n_pore_vars,layer) = pore_bcW(1:n_pore_vars)
+                bcE(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                    &
+                        n_pore_vars,layer) = pore_bcE(1:n_pore_vars)
+                bcS(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                    &
+                        n_pore_vars,layer) = pore_bcS(1:n_pore_vars)
+                bcN(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                    &
+                        n_pore_vars,layer) = pore_bcN(1:n_pore_vars)
 
-        END IF
+            END IF
+
+            ! Optional slots inactive in this layer have homogeneous Neumann BCs.
+            IF (idx_stoch>0 .AND. .NOT.boundary_stochastic_enabled) THEN
+                bcW(idx_stoch,layer)%flag=1
+                bcW(idx_stoch,layer)%value=0.0_wp
+                bcE(idx_stoch,layer)%flag=1
+                bcE(idx_stoch,layer)%value=0.0_wp
+                bcS(idx_stoch,layer)%flag=1
+                bcS(idx_stoch,layer)%value=0.0_wp
+                bcN(idx_stoch,layer)%flag=1
+                bcN(idx_stoch,layer)%value=0.0_wp
+            END IF
+
+            IF (idx_pore>0 .AND. .NOT.boundary_pore_enabled) THEN
+                bcW(idx_pore,layer)%flag=1
+                bcW(idx_pore,layer)%value=0.0_wp
+                bcE(idx_pore,layer)%flag=1
+                bcE(idx_pore,layer)%value=0.0_wp
+                bcS(idx_pore,layer)%flag=1
+                bcS(idx_pore,layer)%value=0.0_wp
+                bcN(idx_pore,layer)%flag=1
+                bcN(idx_pore,layer)%value=0.0_wp
+            END IF
+
+        END DO
 
         ! ------- READ expl_terms_parameters NAMELIST -------------------------------
 
