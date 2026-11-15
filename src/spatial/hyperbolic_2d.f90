@@ -30,6 +30,8 @@ MODULE hyperbolic_2d
 
     PRIVATE
 
+    PUBLIC :: add_interlayer_face_terms
+
     !> \brief Persistent wave speeds, oriented face contributions and cell paths.
     !> \details Face arrays distinguish the contribution seen by either adjacent
     !>          cell; hydrostatic pressure belongs to the path terms, not the
@@ -64,6 +66,93 @@ MODULE hyperbolic_2d
     END TYPE hyperbolic_workspace_type
 
 CONTAINS
+
+    !> @brief Accumulate coupled oriented interlayer face pressure in L1 and L2 residuals.
+    !> @details Reuses the common pressure kernel and requires validated coupled
+    !> wave bounds on the shared OR workset. The cell path is assembled separately.
+    !> @param[in] l1,l2 Reconstructed layer traces on the shared workset.
+    !> @param[in] hp2 Upper-layer pressure coefficients from the same traces.
+    !> @param[in,out] r1,r2 Existing layer spatial residuals.
+    !> @param[in] active Shared active-cell mask.
+    !> @param[in] nx,ny Shared face counts by Cartesian direction.
+    !> @param[in] jx,kx,jy,ky Shared compact face coordinates.
+    !> @param[in] axn,axp,ayn,ayp Validated coupled face-speed bounds.
+    SUBROUTINE add_interlayer_face_terms(l1,l2,hp2,r1,r2,active,nx,jx,kx,ny,jy,ky,axn,axp,ayn,ayp)
+        USE nonconservative_2d, ONLY : PATH_DIR_X,PATH_DIR_Y
+        USE pccu_2d, ONLY : eval_interlayer_oriented_face
+        CLASS(reconstruction_workspace_type), INTENT(IN) :: l1,l2
+        CLASS(hyperbolic_workspace_type), INTENT(IN) :: hp2
+        REAL(wp), INTENT(INOUT) :: r1(n_eqns,comp_cells_x,comp_cells_y),r2(n_eqns,comp_cells_x,comp_cells_y)
+        LOGICAL, INTENT(IN) :: active(comp_cells_x,comp_cells_y)
+        INTEGER, INTENT(IN) :: nx,ny,jx(:),kx(:),jy(:),ky(:)
+        REAL(wp), INTENT(IN) :: axn(:,:),axp(:,:),ayn(:,:),ayp(:,:)
+        REAL(wp) :: fl1(n_eqns),fr1(n_eqns),fl2(n_eqns),fr2(n_eqns)
+        REAL(wp) :: h1a,h1b,h2a,h2b,gamma_a,gamma_b,eta_a,eta_b,metric,am,ap,spacing
+        INTEGER :: direction,l,j,k,prev_j,prev_k,nfaces
+
+        IF (l1%layer/=1 .OR. l2%layer/=2) ERROR STOP 'Invalid interlayer face ordering'
+        IF (.NOT.hp2%clamp_buoyant_pressure) ERROR STOP 'Interlayer face requires L2 pressure'
+
+        DO direction=PATH_DIR_X,PATH_DIR_Y
+            nfaces=nx
+            spacing=one_by_dx
+            IF (direction==PATH_DIR_Y) THEN
+                nfaces=ny
+                spacing=one_by_dy
+            END IF
+
+            DO l=1,nfaces
+                IF (direction==PATH_DIR_X) THEN
+                    j=jx(l)
+                    k=kx(l)
+                    h1a=l1%h_selected_interfaceL(j,k)
+                    h1b=l1%h_selected_interfaceR(j,k)
+                    h2a=l2%h_selected_interfaceL(j,k)
+                    h2b=l2%h_selected_interfaceR(j,k)
+                    gamma_a=hp2%gamma_interface_xL(j,k)
+                    gamma_b=hp2%gamma_interface_xR(j,k)
+                    eta_a=l2%eta_interfaceL(j,k)
+                    eta_b=l2%eta_interfaceR(j,k)
+                    metric=grav_coeff_stag_x(j,k)
+                    am=axn(j,k)
+                    ap=axp(j,k)
+                    prev_j=j-1
+                    prev_k=k
+                ELSE
+                    j=jy(l)
+                    k=ky(l)
+                    h1a=l1%h_selected_interfaceB(j,k)
+                    h1b=l1%h_selected_interfaceT(j,k)
+                    h2a=l2%h_selected_interfaceB(j,k)
+                    h2b=l2%h_selected_interfaceT(j,k)
+                    gamma_a=hp2%gamma_interface_yB(j,k)
+                    gamma_b=hp2%gamma_interface_yT(j,k)
+                    eta_a=l2%eta_interfaceB(j,k)
+                    eta_b=l2%eta_interfaceT(j,k)
+                    metric=grav_coeff_stag_y(j,k)
+                    am=ayn(j,k)
+                    ap=ayp(j,k)
+                    prev_j=j
+                    prev_k=k-1
+                END IF
+
+                CALL eval_interlayer_oriented_face(direction,h1a,h2a,gamma_a,eta_a, &
+                    h1b,h2b,gamma_b,eta_b,metric,am,ap,fl1,fr1,fl2,fr2)
+                IF (prev_j>=1 .AND. prev_k>=1) THEN
+                    IF (active(prev_j,prev_k)) THEN
+                        r1(:,prev_j,prev_k)=r1(:,prev_j,prev_k)+fl1*spacing
+                        r2(:,prev_j,prev_k)=r2(:,prev_j,prev_k)+fl2*spacing
+                    END IF
+                END IF
+                IF (j<=comp_cells_x .AND. k<=comp_cells_y) THEN
+                    IF (active(j,k)) THEN
+                        r1(:,j,k)=r1(:,j,k)-fr1*spacing
+                        r2(:,j,k)=r2(:,j,k)-fr2*spacing
+                    END IF
+                END IF
+            END DO
+        END DO
+    END SUBROUTINE add_interlayer_face_terms
 
     !> @brief Report the resolved face contributions to one conservative residual.
     !> @param[in] this Face-oriented HP-PCCU workspace.
