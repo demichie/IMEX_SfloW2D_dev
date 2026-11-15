@@ -14,6 +14,7 @@ PROGRAM test_spatial_operator
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE state_conversions, ONLY : primitive_to_conservative
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+  USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair
   USE source_terms_2d, ONLY : eval_source_explicit
   USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
   USE state_composition, ONLY : conservative_mass_admissible
@@ -60,6 +61,7 @@ PROGRAM test_spatial_operator
   READ(input_unit,*) dx,dy
   CALL initialize_fixture
   CALL check_uniform_minmod_kernel
+  CALL check_optional_pccu_flux_slots
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) THEN
@@ -303,6 +305,81 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> @brief Verify inactive optional components remain zero in the production PCCU algebra.
+    !> @details Both layer vectors use the same seven component positions. L1 carries only
+    !>          the pore component (7); L2 carries only the stochastic component (6).
+    !>          Test central-upwind, factored advection and oriented face values with
+    !>          two-sided and one-sided wave bounds. This is a local face-algebra test,
+    !>          not a coupled reconstruction or boundary-condition integration test.
+    SUBROUTINE check_optional_pccu_flux_slots
+        REAL(wp) :: q_left(7),q_right(7),f_left(7),f_right(7)
+        REAL(wp) :: flux(7),left_value(7),right_value(7),path(7)
+        REAL(wp) :: a_minus,a_plus,u_left,u_right
+        INTEGER :: layer,case_number,active_index,inactive_index
+
+        u_left=0.5_wp
+        u_right=0.8_wp
+        path=0.0_wp
+
+        DO layer=1,2
+            IF (layer==1) THEN
+                active_index=7
+                inactive_index=6
+            ELSE
+                active_index=6
+                inactive_index=7
+            END IF
+
+            q_left=0.0_wp
+            q_right=0.0_wp
+            q_left(1)=2.0_wp
+            q_right(1)=1.5_wp
+            q_left(active_index)=0.4_wp
+            q_right(active_index)=0.6_wp
+            f_left=u_left*q_left
+            f_right=u_right*q_right
+
+            DO case_number=1,3
+                SELECT CASE(case_number)
+                CASE(1)
+                    a_minus=-0.4_wp
+                    a_plus=1.3_wp
+                CASE(2)
+                    a_minus=0.0_wp
+                    a_plus=1.3_wp
+                CASE(3)
+                    a_minus=-0.4_wp
+                    a_plus=0.0_wp
+                END SELECT
+
+                CALL eval_pccu_advective_flux(a_minus,a_plus,u_left,u_right, &
+                    q_left,q_right,f_left,f_right,flux)
+                IF (ABS(flux(inactive_index))>0.0_wp) &
+                    ERROR STOP 'PCCU advection generated an inactive optional component'
+                IF (ABS(flux(active_index))<=0.0_wp) &
+                    ERROR STOP 'PCCU advection lost an active optional component'
+
+                CALL eval_central_upwind_flux(a_minus,a_plus,f_left,f_right, &
+                    q_left,q_right,flux)
+                IF (ABS(flux(inactive_index))>0.0_wp) &
+                    ERROR STOP 'PCCU central-upwind flux generated an inactive optional component'
+                IF (ABS(flux(active_index))<=0.0_wp) &
+                    ERROR STOP 'PCCU central-upwind flux lost an active optional component'
+
+                CALL eval_oriented_pccu_pair(flux,path,a_minus,a_plus,left_value,right_value)
+                IF (ABS(left_value(inactive_index))>0.0_wp .OR. &
+                    ABS(right_value(inactive_index))>0.0_wp) &
+                    ERROR STOP 'PCCU oriented face generated an inactive optional component'
+                IF (ABS(left_value(active_index))<=0.0_wp .OR. &
+                    ABS(right_value(active_index))<=0.0_wp) &
+                    ERROR STOP 'PCCU oriented face lost an active optional component'
+            END DO
+        END DO
+
+        WRITE(*,*) 'PASS: PCCU inactive optional face slots remain exactly zero'
+    END SUBROUTINE check_optional_pccu_flux_slots
+
 
     !> @brief Verify isolated L2 pressure, advective transport and conservative Euler update.
     !> @details A buoyant plume at rest must have zero residual on shared terrain.
