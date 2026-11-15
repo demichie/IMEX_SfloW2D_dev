@@ -104,7 +104,7 @@ CONTAINS
     !******************************************************************************
 
     SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, boundary_source_enabled,               &
-        reuse_cfl_traces )
+        reuse_cfl_traces, lower_operator, h_lower )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp(n_vars,comp_cells_x,comp_cells_y)
@@ -112,12 +112,30 @@ CONTAINS
         REAL(wp), INTENT(IN) :: time
         CLASS(domain_type), INTENT(IN) :: domain
         LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled,reuse_cfl_traces
+        CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower_operator
+        REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
 
+        IF (PRESENT(lower_operator) .NEQV. PRESENT(h_lower)) &
+            ERROR STOP 'Upper-layer spatial evaluation needs L1 operator and thickness'
+        IF (PRESENT(lower_operator)) THEN
+            IF (this%reconstruction%layer/=2 .OR. lower_operator%reconstruction%layer/=1) &
+                ERROR STOP 'Invalid L1/L2 spatial operator pairing'
+        END IF
+
+        IF (PRESENT(lower_operator)) THEN
+            CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term, &
+                time, domain%solve_cells, domain%j_cent, domain%k_cent, &
+                domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x, &
+                domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y, &
+                source_boundary_enabled=boundary_source_enabled, reuse_cfl_traces=reuse_cfl_traces, &
+                lower_recon=lower_operator%reconstruction,h_lower=h_lower)
+        ELSE
         CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term,                                       &
             time, domain%solve_cells, domain%j_cent, domain%k_cent,                                                    &
             domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &
             domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,                                               &
             source_boundary_enabled=boundary_source_enabled, reuse_cfl_traces=reuse_cfl_traces )
+        END IF
 
     END SUBROUTINE evaluate_spatial_operator
 

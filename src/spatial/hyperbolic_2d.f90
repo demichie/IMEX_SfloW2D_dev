@@ -187,7 +187,7 @@ CONTAINS
     SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                                                            &
             divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,                                           &
             j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y,                                                &
-            source_boundary_enabled,reuse_cfl_traces )
+            source_boundary_enabled,reuse_cfl_traces,lower_recon,h_lower )
 
     IMPLICIT NONE
 
@@ -202,6 +202,8 @@ CONTAINS
         INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
         INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
         LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled,reuse_cfl_traces
+        CLASS(reconstruction_workspace_type), INTENT(IN), OPTIONAL :: lower_recon
+        REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
         LOGICAL :: use_cached_traces
 
         INTEGER :: l , i, j, k      !< loop counters
@@ -215,10 +217,21 @@ CONTAINS
         ! evaluated these face speeds. Only production explicitly opts in.
         use_cached_traces=.FALSE.
         IF (PRESENT(reuse_cfl_traces)) use_cached_traces=reuse_cfl_traces
+        IF (PRESENT(lower_recon) .NEQV. PRESENT(h_lower)) &
+            ERROR STOP 'L2 residual requires lower reconstruction and thickness'
+        IF (PRESENT(lower_recon)) THEN
+            IF (recon%layer/=2 .OR. lower_recon%layer/=1) ERROR STOP 'Invalid L1/L2 HP pairing'
+        END IF
         IF (.NOT.use_cached_traces) THEN
-            CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE.,                                       &
-                source_boundary_enabled=source_boundary_enabled )
-            CALL recon%reconstruct_kt_eta(qp_expl)
+            IF (PRESENT(lower_recon)) THEN
+                CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE., &
+                    source_boundary_enabled=source_boundary_enabled,lower_recon=lower_recon,h_lower=h_lower)
+                CALL recon%reconstruct_kt_eta(qp_expl,lower_recon=lower_recon)
+            ELSE
+                CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE.,                                       &
+                    source_boundary_enabled=source_boundary_enabled )
+                CALL recon%reconstruct_kt_eta(qp_expl)
+            END IF
             CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,                                            &
                 k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
         END IF
@@ -232,10 +245,10 @@ CONTAINS
         CALL eval_flux_PCCU( this, recon, qp_expl,                                                                     &
             .TRUE., t,                                                                                                 &
             solve_interfaces_x, j_stag_x,                                                                              &
-            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
+            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y, lower_recon )
 
         CALL eval_cell_hydrostatic_paths( this, recon, qp_expl,                                                        &
-            .TRUE., solve_cells, j_cent, k_cent )
+            .TRUE., solve_cells, j_cent, k_cent, lower_recon )
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
@@ -462,7 +475,7 @@ CONTAINS
     !> @param[in] j_stag_y X indices of active y faces.
     !> @param[in] k_stag_y Y indices of active y faces.
     SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t, solve_interfaces_x, j_stag_x,                 &
-            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
+            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y, lower_recon )
 
     USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -476,6 +489,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
         INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
         INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
+        CLASS(reconstruction_workspace_type), INTENT(IN), OPTIONAL :: lower_recon
 
         REAL(wp) :: a_minus, a_plus
         REAL(wp) :: source_inflow, other_inflow, face_inflow
@@ -499,6 +513,19 @@ CONTAINS
                     qp_center(1,j-1,k) .LE. dry_thickness_tolerance
                 IF ( j .LE. comp_cells_x ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
+                IF (PRESENT(lower_recon)) THEN
+                CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
+                        recon%h_selected_interfaceL(j,k),                                                              &
+                        recon%h_selected_interfaceR(j,k),                                                              &
+                    recon%qp_adv_interfaceL(:,j,k),                                                                    &
+                    recon%qp_adv_interfaceR(:,j,k), grav_coeff_stag_x(j,k),                                            &
+                    a_minus, a_plus, this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),                      &
+                    PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
+                    dry_donor_left,dry_donor_right,t,                                                                  &
+                    this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k), &
+                    bed_face_left=lower_recon%eta_interfaceL(j,k), &
+                    bed_face_right=lower_recon%eta_interfaceR(j,k) )
+                ELSE
                 CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
                         recon%h_selected_interfaceR(j,k),                                                              &
@@ -508,6 +535,7 @@ CONTAINS
                     PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
                     this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
+                END IF
 
                 ! Apply the boundary's one-way condition to the final numerical flux.
                 ! V2 limited the reconstructed normal momentum to outward-only values
@@ -574,6 +602,19 @@ CONTAINS
                     qp_center(1,j,k-1) .LE. dry_thickness_tolerance
                 IF ( k .LE. comp_cells_y ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
+                IF (PRESENT(lower_recon)) THEN
+                CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
+                        recon%h_selected_interfaceB(j,k),                                                              &
+                        recon%h_selected_interfaceT(j,k),                                                              &
+                    recon%qp_adv_interfaceB(:,j,k),                                                                    &
+                    recon%qp_adv_interfaceT(:,j,k), grav_coeff_stag_y(j,k),                                            &
+                    a_minus, a_plus, this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k),                      &
+                    PATH_DIR_Y, 3, j, k, use_dry_donor,                                               &
+                    dry_donor_left,dry_donor_right,t,                                                                  &
+                    this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k), &
+                    bed_face_left=lower_recon%eta_interfaceB(j,k), &
+                    bed_face_right=lower_recon%eta_interfaceT(j,k) )
+                ELSE
                 CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
                         recon%h_selected_interfaceB(j,k),                                                              &
                         recon%h_selected_interfaceT(j,k),                                                              &
@@ -583,6 +624,7 @@ CONTAINS
                     PATH_DIR_Y, 3, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
                     this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
+                END IF
 
                 IF ( ( k .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                      &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
@@ -732,7 +774,7 @@ CONTAINS
             grav_coeff,a_minus,a_plus,gamma_left_cached,gamma_right_cached,                                          &
             direction,normal_momentum_index,face_i,                                                                    &
             face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                                                     &
-            value_left,value_right)
+            value_left,value_right,bed_face_left,bed_face_right)
 
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : limit_component_mass_flux
@@ -746,6 +788,7 @@ CONTAINS
     IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: eta_left, eta_right, bed_face
+        REAL(wp), INTENT(IN), OPTIONAL :: bed_face_left,bed_face_right
         REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
         REAL(wp), INTENT(IN) :: qp_adv_left(n_vars), qp_adv_right(n_vars)
         REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
@@ -872,20 +915,36 @@ CONTAINS
         qp_path_right=qp_adv_right_use
         eta_path_left=eta_left
         eta_path_right=eta_right
-        IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
-        IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
+        IF (PRESENT(bed_face_left)) THEN
+            IF (source_trace_left) eta_path_left=bed_face_left+h_eta_left
+        ELSE
+            IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
+        END IF
+        IF (PRESENT(bed_face_right)) THEN
+            IF (source_trace_right) eta_path_right=bed_face_right+h_eta_right
+        ELSE
+            IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
+        END IF
 
         IF ( use_dry_donor ) THEN
 
             IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) THEN
                 qp_path_left(1)=0.0_wp
-                eta_path_left=bed_face
+                IF (PRESENT(bed_face_left)) THEN
+                    eta_path_left=bed_face_left
+                ELSE
+                    eta_path_left=bed_face
+                END IF
 
             END IF
 
             IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) THEN
                 qp_path_right(1)=0.0_wp
-                eta_path_right=bed_face
+                IF (PRESENT(bed_face_right)) THEN
+                    eta_path_right=bed_face_right
+                ELSE
+                    eta_path_right=bed_face
+                END IF
 
             END IF
 
@@ -1008,7 +1067,8 @@ CONTAINS
     !> @param[in] solve_cells Number of active cells.
     !> @param[in] j_cent X indices of active cells.
     !> @param[in] k_cent Y indices of active cells.
-    SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent )
+    SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent, &
+        lower_recon )
 
     USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -1020,6 +1080,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_dry_donor
         INTEGER, INTENT(IN) :: solve_cells
         INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
+        CLASS(reconstruction_workspace_type), INTENT(IN), OPTIONAL :: lower_recon
 
         INTEGER :: j, k, l
         REAL(wp) :: qp_path_minus(n_vars), qp_path_plus(n_vars)
@@ -1040,8 +1101,16 @@ CONTAINS
             IF ( comp_cells_x .GT. 1 ) THEN
                 qp_path_minus=recon%qp_adv_interfaceR(:,j,k)
                 qp_path_plus=recon%qp_adv_interfaceL(:,j+1,k)
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-lower_recon%eta_cellW(j,k),0.0_wp)
+                ELSE
                 qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
+                END IF
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-lower_recon%eta_cellE(j,k),0.0_wp)
+                ELSE
                 qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
+                END IF
                 IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),           &
@@ -1056,8 +1125,16 @@ CONTAINS
             IF ( comp_cells_y .GT. 1 ) THEN
                 qp_path_minus=recon%qp_adv_interfaceT(:,j,k)
                 qp_path_plus=recon%qp_adv_interfaceB(:,j,k+1)
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-lower_recon%eta_cellS(j,k),0.0_wp)
+                ELSE
                 qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
+                END IF
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-lower_recon%eta_cellN(j,k),0.0_wp)
+                ELSE
                 qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
+                END IF
                 IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),           &

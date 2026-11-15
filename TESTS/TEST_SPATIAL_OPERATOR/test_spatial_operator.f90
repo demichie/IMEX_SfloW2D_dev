@@ -949,6 +949,17 @@ CONTAINS
                 test_domain%j_cent,test_domain%k_cent,.TRUE., &
                 lower_recon=lower_reconstruction,h_lower=primitive(idx_h,:,:))
             CALL test_reconstruction%reconstruct_kt_eta(primitive,lower_recon=lower_reconstruction)
+            ! Exercise the complete upper-layer backend with the lower HP geometry.
+            ! No two-layer momentum coupling is enabled by this isolated test.
+            CALL test_hyperbolic%initialize(clamp_buoyant_pressure=.TRUE.)
+            CALL test_hyperbolic%evaluate_terms(test_reconstruction,primitive,residual,0.0_wp, &
+                test_domain%solve_cells,test_domain%j_cent,test_domain%k_cent, &
+                test_domain%solve_interfaces_x,test_domain%j_stag_x,test_domain%k_stag_x, &
+                test_domain%solve_interfaces_y,test_domain%j_stag_y,test_domain%k_stag_y, &
+                lower_recon=lower_reconstruction,h_lower=primitive(idx_h,:,:))
+            IF (.NOT.ALL(ieee_is_finite(residual))) &
+                ERROR STOP 'Nonfinite upper-layer hydrostatic path with L1 geometry'
+            CALL test_hyperbolic%finalize
             IF (ANY(test_reconstruction%eta_cellW(2:3,2:3) < &
                 lower_reconstruction%eta_cellW(2:3,2:3))) &
                 ERROR STOP 'Upper surface fell below lower-layer reconstructed interface'
