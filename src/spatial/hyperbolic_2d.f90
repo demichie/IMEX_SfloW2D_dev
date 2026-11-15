@@ -514,7 +514,7 @@ CONTAINS
                 IF ( j .LE. comp_cells_x ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
                 IF (PRESENT(lower_recon)) THEN
-                CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
+                    CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
                         recon%h_selected_interfaceR(j,k),                                                              &
                     recon%qp_adv_interfaceL(:,j,k),                                                                    &
@@ -526,7 +526,7 @@ CONTAINS
                     bed_face_left=lower_recon%eta_interfaceL(j,k), &
                     bed_face_right=lower_recon%eta_interfaceR(j,k) )
                 ELSE
-                CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
+                    CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
                         recon%h_selected_interfaceR(j,k),                                                              &
                     recon%qp_adv_interfaceL(:,j,k),                                                                    &
@@ -603,7 +603,7 @@ CONTAINS
                 IF ( k .LE. comp_cells_y ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
                 IF (PRESENT(lower_recon)) THEN
-                CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
+                    CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
                         recon%h_selected_interfaceB(j,k),                                                              &
                         recon%h_selected_interfaceT(j,k),                                                              &
                     recon%qp_adv_interfaceB(:,j,k),                                                                    &
@@ -615,7 +615,7 @@ CONTAINS
                     bed_face_left=lower_recon%eta_interfaceB(j,k), &
                     bed_face_right=lower_recon%eta_interfaceT(j,k) )
                 ELSE
-                CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
+                    CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
                         recon%h_selected_interfaceB(j,k),                                                              &
                         recon%h_selected_interfaceT(j,k),                                                              &
                     recon%qp_adv_interfaceB(:,j,k),                                                                    &

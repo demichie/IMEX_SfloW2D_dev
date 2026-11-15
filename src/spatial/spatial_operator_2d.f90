@@ -130,11 +130,11 @@ CONTAINS
                 source_boundary_enabled=boundary_source_enabled, reuse_cfl_traces=reuse_cfl_traces, &
                 lower_recon=lower_operator%reconstruction,h_lower=h_lower)
         ELSE
-        CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term,                                       &
-            time, domain%solve_cells, domain%j_cent, domain%k_cent,                                                    &
-            domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &
-            domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,                                               &
-            source_boundary_enabled=boundary_source_enabled, reuse_cfl_traces=reuse_cfl_traces )
+            CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term,                                   &
+                time, domain%solve_cells, domain%j_cent, domain%k_cent,                                                &
+                domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                           &
+                domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,                                           &
+                source_boundary_enabled=boundary_source_enabled, reuse_cfl_traces=reuse_cfl_traces )
         END IF
 
     END SUBROUTINE evaluate_spatial_operator
