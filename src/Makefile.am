@@ -142,21 +142,22 @@ physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
-physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
+physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
@@ -233,6 +234,7 @@ physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_froude_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
@@ -266,6 +268,7 @@ physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJE
 physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/diagnostics_2d.$(OBJEXT)
