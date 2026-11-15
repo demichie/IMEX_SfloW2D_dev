@@ -13,6 +13,8 @@ PROGRAM test_spatial_operator
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE state_conversions, ONLY : primitive_to_conservative
+  USE state_fields, ONLY : state_type
+  USE init_2d, ONLY : init_empty
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair
   USE source_terms_2d, ONLY : eval_source_explicit
@@ -708,7 +710,9 @@ CONTAINS
     TYPE(domain_type) :: test_domain
     TYPE(reconstruction_workspace_type) :: test_reconstruction
     TYPE(hyperbolic_workspace_type) :: test_hyperbolic
-    REAL(wp), ALLOCATABLE :: primitive(:,:,:),conservative(:,:,:),residual(:,:,:)
+    TYPE(state_type) :: empty_state
+    TYPE(source_group_type) :: geometric_group
+    REAL(wp), ALLOCATABLE :: primitive(:,:,:),conservative(:,:,:),residual(:,:,:),source_rate(:)
     INTEGER :: layer,active_index,inactive_index,ix,iy
     LOGICAL :: accepted,active_flux_found
     REAL(wp) :: amplitude
@@ -730,7 +734,18 @@ CONTAINS
     bcS%flag=1; bcS%value=0.0_wp
     bcN%flag=1; bcN%value=0.0_wp
 
+    ! Both allocated layers must start with precisely zero conservative transport.
+    ! Bypass the production model-layout gate: this is a structural test only.
+    ALLOCATE(empty_state%q(n_vars,2,1,1))
+    empty_state%q=1.0_wp
+    CALL init_empty(empty_state)
+    IF (ANY(empty_state%q/=0.0_wp)) ERROR STOP 'Dry initial state retained an optional layer'
+    DEALLOCATE(empty_state%q)
+
+    geometric_group%method=SOURCE_METHOD_EXPLICIT
+    geometric_group%source_mask=IBSET(0,SOURCE_ID_GEOMETRY_CURVATURE-1)
     ALLOCATE(primitive(n_vars,nx,ny),conservative(n_vars,nx,ny),residual(n_eqns,nx,ny))
+    ALLOCATE(source_rate(n_eqns))
     DO layer=1,2
         active_index=idx_pore
         inactive_index=idx_stoch
@@ -754,6 +769,18 @@ CONTAINS
         END DO
         IF (ANY(conservative(inactive_index,:,:)/=0.0_wp)) &
             ERROR STOP 'Inactive optional conservative state is nonzero'
+
+        ! Active curvature accelerates momentum without creating optional mass.
+        ! The same cell-local source kernel is reused with each layer selection.
+        CALL eval_source_explicit(0.2_wp,0.1_wp,0.05_wp,0.0_wp,0.02_wp,1.0_wp, &
+            primitive(:,2,2),source_rate,0.0_wp,0.0_wp,no_fissures, &
+            0.0_wp,0.0_wp,0.0_wp,dx*dy,geometric_group,0.0_wp, &
+            materials=materials,thermal=thermal_l1,rheology=rheology_l1, &
+            pore_enabled=layer==1,stochastic_enabled=layer==2)
+        IF (source_rate(idx_stoch)/=0.0_wp .OR. source_rate(idx_pore)/=0.0_wp) &
+            ERROR STOP 'Explicit geometry source created optional transport'
+        IF (source_rate(idx_uEqn)==0.0_wp .AND. source_rate(idx_vEqn)==0.0_wp) &
+            ERROR STOP 'Optional-layer source check did not activate curvature'
 
         CALL test_domain%initialize
         CALL test_domain%check_solve(conservative,0.0_wp,.TRUE.)
@@ -807,8 +834,8 @@ CONTAINS
         CALL test_reconstruction%finalize
         CALL test_domain%finalize
     END DO
-    DEALLOCATE(primitive,conservative,residual)
-    WRITE(*,*) 'PASS: inactive optional L1/L2 traces, fluxes, paths and residuals are exactly zero'
+    DEALLOCATE(primitive,conservative,residual,source_rate)
+    WRITE(*,*) 'PASS: inactive optional L1/L2 initialization, sources, traces and fluxes'
   END SUBROUTINE check_optional_layer_spatial_slots
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.

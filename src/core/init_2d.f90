@@ -49,7 +49,7 @@ CONTAINS
 
         WRITE(*,*) 'Initialization with zero thickness flow'
         ! The conservative dry state is exactly zero; no qp conversion is needed.
-        state%q(:,1,:,:)=0.0_wp
+        state%q=0.0_wp
     END SUBROUTINE init_empty
 
     !******************************************************************************
