@@ -15,7 +15,7 @@ PROGRAM test_spatial_operator
   USE state_conversions, ONLY : primitive_to_conservative
   USE state_fields, ONLY : state_type
   USE init_2d, ONLY : init_empty
-  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_face_terms
   USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair, &
       eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path, &
       eval_interlayer_oriented_face
@@ -83,6 +83,7 @@ PROGRAM test_spatial_operator
   CLOSE(input_unit)
   q0=q
   CALL refresh_topography_geometry
+  CALL check_interlayer_face_residual
   CALL check_two_layer_union_workset
   CALL check_dry_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
@@ -330,6 +331,65 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> @brief Verify that one shared interface updates only its two adjacent cells.
+    !> @details The same oriented PCCU face kernel provides the reference values.
+    !> The workset is deliberately sparse; no global coupled dynamics are enabled.
+    SUBROUTINE check_interlayer_face_residual
+        TYPE(reconstruction_workspace_type) :: l1,l2
+        TYPE(hyperbolic_workspace_type) :: hp2
+        REAL(wp) :: r1(n_eqns,nx,ny),r2(n_eqns,nx,ny)
+        REAL(wp) :: fl1(n_eqns),fr1(n_eqns),fl2(n_eqns),fr2(n_eqns)
+        REAL(wp) :: tol,scale
+        LOGICAL :: active(nx,ny)
+
+        IF (nx<3 .OR. ny<3) RETURN
+
+        CALL l1%initialize(layer=1)
+        CALL l2%initialize(layer=2)
+        CALL hp2%initialize(clamp_buoyant_pressure=.TRUE.)
+        active=.FALSE.
+        active(1,2)=.TRUE.
+        active(2,2)=.TRUE.
+        r1=0.0_wp
+        r2=0.0_wp
+        l1%h_selected_interfaceL(2,2)=1.2_wp
+        l1%h_selected_interfaceR(2,2)=1.4_wp
+        l2%h_selected_interfaceL(2,2)=0.8_wp
+        l2%h_selected_interfaceR(2,2)=0.6_wp
+        l2%eta_interfaceL(2,2)=2.0_wp
+        l2%eta_interfaceR(2,2)=2.0_wp
+        hp2%gamma_interface_xL(2,2)=4.0_wp
+        hp2%gamma_interface_xR(2,2)=6.0_wp
+        hp2%a_interface_xNeg=-2.0_wp
+        hp2%a_interface_xPos=3.0_wp
+
+        CALL eval_interlayer_oriented_face(1, &
+            1.2_wp,0.8_wp,4.0_wp,2.0_wp,1.4_wp,0.6_wp,6.0_wp,2.0_wp, &
+            grav_coeff_stag_x(2,2),-2.0_wp,3.0_wp,fl1,fr1,fl2,fr2)
+        CALL add_interlayer_face_terms(l1,l2,hp2,r1,r2,active, &
+            1,[2],[2],0,[INTEGER::],[INTEGER::], &
+            hp2%a_interface_xNeg,hp2%a_interface_xPos, &
+            hp2%a_interface_yNeg,hp2%a_interface_yPos)
+
+        scale=MAX(1.0_wp,MAXVAL(ABS(fl1)),MAXVAL(ABS(fr1)), &
+            MAXVAL(ABS(fl2)),MAXVAL(ABS(fr2)))
+        tol=128.0_wp*EPSILON(1.0_wp)*scale*one_by_dx
+        IF (ANY(ABS(r1(:,1,2)-fl1*one_by_dx)>tol) .OR. &
+            ANY(ABS(r2(:,1,2)-fl2*one_by_dx)>tol) .OR. &
+            ANY(ABS(r1(:,2,2)+fr1*one_by_dx)>tol) .OR. &
+            ANY(ABS(r2(:,2,2)+fr2*one_by_dx)>tol)) &
+            ERROR STOP 'Interlayer oriented face not assembled in adjacent cells'
+        r1(:,1:2,2)=0.0_wp
+        r2(:,1:2,2)=0.0_wp
+        IF (ANY(r1/=0.0_wp) .OR. ANY(r2/=0.0_wp)) &
+            ERROR STOP 'Interlayer face modified an inactive cell'
+
+        CALL hp2%finalize
+        CALL l1%finalize
+        CALL l2%finalize
+        WRITE(*,*) 'PASS: shared interlayer face residual and sparse workset'
+    END SUBROUTINE check_interlayer_face_residual
 
     !> @brief Validate the shared workset as the union of independent L1/L2 masks.
     !> @details Checks active cells, faces and HP reconstruction halo without
