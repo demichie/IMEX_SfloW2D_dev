@@ -88,6 +88,7 @@ PROGRAM test_spatial_operator
   CALL check_two_layer_union_workset
   CALL check_dry_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
+  CALL check_coupled_cfl_policy
   IF (domain%solve_cells<=0 .OR. domain%reconstruction_cells<domain%solve_cells) &
        ERROR STOP 'invalid production worksets'
 
@@ -465,6 +466,58 @@ CONTAINS
         CALL lower%finalize
         WRITE(*,*) 'PASS: within-cell interlayer pressure residual and active mask'
     END SUBROUTINE check_interlayer_cell_assembly
+
+    !> @brief Check shared coupled-face CFL reduction against both policy formulas.
+    !> @details This tests face-rate reduction only, not coupled eigenvalues.
+    !> The same suite runs 2D, x-only, y-only and single-cell fixtures.
+    SUBROUTINE check_coupled_cfl_policy
+        REAL(wp) :: axneg(comp_interfaces_x,comp_cells_y)
+        REAL(wp) :: axpos(comp_interfaces_x,comp_cells_y)
+        REAL(wp) :: ayneg(comp_cells_x,comp_interfaces_y)
+        REAL(wp) :: aypos(comp_cells_x,comp_interfaces_y)
+        REAL(wp) :: proposed,reference,lambda_x,lambda_y,rate
+        CHARACTER(LEN=LEN(cfl_policy)) :: saved_policy
+        REAL(wp) :: saved_cap
+        INTEGER :: policy_case
+
+        saved_policy=cfl_policy
+        saved_cap=max_dt
+        axneg=-2.0_wp
+        axpos=3.0_wp
+        ayneg=-4.0_wp
+        aypos=5.0_wp
+        lambda_x=0.0_wp
+        lambda_y=0.0_wp
+        IF (nx>1) lambda_x=3.0_wp
+        IF (ny>1) lambda_y=5.0_wp
+
+        DO policy_case=1,2
+            IF (policy_case==1) THEN
+                cfl_policy='directional_min'
+                reference=max_dt
+                IF (lambda_x>0.0_wp) reference=MIN(reference,MIN(cfl,0.25_wp)*dx/lambda_x)
+                IF (lambda_y>0.0_wp) reference=MIN(reference,MIN(cfl,0.25_wp)*dy/lambda_y)
+            ELSE
+                cfl_policy='combined'
+                reference=max_dt
+                IF (ny==1) THEN
+                    IF (nx>1) reference=MIN(reference,MIN(cfl,0.25_wp)*dx/lambda_x)
+                ELSEIF (nx==1) THEN
+                    reference=MIN(reference,MIN(cfl,0.25_wp)*dy/lambda_y)
+                ELSE
+                    rate=lambda_x/dx+lambda_y/dy
+                    IF (rate>0.0_wp) reference=MIN(reference,MIN(cfl,0.25_wp)/rate)
+                END IF
+            END IF
+
+            CALL spatial%compute_coupled_timestep(domain,axneg,axpos,ayneg,aypos,proposed)
+            CALL same_bits('coupled-speed CFL policy',[proposed],[reference])
+        END DO
+
+        cfl_policy=saved_policy
+        max_dt=saved_cap
+        WRITE(*,*) 'PASS: externally supplied coupled speed bounds use canonical CFL'
+    END SUBROUTINE check_coupled_cfl_policy
 
     !> @brief Validate the shared workset as the union of independent L1/L2 masks.
     !> @details Checks active cells, faces and HP reconstruction halo without

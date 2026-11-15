@@ -13,11 +13,12 @@ MODULE spatial_operator_2d
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : T_ambient
-    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, dx, dy
+    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y, dx, dy
     USE state_conversions, ONLY : conservative_to_primitive
     USE domain_2d, ONLY : domain_type
     USE reconstruction_2d, ONLY : reconstruction_workspace_type
     USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
     IMPLICIT NONE
 
@@ -39,6 +40,7 @@ MODULE spatial_operator_2d
         PROCEDURE, PUBLIC :: evaluate => evaluate_spatial_operator
         PROCEDURE, PUBLIC :: diagnose_cell => diagnose_spatial_cell
         PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
+        PROCEDURE, PUBLIC :: compute_coupled_timestep => compute_coupled_spatial_timestep
         PROCEDURE, PUBLIC :: prepare_hp_workset => prepare_spatial_hp_workset
     END TYPE spatial_operator_type
 
@@ -170,8 +172,8 @@ CONTAINS
         REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
 
         INTEGER :: j, k, l
-        REAL(wp) :: max_a_x, max_a_y, cfl_spatial
-        REAL(wp) :: dynamic_pressure, propagation_rate
+        REAL(wp) :: max_a_x, max_a_y
+        REAL(wp) :: dynamic_pressure
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: conversion_ok,conversion_failed
         IF (this%profile_enabled) THEN
@@ -254,10 +256,81 @@ CONTAINS
         END DO
         !$OMP END PARALLEL DO
 
-        ! Combine the SAME reconstructed face speeds, without another backend
-        ! pass. Keep the legacy operation order exactly in the default branch.
-        ! This is a spatial suggestion, not a general IMEX stability guarantee;
-        ! the main loop subsequently caps accepted steps at events and growth.
+        CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
+
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tock)
+            this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+        END IF
+    END SUBROUTINE compute_spatial_timestep
+
+    !> @brief Limit a timestep using externally validated coupled face-speed bounds.
+    !> @details The caller owns the coupled eigensystem, hyperbolicity check
+    !> and bounds. The method only reduces the same directional face rates
+    !> and applies the unchanged single-layer CFL policy. In particular,
+    !> isolated L1/L2 eigenvalues are not substituted for coupled bounds.
+    !> @param[in] this Spatial operator carrying the public timestep API.
+    !> @param[in] domain Shared OR cell/face workset for the coupled pair.
+    !> @param[in] axneg,axpos Coupled nonpositive/nonnegative x-face bounds.
+    !> @param[in] ayneg,aypos Coupled nonpositive/nonnegative y-face bounds.
+    !> @param[out] dt Shared CFL-limited timestep [s].
+    SUBROUTINE compute_coupled_spatial_timestep(this,domain,axneg,axpos,ayneg,aypos,dt)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        CLASS(domain_type), INTENT(IN) :: domain
+        REAL(wp), INTENT(IN) :: axneg(comp_interfaces_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: axpos(comp_interfaces_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: ayneg(comp_cells_x,comp_interfaces_y)
+        REAL(wp), INTENT(IN) :: aypos(comp_cells_x,comp_interfaces_y)
+        REAL(wp), INTENT(OUT) :: dt
+        REAL(wp) :: max_a_x,max_a_y
+        INTEGER :: l,j,k
+
+        dt=max_dt
+        IF (cfl==-1.0_wp) RETURN
+
+        ! Validate each actual face once; inactive array entries are irrelevant.
+        DO l=1,domain%solve_interfaces_x
+            j=domain%j_stag_x(l)
+            k=domain%k_stag_x(l)
+            IF (.NOT.ieee_is_finite(axneg(j,k)) .OR. .NOT.ieee_is_finite(axpos(j,k))) &
+                CALL fatal_error('Nonfinite coupled x-face wave bound')
+            IF (axneg(j,k)>0.0_wp .OR. axpos(j,k)<0.0_wp) &
+                CALL fatal_error('Coupled x-face wave bounds have invalid signs')
+        END DO
+
+        DO l=1,domain%solve_interfaces_y
+            j=domain%j_stag_y(l)
+            k=domain%k_stag_y(l)
+            IF (.NOT.ieee_is_finite(ayneg(j,k)) .OR. .NOT.ieee_is_finite(aypos(j,k))) &
+                CALL fatal_error('Nonfinite coupled y-face wave bound')
+            IF (ayneg(j,k)>0.0_wp .OR. aypos(j,k)<0.0_wp) &
+                CALL fatal_error('Coupled y-face wave bounds have invalid signs')
+        END DO
+
+        max_a_x=0.0_wp
+        max_a_y=0.0_wp
+        DO l=1,domain%solve_cells
+            j=domain%j_cent(l)
+            k=domain%k_cent(l)
+            ! Match the four-face rate and MAX operand order of the L1 CFL.
+            max_a_x=MAX(max_a_x,axpos(j,k),-axneg(j,k), &
+                axpos(j+1,k),-axneg(j+1,k))
+            max_a_y=MAX(max_a_y,aypos(j,k),-ayneg(j,k), &
+                aypos(j,k+1),-ayneg(j,k+1))
+        END DO
+
+        CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
+    END SUBROUTINE compute_coupled_spatial_timestep
+
+    !> @brief Apply the canonical CFL policy to maximum directional wave speeds.
+    !> @details Keeps the legacy floating-point evaluation order and 1D branch.
+    !> @param[in] max_a_x,max_a_y Maximum face speed magnitudes [m/s].
+    !> @param[in,out] dt Existing maximum permitted timestep [s].
+    SUBROUTINE limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
+        REAL(wp), INTENT(IN) :: max_a_x,max_a_y
+        REAL(wp), INTENT(INOUT) :: dt
+        REAL(wp) :: cfl_spatial,propagation_rate
+
         cfl_spatial = cfl
         cfl_spatial = MIN(cfl_spatial,0.25_wp)
 
@@ -282,12 +355,7 @@ CONTAINS
             CALL fatal_error('CFL_POLICY must be directional_min or combined')
 
         END SELECT
-
-        IF (this%profile_enabled) THEN
-            CALL SYSTEM_CLOCK(tock)
-            this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
-        END IF
-    END SUBROUTINE compute_spatial_timestep
+    END SUBROUTINE limit_timestep_by_spatial_speeds
 
     !> \brief Include all four reconstructed face speeds for one active cell.
     !> \details The MAX operand order is kept identical to the original CFL loop.
