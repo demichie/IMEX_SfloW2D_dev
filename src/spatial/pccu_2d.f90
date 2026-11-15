@@ -25,6 +25,7 @@ MODULE pccu_2d
     PUBLIC :: eval_hydrostatic_path
     PUBLIC :: eval_interlayer_pressure_path
     PUBLIC :: eval_interlayer_pressure_correction
+    PUBLIC :: eval_interlayer_oriented_face
     PUBLIC :: eval_central_upwind_flux
     PUBLIC :: eval_pccu_advective_flux
     PUBLIC :: eval_oriented_pccu_pair
@@ -171,6 +172,46 @@ CONTAINS
             h2_right,gamma_right,eta2_right-h1_right,metric_right,hydro_without_h1)
         correction_l2=full_l2-(hydro_total-hydro_without_h1)
     END SUBROUTINE eval_interlayer_pressure_correction
+
+    !> @brief Evaluate the two layer-specific interlayer pressure contributions at one face.
+    !> @details The two oriented PCCU pairs share explicit characteristic bounds.
+    !> These must be supplied by the coupled solver: isolated-layer wave speeds
+    !> are not a valid replacement. The L2 correction excludes the pressure
+    !> already embedded in its eta2=B+h1+h2 hydrostatic path.
+    !> The conservative numerical flux remains owned by each layer's HP operator.
+    !> @param[in] direction Cartesian face normal.
+    !> @param[in] h1_left,h1_right Lower-layer depths at face endpoints.
+    !> @param[in] h2_left,h2_right Upper-layer depths at face endpoints.
+    !> @param[in] gamma_left,gamma_right Upper-layer pressure coefficients.
+    !> @param[in] eta2_left,eta2_right Reconstructed upper free-surface traces.
+    !> @param[in] metric Shared bed-slope metric at the face.
+    !> @param[in] a_minus,a_plus Validated coupled characteristic bounds.
+    !> @param[out] left_l1,right_l1 Oriented lower-layer pressure contributions.
+    !> @param[out] left_l2,right_l2 Oriented upper-layer correction contributions.
+    SUBROUTINE eval_interlayer_oriented_face(direction, &
+        h1_left,h2_left,gamma_left,eta2_left, &
+        h1_right,h2_right,gamma_right,eta2_right,metric, &
+        a_minus,a_plus,left_l1,right_l1,left_l2,right_l2)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: h1_left,h2_left,gamma_left,eta2_left
+        REAL(wp), INTENT(IN) :: h1_right,h2_right,gamma_right,eta2_right,metric
+        REAL(wp), INTENT(IN) :: a_minus,a_plus
+        REAL(wp), INTENT(OUT) :: left_l1(:),right_l1(:),left_l2(:),right_l2(:)
+        REAL(wp) :: path_l1(SIZE(left_l1)),path_l2(SIZE(left_l2))
+        REAL(wp) :: zero_l1(SIZE(left_l1)),zero_l2(SIZE(left_l2))
+
+        IF (a_minus>0.0_wp .OR. a_plus<0.0_wp .OR. a_plus-a_minus<=pccu_speed_tolerance) &
+            ERROR STOP 'Interlayer face needs valid coupled characteristic bounds'
+        IF (SIZE(left_l1)/=SIZE(right_l1) .OR. SIZE(left_l2)/=SIZE(right_l2)) &
+            ERROR STOP 'Interlayer face oriented sizes differ'
+        zero_l1=0.0_wp
+        zero_l2=0.0_wp
+        CALL eval_interlayer_pressure_correction(direction, &
+            h1_left,h2_left,gamma_left,eta2_left,metric, &
+            h1_right,h2_right,gamma_right,eta2_right,metric,path_l1,path_l2)
+        CALL eval_oriented_pccu_pair(zero_l1,path_l1,a_minus,a_plus,left_l1,right_l1)
+        CALL eval_oriented_pccu_pair(zero_l2,path_l2,a_minus,a_plus,left_l2,right_l2)
+    END SUBROUTINE eval_interlayer_oriented_face
 
     !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
     SUBROUTINE interlayer_pressure_integrand(direction,path_state,dstate_ds,integrand)

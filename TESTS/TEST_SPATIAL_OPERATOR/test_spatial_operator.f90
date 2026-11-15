@@ -17,7 +17,8 @@ PROGRAM test_spatial_operator
   USE init_2d, ONLY : init_empty
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair, &
-      eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path
+      eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path, &
+      eval_interlayer_oriented_face
   USE source_terms_2d, ONLY : eval_source_explicit
   USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
   USE state_composition, ONLY : conservative_mass_admissible
@@ -69,6 +70,7 @@ PROGRAM test_spatial_operator
   CALL check_interlayer_metric_no_double_count
   CALL check_interlayer_variable_gamma_overlap
   CALL check_interlayer_oriented_face_pair
+  CALL check_interlayer_coupled_face
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) THEN
@@ -588,6 +590,56 @@ CONTAINS
         END DO
         WRITE(*,*) 'PASS: oriented interlayer face pair, one-sided speeds and dry upper layer'
     END SUBROUTINE check_interlayer_oriented_face_pair
+
+    !> @brief Validate oriented coupled pressure corrections with supplied common speeds.
+    SUBROUTINE check_interlayer_coupled_face
+        REAL(wp) :: path_l1(5),correction_l2(5),left_l1(5),right_l1(5)
+        REAL(wp) :: left_l2(5),right_l2(5),metric,eta_l,eta_r
+        REAL(wp) :: tol,scale,a_minus,a_plus
+        INTEGER :: direction,case_number,normal
+
+        metric=0.78_wp
+        eta_l=2.3_wp
+        eta_r=2.7_wp
+        DO direction=1,2
+            normal=direction+1
+            DO case_number=1,3
+                SELECT CASE(case_number)
+                CASE(1)
+                    a_minus=-2.0_wp
+                    a_plus=3.0_wp
+                CASE(2)
+                    a_minus=0.0_wp
+                    a_plus=3.0_wp
+                CASE(3)
+                    a_minus=-2.0_wp
+                    a_plus=0.0_wp
+                END SELECT
+                CALL eval_interlayer_oriented_face(direction, &
+                    1.2_wp,1.1_wp,4.0_wp,eta_l,1.8_wp,0.9_wp,6.0_wp,eta_r,metric, &
+                    a_minus,a_plus,left_l1,right_l1,left_l2,right_l2)
+                CALL eval_interlayer_pressure_correction(direction, &
+                    1.2_wp,1.1_wp,4.0_wp,eta_l,metric, &
+                    1.8_wp,0.9_wp,6.0_wp,eta_r,metric,path_l1,correction_l2)
+                scale=MAX(1.0_wp,ABS(path_l1(normal)),ABS(correction_l2(normal)))
+                tol=128.0_wp*EPSILON(1.0_wp)*scale
+                IF (ANY(ABS(right_l1-left_l1-path_l1)>tol) .OR. &
+                    ANY(ABS(right_l2-left_l2-correction_l2)>tol)) &
+                    ERROR STOP 'Interlayer face correction differs from path jump'
+                IF (case_number==2) THEN
+                    IF (ANY(left_l1/=0.0_wp) .OR. ANY(left_l2/=0.0_wp)) &
+                        ERROR STOP 'One-sided interlayer face has wrong negative-side split'
+                ELSEIF (case_number==3) THEN
+                    IF (ANY(right_l1/=0.0_wp) .OR. ANY(right_l2/=0.0_wp)) &
+                        ERROR STOP 'One-sided interlayer face has wrong positive-side split'
+                END IF
+                IF (ANY(left_l1(:normal-1)/=0.0_wp) .OR. ANY(right_l1(normal+1:)/=0.0_wp) .OR. &
+                    ANY(left_l2(:normal-1)/=0.0_wp) .OR. ANY(right_l2(normal+1:)/=0.0_wp)) &
+                    ERROR STOP 'Interlayer face pressure contaminated non-momentum components'
+            END DO
+        END DO
+        WRITE(*,*) 'PASS: shared-speed interlayer oriented face with embedded L2 pressure'
+    END SUBROUTINE check_interlayer_coupled_face
 
     !> @brief Verify inactive optional components remain zero in the production PCCU algebra.
     !> @details Both layer vectors use the same seven component positions. L1 carries only
