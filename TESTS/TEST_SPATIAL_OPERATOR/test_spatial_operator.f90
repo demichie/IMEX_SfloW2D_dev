@@ -71,6 +71,7 @@ PROGRAM test_spatial_operator
   CALL check_interlayer_variable_gamma_overlap
   CALL check_interlayer_oriented_face_pair
   CALL check_interlayer_coupled_face
+  CALL check_interlayer_cell_residual
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) THEN
@@ -691,6 +692,86 @@ CONTAINS
         END DO
         WRITE(*,*) 'PASS: shared-speed interlayer oriented face with embedded L2 pressure'
     END SUBROUTINE check_interlayer_coupled_face
+
+    !> @brief Check the HP-PCCU cell assembly sign for interlayer pressure.
+    !> @details Both physical faces have identical traces on their two sides,
+    !> so the extra face paths vanish. The cell pressure contribution is the
+    !> complete interlayer quadrature with the L2 hydrostatic overlap removed.
+    !> Checks all four local layer-presence cases and a variable Gamma2 path.
+    SUBROUTINE check_interlayer_cell_residual
+        REAL(wp) :: h1_w,h1_e,h2_w,h2_e,gamma_w,gamma_e
+        REAL(wp) :: eta_w,eta_e,g_w,g_e,path_l1(5),path_l2(5)
+        REAL(wp) :: full_l1(5),full_l2(5),hydro_total(5),hydro_without_h1(5)
+        REAL(wp) :: residual_l1(5),residual_l2(5),reference(5),tol,scale
+        INTEGER :: direction,case_number,normal
+
+        DO direction=1,2
+            normal=direction+1
+            DO case_number=1,4
+                h1_w=1.6_wp
+                h1_e=1.9_wp
+                h2_w=0.5_wp
+                h2_e=0.8_wp
+                gamma_w=4.0_wp
+                gamma_e=6.0_wp
+                g_w=0.72_wp
+                g_e=0.89_wp
+                SELECT CASE(case_number)
+                CASE(1)
+                    ! Both layers present with varying material and metric.
+                    CONTINUE
+                CASE(2)
+                    ! Only lower layer present: no interlayer pressure.
+                    h2_w=0.0_wp
+                    h2_e=0.0_wp
+                CASE(3)
+                    ! Only upper layer present: h1=0 on both sides.
+                    h1_w=0.0_wp
+                    h1_e=0.0_wp
+                CASE(4)
+                    ! Both layers dry.
+                    h1_w=0.0_wp
+                    h1_e=0.0_wp
+                    h2_w=0.0_wp
+                    h2_e=0.0_wp
+                END SELECT
+
+                eta_w=0.3_wp+h1_w+h2_w
+                eta_e=0.3_wp+h1_e+h2_e
+                CALL eval_interlayer_pressure_correction(direction, &
+                    h1_w,h2_w,gamma_w,eta_w,g_w, &
+                    h1_e,h2_e,gamma_e,eta_e,g_e,path_l1,path_l2)
+                CALL eval_interlayer_pressure_path(direction, &
+                    h1_w,gamma_w*h2_w,g_w,h1_e,gamma_e*h2_e,g_e,full_l1,full_l2)
+                CALL eval_hydrostatic_path(direction,h2_w,gamma_w,eta_w,g_w, &
+                    h2_e,gamma_e,eta_e,g_e,hydro_total)
+                CALL eval_hydrostatic_path(direction,h2_w,gamma_w,eta_w-h1_w,g_w, &
+                    h2_e,gamma_e,eta_e-h1_e,g_e,hydro_without_h1)
+
+                ! In the production divergence the within-cell path is subtracted.
+                ! Equal physical states at both faces give zero face path jumps.
+                residual_l1=-path_l1
+                residual_l2=-path_l2
+                reference=-full_l2+hydro_total-hydro_without_h1
+                scale=MAX(1.0_wp,ABS(g_w*h1_w*gamma_w*h2_w),ABS(g_e*h1_e*gamma_e*h2_e))
+                tol=128.0_wp*EPSILON(1.0_wp)*scale
+                IF (ANY(ABS(residual_l1+full_l1)>tol)) &
+                    ERROR STOP 'Lower-layer cell pressure has wrong sign'
+                IF (ANY(ABS(residual_l2-reference)>tol)) &
+                    ERROR STOP 'Upper-layer cell pressure was counted twice'
+                IF (case_number>1) THEN
+                    IF (ANY(residual_l1/=0.0_wp) .OR. ANY(residual_l2/=0.0_wp)) &
+                        ERROR STOP 'Absent interlayer contact created cell pressure'
+                END IF
+                IF (ANY(residual_l1(:normal-1)/=0.0_wp) .OR. &
+                    ANY(residual_l1(normal+1:)/=0.0_wp) .OR. &
+                    ANY(residual_l2(:normal-1)/=0.0_wp) .OR. &
+                    ANY(residual_l2(normal+1:)/=0.0_wp)) &
+                    ERROR STOP 'Interlayer cell pressure contaminated transported variables'
+            END DO
+        END DO
+        WRITE(*,*) 'PASS: coupled cell path residual signs and four layer-presence cases'
+    END SUBROUTINE check_interlayer_cell_residual
 
     !> @brief Verify inactive optional components remain zero in the production PCCU algebra.
     !> @details Both layer vectors use the same seven component positions. L1 carries only
