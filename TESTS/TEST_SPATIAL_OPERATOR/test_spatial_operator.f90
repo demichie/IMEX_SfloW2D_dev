@@ -338,6 +338,9 @@ CONTAINS
         REAL(wp) :: lower_q(n_vars,nx,ny),upper_q(n_vars,nx,ny)
         REAL(wp) :: lower_q_before(n_vars,nx,ny),upper_q_before(n_vars,nx,ny)
 
+        ! One-dimensional and single-cell fixtures have no two interior cells.
+        IF (nx<3 .OR. ny<3) RETURN
+
         lower_q=0.0_wp
         upper_q=0.0_wp
         lower_q(idx_totMassEqn,2,2)=1.0_wp
