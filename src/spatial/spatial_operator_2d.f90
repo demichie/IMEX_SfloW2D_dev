@@ -313,10 +313,14 @@ CONTAINS
             j=domain%j_cent(l)
             k=domain%k_cent(l)
             ! Match the four-face rate and MAX operand order of the L1 CFL.
-            max_a_x=MAX(max_a_x,axpos(j,k),-axneg(j,k), &
-                axpos(j+1,k),-axneg(j+1,k))
-            max_a_y=MAX(max_a_y,aypos(j,k),-ayneg(j,k), &
-                aypos(j,k+1),-ayneg(j,k+1))
+            IF (comp_cells_x>1) THEN
+                max_a_x=MAX(max_a_x,axpos(j,k),-axneg(j,k), &
+                    axpos(j+1,k),-axneg(j+1,k))
+            END IF
+            IF (comp_cells_y>1) THEN
+                max_a_y=MAX(max_a_y,aypos(j,k),-ayneg(j,k), &
+                    aypos(j,k+1),-ayneg(j,k+1))
+            END IF
         END DO
 
         CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
