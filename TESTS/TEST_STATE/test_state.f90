@@ -737,9 +737,9 @@ CONTAINS
                 layer_primitive(idx_pore,layer),1.0E-12_wp)
         END DO
 
-        IF (layer_conservative(idx_stoch,1)/=0.0_wp .OR. layer_conservative(idx_pore,2)/=0.0_wp) &
+        IF (ABS(layer_conservative(idx_stoch,1))>0.0_wp .OR. ABS(layer_conservative(idx_pore,2))>0.0_wp) &
             ERROR STOP 'inactive optional conservative component is not zero'
-        IF (layer_conservative(idx_pore,1)==0.0_wp .OR. layer_conservative(idx_stoch,2)==0.0_wp) &
+        IF (ABS(layer_conservative(idx_pore,1))<=0.0_wp .OR. ABS(layer_conservative(idx_stoch,2))<=0.0_wp) &
             ERROR STOP 'active optional conservative component was lost'
 
         DO layer=1,2
@@ -750,10 +750,17 @@ CONTAINS
                 CMPLX(layer_primitive(idx_stoch,layer),1.0E-25_wp,wp)
             CALL primitive_to_conservative(complex_primitive,complex_conservative)
             CALL conservative_to_primitive(complex_conservative,complex_decoded)
-            IF (ABS(complex_decoded(idx_stoch)-complex_primitive(idx_stoch))>1.0E-24_wp) &
-                ERROR STOP 'COMPLEX stochastic slot not preserved'
-            IF (ABS(complex_decoded(idx_pore)-complex_primitive(idx_pore))>1.0E-24_wp) &
-                ERROR STOP 'COMPLEX pore-pressure slot not preserved'
+            ! Roundoff in the REAL part must not mask preservation of a tiny complex-step perturbation.
+            CALL assert_close('COMPLEX stochastic real slot',REAL(complex_decoded(idx_stoch),wp), &
+                REAL(complex_primitive(idx_stoch),wp),1.0E-12_wp)
+            CALL assert_close('COMPLEX pore-pressure real slot',REAL(complex_decoded(idx_pore),wp), &
+                REAL(complex_primitive(idx_pore),wp),1.0E-12_wp)
+            IF (ABS(AIMAG(complex_decoded(idx_stoch))-AIMAG(complex_primitive(idx_stoch)))> &
+                1.0E-12_wp*ABS(AIMAG(complex_primitive(idx_stoch)))) &
+                ERROR STOP 'COMPLEX stochastic imaginary slot not preserved'
+            IF (ABS(AIMAG(complex_decoded(idx_pore))-AIMAG(complex_primitive(idx_pore)))> &
+                1.0E-12_wp*ABS(AIMAG(complex_primitive(idx_pore)))) &
+                ERROR STOP 'COMPLEX pore-pressure imaginary slot not preserved'
         END DO
     END SUBROUTINE check_opposite_optional_state_slots
 
