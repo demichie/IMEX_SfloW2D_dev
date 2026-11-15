@@ -412,11 +412,19 @@
 
     NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW,                                                         &
         xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
+    NAMELIST /west_l1_boundary_conditions/ h_bcW, hu_bcW, hv_bcW,                                                      &
+        xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
     NAMELIST /east_boundary_conditions/ h_bcE, hu_bcE, hv_bcE,                                                         &
+        xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
+    NAMELIST /east_l1_boundary_conditions/ h_bcE, hu_bcE, hv_bcE,                                                      &
         xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
     NAMELIST /south_boundary_conditions/ h_bcS, hu_bcS, hv_bcS,                                                        &
         xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
+    NAMELIST /south_l1_boundary_conditions/ h_bcS, hu_bcS, hv_bcS,                                                     &
+        xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
     NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                        &
+        xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
+    NAMELIST /north_l1_boundary_conditions/ h_bcN, hu_bcN, hv_bcN,                                                     &
         xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
     NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s,                                                 &
         sp_heat_s, alphastot_min, maximum_solid_packing, vonK
@@ -1052,7 +1060,7 @@
 
         CHARACTER(LEN=15) :: chara
 
-        INTEGER :: ios, n_rheology_legacy, n_rheology_l1, n_rheology_l2
+        INTEGER :: ios, ios_bc_l1, n_rheology_legacy, n_rheology_l1, n_rheology_l2
         INTEGER :: n_thermal_legacy, n_thermal_l1, n_thermal_l2
         INTEGER :: n_pore_legacy, n_pore_l1, n_pore_l2
         CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line
@@ -2079,12 +2087,12 @@
         xs_bcN(1:n_solid)%flag = -1
 
 
-        ALLOCATE (bcW(n_vars), bcE(n_vars), bcS(n_vars), bcN(n_vars))
+        ALLOCATE (bcW(n_vars,n_layers), bcE(n_vars,n_layers), bcS(n_vars,n_layers), bcN(n_vars,n_layers))
 
-        bcW(1:n_vars)%flag = -1
-        bcE(1:n_vars)%flag = -1
-        bcS(1:n_vars)%flag = -1
-        bcN(1:n_vars)%flag = -1
+        bcW(1:n_vars,1)%flag = -1
+        bcE(1:n_vars,1)%flag = -1
+        bcS(1:n_vars,1)%flag = -1
+        bcN(1:n_vars,1)%flag = -1
 
         ALLOCATE (inv_rho_s(n_solid))
 
@@ -2344,8 +2352,15 @@
             ! --------- West boundary conditions -------------------------------------
 
             READ (input_unit, west_boundary_conditions, IOSTAT=ios)
+            REWIND (input_unit)
+            READ (input_unit, west_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+            REWIND (input_unit)
+            IF (ios==0 .AND. ios_bc_l1==0) &
+                CALL fatal_error('Both WEST and WEST_L1 boundary namelists supplied')
+            IF (n_layers==2 .AND. ios==0) &
+                CALL fatal_error('N_LAYERS=2 requires explicit WEST_L1 boundary namelist')
 
-            IF (ios .NE. 0) THEN
+            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
 
                 WRITE (*, *) 'IOSTAT=', ios
                 WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
@@ -2463,15 +2478,22 @@
 
             ! set the approriate boundary conditions
 
-            bcW(1) = h_bcW
-            bcW(2) = hu_bcW
-            bcW(3) = hv_bcW
+            bcW(1,1) = h_bcW
+            bcW(2,1) = hu_bcW
+            bcW(3,1) = hv_bcW
 
             ! ------------- East boundary conditions --------------------------------
 
             READ (input_unit, east_boundary_conditions, IOSTAT=ios)
+            REWIND (input_unit)
+            READ (input_unit, east_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+            REWIND (input_unit)
+            IF (ios==0 .AND. ios_bc_l1==0) &
+                CALL fatal_error('Both EAST and EAST_L1 boundary namelists supplied')
+            IF (n_layers==2 .AND. ios==0) &
+                CALL fatal_error('N_LAYERS=2 requires explicit EAST_L1 boundary namelist')
 
-            IF (ios .NE. 0) THEN
+            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
 
                 WRITE (*, *) 'IOSTAT=', ios
                 WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
@@ -2591,9 +2613,9 @@
 
             END IF
 
-            bcE(1) = h_bcE
-            bcE(2) = hu_bcE
-            bcE(3) = hv_bcE
+            bcE(1,1) = h_bcE
+            bcE(2,1) = hu_bcE
+            bcE(3,1) = hv_bcE
 
         END IF
 
@@ -2602,8 +2624,15 @@
             ! --------------- South boundary conditions ------------------------------
 
             READ (input_unit, south_boundary_conditions, IOSTAT=ios)
+            REWIND (input_unit)
+            READ (input_unit, south_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+            REWIND (input_unit)
+            IF (ios==0 .AND. ios_bc_l1==0) &
+                CALL fatal_error('Both SOUTH and SOUTH_L1 boundary namelists supplied')
+            IF (n_layers==2 .AND. ios==0) &
+                CALL fatal_error('N_LAYERS=2 requires explicit SOUTH_L1 boundary namelist')
 
-            IF (ios .NE. 0) THEN
+            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
 
                 WRITE (*, *) 'IOSTAT=', ios
                 WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
@@ -2723,15 +2752,22 @@
 
             END IF
 
-            bcS(1) = h_bcS
-            bcS(2) = hu_bcS
-            bcS(3) = hv_bcS
+            bcS(1,1) = h_bcS
+            bcS(2,1) = hu_bcS
+            bcS(3,1) = hv_bcS
 
             ! ---------------- North boundary conditions ----------------------------
 
             READ (input_unit, north_boundary_conditions, IOSTAT=ios)
+            REWIND (input_unit)
+            READ (input_unit, north_l1_boundary_conditions, IOSTAT=ios_bc_l1)
+            REWIND (input_unit)
+            IF (ios==0 .AND. ios_bc_l1==0) &
+                CALL fatal_error('Both NORTH and NORTH_L1 boundary namelists supplied')
+            IF (n_layers==2 .AND. ios==0) &
+                CALL fatal_error('N_LAYERS=2 requires explicit NORTH_L1 boundary namelist')
 
-            IF (ios .NE. 0) THEN
+            IF (ios .NE. 0 .AND. ios_bc_l1 .NE. 0) THEN
 
                 WRITE (*, *) 'IOSTAT=', ios
                 WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
@@ -2851,46 +2887,46 @@
 
             END IF
 
-            bcN(1) = h_bcN
-            bcN(2) = hu_bcN
-            bcN(3) = hv_bcN
+            bcN(1,1) = h_bcN
+            bcN(2,1) = hu_bcN
+            bcN(3,1) = hv_bcN
 
         END IF
 
-        bcW(4) = T_bcW
-        bcE(4) = T_bcE
-        bcS(4) = T_bcS
-        bcN(4) = T_bcN
+        bcW(4,1) = T_bcW
+        bcE(4,1) = T_bcE
+        bcS(4,1) = T_bcS
+        bcN(4,1) = T_bcN
 
-        bcW(5:4 + n_solid) = xs_bcW(1:n_solid)
-        bcE(5:4 + n_solid) = xs_bcE(1:n_solid)
-        bcS(5:4 + n_solid) = xs_bcS(1:n_solid)
-        bcN(5:4 + n_solid) = xs_bcN(1:n_solid)
+        bcW(5:4 + n_solid,1) = xs_bcW(1:n_solid)
+        bcE(5:4 + n_solid,1) = xs_bcE(1:n_solid)
+        bcS(5:4 + n_solid,1) = xs_bcS(1:n_solid)
+        bcN(5:4 + n_solid,1) = xs_bcN(1:n_solid)
 
-        bcW(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcW(1:n_add_gas)
-        bcE(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcE(1:n_add_gas)
-        bcS(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcS(1:n_add_gas)
-        bcN(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcN(1:n_add_gas)
+        bcW(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcW(1:n_add_gas)
+        bcE(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcE(1:n_add_gas)
+        bcS(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcS(1:n_add_gas)
+        bcN(4 + n_solid + 1:4 + n_solid + n_add_gas,1) = xg_bcN(1:n_add_gas)
 
         IF (stochastic_l1%stochastic_transport_flag) THEN
 
-            bcW(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcW(1:n_stoch_vars)
-            bcE(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcE(1:n_stoch_vars)
-            bcS(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcS(1:n_stoch_vars)
-            bcN(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars) = stoch_bcN(1:n_stoch_vars)
+            bcW(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcW(1:n_stoch_vars)
+            bcE(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcE(1:n_stoch_vars)
+            bcS(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcS(1:n_stoch_vars)
+            bcN(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas + n_stoch_vars,1) = stoch_bcN(1:n_stoch_vars)
 
         END IF
 
         IF (pore_pressure_l1%pore_pressure_flag) THEN
 
             bcW(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars) = pore_bcW(1:n_pore_vars)
+                    n_pore_vars,1) = pore_bcW(1:n_pore_vars)
             bcE(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars) = pore_bcE(1:n_pore_vars)
+                    n_pore_vars,1) = pore_bcE(1:n_pore_vars)
             bcS(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars) = pore_bcS(1:n_pore_vars)
+                    n_pore_vars,1) = pore_bcS(1:n_pore_vars)
             bcN(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars +                        &
-                    n_pore_vars) = pore_bcN(1:n_pore_vars)
+                    n_pore_vars,1) = pore_bcN(1:n_pore_vars)
 
         END IF
 

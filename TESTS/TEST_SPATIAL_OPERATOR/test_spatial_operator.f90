@@ -528,7 +528,7 @@ CONTAINS
     cfl=0.24_wp; max_dt=1.0E6_wp; maximum_solid_packing=0.6_wp
     ALLOCATE(rho_s(1),inv_rho_s(1),sp_heat_s(1),sp_heat_g(0),sp_gas_const_g(0))
     rho_s=2500.0_wp; inv_rho_s=1.0_wp/rho_s; sp_heat_s=1100.0_wp
-    ALLOCATE(bcW(n_vars),bcE(n_vars),bcS(n_vars),bcN(n_vars))
+    ALLOCATE(bcW(n_vars,2),bcE(n_vars,2),bcS(n_vars,2),bcN(n_vars,2))
     bcW%flag=1; bcW%value=0.0_wp; bcE%flag=1; bcE%value=0.0_wp
     bcS%flag=1; bcS%value=0.0_wp; bcN%flag=1; bcN%value=0.0_wp
     ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars,nx,ny))
@@ -566,14 +566,14 @@ CONTAINS
     INTEGER :: mode
 
     IF (nx<=1) RETURN
-    saved_depth_bc=bcW(idx_h)
-    saved_discharge_bc=bcW(idx_u)
+    saved_depth_bc=bcW(idx_h,1)
+    saved_discharge_bc=bcW(idx_u,1)
     saved_mode=kt_trace_reconstruction
 
-    bcW(idx_h)%flag=0
-    bcW(idx_h)%value=4.0_wp
-    bcW(idx_u)%flag=0
-    bcW(idx_u)%value=10.0_wp
+    bcW(idx_h,1)%flag=0
+    bcW(idx_h,1)%value=4.0_wp
+    bcW(idx_u,1)%flag=0
+    bcW(idx_u,1)%value=10.0_wp
     q=0.0_wp
     qp=0.0_wp
     qp(idx_T,:,:)=T_ambient
@@ -600,8 +600,8 @@ CONTAINS
     END DO
 
     ! A dry Dirichlet boundary with zero discharge remains dry.
-    bcW(idx_h)%value=0.0_wp
-    bcW(idx_u)%value=0.0_wp
+    bcW(idx_h,1)%value=0.0_wp
+    bcW(idx_u,1)%value=0.0_wp
     kt_trace_reconstruction='froude_blend'
     CALL reconstruction%reconstruct(qp,0.0_wp,domain%solve_cells,domain%j_cent,domain%k_cent,.TRUE.)
     CALL reconstruction%reconstruct_kt_eta(qp)
@@ -610,8 +610,8 @@ CONTAINS
     IF (reconstruction%qp_adv_interfaceR(idx_u,1,1)/=0.0_wp) &
          ERROR STOP 'zero prescribed discharge did not stay zero'
 
-    bcW(idx_h)=saved_depth_bc
-    bcW(idx_u)=saved_discharge_bc
+    bcW(idx_h,1)=saved_depth_bc
+    bcW(idx_u,1)=saved_discharge_bc
     kt_trace_reconstruction=saved_mode
     q=q0
     CALL reconstruction%finalize

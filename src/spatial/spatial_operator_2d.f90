@@ -77,7 +77,7 @@ CONTAINS
         IF (PRESENT(layer)) selected_layer=layer
         IF (selected_layer<1 .OR. selected_layer>2) CALL fatal_error('Invalid spatial layer slot')
 
-        CALL this%reconstruction%initialize
+        CALL this%reconstruction%initialize(layer=selected_layer)
         CALL this%hp_pccu%initialize(clamp_buoyant_pressure=selected_layer==2)
 
     END SUBROUTINE initialize_spatial_operator

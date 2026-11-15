@@ -39,6 +39,7 @@ Questo documento è l'unica roadmap operativa vigente. Descrive l'architettura o
 - `q/qp(componente,layer,x,y)` e workspace di integrazione hanno struttura rank-4. **La dimensione componente e gli indici sono comuni** a L1/L2; le variabili opzionali stocastica e Darcy occupano ciascuna un solo slot se attive in almeno un layer (OR dei flag canonici). Uno slot non attivo in un layer rimane esattamente zero in stato, trasporto, sorgenti, confini e restart.
 - Le configurazioni dei processi appartengono a `L1` o `L2`; topografia `B`, geometria del terreno, substrato, `deposit_tot`, specie/proprietà solide, atmosfera, temperatura `T_ambient` e fase portante gas/liquido/lava sono **SHARED**. Non duplicare proprietà di materiale o inventari.
 - Le attivazioni di reologia stocastica, trasporto conservativo stocastico e pressione interstiziale sono distinte e canoniche **per layer**. Il processo OU può essere necessario anche senza trasporto stocastico conservativo; il sorgente reologico dipende solo dal relativo flag.
+- I confini laterali W/E/S/N possiedono ciascuno un array canonico `bc(component,layer)`; il workspace spaziale seleziona il layer senza duplicare i kernel. Per `N_LAYERS=1` i gruppi `*_BOUNDARY_CONDITIONS` e `*_L1_BOUNDARY_CONDITIONS` sono alternative mutuamente esclusive. Il parsing delle BC `_L2` e le verifiche accoppiate rimangono da implementare mentre `N_LAYERS=2` è disabilitato.
 - Nel single-layer, per le famiglie previste, `<FAMILY>_PARAMETERS` e `<FAMILY>_L1_PARAMETERS` sono nomi alternativi mutuamente esclusivi dello **stesso oggetto L1**; nessuna copia. Quando L2 sarà abilitato, richiedere gli input espliciti L1/L2 e rifiutare il nome breve. I nomi scalari obsoleti non sono interfacce interne da preservare.
 - Il substrato possiede l'unico `T_ground`, il deposito canonico è `deposit_tot`; `T_ambient` è la sola temperatura atmosferica. Le proprietà solide sono condivise, ma il massimo packing di ammissibilità non va confuso con hindrance di deposizione o futuro packing L1.
 
@@ -75,7 +76,7 @@ La parola **completato** indica implementazione preparatoria disponibile, non ce
 | HP-PCCU accoppiato e CFL two-layer | **Da fare** | Pressione di coppia, path, wet/dry, topografia, stratified rest e iperbolicità. |
 | Lie L1/L2/INTERLAYER | **Da fare** | Scope, candidato doppio, contatti aggiornati per gruppo, transazioni condivise e rollback atomico. |
 | Chiusure interlayer e scambi esterni accoppiati | **Da fare** | Settling, elutriazione, drag, entrainment, deposito/erosione, lofting e bilanci. |
-| Input, output e restart two-layer | **Da fare** | Parser completo L2, schema autorevole versionato, NetCDF, diagnostiche e round-trip. |
+| Input, output e restart two-layer | **Avviato (BC)** | BC canoniche per layer e alias L1 predisposti; parser BC L2, altre configurazioni L2, NetCDF, diagnostiche e restart ancora da realizzare. |
 | Validazione integrata e attivazione `N_LAYERS=2` | **Da fare** | Benchmark accoppiati, prestazioni, conservazione e approvazione prima dell'abilitazione. |
 
 ## 4. Roadmap operativa e condizioni di uscita
@@ -84,7 +85,7 @@ La parola **completato** indica implementazione preparatoria disponibile, non ce
 |---|---|---|
 | **A — Fondazioni single-layer** (TL00–TL03) | **Avviata, preparazione sostanzialmente realizzata** | Chiudere baseline riproducibile, matrice deposito/lava/dry, EXAMPLES, restart/NetCDF, verifiche quantitative e OpenMP; assicurare equivalenza L1 salvo delta termici approvati. |
 | **B — Proprietà e fisica per layer** (TL04) | **Avviata, implementazione principale completata** | Certificare parsing/alias, tutte le configurazioni e combinazioni opzionali, budget dei processi e regressioni; nessuna attivazione L2 in produzione. |
-| **C — Operatori L2 indipendenti** (TL05) | **Avviata, test isolati realizzati** | Verificare zeri degli slot inattivi nell'intera ricostruzione spaziale, sorgenti, IC/BC e restart; i flussi PCCU locali con attivazioni L1/L2 opposte hanno un test mirato, da certificare in CI. |
+| **C — Operatori L2 indipendenti** (TL05) | **Avviata, test isolati realizzati** | BC canoniche per layer e parser degli alias L1 introdotti (CI da verificare). Restano test di ricostruzione, slot inattivi, sorgenti, IC/BC L2 e restart. |
 | **D — Spaziale accoppiato** (TL06) | **Da fare** | Completare path e pressioni di coppia, topografia condivisa, test di riduzione, wet/dry, well-balancing previsto e CFL/iperbolicità; gate spaziale. |
 | **E — Lie accoppiato** (TL07) | **Da fare** | Scope dei gruppi, doppio candidato, gruppo 0, refresh dei contatti, buoyancy L2 e transazioni/rollback atomici, mantenendo cell-outer/OpenMP. |
 | **F — Chiusure fisiche** (TL08–TL11) | **Da fare** | Settling L2→L1; elutriazione L1→L2 con cold-start; drag di coppia; scambi esterni e basali per layer esposto. Verificare risorse SHARED, disponibilità, bilanci e limiti. |

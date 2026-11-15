@@ -518,7 +518,7 @@ CONTAINS
                 ! are exempt, as in the legacy reconstruction.
                 IF ( ( j .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                      &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcW(2)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcW(2,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_xL(1,j,k) .GT. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
@@ -526,8 +526,8 @@ CONTAINS
                     this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
                 ELSEIF ( ( j .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                  &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcW(2)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcW(2)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcW(2,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcW(2,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
                     this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
@@ -535,7 +535,7 @@ CONTAINS
                 ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                                                            &
                     ( source_cell(MAX(1,MIN(j-1,SIZE(source_cell,1))),                                                 &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcE(2)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcE(2,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_xL(1,j,k) .LT. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
@@ -544,8 +544,8 @@ CONTAINS
                 ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                                                            &
                     ( source_cell(MAX(1,MIN(j-1,SIZE(source_cell,1))),                                                 &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcE(2)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcE(2)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcE(2,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcE(2,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
                     this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
@@ -586,7 +586,7 @@ CONTAINS
 
                 IF ( ( k .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                      &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcS(3)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcS(3,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_yB(1,j,k) .GT. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
@@ -594,8 +594,8 @@ CONTAINS
                     this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
                 ELSEIF ( ( k .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                  &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcS(3)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcS(3)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcS(3,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcS(3,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
                     this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
@@ -603,7 +603,7 @@ CONTAINS
                 ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                                                            &
                     ( source_cell(MIN(j,SIZE(source_cell,1)),                                                          &
                     MAX(1,MIN(k-1,SIZE(source_cell,2)))) .NE. 2 ) .AND.                                                &
-                    ( bcN(3)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcN(3,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_yB(1,j,k) .LT. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
@@ -612,8 +612,8 @@ CONTAINS
                 ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                                                            &
                     ( source_cell(MIN(j,SIZE(source_cell,1)),                                                          &
                     MAX(1,MIN(k-1,SIZE(source_cell,2)))) .NE. 2 ) .AND.                                                &
-                    ( bcN(3)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcN(3)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcN(3,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcN(3,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
                     this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp

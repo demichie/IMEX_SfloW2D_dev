@@ -310,7 +310,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcW%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcW%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcW(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcW(:,:)
 
     !> bcE&flag defines the east boundary condition:\n
     !> - bcE%flag = 0     => Dirichlet boundary condition;
@@ -320,7 +321,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcE%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcE%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcE(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcE(:,:)
 
     !> bcS&flag defines the south boundary condition:\n
     !> - bcS%flag = 0     => Dirichlet boundary condition;
@@ -330,7 +332,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcS%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcS%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcS(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcS(:,:)
 
     !> bcN&flag defines the north boundary condition:\n
     !> - bcN%flag = 0     => Dirichlet boundary condition;
@@ -340,7 +343,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcN%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcN%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcN(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcN(:,:)
 
 CONTAINS
     !> Configure canonical physical and conservative indices for a complete state.

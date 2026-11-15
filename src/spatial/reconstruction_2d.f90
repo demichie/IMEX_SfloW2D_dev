@@ -39,6 +39,9 @@ MODULE reconstruction_2d
     !> \brief Persistent cell and face traces for the selected depth reconstruction.
     TYPE, PUBLIC :: reconstruction_workspace_type
 
+        !> Material layer selected when this spatial workspace is initialized.
+        INTEGER :: layer=1
+
 
         ! Direct h_x-based states for the advective part of the PCCU flux.
         ! The existing interface states retain the eta-based reconstruction and
@@ -89,12 +92,16 @@ CONTAINS
     !> \brief Allocate interface traces, HP candidates and per-thread scratch storage.
     !>
     !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+    !> @param[in] layer Optional material layer; omitted means L1.
 
-    SUBROUTINE initialize_reconstruction( this )
+    SUBROUTINE initialize_reconstruction( this, layer )
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+        INTEGER, INTENT(IN), OPTIONAL :: layer
 
-
+        this%layer=1
+        IF (PRESENT(layer)) this%layer=layer
+        IF (this%layer<1 .OR. this%layer>2) ERROR STOP 'Invalid reconstruction layer'
 
         ALLOCATE( this%qp_adv_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
         ALLOCATE( this%h_selected_interfaceL( comp_interfaces_x, comp_cells_y ) )
@@ -337,27 +344,27 @@ CONTAINS
             vars_loop:DO i=1,n_vars
 
                 qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
-                bcW_effective=bcW(i)
-                bcE_effective=bcE(i)
-                bcS_effective=bcS(i)
-                bcN_effective=bcN(i)
+                bcW_effective=bcW(i,this%layer)
+                bcE_effective=bcE(i,this%layer)
+                bcS_effective=bcS(i,this%layer)
+                bcN_effective=bcN(i,this%layer)
                 ! The input BCs on components 2/3 prescribe hu/hv, not velocities.
                 ! Convert their trace values to velocities for the primitive limiter.
                 IF (i==idx_u .OR. i==idx_v) THEN
                     IF (j==1 .AND. comp_cells_x>1) CALL discharge_bc_to_velocity(                                     &
-                        bcW(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        bcW(i,this%layer),qp_expl(1,j,k),qp_expl(i,j,k),                                               &
                         qp_expl(1,j+1,k),qp_expl(i,j+1,k),qrecW(1),dx2,one_by_dx,-1,                                  &
                         i==idx_u,bcW_effective)
                     IF (j==comp_cells_x .AND. comp_cells_x>1) CALL discharge_bc_to_velocity(                          &
-                        bcE(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        bcE(i,this%layer),qp_expl(1,j,k),qp_expl(i,j,k),                                               &
                         qp_expl(1,j-1,k),qp_expl(i,j-1,k),qrecE(1),dx2,one_by_dx,1,                                   &
                         i==idx_u,bcE_effective)
                     IF (k==1 .AND. comp_cells_y>1) CALL discharge_bc_to_velocity(                                     &
-                        bcS(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        bcS(i,this%layer),qp_expl(1,j,k),qp_expl(i,j,k),                                               &
                         qp_expl(1,j,k+1),qp_expl(i,j,k+1),qrecS(1),dy2,one_by_dy,-1,                                  &
                         i==idx_v,bcS_effective)
                     IF (k==comp_cells_y .AND. comp_cells_y>1) CALL discharge_bc_to_velocity(                          &
-                        bcN(i),qp_expl(1,j,k),qp_expl(i,j,k),                                                          &
+                        bcN(i,this%layer),qp_expl(1,j,k),qp_expl(i,j,k),                                               &
                         qp_expl(1,j,k-1),qp_expl(i,j,k-1),qrecN(1),dy2,one_by_dy,1,                                   &
                         i==idx_v,bcN_effective)
                 END IF
@@ -1331,16 +1338,16 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             j=this%hp_eta_j(l)
             k=this%hp_eta_k(l)
             IF (source_cell(j,k)/=2) THEN
-                IF (j==1) CALL preserve_dirichlet_hp_depth(bcW(idx_h),this%qp_adv_interfaceR(:,j,k),                  &
+                IF (j==1) CALL preserve_dirichlet_hp_depth(bcW(idx_h,this%layer),this%qp_adv_interfaceR(:,j,k),        &
                     B_face_x(j,k),this%eta_interfaceR(j,k),this%h_minmod_interfaceR(j,k), &
                     this%h_froude_interfaceR(j,k))
-                IF (j==comp_cells_x) CALL preserve_dirichlet_hp_depth(bcE(idx_h),                                      &
+                IF (j==comp_cells_x) CALL preserve_dirichlet_hp_depth(bcE(idx_h,this%layer),                           &
                     this%qp_adv_interfaceL(:,j+1,k),B_face_x(j+1,k),this%eta_interfaceL(j+1,k),                        &
                     this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k))
-                IF (k==1) CALL preserve_dirichlet_hp_depth(bcS(idx_h),this%qp_adv_interfaceT(:,j,k),                  &
+                IF (k==1) CALL preserve_dirichlet_hp_depth(bcS(idx_h,this%layer),this%qp_adv_interfaceT(:,j,k),        &
                     B_face_y(j,k),this%eta_interfaceT(j,k),this%h_minmod_interfaceT(j,k), &
                     this%h_froude_interfaceT(j,k))
-                IF (k==comp_cells_y) CALL preserve_dirichlet_hp_depth(bcN(idx_h),                                      &
+                IF (k==comp_cells_y) CALL preserve_dirichlet_hp_depth(bcN(idx_h,this%layer),                           &
                     this%qp_adv_interfaceB(:,j,k+1),B_face_y(j,k+1),this%eta_interfaceB(j,k+1),                        &
                     this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1))
             END IF
@@ -1373,18 +1380,18 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                 IF (source_cell(1,k)/=2) THEN
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceR(:,1,k),                                   &
                         this%h_selected_interfaceR(1,k),qp_expl(:,1,k),                                               &
-                        qp_expl(:,2,k),bcW(2),dx2,one_by_dx,-1,.TRUE.,idx_u)
+                        qp_expl(:,2,k),bcW(2,this%layer),dx2,one_by_dx,-1,.TRUE.,idx_u)
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceR(:,1,k),                                   &
                         this%h_selected_interfaceR(1,k),qp_expl(:,1,k),                                               &
-                        qp_expl(:,2,k),bcW(3),dx2,one_by_dx,-1,.FALSE.,idx_v)
+                        qp_expl(:,2,k),bcW(3,this%layer),dx2,one_by_dx,-1,.FALSE.,idx_v)
                 END IF
                 IF (source_cell(comp_cells_x,k)/=2) THEN
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceL(:,comp_interfaces_x,k),                  &
                         this%h_selected_interfaceL(comp_interfaces_x,k),qp_expl(:,comp_cells_x,k),                    &
-                        qp_expl(:,comp_cells_x-1,k),bcE(2),dx2,one_by_dx,1,.TRUE.,idx_u)
+                        qp_expl(:,comp_cells_x-1,k),bcE(2,this%layer),dx2,one_by_dx,1,.TRUE.,idx_u)
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceL(:,comp_interfaces_x,k),                  &
                         this%h_selected_interfaceL(comp_interfaces_x,k),qp_expl(:,comp_cells_x,k),                    &
-                        qp_expl(:,comp_cells_x-1,k),bcE(3),dx2,one_by_dx,1,.FALSE.,idx_v)
+                        qp_expl(:,comp_cells_x-1,k),bcE(3,this%layer),dx2,one_by_dx,1,.FALSE.,idx_v)
                 END IF
             END IF
         END DO
@@ -1393,18 +1400,18 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                 IF (source_cell(j,1)/=2) THEN
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceT(:,j,1),                                   &
                         this%h_selected_interfaceT(j,1),qp_expl(:,j,1),                                               &
-                        qp_expl(:,j,2),bcS(2),dy2,one_by_dy,-1,.FALSE.,idx_u)
+                        qp_expl(:,j,2),bcS(2,this%layer),dy2,one_by_dy,-1,.FALSE.,idx_u)
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceT(:,j,1),                                   &
                         this%h_selected_interfaceT(j,1),qp_expl(:,j,1),                                               &
-                        qp_expl(:,j,2),bcS(3),dy2,one_by_dy,-1,.TRUE.,idx_v)
+                        qp_expl(:,j,2),bcS(3,this%layer),dy2,one_by_dy,-1,.TRUE.,idx_v)
                 END IF
                 IF (source_cell(j,comp_cells_y)/=2) THEN
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceB(:,j,comp_interfaces_y),                  &
                         this%h_selected_interfaceB(j,comp_interfaces_y),qp_expl(:,j,comp_cells_y),                    &
-                        qp_expl(:,j,comp_cells_y-1),bcN(2),dy2,one_by_dy,1,.FALSE.,idx_u)
+                        qp_expl(:,j,comp_cells_y-1),bcN(2,this%layer),dy2,one_by_dy,1,.FALSE.,idx_u)
                     CALL enforce_boundary_discharge(this%qp_adv_interfaceB(:,j,comp_interfaces_y),                  &
                         this%h_selected_interfaceB(j,comp_interfaces_y),qp_expl(:,j,comp_cells_y),                    &
-                        qp_expl(:,j,comp_cells_y-1),bcN(3),dy2,one_by_dy,1,.TRUE.,idx_v)
+                        qp_expl(:,j,comp_cells_y-1),bcN(3,this%layer),dy2,one_by_dy,1,.TRUE.,idx_v)
                 END IF
             END IF
         END DO
