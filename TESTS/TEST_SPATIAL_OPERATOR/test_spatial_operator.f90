@@ -66,6 +66,7 @@ PROGRAM test_spatial_operator
   CALL check_uniform_minmod_kernel
   CALL check_optional_pccu_flux_slots
   CALL check_interlayer_pressure_path
+  CALL check_interlayer_oriented_face_pair
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) THEN
@@ -372,6 +373,81 @@ CONTAINS
         END DO
         WRITE(*,*) 'PASS: interlayer pressure path product balance, dry limit and reversal'
     END SUBROUTINE check_interlayer_pressure_path
+
+    !> @brief Check interlayer path splitting into the two oriented PCCU face values.
+    !> @details The numerical flux is set to zero to isolate the nonconservative
+    !> contribution. The production oriented split must reconstruct the same
+    !> left-to-right jump for each layer, including variable G and a dry L2 side.
+    SUBROUTINE check_interlayer_oriented_face_pair
+        REAL(wp) :: path_l1(5),path_l2(5)
+        REAL(wp) :: left_l1(5),right_l1(5),left_l2(5),right_l2(5)
+        REAL(wp) :: zero_flux(5),expected,tolerance,scale
+        REAL(wp) :: a_minus,a_plus,h1_left,h1_right,load_left,load_right
+        REAL(wp) :: metric_left,metric_right
+        INTEGER :: direction,case_number,speed_case,normal_momentum
+
+        zero_flux=0.0_wp
+        DO direction=1,2
+            normal_momentum=direction+1
+            DO case_number=1,3
+                SELECT CASE(case_number)
+                CASE(1)
+                    ! Shared metric at a face, unequal upper pressure.
+                    h1_left=1.8_wp; h1_right=1.2_wp
+                    load_left=7.0_wp; load_right=3.0_wp
+                    metric_left=0.8_wp; metric_right=0.8_wp
+                CASE(2)
+                    ! Variable metric along a cell-internal quadrature path.
+                    h1_left=1.8_wp; h1_right=1.2_wp
+                    load_left=7.0_wp; load_right=3.0_wp
+                    metric_left=0.6_wp; metric_right=0.9_wp
+                CASE(3)
+                    ! Wet L1 with a vanishing upper layer.
+                    h1_left=1.8_wp; h1_right=1.2_wp
+                    load_left=0.0_wp; load_right=0.0_wp
+                    metric_left=0.6_wp; metric_right=0.9_wp
+                END SELECT
+                CALL eval_interlayer_pressure_path(direction,h1_left,load_left,metric_left, &
+                    h1_right,load_right,metric_right,path_l1,path_l2)
+                expected=metric_left*h1_left*load_left-metric_right*h1_right*load_right
+                scale=MAX(1.0_wp,ABS(metric_left*h1_left*load_left),ABS(metric_right*h1_right*load_right))
+                tolerance=128.0_wp*EPSILON(1.0_wp)*scale
+
+                DO speed_case=1,3
+                    SELECT CASE(speed_case)
+                    CASE(1)
+                        a_minus=-2.0_wp; a_plus=3.0_wp
+                    CASE(2)
+                        a_minus=0.0_wp; a_plus=3.0_wp
+                    CASE(3)
+                        a_minus=-2.0_wp; a_plus=0.0_wp
+                    END SELECT
+                    CALL eval_oriented_pccu_pair(zero_flux,path_l1,a_minus,a_plus,left_l1,right_l1)
+                    CALL eval_oriented_pccu_pair(zero_flux,path_l2,a_minus,a_plus,left_l2,right_l2)
+                    IF (ABS(right_l1(normal_momentum)-left_l1(normal_momentum) &
+                        -path_l1(normal_momentum))>tolerance) &
+                        ERROR STOP 'Oriented interlayer L1 face jump differs from path'
+                    IF (ABS(right_l2(normal_momentum)-left_l2(normal_momentum) &
+                        -path_l2(normal_momentum))>tolerance) &
+                        ERROR STOP 'Oriented interlayer L2 face jump differs from path'
+                    IF (ABS(right_l1(normal_momentum)+right_l2(normal_momentum) &
+                        -left_l1(normal_momentum)-left_l2(normal_momentum)-expected)>tolerance) &
+                        ERROR STOP 'Oriented interlayer face pair violates pressure product balance'
+                    IF (ANY(left_l1(1:normal_momentum-1)/=0.0_wp) .OR. &
+                        ANY(right_l1(1:normal_momentum-1)/=0.0_wp) .OR. &
+                        ANY(left_l2(1:normal_momentum-1)/=0.0_wp) .OR. &
+                        ANY(right_l2(1:normal_momentum-1)/=0.0_wp)) &
+                        ERROR STOP 'Oriented interlayer face pair created a non-momentum flux'
+                    IF (case_number==3) THEN
+                        IF (ANY(left_l1/=0.0_wp) .OR. ANY(right_l1/=0.0_wp) .OR. &
+                            ANY(left_l2/=0.0_wp) .OR. ANY(right_l2/=0.0_wp)) &
+                            ERROR STOP 'Dry L2 created an oriented interlayer face force'
+                    END IF
+                END DO
+            END DO
+        END DO
+        WRITE(*,*) 'PASS: oriented interlayer face pair, one-sided speeds and dry upper layer'
+    END SUBROUTINE check_interlayer_oriented_face_pair
 
     !> @brief Verify inactive optional components remain zero in the production PCCU algebra.
     !> @details Both layer vectors use the same seven component positions. L1 carries only
