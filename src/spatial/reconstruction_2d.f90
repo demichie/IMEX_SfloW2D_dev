@@ -158,7 +158,8 @@ CONTAINS
     !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
 
 
-    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, source_boundary_enabled )
+    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, use_kt_direct, &
+        source_boundary_enabled, bed_center, bed_face_x, bed_face_y )
 
         ! External procedures
     USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
@@ -185,6 +186,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: k_cent(:)
         LOGICAL, INTENT(IN) :: use_kt_direct
         LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled
+        REAL(wp), INTENT(IN), OPTIONAL :: bed_center(:,:),bed_face_x(:,:),bed_face_y(:,:)
 
         REAL(wp) :: qrecW(n_vars) !< recons var at the west edge of the cells
         REAL(wp) :: qrecE(n_vars) !< recons var at the east edge of the cells
@@ -632,7 +634,7 @@ CONTAINS
             this%qp_cellE(:,j,k) = qrecE
             this%qp_cellS(:,j,k) = qrecS
             this%qp_cellN(:,j,k) = qrecN
-            CALL reconstruct_kt_eta_cell(this,qp_expl,j,k)
+            CALL reconstruct_kt_eta_cell(this,qp_expl,j,k,bed_center,bed_face_x,bed_face_y)
 
 
 
@@ -733,10 +735,11 @@ CONTAINS
     !> @param[in] qp_expl Cell-centered primitive states including stencil halo.
     !> @param[in] j X index of the workset cell.
     !> @param[in] k Y index of the workset cell.
-    SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k)
+    SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k,bed_center,bed_face_x,bed_face_y)
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
         INTEGER, INTENT(IN) :: j,k
+        REAL(wp), INTENT(IN), OPTIONAL :: bed_center(:,:),bed_face_x(:,:),bed_face_y(:,:)
         REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
         REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
         REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
@@ -744,15 +747,30 @@ CONTAINS
         REAL(wp) :: slope_eta2_x,slope_eta2_y
         REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
         REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
-            eta_center=qp_expl(1,j,k)+B_cent(j,k)
+        REAL(wp) :: z_c,z_wc,z_ec,z_sc,z_nc,z_w,z_e,z_s,z_n
+            z_c=B_cent(j,k)
+            z_w=B_face_x(j,k); z_e=B_face_x(j+1,k)
+            z_s=B_face_y(j,k); z_n=B_face_y(j,k+1)
+            IF (PRESENT(bed_center)) z_c=bed_center(j,k)
+            IF (PRESENT(bed_face_x)) THEN
+                z_w=bed_face_x(j,k); z_e=bed_face_x(j+1,k)
+            END IF
+            IF (PRESENT(bed_face_y)) THEN
+                z_s=bed_face_y(j,k); z_n=bed_face_y(j,k+1)
+            END IF
+            eta_center=qp_expl(1,j,k)+z_c
             slope_x=0.0_wp
             slope_y=0.0_wp
             slope_hx=0.0_wp
             slope_hy=0.0_wp
 
             IF ((j.GT.1).AND.(j.LT.comp_cells_x)) THEN
-                sx=[qp_expl(1,j-1,k)+B_cent(j-1,k),eta_center,                                                         &
-                    qp_expl(1,j+1,k)+B_cent(j+1,k)]
+                z_wc=B_cent(j-1,k); z_ec=B_cent(j+1,k)
+                IF (PRESENT(bed_center)) THEN
+                    z_wc=bed_center(j-1,k); z_ec=bed_center(j+1,k)
+                END IF
+                sx=[qp_expl(1,j-1,k)+z_wc,eta_center,                                                         &
+                    qp_expl(1,j+1,k)+z_ec]
                 hx=[qp_expl(1,j-1,k),qp_expl(1,j,k),qp_expl(1,j+1,k)]
                 xx=[x_comp(j-1),x_comp(j),x_comp(j+1)]
                 CALL limit(sx,xx,limiter(1),slope_x)
@@ -764,8 +782,12 @@ CONTAINS
             END IF
 
             IF ((k.GT.1).AND.(k.LT.comp_cells_y)) THEN
-                sy=[qp_expl(1,j,k-1)+B_cent(j,k-1),eta_center,                                                         &
-                    qp_expl(1,j,k+1)+B_cent(j,k+1)]
+                z_sc=B_cent(j,k-1); z_nc=B_cent(j,k+1)
+                IF (PRESENT(bed_center)) THEN
+                    z_sc=bed_center(j,k-1); z_nc=bed_center(j,k+1)
+                END IF
+                sy=[qp_expl(1,j,k-1)+z_sc,eta_center,                                                         &
+                    qp_expl(1,j,k+1)+z_nc]
                 hy=[qp_expl(1,j,k-1),qp_expl(1,j,k),qp_expl(1,j,k+1)]
                 yy=[y_comp(k-1),y_comp(k),y_comp(k+1)]
                 CALL limit(sy,yy,limiter(1),slope_y)
@@ -781,20 +803,20 @@ CONTAINS
 
             ! K&P positivity correction for the eta_x traces used by the
             ! hydrostatic/path discretization.
-            IF ( eta_e .LT. B_face_x(j+1,k) ) THEN
-                eta_e=B_face_x(j+1,k)
+            IF ( eta_e .LT. z_e ) THEN
+                eta_e=z_e
                 eta_w=2.0_wp*eta_center-eta_e
-            ELSEIF ( eta_w .LT. B_face_x(j,k) ) THEN
-                eta_w=B_face_x(j,k)
+            ELSEIF ( eta_w .LT. z_w ) THEN
+                eta_w=z_w
                 eta_e=2.0_wp*eta_center-eta_w
 
             END IF
 
-            IF ( eta_n .LT. B_face_y(j,k+1) ) THEN
-                eta_n=B_face_y(j,k+1)
+            IF ( eta_n .LT. z_n ) THEN
+                eta_n=z_n
                 eta_s=2.0_wp*eta_center-eta_n
-            ELSEIF ( eta_s .LT. B_face_y(j,k) ) THEN
-                eta_s=B_face_y(j,k)
+            ELSEIF ( eta_s .LT. z_s ) THEN
+                eta_s=z_s
                 eta_n=2.0_wp*eta_center-eta_s
 
             END IF
@@ -808,44 +830,44 @@ CONTAINS
                 ! Alternative transport traces: minmod(eta_x, h_x+B_x), followed
                 ! by the face-bed positivity correction. Hydrostatic eta stays above.
                 slope_eta2=reconstr_coeff*slope_hx +                                                                   &
-                    (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
+                    (z_e-z_w)*one_by_dx
                 slope_minmod=minmod_slope_pair(reconstr_coeff*slope_x,slope_eta2)
                 eta_w_mm=eta_center-dx2*slope_minmod
                 eta_e_mm=eta_center+dx2*slope_minmod
 
-                IF ( eta_e_mm .LT. B_face_x(j+1,k) ) THEN
-                    eta_e_mm=B_face_x(j+1,k)
+                IF ( eta_e_mm .LT. z_e ) THEN
+                    eta_e_mm=z_e
                     eta_w_mm=2.0_wp*eta_center-eta_e_mm
-                ELSEIF ( eta_w_mm .LT. B_face_x(j,k) ) THEN
-                    eta_w_mm=B_face_x(j,k)
+                ELSEIF ( eta_w_mm .LT. z_w ) THEN
+                    eta_w_mm=z_w
                     eta_e_mm=2.0_wp*eta_center-eta_w_mm
 
                 END IF
 
                 this%h_minmod_interfaceR(j,k)=                                                                         &
-                    MAX(eta_w_mm-B_face_x(j,k),0.0_wp)
+                    MAX(eta_w_mm-z_w,0.0_wp)
                 this%h_minmod_interfaceL(j+1,k)=                                                                       &
-                    MAX(eta_e_mm-B_face_x(j+1,k),0.0_wp)
+                    MAX(eta_e_mm-z_e,0.0_wp)
 
                 slope_eta2=reconstr_coeff*slope_hy +                                                                   &
-                    (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
+                    (z_n-z_s)*one_by_dy
                 slope_minmod=minmod_slope_pair(reconstr_coeff*slope_y,slope_eta2)
                 eta_s_mm=eta_center-dy2*slope_minmod
                 eta_n_mm=eta_center+dy2*slope_minmod
 
-                IF ( eta_n_mm .LT. B_face_y(j,k+1) ) THEN
-                    eta_n_mm=B_face_y(j,k+1)
+                IF ( eta_n_mm .LT. z_n ) THEN
+                    eta_n_mm=z_n
                     eta_s_mm=2.0_wp*eta_center-eta_n_mm
-                ELSEIF ( eta_s_mm .LT. B_face_y(j,k) ) THEN
-                    eta_s_mm=B_face_y(j,k)
+                ELSEIF ( eta_s_mm .LT. z_s ) THEN
+                    eta_s_mm=z_s
                     eta_n_mm=2.0_wp*eta_center-eta_s_mm
 
                 END IF
 
                 this%h_minmod_interfaceT(j,k)=                                                                         &
-                    MAX(eta_s_mm-B_face_y(j,k),0.0_wp)
+                    MAX(eta_s_mm-z_s,0.0_wp)
                 this%h_minmod_interfaceB(j,k+1)=                                                                       &
-                    MAX(eta_n_mm-B_face_y(j,k+1),0.0_wp)
+                    MAX(eta_n_mm-z_n,0.0_wp)
 
             END IF
 
@@ -855,9 +877,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             fr_weight_y=froude_h_blend_weight(qp_expl(1,j,k),                                                          &
                 qp_expl(idx_v,j,k),grav)
             slope_eta2_x=reconstr_coeff*slope_hx +                                                                     &
-                (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
+                (z_e-z_w)*one_by_dx
             slope_eta2_y=reconstr_coeff*slope_hy +                                                                     &
-                (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
+                (z_n-z_s)*one_by_dy
             slope_blend_x=(1.0_wp-fr_weight_x)*reconstr_coeff*slope_x +                                                &
                 fr_weight_x*slope_eta2_x
             slope_blend_y=(1.0_wp-fr_weight_y)*reconstr_coeff*slope_y +                                                &
@@ -866,36 +888,36 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             eta_blend_w=eta_center-dx2*slope_blend_x
             eta_blend_e=eta_center+dx2*slope_blend_x
 
-            IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
-                eta_blend_e=B_face_x(j+1,k)
+            IF ( eta_blend_e .LT. z_e ) THEN
+                eta_blend_e=z_e
                 eta_blend_w=2.0_wp*eta_center-eta_blend_e
-            ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
-                eta_blend_w=B_face_x(j,k)
+            ELSEIF ( eta_blend_w .LT. z_w ) THEN
+                eta_blend_w=z_w
                 eta_blend_e=2.0_wp*eta_center-eta_blend_w
 
             END IF
 
             this%h_froude_interfaceR(j,k)=                                                                             &
-                MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
+                MAX(eta_blend_w-z_w,0.0_wp)
             this%h_froude_interfaceL(j+1,k)=                                                                           &
-                MAX(eta_blend_e-B_face_x(j+1,k),0.0_wp)
+                MAX(eta_blend_e-z_e,0.0_wp)
 
             eta_blend_s=eta_center-dy2*slope_blend_y
             eta_blend_n=eta_center+dy2*slope_blend_y
 
-            IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
-                eta_blend_n=B_face_y(j,k+1)
+            IF ( eta_blend_n .LT. z_n ) THEN
+                eta_blend_n=z_n
                 eta_blend_s=2.0_wp*eta_center-eta_blend_n
-            ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
-                eta_blend_s=B_face_y(j,k)
+            ELSEIF ( eta_blend_s .LT. z_s ) THEN
+                eta_blend_s=z_s
                 eta_blend_n=2.0_wp*eta_center-eta_blend_s
 
             END IF
 
             this%h_froude_interfaceT(j,k)=                                                                             &
-                MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
+                MAX(eta_blend_s-z_s,0.0_wp)
             this%h_froude_interfaceB(j,k+1)=                                                                           &
-                MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
+                MAX(eta_blend_n-z_n,0.0_wp)
 
             END IF
 
@@ -1185,12 +1207,14 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> @details Applies the configured trace reconstruction to prepared HP cells.
     !> @param[in,out] this Reconstruction workspace and output face traces.
     !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
-    SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
+    SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl,bed_face_x,bed_face_y)
     USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
 
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
+        REAL(wp), INTENT(IN), OPTIONAL :: bed_face_x(:,:),bed_face_y(:,:)
         INTEGER :: l,j,k,kt_mode
+        REAL(wp) :: z_w,z_e,z_s,z_n
 
         ! Decode the configuration once, outside the reconstruction face loop.
         SELECT CASE (TRIM(kt_trace_reconstruction))
@@ -1333,39 +1357,47 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         ! composition normalization and discharge-to-velocity conversion.
         ! Select final depths after eta and radial boundary corrections.
         ! Keep the direct h_x candidate available for characteristic speed bounds.
-        !$OMP PARALLEL DO PRIVATE(l,j,k)
+        !$OMP PARALLEL DO PRIVATE(l,j,k,z_w,z_e,z_s,z_n)
         DO l=1,this%hp_eta_cells
             j=this%hp_eta_j(l)
             k=this%hp_eta_k(l)
+            z_w=B_face_x(j,k); z_e=B_face_x(j+1,k)
+            z_s=B_face_y(j,k); z_n=B_face_y(j,k+1)
+            IF (PRESENT(bed_face_x)) THEN
+                z_w=bed_face_x(j,k); z_e=bed_face_x(j+1,k)
+            END IF
+            IF (PRESENT(bed_face_y)) THEN
+                z_s=bed_face_y(j,k); z_n=bed_face_y(j,k+1)
+            END IF
             IF (source_cell(j,k)/=2) THEN
                 IF (j==1) CALL preserve_dirichlet_hp_depth(bcW(idx_h,this%layer),this%qp_adv_interfaceR(:,j,k),        &
-                    B_face_x(j,k),this%eta_interfaceR(j,k),this%h_minmod_interfaceR(j,k), &
+                    z_w,this%eta_interfaceR(j,k),this%h_minmod_interfaceR(j,k), &
                     this%h_froude_interfaceR(j,k))
                 IF (j==comp_cells_x) CALL preserve_dirichlet_hp_depth(bcE(idx_h,this%layer),                           &
-                    this%qp_adv_interfaceL(:,j+1,k),B_face_x(j+1,k),this%eta_interfaceL(j+1,k),                        &
+                    this%qp_adv_interfaceL(:,j+1,k),z_e,this%eta_interfaceL(j+1,k),                        &
                     this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k))
                 IF (k==1) CALL preserve_dirichlet_hp_depth(bcS(idx_h,this%layer),this%qp_adv_interfaceT(:,j,k),        &
-                    B_face_y(j,k),this%eta_interfaceT(j,k),this%h_minmod_interfaceT(j,k), &
+                    z_s,this%eta_interfaceT(j,k),this%h_minmod_interfaceT(j,k), &
                     this%h_froude_interfaceT(j,k))
                 IF (k==comp_cells_y) CALL preserve_dirichlet_hp_depth(bcN(idx_h,this%layer),                           &
-                    this%qp_adv_interfaceB(:,j,k+1),B_face_y(j,k+1),this%eta_interfaceB(j,k+1),                        &
+                    this%qp_adv_interfaceB(:,j,k+1),z_n,this%eta_interfaceB(j,k+1),                        &
                     this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1))
             END IF
-            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), this%eta_interfaceR(j,k),B_face_x(j,k),   &
+            CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), this%eta_interfaceR(j,k),z_w,   &
                 this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k),                                           &
                 lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2,                                              &
                 this%h_selected_interfaceR(j,k),'KT reconstruction west',kt_mode)
             CALL select_final_transport_trace(this%qp_adv_interfaceL(:,j+1,k),                                         &
-                this%eta_interfaceL(j+1,k),B_face_x(j+1,k),                                                            &
+                this%eta_interfaceL(j+1,k),z_e,                                                            &
                 this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k),                                       &
                 lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2,                                   &
                 this%h_selected_interfaceL(j+1,k),'KT reconstruction east',kt_mode)
-            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), this%eta_interfaceT(j,k),B_face_y(j,k),   &
+            CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), this%eta_interfaceT(j,k),z_s,   &
                 this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k),                                           &
                 lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2,                                              &
                 this%h_selected_interfaceT(j,k),'KT reconstruction south',kt_mode)
             CALL select_final_transport_trace(this%qp_adv_interfaceB(:,j,k+1),                                         &
-                this%eta_interfaceB(j,k+1),B_face_y(j,k+1),                                                            &
+                this%eta_interfaceB(j,k+1),z_n,                                                            &
                 this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1),                                       &
                 lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2,                                   &
                 this%h_selected_interfaceB(j,k+1),'KT reconstruction north',kt_mode)

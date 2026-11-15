@@ -850,6 +850,8 @@ CONTAINS
     TYPE(state_type) :: empty_state
     TYPE(source_group_type) :: geometric_group
     REAL(wp), ALLOCATABLE :: primitive(:,:,:),conservative(:,:,:),residual(:,:,:),source_rate(:)
+    REAL(wp), ALLOCATABLE :: z_center(:,:),z_x(:,:),z_y(:,:)
+    REAL(wp) :: eta_original,depth_original
     INTEGER :: layer,active_index,inactive_index,ix,iy
     LOGICAL :: accepted,active_flux_found
     REAL(wp) :: amplitude
@@ -924,6 +926,26 @@ CONTAINS
         CALL test_reconstruction%initialize(layer)
         CALL test_reconstruction%prepare_hp_workset( &
             test_domain%hp_eta_cells,test_domain%hp_eta_j,test_domain%hp_eta_k)
+        IF (layer==2) THEN
+            ALLOCATE(z_center(nx,ny),z_x(nx+1,ny),z_y(nx,ny+1))
+            z_center=B_cent+0.35_wp
+            z_x=B_face_x+0.35_wp
+            z_y=B_face_y+0.35_wp
+            CALL test_reconstruction%reconstruct(primitive,0.0_wp,test_domain%solve_cells, &
+                test_domain%j_cent,test_domain%k_cent,.TRUE.)
+            CALL test_reconstruction%reconstruct_kt_eta(primitive)
+            eta_original=test_reconstruction%eta_cellW(2,2)
+            depth_original=test_reconstruction%h_selected_interfaceR(2,2)
+            CALL test_reconstruction%reconstruct(primitive,0.0_wp,test_domain%solve_cells, &
+                test_domain%j_cent,test_domain%k_cent,.TRUE.,bed_center=z_center, &
+                bed_face_x=z_x,bed_face_y=z_y)
+            CALL test_reconstruction%reconstruct_kt_eta(primitive,bed_face_x=z_x,bed_face_y=z_y)
+            IF (ABS(test_reconstruction%eta_cellW(2,2)-eta_original-0.35_wp)> &
+                128.0_wp*EPSILON(1.0_wp)) ERROR STOP 'L2 free surface ignored L1 base'
+            IF (ABS(test_reconstruction%h_selected_interfaceR(2,2)-depth_original)> &
+                128.0_wp*EPSILON(1.0_wp)) ERROR STOP 'L2 depth changed with flat L1 base'
+            DEALLOCATE(z_center,z_x,z_y)
+        END IF
         CALL test_hyperbolic%initialize(clamp_buoyant_pressure=layer==2)
         CALL test_hyperbolic%evaluate_terms(test_reconstruction,primitive,residual,0.0_wp, &
             test_domain%solve_cells,test_domain%j_cent,test_domain%k_cent, &
