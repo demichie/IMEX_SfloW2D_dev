@@ -850,9 +850,10 @@ CONTAINS
     TYPE(state_type) :: empty_state
     TYPE(source_group_type) :: geometric_group
     REAL(wp), ALLOCATABLE :: primitive(:,:,:),conservative(:,:,:),residual(:,:,:),source_rate(:)
+    REAL(wp), ALLOCATABLE :: upper_center(:,:),upper_w(:,:),upper_e(:,:),upper_s(:,:),upper_n(:,:)
     INTEGER :: layer,active_index,inactive_index,ix,iy
     LOGICAL :: accepted,active_flux_found
-    REAL(wp) :: amplitude
+    REAL(wp) :: amplitude,saved_e,adjacent_w
 
     ! Some reference fixtures collapse one axis; only use an actual 2-D case.
     IF (nx<3 .OR. ny<3) RETURN
@@ -929,6 +930,36 @@ CONTAINS
             test_domain%solve_cells,test_domain%j_cent,test_domain%k_cent, &
             test_domain%solve_interfaces_x,test_domain%j_stag_x,test_domain%k_stag_x, &
             test_domain%solve_interfaces_y,test_domain%j_stag_y,test_domain%k_stag_y)
+
+        IF (layer==1) THEN
+            ALLOCATE(upper_center(nx,ny),upper_w(nx,ny),upper_e(nx,ny),upper_s(nx,ny),upper_n(nx,ny))
+            CALL test_reconstruction%prepare_upper_layer_bed(primitive(idx_h,:,:), &
+                upper_center,upper_w,upper_e,upper_s,upper_n)
+            IF (ANY(upper_center/=B_cent+primitive(idx_h,:,:))) &
+                ERROR STOP 'Upper-layer center base is not B+h1'
+
+            DO iy=1,ny
+                DO ix=1,nx
+                    IF (.NOT.test_domain%hp_eta_mask(ix,iy)) CYCLE
+                    IF (upper_w(ix,iy)/=test_reconstruction%eta_cellW(ix,iy) .OR. &
+                        upper_e(ix,iy)/=test_reconstruction%eta_cellE(ix,iy) .OR. &
+                        upper_s(ix,iy)/=test_reconstruction%eta_cellS(ix,iy) .OR. &
+                        upper_n(ix,iy)/=test_reconstruction%eta_cellN(ix,iy)) &
+                        ERROR STOP 'Upper-layer face base differs from L1 traces'
+                END DO
+            END DO
+
+            ! Adjacent cell-side bases must not be silently averaged.
+            saved_e=test_reconstruction%eta_cellE(2,2)
+            adjacent_w=test_reconstruction%eta_cellW(3,2)
+            test_reconstruction%eta_cellE(2,2)=saved_e+0.125_wp
+            CALL test_reconstruction%prepare_upper_layer_bed(primitive(idx_h,:,:), &
+                upper_center,upper_w,upper_e,upper_s,upper_n)
+            IF (upper_e(2,2)/=saved_e+0.125_wp .OR. upper_w(3,2)/=adjacent_w) &
+                ERROR STOP 'Upper-layer base averaged opposite L1 traces'
+            test_reconstruction%eta_cellE(2,2)=saved_e
+            DEALLOCATE(upper_center,upper_w,upper_e,upper_s,upper_n)
+        END IF
 
         ! Inspect only active faces: unvisited scratch is outside the operator contract.
         active_flux_found=.FALSE.

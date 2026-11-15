@@ -85,9 +85,48 @@ MODULE reconstruction_2d
         PROCEDURE :: reconstruct => reconstruction
         PROCEDURE :: prepare_hp_workset
         PROCEDURE :: reconstruct_kt_eta => reconstruct_kt_eta_traces
+        PROCEDURE :: prepare_upper_layer_bed
     END TYPE reconstruction_workspace_type
 
 CONTAINS
+
+    !> @brief Return the effective base B+h1 for an upper-layer HP reconstruction.
+    !> @details Cell-side values come directly from the completed L1 free-surface
+    !> reconstruction. Opposite sides of a common face remain distinct: no
+    !> averaging or premature choice of a common L2 face bed is made here.
+    !> Outputs are caller-owned temporaries; only the existing HP workset
+    !> cells have defined side values. No new persistent geometry is stored.
+    !> @param[in] this Completed lower-layer reconstruction workspace.
+    !> @param[in] h_lower Nonnegative cell-centered lower-layer thickness [m].
+    !> @param[out] bed_center Effective upper-layer cell-center base [m].
+    !> @param[out] bed_w,bed_e,bed_s,bed_n Cell-owned effective face bases [m].
+    SUBROUTINE prepare_upper_layer_bed(this,h_lower,bed_center,bed_w,bed_e,bed_s,bed_n)
+        CLASS(reconstruction_workspace_type), INTENT(IN) :: this
+        REAL(wp), INTENT(IN) :: h_lower(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: bed_center(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: bed_w(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: bed_e(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: bed_s(comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: bed_n(comp_cells_x,comp_cells_y)
+        INTEGER :: l,j,k
+
+        IF (this%layer/=1) ERROR STOP 'Upper-layer base requires the L1 reconstruction'
+        IF (ANY(h_lower<0.0_wp)) ERROR STOP 'Negative lower-layer thickness in upper-layer geometry'
+
+        bed_center=B_cent+h_lower
+        bed_w=0.0_wp
+        bed_e=0.0_wp
+        bed_s=0.0_wp
+        bed_n=0.0_wp
+        DO l=1,this%hp_eta_cells
+            j=this%hp_eta_j(l)
+            k=this%hp_eta_k(l)
+            bed_w(j,k)=this%eta_cellW(j,k)
+            bed_e(j,k)=this%eta_cellE(j,k)
+            bed_s(j,k)=this%eta_cellS(j,k)
+            bed_n(j,k)=this%eta_cellN(j,k)
+        END DO
+    END SUBROUTINE prepare_upper_layer_bed
 
     !> \brief Allocate interface traces, HP candidates and per-thread scratch storage.
     !>
