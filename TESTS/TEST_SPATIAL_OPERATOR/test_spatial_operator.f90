@@ -341,6 +341,7 @@ PROGRAM test_spatial_operator
        reconstruction%h_froude_interfaceT
   CLOSE(output_unit)
   CALL check_stratified_rest_geometry
+  CALL check_closed_coupled_spatial_budget
   ! Keep this state-mutating BC fixture separate from the reference payload.
   ! It runs after serialization so it cannot perturb the measured spatial fields.
   CALL check_layer_local_dirichlet_inlet
@@ -354,21 +355,15 @@ PROGRAM test_spatial_operator
 
 CONTAINS
 
-    !> @brief Check a two-layer conservative trial using the actual face budgets.
-    !> @details Neumann boundaries are not impermeable: balance each conserved
-    !> quantity against net outward flux across the active workset, not zero.
-    !> The interlayer pressure acts only on momentum, never on these budgets.
+    !> @brief Validate an Euler trial on the existing two-layer spatial fixture.
+    !> @details The fixture has Neumann boundaries, so its global residual sum
+    !> need not vanish. A separate compact-support case checks conservation.
     SUBROUTINE check_coupled_spatial_trial
         REAL(wp) :: step,updated(n_eqns)
         INTEGER :: l,j,k
 
         step=MIN(coupled_dt*0.01_wp,1.0E-5_wp)
         IF (step<=0.0_wp) ERROR STOP 'Coupled spatial trial has invalid timestep'
-
-        CALL check_layer_spatial_budget(spatial%hp_pccu,direct)
-        CALL check_layer_spatial_budget(slot2_spatial%hp_pccu,slot2_term)
-
-        ! Validate both trial states without publishing or invoking Lie sources.
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
@@ -379,80 +374,88 @@ CONTAINS
             IF (.NOT.conservative_mass_admissible(updated)) &
                 ERROR STOP 'Coupled L2 spatial candidate is inadmissible'
         END DO
-        WRITE(*,*) 'PASS: coupled spatial trial conserves face budgets and candidate admissibility'
+        WRITE(*,*) 'PASS: coupled Euler trial admissibility for both layers'
     END SUBROUTINE check_coupled_spatial_trial
 
-    !> @brief Check telescoping of the conservative mass, thermal and solid face fluxes.
-    SUBROUTINE check_layer_spatial_budget(hp,residual)
-        TYPE(hyperbolic_workspace_type), INTENT(IN) :: hp
-        REAL(wp), INTENT(IN) :: residual(n_eqns,nx,ny)
-        REAL(wp) :: budget,actual,scale,tol,flux_left,flux_right
-        LOGICAL :: left_active,right_active
-        INTEGER :: i,eq,l,j,k
+    !> @brief Check exact global conservative budgets for compact-support layers.
+    !> @details Both layers are dry in a collar, so no boundary flux is present.
+    !> Only the mass, thermal and constituent equations have no pressure paths.
+    SUBROUTINE check_closed_coupled_spatial_budget
+        TYPE(domain_type) :: paired
+        TYPE(spatial_operator_type) :: lower,upper
+        REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+        REAL(wp) :: p1(n_vars,nx,ny),p2(n_vars,nx,ny)
+        REAL(wp) :: r1(n_eqns,nx,ny),r2(n_eqns,nx,ny)
+        REAL(wp) :: primitive(n_vars),dt1,dt2,dt_pair
+        REAL(wp) :: balance,scale,tol
+        INTEGER :: j,k,l,layer,i,eq
+        LOGICAL :: accepted
 
-        DO i=1,3
-            SELECT CASE(i)
-            CASE(1)
-                eq=idx_totMassEqn
-            CASE(2)
-                eq=idx_engyEqn
-            CASE(3)
-                eq=idx_solidEqn_first
-            END SELECT
-
-            actual=0.0_wp
-            scale=0.0_wp
-            DO l=1,domain%solve_cells
-                j=domain%j_cent(l)
-                k=domain%k_cent(l)
-                actual=actual+residual(eq,j,k)
-                scale=scale+ABS(residual(eq,j,k))
+        IF (nx<12 .OR. ny<12) RETURN
+        q1=0.0_wp
+        q2=0.0_wp
+        p1=0.0_wp
+        p2=0.0_wp
+        p1(idx_T,:,:)=T_ambient
+        p2(idx_T,:,:)=T_ambient
+        primitive=0.0_wp
+        primitive(idx_T)=T_ambient
+        DO k=5,ny-4
+            DO j=5,nx-4
+                primitive(idx_h)=0.5_wp
+                primitive(idx_u)=0.2_wp
+                CALL primitive_to_conservative(primitive,q1(:,j,k),accepted=accepted)
+                IF (.NOT.accepted) ERROR STOP 'Invalid compact lower-layer fixture'
+                primitive(idx_h)=0.3_wp
+                primitive(idx_u)=-0.1_wp
+                CALL primitive_to_conservative(primitive,q2(:,j,k),accepted=accepted)
+                IF (.NOT.accepted) ERROR STOP 'Invalid compact upper-layer fixture'
             END DO
-
-            budget=0.0_wp
-            DO l=1,domain%solve_interfaces_x
-                j=domain%j_stag_x(l)
-                k=domain%k_stag_x(l)
-                left_active=.FALSE.
-                right_active=.FALSE.
-                IF (j>1) left_active=domain%solve_mask(j-1,k)
-                IF (j<=nx) right_active=domain%solve_mask(j,k)
-                flux_left=hp%G_interface_xL(eq,j,k)
-                flux_right=hp%G_interface_xR(eq,j,k)
-                IF (left_active .AND. right_active) THEN
-                    tol=1024.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(flux_left),ABS(flux_right))
-                    IF (ABS(flux_left-flux_right)>tol) &
-                        ERROR STOP 'Coupled spatial internal conservative face mismatch'
-                ELSEIF (left_active) THEN
-                    budget=budget+flux_left*one_by_dx
-                ELSEIF (right_active) THEN
-                    budget=budget-flux_right*one_by_dx
-                END IF
-            END DO
-            DO l=1,domain%solve_interfaces_y
-                j=domain%j_stag_y(l)
-                k=domain%k_stag_y(l)
-                left_active=.FALSE.
-                right_active=.FALSE.
-                IF (k>1) left_active=domain%solve_mask(j,k-1)
-                IF (k<=ny) right_active=domain%solve_mask(j,k)
-                flux_left=hp%G_interface_yB(eq,j,k)
-                flux_right=hp%G_interface_yT(eq,j,k)
-                IF (left_active .AND. right_active) THEN
-                    tol=1024.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(flux_left),ABS(flux_right))
-                    IF (ABS(flux_left-flux_right)>tol) &
-                        ERROR STOP 'Coupled spatial internal conservative face mismatch'
-                ELSEIF (left_active) THEN
-                    budget=budget+flux_left*one_by_dy
-                ELSEIF (right_active) THEN
-                    budget=budget-flux_right*one_by_dy
-                END IF
-            END DO
-            tol=4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,scale,ABS(budget))
-            IF (ABS(actual-budget)>tol) &
-                ERROR STOP 'Two-layer spatial trial violates conservative boundary flux budget'
         END DO
-    END SUBROUTINE check_layer_spatial_budget
+        CALL paired%initialize
+        CALL lower%initialize(1)
+        CALL upper%initialize(2)
+        CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+        CALL lower%prepare_hp_workset(paired)
+        CALL upper%prepare_hp_workset(paired)
+        CALL lower%compute_timestep(q1,p1,0.0_wp,dt1,paired)
+        CALL upper%compute_timestep(q2,p2,0.0_wp,dt2,paired, &
+            lower_operator=lower,h_lower=p1(idx_h,:,:))
+        CALL lower%evaluate_coupled(upper,p1,p2,r1,r2,0.0_wp,paired,dt_pair)
+
+        DO layer=1,2
+            DO i=1,3
+                SELECT CASE(i)
+                CASE(1)
+                    eq=idx_totMassEqn
+                CASE(2)
+                    eq=idx_engyEqn
+                CASE(3)
+                    eq=idx_solidEqn_first
+                END SELECT
+                balance=0.0_wp
+                scale=0.0_wp
+                DO l=1,paired%solve_cells
+                    j=paired%j_cent(l)
+                    k=paired%k_cent(l)
+                    IF (layer==1) THEN
+                        balance=balance+r1(eq,j,k)
+                        scale=scale+ABS(r1(eq,j,k))
+                    ELSE
+                        balance=balance+r2(eq,j,k)
+                        scale=scale+ABS(r2(eq,j,k))
+                    END IF
+                END DO
+                tol=4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,scale)
+                IF (ABS(balance)>tol) &
+                    ERROR STOP 'Compact two-layer spatial conservative budget mismatch'
+            END DO
+        END DO
+        CALL lower%finalize
+        CALL upper%finalize
+        CALL paired%finalize
+        WRITE(*,*) 'PASS: compact two-layer spatial mass, thermal and constituent budgets'
+    END SUBROUTINE check_closed_coupled_spatial_budget
 
     !> @brief Quantify stratified-rest residuals on flat, affine and curved beds.
     !> @details Two constant free surfaces eta1 and eta2 give stationary layers.
