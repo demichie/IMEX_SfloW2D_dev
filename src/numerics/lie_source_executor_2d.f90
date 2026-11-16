@@ -15,7 +15,7 @@ MODULE lie_source_executor_2d
         idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
     USE domain_2d, ONLY : domain_type
-    USE source_registry_2d, ONLY : source_registry_type, source_group_type
+    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
         SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
     USE state_fields, ONLY : state_type
@@ -89,6 +89,10 @@ CONTAINS
         IF (executor%initialized) CALL fatal_error('Lie source executor already initialized')
         ! Cache the groups and classify their methods once per simulation.
         executor%groups=source_registry%groups()
+        ! The legacy rank-3 executor may only consume L1 descriptors.
+        ! Coupled groups require the atomic rank-4 cell transaction (TL07-B).
+        IF (ANY(executor%groups%scope/=SOURCE_SCOPE_L1)) &
+            CALL fatal_error('TL07: two-layer source scopes require the coupled Lie executor')
         ALLOCATE(executor%exchange_group(SIZE(executor%groups)),                                                       &
             executor%dry_noop_group(SIZE(executor%groups)),                                                           &
             executor%non_exchange_groups(SIZE(executor%groups)))

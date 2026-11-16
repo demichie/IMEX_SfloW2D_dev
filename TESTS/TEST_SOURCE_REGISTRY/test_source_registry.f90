@@ -184,6 +184,35 @@ PROGRAM test_source_registry
   CALL require(.NOT.group_contains_name(groups(1),'pore_pressure_dissipation'), &
        'unselected Darcy does not register an active source')
   CALL registry%finalize()
+  ! TL07-B: equal Lie group IDs can carry one source for each layer.
+  DEALLOCATE(groups)
+  ALLOCATE(groups(3))
+  groups(1)%id=0
+  groups(1)%method=SOURCE_METHOD_EXPLICIT
+  groups(1)%source_names=[CHARACTER(LEN=64)::]
+  groups(1)%equation_ids=[1,2,3,4,5]
+  groups(2)%id=1
+  groups(2)%method=SOURCE_METHOD_EXPLICIT
+  groups(2)%scope=SOURCE_SCOPE_L1
+  groups(2)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
+  groups(2)%equation_ids=[1,2,3,4,5]
+  groups(3)=groups(2)
+  groups(3)%scope=SOURCE_SCOPE_L2
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(LEN_TRIM(error)==0,'independent L1/L2 group identity')
+  CALL require(ALL(registry%groups()%scope==[SOURCE_SCOPE_L1,SOURCE_SCOPE_L1,SOURCE_SCOPE_L2]), &
+       'ordered source scopes') 
+  CALL registry%finalize()
+  groups(3)%scope=SOURCE_SCOPE_L1
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(LEN_TRIM(error)>0,'duplicate group and source within L1 rejected')
+  groups(3)%scope=SOURCE_SCOPE_INTERLAYER
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(LEN_TRIM(error)>0,'unsupported interlayer source rejected')
+  groups(3)%scope=99
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(LEN_TRIM(error)>0,'invalid source scope rejected')
+  CALL registry%finalize()
   PRINT *, 'PASS Lie registry complete Newton footprints, ordering and methods'
 CONTAINS
   !> @brief Check the complete physical column-contact contract.

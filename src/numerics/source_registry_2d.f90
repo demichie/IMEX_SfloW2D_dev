@@ -11,11 +11,15 @@ MODULE source_registry_2d
     PRIVATE
     PUBLIC :: source_group_type, source_registry_type
     PUBLIC :: group_contains_name, group_source_names
+    PUBLIC :: SOURCE_SCOPE_L1, SOURCE_SCOPE_L2, SOURCE_SCOPE_INTERLAYER
+
+    INTEGER, PARAMETER :: SOURCE_SCOPE_L1=1, SOURCE_SCOPE_L2=2, SOURCE_SCOPE_INTERLAYER=3
 
     !> \brief Ordered Lie source group; id=0 is the explicit spatial/source group.
     TYPE :: source_group_type
         INTEGER :: id=0 !< Public or normalized internal group identity.
         INTEGER :: method=0 !< Explicit, Newton or analytic.
+        INTEGER :: scope=SOURCE_SCOPE_L1 !< Source ownership: lower, upper or interlayer.
         CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
         INTEGER, ALLOCATABLE :: equation_ids(:) !< Full structurally affected Newton equation set or explicit footprint.
         CHARACTER(LEN=64) :: rheology_name='' !< Validated canonical name, cached for every cell.
@@ -59,12 +63,13 @@ CONTAINS
         CHARACTER(*), INTENT(OUT) :: error
         TYPE(source_term_type) :: term
         CHARACTER(LEN=64), ALLOCATABLE :: seen(:)
-        INTEGER :: i,j,mass_group,k,eq,rheology_count,source_id
+        INTEGER, ALLOCATABLE :: seen_scope(:)
+        INTEGER :: i,j,mass_group(2),k,eq,rheology_count(2),source_id,layer
         INTEGER, ALLOCATABLE :: expected(:),affected(:)
         CALL this%finalize()
         mass_group=-1
         rheology_count=0
-        ALLOCATE(seen(0))
+        ALLOCATE(seen(0),seen_scope(0))
         error='D19: invalid Lie group configuration'
         IF (n_equations<4 .OR. SIZE(groups)==0) RETURN
 
@@ -77,13 +82,19 @@ CONTAINS
 
         DO i=1,SIZE(groups)
 
+            IF (groups(i)%scope<SOURCE_SCOPE_L1 .OR. groups(i)%scope>SOURCE_SCOPE_INTERLAYER) RETURN
+            ! Interlayer sources need their own registered physical descriptors.
+            ! Do not silently run a layer-local law as an interlayer transfer.
+            IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER) RETURN
+            layer=groups(i)%scope
             IF (i>1) THEN
-                IF (groups(i)%id<=groups(i-1)%id) RETURN
-
+                IF (groups(i)%id<groups(i-1)%id) RETURN
+                IF (groups(i)%id==groups(i-1)%id .AND. groups(i)%scope<=groups(i-1)%scope) RETURN
             END IF
+            IF (groups(i)%id==0 .AND. groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
 
             IF (.NOT.ALLOCATED(groups(i)%source_names)) RETURN
-            IF (i>1 .AND. SIZE(groups(i)%source_names)==0) RETURN
+            IF (groups(i)%id/=0 .AND. SIZE(groups(i)%source_names)==0) RETURN
             IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
             IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
 
@@ -112,19 +123,20 @@ CONTAINS
                     ! Inventory-coupled mass exchange currently supports only an
                     ! explicit Lie group; reject incompatible configurations here.
                     IF (groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
-                    IF (mass_group>=0 .AND. mass_group/=groups(i)%id) RETURN
-                    mass_group=groups(i)%id
+                    IF (mass_group(layer)>=0 .AND. mass_group(layer)/=groups(i)%id) RETURN
+                    mass_group(layer)=groups(i)%id
 
                 END IF
 
                 IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
-                    rheology_count=rheology_count+1
-                    IF (rheology_count>1) RETURN
+                    rheology_count(layer)=rheology_count(layer)+1
+                    IF (rheology_count(layer)>1) RETURN
 
                 END IF
 
-                IF (ANY(seen==term%name)) RETURN
+                IF (ANY((seen==term%name) .AND. (seen_scope==layer))) RETURN
                 seen=[CHARACTER(LEN=64) :: seen,term%name]
+                seen_scope=[seen_scope,layer]
 
                 IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
                     affected=source_newton_affected_equations(term%name)
@@ -159,8 +171,10 @@ CONTAINS
 
         END DO
         ! A vaporization-only group would silently evaluate a zero deposition rate.
-        IF (ANY(seen=='mass_exchange_vaporization') .AND.                                                              &
-            .NOT.ANY(seen=='mass_exchange_deposition')) RETURN
+        DO layer=SOURCE_SCOPE_L1,SOURCE_SCOPE_L2
+            IF (ANY((seen=='mass_exchange_vaporization') .AND. (seen_scope==layer)) .AND. &
+                .NOT.ANY((seen=='mass_exchange_deposition') .AND. (seen_scope==layer))) RETURN
+        END DO
         this%n_equations=n_equations
         this%pore_equation=pore_equation
         this%lie_entries=groups
