@@ -116,7 +116,7 @@ CONTAINS
         CHARACTER(LEN=256) :: source_failure
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
         REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:,:),qp_authoritative(:,:,:,:),                              &
-            bed_before(:,:),
+            bed_before(:,:), &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
         LOGICAL :: check_injected_rollback,had_bed_change
