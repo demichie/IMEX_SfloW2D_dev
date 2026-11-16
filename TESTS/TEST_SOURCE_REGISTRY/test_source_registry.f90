@@ -200,8 +200,9 @@ PROGRAM test_source_registry
   groups(3)%scope=SOURCE_SCOPE_L2
   CALL registry%initialize(5,0,groups,error)
   CALL require(LEN_TRIM(error)==0,'independent L1/L2 group identity')
-  CALL require(ALL(registry%groups()%scope==[SOURCE_SCOPE_L1,SOURCE_SCOPE_L1,SOURCE_SCOPE_L2]), &
-       'ordered source scopes') 
+  groups=registry%groups()
+  CALL require(ALL(groups%scope==[SOURCE_SCOPE_L1,SOURCE_SCOPE_L1,SOURCE_SCOPE_L2]), &
+       'ordered source scopes')
   CALL registry%finalize()
   groups(3)%scope=SOURCE_SCOPE_L1
   CALL registry%initialize(5,0,groups,error)
