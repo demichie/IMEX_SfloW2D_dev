@@ -44,7 +44,7 @@ PROGRAM test_spatial_operator
     REAL(wp), ALLOCATABLE :: slot2_qp(:,:,:),slot2_term(:,:,:) !< Independent slot buffers.
     REAL(wp), ALLOCATABLE :: slot_q(:,:,:,:) !< Test-only two-slot conservative states.
     LOGICAL, ALLOCATABLE :: l1_solve_mask_before(:,:) !< Check L2 refresh does not modify L1.
-  REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0),slot2_dt
+  REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0),slot2_dt,coupled_dt
   !> Independent rate derived from the public backend face payload [1/s].
   REAL(wp) :: lambda_x, lambda_y, expected_dt, combined_dt, saved_max_dt, rate
   CHARACTER(LEN=32) :: argument
@@ -147,6 +147,21 @@ PROGRAM test_spatial_operator
         lower_operator=spatial,h_lower=qp(1,:,:))
     IF (.NOT.ieee_is_finite(slot2_dt) .OR. slot2_dt<=0.0_wp) &
         ERROR STOP 'Invalid L2 reconstructed isolated CFL'
+
+    ! Complete coupled spatial residual and CFL on the SAME prepared workset.
+    ! The public L1 and L2 entry points are unchanged.
+    CALL spatial%evaluate_coupled(slot2_spatial,qp,slot2_qp,direct,slot2_term, &
+        0.0_wp,domain,coupled_dt)
+    IF (.NOT.ieee_is_finite(coupled_dt) .OR. coupled_dt<=0.0_wp) &
+        ERROR STOP 'Invalid total-depth coupled CFL'
+    DO l=1,domain%solve_cells
+        j=domain%j_cent(l)
+        k=domain%k_cent(l)
+        IF (.NOT.ALL(ieee_is_finite(direct(:,j,k))) .OR. &
+            .NOT.ALL(ieee_is_finite(slot2_term(:,j,k)))) &
+            ERROR STOP 'Nonfinite coupled HP-PCCU spatial residual'
+    END DO
+
     ! Restore independent-layer traces for the existing bitwise regression.
     CALL slot2_spatial%compute_timestep(slot_q(:,2,:,:),slot2_qp,0.0_wp,slot2_dt,slot2_domain)
     CALL same_bits('slot-local CFL survives optional L2 geometry',[slot2_dt],[dt])

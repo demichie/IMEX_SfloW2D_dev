@@ -17,7 +17,7 @@ MODULE spatial_operator_2d
     USE state_conversions, ONLY : conservative_to_primitive
     USE domain_2d, ONLY : domain_type
     USE reconstruction_2d, ONLY : reconstruction_workspace_type
-    USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+    USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_terms
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
     IMPLICIT NONE
@@ -38,6 +38,7 @@ MODULE spatial_operator_2d
         PROCEDURE, PUBLIC :: initialize => initialize_spatial_operator
         PROCEDURE, PUBLIC :: finalize => finalize_spatial_operator
         PROCEDURE, PUBLIC :: evaluate => evaluate_spatial_operator
+        PROCEDURE, PUBLIC :: evaluate_coupled => evaluate_coupled_spatial_operator
         PROCEDURE, PUBLIC :: diagnose_cell => diagnose_spatial_cell
         PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
         PROCEDURE, PUBLIC :: compute_coupled_timestep => compute_coupled_spatial_timestep
@@ -140,6 +141,62 @@ CONTAINS
         END IF
 
     END SUBROUTINE evaluate_spatial_operator
+
+    !> @brief Evaluate both HP-PCCU residuals with shared total-depth face bounds.
+    !> @details Requires up-to-date L1/L2 reconstruction and hydrostatic
+    !> coefficients from CFL passes on the SAME union workset. Reuses both
+    !> layer operators and adds the interlayer terms once; no second engine.
+    !> This remains test-only until coupled eigenvalues and shear are validated.
+    !> @param[in,out] this Prepared lower-layer spatial operator.
+    !> @param[in,out] upper Prepared upper-layer spatial operator.
+    !> @param[in] qp1,qp2 Current layer primitive fields.
+    !> @param[out] term1,term2 Coupled spatial residuals, on active cells.
+    !> @param[in] time Explicit stage time [s].
+    !> @param[in] domain Shared OR cell, face and HP reconstruction workset.
+    !> @param[out] dt Preliminary shared CFL timestep [s].
+    SUBROUTINE evaluate_coupled_spatial_operator(this,upper,qp1,qp2,term1,term2,time,domain,dt)
+        CLASS(spatial_operator_type), INTENT(INOUT) :: this,upper
+        REAL(wp), INTENT(IN) :: qp1(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp2(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: term1(n_eqns,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(OUT) :: term2(n_eqns,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: time
+        CLASS(domain_type), INTENT(IN) :: domain
+        REAL(wp), INTENT(OUT) :: dt
+
+        IF (this%reconstruction%layer/=1 .OR. upper%reconstruction%layer/=2) &
+            ERROR STOP 'Coupled spatial operator requires ordered L1/L2'
+
+        ! Hydrostatic gamma coefficients were cached by each isolated
+        ! reconstruction pass; overwrite only the characteristic bounds.
+        CALL this%hp_pccu%evaluate_total_depth_speeds(this%reconstruction,upper%reconstruction, &
+            domain%solve_interfaces_x,domain%j_stag_x,domain%k_stag_x, &
+            domain%solve_interfaces_y,domain%j_stag_y,domain%k_stag_y)
+
+        ! Each layer backend reads its own face arrays. Copy only the active
+        ! face bounds; keep the hydrostatic coefficients layer-specific.
+        upper%hp_pccu%a_interface_xNeg=this%hp_pccu%a_interface_xNeg
+        upper%hp_pccu%a_interface_xPos=this%hp_pccu%a_interface_xPos
+        upper%hp_pccu%a_interface_yNeg=this%hp_pccu%a_interface_yNeg
+        upper%hp_pccu%a_interface_yPos=this%hp_pccu%a_interface_yPos
+
+        CALL this%compute_coupled_timestep(domain, &
+            this%hp_pccu%a_interface_xNeg,this%hp_pccu%a_interface_xPos, &
+            this%hp_pccu%a_interface_yNeg,this%hp_pccu%a_interface_yPos,dt)
+
+        ! Use the two previously prepared reconstructions, without rebuilding
+        ! the faces and undoing the common characteristic bounds.
+        CALL this%evaluate(qp1,term1,time,domain,reuse_cfl_traces=.TRUE.)
+        CALL upper%evaluate(qp2,term2,time,domain,reuse_cfl_traces=.TRUE., &
+            lower_operator=this,h_lower=qp1(1,:,:))
+
+        CALL add_interlayer_terms(this%reconstruction,upper%reconstruction,upper%hp_pccu, &
+            term1,term2,domain%solve_mask,domain%solve_cells,domain%j_cent,domain%k_cent,qp2, &
+            domain%solve_interfaces_x,domain%j_stag_x,domain%k_stag_x, &
+            domain%solve_interfaces_y,domain%j_stag_y,domain%k_stag_y, &
+            this%hp_pccu%a_interface_xNeg,this%hp_pccu%a_interface_xPos, &
+            this%hp_pccu%a_interface_yNeg,this%hp_pccu%a_interface_yPos)
+    END SUBROUTINE evaluate_coupled_spatial_operator
 
     !******************************************************************************
     !> \brief Refresh the reconstruction states and compute the face-speed CFL timestep.
