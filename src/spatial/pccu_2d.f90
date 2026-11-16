@@ -200,15 +200,28 @@ CONTAINS
         REAL(wp) :: path_l1(SIZE(left_l1)),path_l2(SIZE(left_l2))
         REAL(wp) :: zero_l1(SIZE(left_l1)),zero_l2(SIZE(left_l2))
 
-        IF (a_minus>0.0_wp .OR. a_plus<0.0_wp .OR. a_plus-a_minus<=pccu_speed_tolerance) &
-            ERROR STOP 'Interlayer face needs valid coupled characteristic bounds'
         IF (SIZE(left_l1)/=SIZE(right_l1) .OR. SIZE(left_l2)/=SIZE(right_l2)) &
             ERROR STOP 'Interlayer face oriented sizes differ'
+        IF (a_minus>0.0_wp .OR. a_plus<0.0_wp) &
+            ERROR STOP 'Interlayer face needs signed coupled characteristic bounds'
         zero_l1=0.0_wp
         zero_l2=0.0_wp
         CALL eval_interlayer_pressure_correction(direction, &
             h1_left,h2_left,gamma_left,eta2_left,metric, &
             h1_right,h2_right,gamma_right,eta2_right,metric,path_l1,path_l2)
+
+        ! The shared PCCU kernel accepts stationary faces when the pressure
+        ! jump is exactly zero. No artificial wave speed is introduced.
+        IF (a_plus-a_minus<=pccu_speed_tolerance) THEN
+            IF (ANY(path_l1/=0.0_wp) .OR. ANY(path_l2/=0.0_wp)) &
+                ERROR STOP 'Nonzero interlayer pressure with degenerate characteristic bounds'
+            left_l1=0.0_wp
+            right_l1=0.0_wp
+            left_l2=0.0_wp
+            right_l2=0.0_wp
+            RETURN
+        END IF
+
         CALL eval_oriented_pccu_pair(zero_l1,path_l1,a_minus,a_plus,left_l1,right_l1)
         CALL eval_oriented_pccu_pair(zero_l2,path_l2,a_minus,a_plus,left_l2,right_l2)
     END SUBROUTINE eval_interlayer_oriented_face

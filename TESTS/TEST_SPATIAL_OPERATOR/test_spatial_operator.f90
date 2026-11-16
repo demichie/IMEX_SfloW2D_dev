@@ -72,6 +72,7 @@ PROGRAM test_spatial_operator
   CALL check_interlayer_variable_gamma_overlap
   CALL check_interlayer_oriented_face_pair
   CALL check_interlayer_coupled_face
+  CALL check_degenerate_interlayer_face
   CALL check_interlayer_cell_residual
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%source_names=[CHARACTER(LEN=64)::]
@@ -998,6 +999,25 @@ CONTAINS
         END DO
         WRITE(*,*) 'PASS: oriented interlayer face pair, one-sided speeds and dry upper layer'
     END SUBROUTINE check_interlayer_oriented_face_pair
+
+    !> @brief Check a stationary, pressure-free face with zero coupled speeds.
+    !> @details No speed floor is introduced and all four oriented values
+    !> must vanish. The nondegenerate-pressure case remains guarded.
+    SUBROUTINE check_degenerate_interlayer_face
+        REAL(wp) :: l1left(n_eqns),l1right(n_eqns)
+        REAL(wp) :: l2left(n_eqns),l2right(n_eqns)
+
+        CALL eval_interlayer_oriented_face(1, &
+            0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+            0.0_wp,0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+            0.0_wp,0.0_wp,l1left,l1right,l2left,l2right)
+
+        IF (ANY(l1left/=0.0_wp) .OR. ANY(l1right/=0.0_wp) .OR. &
+            ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
+            ERROR STOP 'Stationary pressure-free interlayer face is not zero'
+
+        WRITE(*,*) 'PASS: stationary pressure-free interlayer face'
+    END SUBROUTINE check_degenerate_interlayer_face
 
     !> @brief Validate oriented coupled pressure corrections with supplied common speeds.
     SUBROUTINE check_interlayer_coupled_face
