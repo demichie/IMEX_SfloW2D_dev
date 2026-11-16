@@ -21,7 +21,7 @@ PROGRAM test_spatial_operator
       eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path, &
       eval_interlayer_oriented_face
   USE source_terms_2d, ONLY : eval_source_explicit
-  USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
+  USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
   USE state_composition, ONLY : conservative_mass_admissible
   USE mass_injection_coefficients_2d, ONLY : injection_material_set_type, prepare_injection_materials
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
