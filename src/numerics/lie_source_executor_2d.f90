@@ -551,7 +551,9 @@ CONTAINS
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
                         q_original(1:n_eqns,layer,j,k),executor%injection_materials, &
                         thermal(layer),rheology(layer),mass_config(layer), &
-                        transport_stochastic(layer),pore_enabled(layer),stochastic_enabled(layer))
+                        transport_stochastic(layer),pore_enabled(layer),stochastic_enabled(layer), &
+                        n_layers==1 .OR. contacts%terrain_exposed(layer), &
+                        n_layers==1 .OR. contacts%atmosphere_exposed(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &

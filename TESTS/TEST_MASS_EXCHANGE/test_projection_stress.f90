@@ -44,6 +44,7 @@ PROGRAM test_projection_stress
   OPEN(NEWUNIT=unit,FILE='projection_snapshot.bin',ACCESS='STREAM', &
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
+  CALL check_contact_eligibility
   CALL check_limiter_representability
   CALL check_lava_energy_depletion
   CALL check_taal_saturated_species_budget
@@ -291,6 +292,67 @@ CONTAINS
     IF (.NOT.conservative_mass_admissible(candidate)) &
         ERROR STOP 'Two-budget limiter accepted negative solid mass'
   END SUBROUTINE check_preexisting_settling_budget
+
+  !> \brief Verify that column contacts gate actual terrain/atmosphere exchange rates.
+  SUBROUTINE check_contact_eligibility
+    USE layer_contacts_2d, ONLY : layer_contacts_type,evaluate_layer_contacts
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS,SOURCE_ID_EXCHANGE_ENTRAINMENT
+    USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
+    USE state_types, ONLY : physical_state_real,initialize_physical_state_real
+    USE state_physical, ONLY : build_physical_state_from_qp
+    TYPE(layer_contacts_type) :: contacts
+    TYPE(physical_state_real) :: wet
+    TYPE(mass_exchange_rates_type) :: transfers
+    REAL(wp) :: primitive(n_vars),rates(n_eqns)
+    REAL(wp), PARAMETER :: columns(2,4)=RESHAPE([1.0_wp,1.0_wp,0.0_wp,0.0_wp, &
+        1.0_wp,0.0_wp,0.0_wp,1.0_wp],[2,4])
+    LOGICAL :: valid
+    INTEGER :: cell_case,layer,mask
+
+    primitive=0.0_wp
+    primitive(idx_h)=2.0_wp
+    primitive(idx_u)=3.0_wp
+    primitive(idx_v)=4.0_wp
+    primitive(idx_T)=320.0_wp
+    primitive(idx_solid_first)=0.15_wp
+    primitive(idx_solid_first+1)=0.05_wp
+    CALL initialize_physical_state_real(wet)
+    CALL build_physical_state_from_qp(primitive,wet)
+    mass_exchange_l1%carrier_liquid_loss%loss_rate=0.05_wp
+    mass_exchange_l1%entrainment%flag=.TRUE.
+
+    DO cell_case=1,4
+       CALL evaluate_layer_contacts(columns(:,cell_case),contacts,valid)
+       IF (.NOT.valid) ERROR STOP 'Invalid test column contacts'
+       DO layer=1,2
+          mask=IBSET(0,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
+          CALL eval_mass_exchange_explicit(rheology_l1,mass_exchange_l1,wet,0, &
+              [0.0_wp,0.0_wp],1.0_wp,mask,transfers,rates, &
+              transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
+              terrain_exposed=contacts%terrain_exposed(layer), &
+              atmosphere_exposed=contacts%atmosphere_exposed(layer))
+          IF (contacts%terrain_exposed(layer)) THEN
+             IF (rates(idx_totMassEqn)>=0.0_wp) ERROR STOP 'Terrain contact did not enable carrier loss'
+          ELSE
+             IF (ANY(rates/=0.0_wp)) ERROR STOP 'Carrier loss without terrain contact'
+          END IF
+
+          mask=IBSET(0,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
+          CALL eval_mass_exchange_explicit(rheology_l1,mass_exchange_l1,wet,0, &
+              [0.0_wp,0.0_wp],1.0_wp,mask,transfers,rates, &
+              transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
+              terrain_exposed=contacts%terrain_exposed(layer), &
+              atmosphere_exposed=contacts%atmosphere_exposed(layer))
+          IF (contacts%atmosphere_exposed(layer)) THEN
+             IF (rates(idx_totMassEqn)<=0.0_wp) ERROR STOP 'Atmosphere contact did not enable entrainment'
+          ELSE
+             IF (ANY(rates/=0.0_wp)) ERROR STOP 'Entrainment without atmosphere contact'
+          END IF
+       END DO
+    END DO
+    mass_exchange_l1%carrier_liquid_loss%loss_rate=0.0_wp
+    mass_exchange_l1%entrainment%flag=.FALSE.
+  END SUBROUTINE check_contact_eligibility
 
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics

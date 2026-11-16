@@ -52,9 +52,11 @@ CONTAINS
         !> @param[out] eqns_term Conservative source vector [equations/s].
         !> @param[in] transport_stochastic Selected layer stochastic transport.
         !> @param[in] pore_enabled Selected layer pore pressure.
+        !> @param[in] terrain_exposed True when this layer contacts the substrate.
+        !> @param[in] atmosphere_exposed True when this layer contacts the atmosphere.
     SUBROUTINE eval_mass_exchange_explicit(config,mass_config,physical_state,B_zone,erodible,dt,source_mask, &
             total_rates,eqns_term, &
-            scratch,transport_stochastic,pore_enabled)
+            scratch,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed)
 
             TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
@@ -62,7 +64,7 @@ CONTAINS
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
             INTEGER, INTENT(IN) :: B_zone
             INTEGER, INTENT(IN) :: source_mask
-            LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled
+            LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             TYPE(mass_exchange_scratch_type), TARGET, INTENT(INOUT), OPTIONAL :: scratch
@@ -78,12 +80,15 @@ CONTAINS
             IF (PRESENT(scratch)) work=>scratch
             ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                      &
                 liquid_loss_rates=>work%liquid_loss_rates)
-            do_erosion=BTEST(source_mask,SOURCE_ID_EXCHANGE_EROSION-1)
-            do_deposition=BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
-            do_liquid_loss=BTEST(source_mask,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
-            do_entrainment=BTEST(source_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
-            do_vaporization=BTEST(source_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
-            do_lava=BTEST(source_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1)
+            ! Contact eligibility applies only to external exchanges.
+            ! A layer without terrain contact cannot deposit into the substrate;
+            ! interlayer settling is a separate, conservatively coupled process.
+            do_erosion=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_EROSION-1)
+            do_deposition=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
+            do_liquid_loss=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
+            do_entrainment=atmosphere_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
+            do_vaporization=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
+            do_lava=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1)
             IF (do_vaporization .AND. .NOT.do_deposition)                                                              &
                     CALL fatal_error('mass_exchange: vaporization requires same-group deposition')
             CALL reset_mass_exchange_rates(total_rates)
