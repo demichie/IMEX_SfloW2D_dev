@@ -114,7 +114,8 @@ CONTAINS
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
         LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
-        REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:),qp_authoritative(:,:,:),bed_before(:,:),                      &
+        REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:,:),qp_authoritative(:,:,:,:),                              &
+            bed_before(:,:),
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
         LOGICAL :: check_injected_rollback,had_bed_change
@@ -122,12 +123,12 @@ CONTAINS
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
         END IF
-        ! Retain full pre-step snapshots only for the D20 injected rollback test.
+        ! Snapshot all layer slots only for the D20 injected rollback test.
         check_injected_rollback=this%lie_executor%reject_active
 
         IF (check_injected_rollback) THEN
-            q_authoritative=state%q(:,1,:,:)
-            qp_authoritative=state%qp(:,1,:,:)
+            q_authoritative=state%q
+            qp_authoritative=state%qp
             bed_before=B_vertex
             bed_cent_before=B_cent
             bed_face_x_before=B_face_x
@@ -283,9 +284,9 @@ CONTAINS
                     CALL fatal_error('D20 rollback: failpoint did not trigger')
                 IF (.NOT.had_bed_change)                                                                               &
                     CALL fatal_error('D20 rollback: failpoint had no prior bed change')
-                IF (.NOT.ALL(state%q(:,1,:,:)==q_authoritative) .OR.                                                           &
-                    .NOT.ALL(state%qp(:,1,:,:)==qp_authoritative))                                                             &
-                    CALL fatal_error('D20 rollback: published fluid state changed')
+                IF (.NOT.ALL(state%q==q_authoritative) .OR.                                                           &
+                    .NOT.ALL(state%qp==qp_authoritative))                                                             &
+                    CALL fatal_error('D20 rollback: published layer state changed')
                 IF (.NOT.ALL(state%deposit==this%substrate_before%deposit) .OR.                                             &
                     .NOT.ALL(state%erosion==this%substrate_before%erosion) .OR.                                             &
                     .NOT.ALL(state%erodible==this%substrate_before%erodible) .OR.                                           &
