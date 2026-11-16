@@ -108,9 +108,9 @@ CONTAINS
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
-        REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:),qp_pre2(:,:,:)
+        REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:),qp_pre2(:,:,:),qp_pre_all(:,:,:,:)
         REAL(wp) :: coupled_dt
-        INTEGER :: l,j,k,first_failure,eq,failed_layer,layer_status
+        INTEGER :: l,j,k,first_failure,eq,failed_layer,layer_status,layer
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
@@ -149,16 +149,17 @@ CONTAINS
         IF (n_layers==2 .AND. .NOT.reuse_cfl_traces) &
             CALL fatal_error('TL07 coupled Lie requires prepared L1/L2 CFL traces on a shared workset')
         IF (reuse_cfl_traces) THEN
-            qp_pre=>state%qp(:,1,:,:)
-            IF (n_layers==2) qp_pre2=>state%qp(:,2,:,:)
+            qp_pre_all=>state%qp
         ELSE
             ! This full halo buffer exists only for direct/non-CFL callers.
             ! Preserve their original reconstruction-stencil semantics.
             IF (.NOT.ALLOCATED(this%qp_before))                                                                     &
                 ALLOCATE(this%qp_before(n_vars,n_layers,comp_cells_x,comp_cells_y))
             this%qp_before(:,1,:,:)=state%qp(:,1,:,:)
-            qp_pre=>this%qp_before(:,1,:,:)
+            qp_pre_all=>this%qp_before
         END IF
+        qp_pre=>qp_pre_all(:,1,:,:)
+        IF (n_layers==2) qp_pre2=>qp_pre_all(:,2,:,:)
         IF (.NOT.reuse_cfl_traces) THEN
             ! Each cell initializes its own status in the conversion sweep.
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,conversion_ok)
@@ -197,19 +198,18 @@ CONTAINS
         END IF
 
         ! Both layer candidates are checked before any authoritative fluid publication.
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,layer_status)
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,layer,layer_status)
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
-            CALL update_spatial_cell(state%q(:,1,j,k),qp_pre(:,j,k),this%spatial_rate(:,1,j,k),dt, &
-                sea_mass_removal_flag .AND. B_zone(j,k)==1, &
-                this%q_trial(:,1,j,k),this%qp_trial(:,1,j,k),this%cell_status(l))
-            IF (n_layers==2) THEN
-                CALL update_spatial_cell(state%q(:,2,j,k),qp_pre2(:,j,k),this%spatial_rate(:,2,j,k),dt, &
-                    sea_mass_removal_flag .AND. B_zone(j,k)==1, &
-                    this%q_trial(:,2,j,k),this%qp_trial(:,2,j,k),layer_status)
-                IF (this%cell_status(l)==0 .AND. layer_status/=0) this%cell_status(l)=layer_status+2
-            END IF
+            this%cell_status(l)=0
+            DO layer=1,n_layers
+                CALL update_spatial_cell(state%q(:,layer,j,k),qp_pre_all(:,layer,j,k), &
+                    this%spatial_rate(:,layer,j,k),dt,sea_mass_removal_flag .AND. B_zone(j,k)==1, &
+                    this%q_trial(:,layer,j,k),this%qp_trial(:,layer,j,k),layer_status)
+                IF (this%cell_status(l)==0 .AND. layer_status/=0) &
+                    this%cell_status(l)=layer_status+2*(layer-1)
+            END DO
         END DO
         !$OMP END PARALLEL DO
         first_failure=MINLOC(this%cell_status(1:domain%solve_cells),1,                                                &
