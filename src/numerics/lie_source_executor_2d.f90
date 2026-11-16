@@ -987,8 +987,7 @@ CONTAINS
 
         CONTAINS
 
-        ! Return a recoverable cell/group rejection without leaving the executor
-        ! before returning the source-group status.
+        ! Record a cell/group failure for the caller to report as a fatal error.
         SUBROUTINE reject_cell(message)
             CHARACTER(*), INTENT(IN) :: message
             failure_reason=message
