@@ -108,8 +108,9 @@ CONTAINS
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
-        REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:)
-        INTEGER :: l,j,k,first_failure,eq
+        REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:),qp_pre2(:,:,:)
+        REAL(wp) :: coupled_dt
+        INTEGER :: l,j,k,first_failure,eq,failed_layer,layer_status
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
@@ -145,8 +146,11 @@ CONTAINS
         ! Direct callers retain the original preflight unless they explicitly opt in.
         reuse_cfl_traces=.FALSE.
         IF (PRESENT(pre_spatial_primitives_ready)) reuse_cfl_traces=pre_spatial_primitives_ready
+        IF (n_layers==2 .AND. .NOT.reuse_cfl_traces) &
+            CALL fatal_error('TL07 coupled Lie requires prepared L1/L2 CFL traces on a shared workset')
         IF (reuse_cfl_traces) THEN
             qp_pre=>state%qp(:,1,:,:)
+            IF (n_layers==2) qp_pre2=>state%qp(:,2,:,:)
         ELSE
             ! This full halo buffer exists only for direct/non-CFL callers.
             ! Preserve their original reconstruction-stencil semantics.
@@ -180,16 +184,32 @@ CONTAINS
             CALL fatal_error('Lie pre-spatial state conversion rejected')
         END IF
 
-        ! The spatial step is conservative; only admissibility is checked.
-        CALL spatial_operators(1)%evaluate(qp_pre,this%spatial_rate(:,1,:,:),t,domain, &
-            reuse_cfl_traces=reuse_cfl_traces)
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k)
+        ! Evaluate the shared spatial operator once, using the prepared OR workset.
+        ! The production L1 path retains its original evaluation and floating-point order.
+        IF (n_layers==2) THEN
+            IF (SIZE(spatial_operators)/=2) CALL fatal_error('TL07 coupled Lie needs two spatial operators')
+            CALL spatial_operators(1)%evaluate_coupled(spatial_operators(2),qp_pre,qp_pre2, &
+                this%spatial_rate(:,1,:,:),this%spatial_rate(:,2,:,:),t,domain,coupled_dt)
+            IF (dt>coupled_dt) CALL fatal_error('TL07 timestep exceeds preliminary coupled CFL bound')
+        ELSE
+            CALL spatial_operators(1)%evaluate(qp_pre,this%spatial_rate(:,1,:,:),t,domain, &
+                reuse_cfl_traces=reuse_cfl_traces)
+        END IF
+
+        ! Both layer candidates are checked before any authoritative fluid publication.
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,layer_status)
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
             CALL update_spatial_cell(state%q(:,1,j,k),qp_pre(:,j,k),this%spatial_rate(:,1,j,k),dt, &
                 sea_mass_removal_flag .AND. B_zone(j,k)==1, &
                 this%q_trial(:,1,j,k),this%qp_trial(:,1,j,k),this%cell_status(l))
+            IF (n_layers==2) THEN
+                CALL update_spatial_cell(state%q(:,2,j,k),qp_pre2(:,j,k),this%spatial_rate(:,2,j,k),dt, &
+                    sea_mass_removal_flag .AND. B_zone(j,k)==1, &
+                    this%q_trial(:,2,j,k),this%qp_trial(:,2,j,k),layer_status)
+                IF (this%cell_status(l)==0 .AND. layer_status/=0) this%cell_status(l)=layer_status+2
+            END IF
         END DO
         !$OMP END PARALLEL DO
         first_failure=MINLOC(this%cell_status(1:domain%solve_cells),1,                                                &
@@ -200,9 +220,16 @@ CONTAINS
             ! Do not change, limit or repair the rejected conservative candidate.
             j=domain%j_cent(first_failure)
             k=domain%k_cent(first_failure)
+            failed_layer=1
+            layer_status=this%cell_status(first_failure)
+            IF (layer_status>2) THEN
+                failed_layer=2
+                layer_status=layer_status-2
+            END IF
             WRITE(*,'(A,2(I0,1X),A,ES23.15,A,ES23.15)') &
                 'LIE_SPATIAL_FAILURE cell(j,k)=',j,k,' t=',t,' dt=',dt
-            WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',this%cell_status(first_failure)
+            WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',layer_status
+            IF (n_layers==2) WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE layer=',failed_layer
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
                 'LIE_SPATIAL_FAILURE mass_before=',state%q(idx_totMassEqn,1,j,k), &
                 ' mass_after=',this%q_trial(idx_totMassEqn,1,j,k)
@@ -217,9 +244,9 @@ CONTAINS
                 WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
                     ' before/rate/after=',state%q(eq,1,j,k), &
                     this%spatial_rate(eq,1,j,k),this%q_trial(eq,1,j,k)
-                CALL spatial_operators(1)%diagnose_cell(j,k,eq)
+                CALL spatial_operators(failed_layer)%diagnose_cell(j,k,eq)
             END DO
-            IF (this%cell_status(first_failure)==1)                                                                  &
+            IF (layer_status==1)                                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')
             CALL fatal_error('Lie spatial state conversion rejected')
 
@@ -230,6 +257,10 @@ CONTAINS
             this%profile_spatial=this%profile_spatial+REAL(tock-tick,wp)/REAL(tick_rate,wp)
             tick=tock
         END IF
+        ! TL07-B must extend the existing Lie groups to L1/L2/INTERLAYER before
+        ! the coupled trial may reach the source executor or the atomic commit.
+        IF (n_layers==2) CALL fatal_error('TL07 coupled spatial trial ready; coupled Lie sources not yet implemented')
+
         ! OU is now the post-spatial fractional stage.  q_trial/qp_trial
         ! are valid only on the solve worklist, so stochastic%prepare_timestep
         ! uses the published state for inactive cells. Keep both published
