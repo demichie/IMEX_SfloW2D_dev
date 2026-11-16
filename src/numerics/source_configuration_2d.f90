@@ -6,7 +6,7 @@
 !********************************************************************************
 MODULE source_configuration_2d
     USE source_catalog_2d
-    USE source_registry_2d, ONLY : source_registry_type, source_group_type
+    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2
     USE source_input_2d
     USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                                               &
             curvature_term_flag, bottom_radial_source_flag,                                        &
@@ -96,33 +96,79 @@ CONTAINS
         error=''
     END SUBROUTINE collect_active_source_names
 
-    !> Create Lie groups directly from physical METHOD and GROUP configuration.
-    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config)
+    !> @brief Create one ordered Lie registry from layer-specific physical configuration.
+    !> @details Optional L2 arguments must be provided together; they do not create
+    !>          duplicated runtime storage or change the single-layer input contract.
+    !> @param[in,out] registry Destination for validated source groups.
+    !> @param[out] error Empty on success, otherwise configuration diagnostic.
+    !> @param[in] rheology Selected L1 rheology.
+    !> @param[in] thermal Selected L1 thermal configuration.
+    !> @param[in] pore_pressure Selected L1 Darcy configuration.
+    !> @param[in] mass_config Selected L1 mass-exchange configuration.
+    !> @param[in] rheology_l2 Optional L2 rheology.
+    !> @param[in] thermal_l2 Optional L2 thermal configuration.
+    !> @param[in] pore_pressure_l2 Optional L2 Darcy configuration.
+    !> @param[in] mass_config_l2 Optional L2 mass-exchange configuration.
+    SUBROUTINE initialize_configured_sources(registry,error,rheology,thermal,pore_pressure,mass_config, &
+        rheology_l2,thermal_l2,pore_pressure_l2,mass_config_l2)
         TYPE(source_registry_type), INTENT(INOUT) :: registry
         CHARACTER(*), INTENT(OUT) :: error
-        TYPE(rheology_config_type), INTENT(IN) :: rheology
-        TYPE(thermal_config_type), INTENT(IN) :: thermal
-        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
-        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        TYPE(rheology_config_type), INTENT(IN), TARGET :: rheology
+        TYPE(thermal_config_type), INTENT(IN), TARGET :: thermal
+        TYPE(pore_pressure_config_type), INTENT(IN), TARGET :: pore_pressure
+        TYPE(mass_exchange_config_type), INTENT(IN), TARGET :: mass_config
+        TYPE(rheology_config_type), INTENT(IN), OPTIONAL, TARGET :: rheology_l2
+        TYPE(thermal_config_type), INTENT(IN), OPTIONAL, TARGET :: thermal_l2
+        TYPE(pore_pressure_config_type), INTENT(IN), OPTIONAL, TARGET :: pore_pressure_l2
+        TYPE(mass_exchange_config_type), INTENT(IN), OPTIONAL, TARGET :: mass_config_l2
+        TYPE(rheology_config_type), POINTER :: selected_rheology
+        TYPE(thermal_config_type), POINTER :: selected_thermal
+        TYPE(pore_pressure_config_type), POINTER :: selected_pore
+        TYPE(mass_exchange_config_type), POINTER :: selected_mass
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         TYPE(source_group_type) :: g,tmp
         TYPE(source_term_type) :: term
         CHARACTER(LEN=64), ALLOCATABLE :: names(:)
         CHARACTER(LEN=16) :: requested_method
-        INTEGER :: i,j,k,id,method,pore,n,affected_idx
+        INTEGER :: i,j,k,id,method,pore,n,affected_idx,layer,last_layer
         INTEGER, ALLOCATABLE :: affected(:)
         ! A failed reconfiguration must never leave a previous registry active.
         CALL registry%finalize()
-        CALL collect_active_source_names(rheology,mass_config,thermal%thermal_cooling_flag, &
-            pore_pressure%pore_pressure_flag,names,error)
-        IF (LEN_TRIM(error)>0) RETURN
-        ALLOCATE(groups(1))
-        groups(1)%id=0
-        groups(1)%method=SOURCE_METHOD_EXPLICIT
-        groups(1)%source_names=[CHARACTER(LEN=64)::]
-        groups(1)%equation_ids=[(n,n=1,n_eqns)]
+        last_layer=1
+        IF (PRESENT(rheology_l2) .OR. PRESENT(thermal_l2) .OR. &
+            PRESENT(pore_pressure_l2) .OR. PRESENT(mass_config_l2)) THEN
+            IF (.NOT.(PRESENT(rheology_l2) .AND. PRESENT(thermal_l2) .AND. &
+                PRESENT(pore_pressure_l2) .AND. PRESENT(mass_config_l2))) THEN
+                error='TL07: incomplete L2 source configuration'
+                RETURN
+            END IF
+            last_layer=2
+        END IF
+        ALLOCATE(groups(0))
+        DO layer=SOURCE_SCOPE_L1,last_layer
+            IF (layer==SOURCE_SCOPE_L1) THEN
+                selected_rheology=>rheology
+                selected_thermal=>thermal
+                selected_pore=>pore_pressure
+                selected_mass=>mass_config
+            ELSE
+                selected_rheology=>rheology_l2
+                selected_thermal=>thermal_l2
+                selected_pore=>pore_pressure_l2
+                selected_mass=>mass_config_l2
+            END IF
+            CALL collect_active_source_names(selected_rheology,selected_mass, &
+                selected_thermal%thermal_cooling_flag,selected_pore%pore_pressure_flag,names,error)
+            IF (LEN_TRIM(error)>0) RETURN
 
-        DO i=1,SIZE(names)
+            g%id=0
+            g%scope=layer
+            g%method=SOURCE_METHOD_EXPLICIT
+            g%source_names=[CHARACTER(LEN=64)::]
+            g%equation_ids=[(n,n=1,n_eqns)]
+            groups=[groups,g]
+
+            DO i=1,SIZE(names)
         term=source_term_descriptor_by_name(names(i))
         method=term%default_method
         id=0
@@ -136,14 +182,14 @@ CONTAINS
                 'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
                 'rheology_froude','rheology_lucas','rheology_mui',                                                     &
                 'rheology_mui_voellmy','rheology_newmodel')
-            requested_method=rheology%rheology_method
-            id=rheology%rheology_group
+            requested_method=selected_rheology%rheology_method
+            id=selected_rheology%rheology_group
         CASE('thermal_cooling')
-            requested_method=thermal%thermal_method
-            id=thermal%thermal_group
+            requested_method=selected_thermal%thermal_method
+            id=selected_thermal%thermal_group
         CASE('pore_pressure_dissipation')
-            requested_method=pore_pressure%pore_pressure_method
-            id=pore_pressure%pore_pressure_group
+            requested_method=selected_pore%pore_pressure_method
+            id=selected_pore%pore_pressure_group
         CASE('bottom_circular_injection','bottom_fissural_injection',                                                  &
                 'radial_injection','geometry_curvature')
 
@@ -166,8 +212,8 @@ CONTAINS
                 'mass_exchange_deposition','mass_exchange_carrier_liquid_loss',                                        &
                 'mass_exchange_entrainment',                                                                           &
                 'mass_exchange_vaporization')
-            requested_method=mass_config%method
-            id=mass_config%group
+            requested_method=selected_mass%method
+            id=selected_mass%group
         CASE DEFAULT
         END SELECT
 
@@ -221,12 +267,13 @@ CONTAINS
         k=0
 
         DO j=1,SIZE(groups)
-            IF (groups(j)%id==id) k=j
+            IF (groups(j)%id==id .AND. groups(j)%scope==layer) k=j
 
         END DO
 
         IF (k==0) THEN
             g%id=id
+            g%scope=layer
             g%method=method
             g%source_names=[CHARACTER(LEN=64)::]
             g%equation_ids=[INTEGER::]
@@ -265,20 +312,21 @@ CONTAINS
 
         END IF
 
+            END DO
+            ! Each layer must provide the local deposition source for vaporization.
+            IF (ANY(names=='mass_exchange_vaporization') .AND. &
+                .NOT.ANY(names=='mass_exchange_deposition')) THEN
+                error='D19: vaporization requires deposition in the same mass-exchange group'
+                RETURN
+            END IF
         END DO
-        ! Vaporization produces steam from material deposited in the same Lie
-        ! transaction. A separate (or absent) deposition source has no rate to use.
-        IF (ANY(names=='mass_exchange_vaporization') .AND.                                                             &
-            .NOT.ANY(names=='mass_exchange_deposition')) THEN
-        error='D19: vaporization requires deposition in the same mass-exchange group'; RETURN
-
-        END IF
 
         DO i=1,SIZE(groups)
 
         DO j=i+1,SIZE(groups)
 
-            IF (groups(j)%id<groups(i)%id) THEN
+            IF (groups(j)%id<groups(i)%id .OR. &
+                (groups(j)%id==groups(i)%id .AND. groups(j)%scope<groups(i)%scope)) THEN
                 tmp=groups(j); groups(j)=groups(i); groups(i)=tmp
 
             END IF
@@ -289,6 +337,9 @@ CONTAINS
 
         pore=0
         IF (pore_pressure%pore_pressure_flag) pore=idx_pore
+        IF (last_layer==2) THEN
+            IF (pore_pressure_l2%pore_pressure_flag) pore=idx_pore
+        END IF
         CALL registry%initialize(n_eqns,pore,groups,error)
     END SUBROUTINE initialize_configured_sources
 

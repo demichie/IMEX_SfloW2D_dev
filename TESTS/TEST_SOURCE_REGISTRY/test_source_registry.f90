@@ -9,7 +9,7 @@ PROGRAM test_source_registry
   USE thermal_laws_2d, ONLY : eval_thermal_implicit_temperature
   USE source_input_2d
   USE parameters_2d
-  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
@@ -214,6 +214,29 @@ PROGRAM test_source_registry
   CALL registry%initialize(5,0,groups,error)
   CALL require(LEN_TRIM(error)>0,'invalid source scope rejected')
   CALL registry%finalize()
+  ! Registry construction selects both layer configurations without cloning source logic.
+  n_eqns=5; n_vars=5; idx_pore=5; idx_poreEqn=5
+  rheology_flag=.FALSE.
+  thermal_l1%thermal_cooling_flag=.FALSE.
+  thermal_l2%thermal_cooling_flag=.FALSE.
+  pore_pressure_l1%pore_pressure_flag=.FALSE.
+  pore_pressure_l2%pore_pressure_flag=.TRUE.
+  pore_pressure_l2%pore_pressure_method='ANALYTIC'
+  pore_pressure_l2%pore_pressure_group=3
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+       rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+  CALL require(LEN_TRIM(error)==0,'two-layer source configuration: '//TRIM(error))
+  groups=registry%groups()
+  CALL require(COUNT(groups%id==0)==2,'one explicit group zero for each layer')
+  CALL require(ANY(groups%scope==SOURCE_SCOPE_L2 .AND. groups%id==3), &
+       'L2 Darcy source configured at its own group')
+  CALL registry%finalize()
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+       rheology_l2=rheology_l2)
+  CALL require(LEN_TRIM(error)>0,'incomplete L2 configurations rejected')
+  CALL require(.NOT.registry%is_initialized(),'failed L2 setup leaves registry uninitialized')
   PRINT *, 'PASS Lie registry complete Newton footprints, ordering and methods'
 CONTAINS
   !> @brief Check the complete physical column-contact contract.
