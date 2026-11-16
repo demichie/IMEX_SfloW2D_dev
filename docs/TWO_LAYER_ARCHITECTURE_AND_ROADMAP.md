@@ -18,6 +18,52 @@
 - Superfici **derivate**: `eta1=B+h1` ed `eta2=B+h1+h2`. La metrica condivisa `G=1/(1+B_x^2+B_y^2)` e la curvatura derivano da `B`, non da `B+h1`; velocita' e sorgenti cinematiche restano specifiche del layer.
 - Pressioni interlayer, con `L=rho_m2*gprime2*h2`: `S_inter1=-G*h1*d_j(L)`, `S_inter2=-L*d_j(G*h1)`. Evitare il doppio conteggio del contributo gia' incluso nel path idrostatico L2. Il clamp L2 della pressione buoyant resta quello autorizzato; non compensare artificialmente eventuali difetti di bilancio.
 - Un solo Lie del primo ordine con timestep comune, gruppo 0, ordine dei gruppi, cell-outer/OpenMP, transazione e rollback. Scope `L1`, `L2`, `INTERLAYER`; ogni scambio interno usa un unico rate sullo stesso snapshot, trasferimenti opposti e controllo atomico dei candidati e delle risorse SHARED.
+
+#### Semantica vincolante del gruppo 0 (spaziale + sorgenti esplicite)
+
+Il **gruppo 0 comprende l'operatore spaziale e le sorgenti esplicite assegnate al gruppo 0**.
+L'operatore spaziale e' eseguito per primo. I rate delle sorgenti del gruppo 0 vengono
+**valutati sullo stato iniziale** `q^n/qp^n`, mentre il loro contributo viene applicato
+**al candidato dopo lo stadio spaziale** `q^*`. Questi due stati non sono intercambiabili.
+
+Con `L` definito come contributo spaziale con il segno gia' adottato dall'integratore,
+la sequenza concettuale e':
+
+```text
+q*       = q^n + dt * L(q^n)
+R0       = S0(q^n, qp^n, ... )
+R0_limit = Limit(R0, q*, dt, inventari e vincoli fisici)
+q^(0)    = q* + dt * R0_limit
+```
+
+**Il limitatore interviene prima dell'aggiornamento**: considera congiuntamente i
+rate proposti, la disponibilita' nel candidato destinatario `q^*`, il passo
+temporale e gli inventari pertinenti. Non e' corretto limitare i rate utilizzando
+solo `q^n`, ne' valutarli su `q^*` al posto di `q^n`. Per i processi accoppiati,
+la limitazione deve mantenere coerenti rate e trasferimenti associati, senza
+alterare i bilanci di massa, specie, momento ed energia previsti dalle leggi fisiche.
+Restano applicabili i vincoli specifici sui prelievi e sulle disponibilita'
+preesistenti gia' stabiliti dai kernel, incluso il divieto di consumare nello
+stesso passo materiale appena iniettato, dove previsto: non sostituirli con
+un nuovo limitatore generico.
+
+Per `N_LAYERS=2`, la stessa sequenza vale per entrambi i candidati L1/L2 sul
+**medesimo timestep**. Le sorgenti locali usano i rispettivi stati iniziali
+e le configurazioni di layer; i trasferimenti interlayer usano un unico rate
+calcolato sul medesimo snapshot, con contributi opposti e limitazione
+**congiunta** rispetto ai candidati destinatari di entrambi i layer e alle
+risorse condivise. I contatti per i gruppi successivi si ricavano invece dai
+candidati correnti, dopo l'accettazione del gruppo precedente. Nessun gruppo
+puo' pubblicare modifiche autorevoli prima dell'accettazione dell'intera
+transazione Lie.
+
+I gruppi `1,2,...` seguono in ordine, valutando le proprie sorgenti sullo
+stato candidato aggiornato dai gruppi precedenti e usando il metodo configurato.
+La separazione tra `spatial` e `lie_source_executor` e' organizzativa, non
+cambia l'appartenenza matematica dello spaziale al gruppo 0.
+**La migrazione all'esecutore unico L1/L2 non deve cambiare questa semantica,
+il limitatore esistente, la sequenza di valutazione o l'ordine floating-point
+senza un'esplicita decisione numerica e le relative regressioni.**
 - Verificare ogni modifica con audit delle dipendenze (chiamanti, `.inc` REAL/COMPLEX, Makefile, input, I/O, test), stile `docs/FORTRAN_STYLE.md`, build optimized/strict e regressioni pertinenti. Non correggere la fisica per far passare i test. Nessun merge in `master` senza autorizzazione.
 
 ## 2. Stato effettivo e lavoro di implementazione
@@ -29,7 +75,7 @@
 | **TL00–TL04 — Stato, configurazioni e fisica per layer** | Predisposti | Layout canonico e ownership L1/L2, migrazioni REAL/COMPLEX e SHARED presenti. Chiudere i percorsi non ancora esercitati: slot opzionali, alias/parser, sorgenti, IC/BC e regressioni single-layer. |
 | **TL05 — OperatorI L2 isolati** | Predisposti e testati | Ricostruzione HP, BC, pressioni e trasporto L2 isolati; completare copertura integrata di stati dry, sorgenti e variabili opzionali senza creare un secondo operatore. |
 | **TL06 — Spaziale accoppiato** | **Implementazione parziale verificata** | `evaluate_coupled`, workset OR, bound preliminari con `h1+h2`, CFL comune, path e residui interlayer sono presenti e testati isolatamente (quattro stati wet/dry, stratified rest, geometrie Q1). Il trial Euler verifica l'ammissibilita' dei due candidati; un caso separato a supporto compatto verifica bilanci globali di massa, energia e specie senza flussi di contorno. **Collegare l'operatore alla transazione Lie completa** (TL07), quindi verificare i bilanci negli stadi con sorgenti e i casi dry/BC. |
-| **TL07 — Lie accoppiato** | **Avviato** | Il candidato spaziale per cella/layer usa un unico kernel privato dell'integratore; il controllo D20 dello snapshot autorevole copre tutti gli slot di layer. La transazione Lie richiama ora `evaluate_coupled` e verifica entrambi i candidati sul workset OR, con tracce CFL L1/L2 gia' preparate; il percorso L1 resta invariato. Il percorso L2 si interrompe esplicitamente prima delle sorgenti e del commit, fino a TL07-B. La pubblicazione finale dei campi fluidi comprende tutti gli slot attivi in un'unica transazione, ma resta bloccata per L2 fino all'esecutore scoped completo. Restano da integrare L1/L2 sul workset comune, esecuzione dei gruppi scoped, gruppo 0, refresh dei contatti per gruppo, buoyancy L2, rollback atomico delle risorse condivise e sorgenti interlayer; i descrittori Lie ora distinguono L1/L2 e accettano la stessa identita' di gruppo nei due layer; il configuratore registra entrambi i layer usando lo stesso percorso e `simulation_2d` inizializza i descrittori fisici L1/L2 quando richiesti, mentre l'esecutore rank-3 rifiuta esplicitamente scope non-L1; nessun fallback silenzioso tra metodi. |
+| **TL07 — Lie accoppiato** | **Avviato** | Il candidato spaziale per cella/layer usa un unico kernel privato dell'integratore; il controllo D20 dello snapshot autorevole copre tutti gli slot di layer. La transazione Lie richiama ora `evaluate_coupled` e verifica entrambi i candidati sul workset OR, con tracce CFL L1/L2 gia' preparate; il percorso L1 resta invariato. Il percorso L2 si interrompe esplicitamente prima delle sorgenti e del commit, fino a TL07-B. La pubblicazione finale dei campi fluidi comprende tutti gli slot attivi in un'unica transazione, ma resta bloccata per L2 fino all'esecutore scoped completo. Restano da integrare L1/L2 sul workset comune, esecuzione dei gruppi scoped e semantica completa del gruppo 0 (rate su `q^n`, limitazione con `q^*` e inventari, applicazione a `q^*`), refresh dei contatti per gruppo, buoyancy L2, rollback atomico delle risorse condivise e sorgenti interlayer; i descrittori Lie ora distinguono L1/L2 e accettano la stessa identita' di gruppo nei due layer; il configuratore registra entrambi i layer usando lo stesso percorso e `simulation_2d` inizializza i descrittori fisici L1/L2 quando richiesti, mentre l'esecutore rank-3 rifiuta esplicitamente scope non-L1; nessun fallback silenzioso tra metodi. |
 | **TL08–TL11 — Scambi e chiusure** | Da integrare | Settling L2→L1, elutriazione L1→L2 e cold-start, drag interlayer, entrainment e scambi esterni con terreno/atmosfera. Condividere disponibilita' del substrato e depositi; verificare specie, momento, energia/termica e limiti di ammissibilita'. |
 | **TL12 — I/O e integrazione** | Parziale (input/BC) | Input two-layer completo, output/diagnostiche, NetCDF, restart e continuazione; casi representative EXAMPLES; preservare input e risultati single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end coerente, nessuna struttura obsoleta, controlli essenziali del §3 superati in build strict/optimized, OpenMP e regressioni. Solo dopo, valutare l'abilitazione **controllata** di `N_LAYERS=2` per test integrati; non equivale a validazione scientifica o rilascio. |
@@ -41,7 +87,7 @@
 
 1. **Single-layer invariato:** test quantitativi, EXAMPLES rappresentativi, input, ordine Lie, sorgenti, deposizione, restart/NetCDF e OpenMP per le parti toccate; nessuna variazione fisica o di floating-point non autorizzata.
 2. **Ammissibilita' e wet/dry:** tutti e quattro i casi locali, ingressi Dirichlet su celle asciutte, comparsa/scomparsa dei layer, nessuna profondita' o composizione non valida; slot inattivi nulli in REAL/COMPLEX, flussi, sorgenti, IC/BC e I/O.
-3. **Bilanci:** massa totale e per specie, trasporto, momento e variabili termiche secondo il contratto fisico; trasferimenti interlayer opposti, dissipazione e scambi esterni distinti; assenza di doppio conteggio di `deposit_tot` e substrato. Testare rollback atomico e risorse condivise.
+3. **Bilanci e limitazione del gruppo 0:** massa totale e per specie, trasporto, momento e variabili termiche secondo il contratto fisico; verificare separatamente il rate valutato su `q^n`, la limitazione rispetto a `q^*` e agli inventari, e il candidato `q^(0)` dopo l'applicazione. Per gli scambi, controllare rate unico, trasferimenti interlayer opposti, disponibilita' condivise, assenza di doppio conteggio di `deposit_tot` e substrato, dissipazione e scambi esterni distinti. Testare rollback atomico e risorse condivise.
 4. **Spaziale e tempo:** stabilita' e finitezza nei casi di sviluppo ammessi, CFL condiviso, topografia piana/inclinata/curva, stratified rest e limiti wet/dry; rispettare il residuo ammesso su terreno curvo. Il bound `h1+h2` e' **provvisorio**, non una garanzia universale di iperbolicita'.
 5. **Evidenze:** build optimized e strict/debug, regressioni fisiche, test REAL/COMPLEX, OpenMP 1/4 thread e casi integrati pertinenti. Registrare SHA e test effettivamente superati; CI precedente non valida un nuovo commit.
 
