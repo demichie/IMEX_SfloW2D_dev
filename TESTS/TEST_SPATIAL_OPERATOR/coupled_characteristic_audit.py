@@ -46,7 +46,8 @@ def audit_case(label, h1, h2, u1, u2, rho1, rho2, expect_hyperbolic):
     roots = np.linalg.eigvals(matrix)
     scale = max(1.0, np.max(np.abs(roots)))
     imaginary = float(np.max(np.abs(roots.imag)))
-    hyperbolic = imaginary <= 1.0e-10 * scale
+    # Coincident internal modes can split by O(sqrt(machine epsilon)).
+    hyperbolic = imaginary <= 1.0e-7 * scale
     if hyperbolic != expect_hyperbolic:
         raise AssertionError(f"{label}: unexpected hyperbolicity ({roots})")
 
@@ -57,7 +58,8 @@ def audit_case(label, h1, h2, u1, u2, rho1, rho2, expect_hyperbolic):
             raise AssertionError(f"{label}: provisional envelope misses real eigenvalues: {roots}")
         if label == "identical_material":
             expected = np.sqrt(9.81 * (rho1 - 1.2) / rho1 * (h1 + h2))
-            if not np.allclose(sorted(roots.real), [-expected, 0.0, 0.0, expected], rtol=0, atol=tolerance):
+            if not np.allclose(sorted(roots.real), [-expected, 0.0, 0.0, expected],
+                               rtol=0, atol=1.0e-7 * scale):
                 raise AssertionError("identical layers must recover the barotropic external mode")
     else:
         # CFL bounds on real wave speeds cannot guarantee stability when
@@ -97,7 +99,8 @@ def audit_frozen_parameter_families():
                     roots = np.linalg.eigvals(principal_matrix(
                         h1, h2, u1, u2, rho1, rho2, metric=metric))
                     scale = max(1.0, float(np.max(np.abs(roots))))
-                    if np.max(np.abs(roots.imag)) > 1.0e-9 * scale:
+                    # Double roots at zero shear are numerically ill-conditioned.
+                    if np.max(np.abs(roots.imag)) > 1.0e-7 * scale:
                         nonhyperbolic_shears.append(shear)
                         continue
                     hyperbolic_count += 1
