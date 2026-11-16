@@ -134,7 +134,8 @@ physics/thermal_laws/thermal_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEX
     core/constitutive_parameters_2d.$(OBJEXT)
 physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 numerics/source_configuration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
-numerics/time_integration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
+    core/layer_physics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_types.$(OBJEXT)
@@ -165,7 +166,8 @@ physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
-    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
+    numerics/layer_contacts_2d.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
 core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
