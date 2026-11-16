@@ -209,7 +209,24 @@ PROGRAM test_source_registry
   CALL require(LEN_TRIM(error)>0,'duplicate group and source within L1 rejected')
   groups(3)%scope=SOURCE_SCOPE_INTERLAYER
   CALL registry%initialize(5,0,groups,error)
-  CALL require(LEN_TRIM(error)>0,'unsupported interlayer source rejected')
+  CALL require(INDEX(error,'INTERLAYER source descriptors')>0, &
+       'interlayer source rejected with explicit reason')
+  CALL require(.NOT.registry%is_initialized(), &
+       'invalid interlayer group must not leave an active registry')
+  ! Neither an empty group nor a layer-local Newton law may bypass the
+  ! physical INTERLAYER contract.
+  groups(3)%source_names=[CHARACTER(LEN=64)::]
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(INDEX(error,'INTERLAYER source descriptors')>0, &
+       'empty interlayer group rejected without fallback')
+  CALL require(.NOT.registry%is_initialized(),'empty interlayer group leaves no registry')
+  groups(3)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
+  groups(3)%method=SOURCE_METHOD_NEWTON
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(INDEX(error,'INTERLAYER source descriptors')>0, &
+       'layer-local Newton law cannot become an interlayer source')
+  CALL require(.NOT.registry%is_initialized(),'interlayer Newton leaves no registry')
+  groups(3)%method=SOURCE_METHOD_EXPLICIT
   groups(3)%scope=99
   CALL registry%initialize(5,0,groups,error)
   CALL require(LEN_TRIM(error)>0,'invalid source scope rejected')

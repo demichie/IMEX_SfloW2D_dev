@@ -81,6 +81,35 @@ senza un'esplicita decisione numerica e le relative regressioni.**
 
 **Sequenza:** chiudere TL06 e TL07, poi TL08–TL11; completare in parallelo le lacune TL00–TL05 e TL12 senza bloccare lavori indipendenti. Successivamente TL13a e TL13b. Non dichiarare chiusa una fase sulla base dei soli test di un kernel isolato.
 
+### Contratto degli scambi `INTERLAYER` (non ancora eseguibili)
+
+Lo scope `INTERLAYER` e' gia' definito, ma **nessuna sorgente fisica
+interlayer e' registrata nel catalogo**. Il registro deve rifiutare
+con diagnostica esplicita un gruppo con tale scope, anche se vuoto
+o contenente una legge locale L1/L2. Non introdurre gruppi segnaposto
+o dispatcher senza leggi fisiche.
+
+Per attivare uno scambio occorrono:
+
+1. Legge **cell-local** definita scientificamente per settling L2->L1,
+   elutriazione L1->L2 o drag, compresi parametri, unita' e comportamento
+   quando un layer e' inizialmente asciutto.
+2. **Un solo rate per trasferimento**, con contributi opposti alle
+   grandezze conservate nei due layer; budget di momento ed energia,
+   compresa la dissipazione, esplicitamente definiti.
+3. **Limitazione congiunta** prima dell'applicazione in funzione
+   dei due candidati destinatari, del timestep e degli inventari
+   condivisi. Per il gruppo 0 i rate si valutano su `q^n`, ma
+   si limitano e applicano al candidato post-spaziale `q^*`.
+4. Un'unica iterazione cell-outer nell'ordine Lie, con aggiornamento
+   dei due candidati locali, nessun rollback e stop fatale su errore.
+5. Regressioni su conservazione di massa/specie, momento, energia,
+   wet/dry nei quattro casi, cold-start, risorse saturate,
+   REAL/COMPLEX e OpenMP, senza alterare i risultati single-layer.
+
+Il solo scope nel registro **non** equivale a implementare uno
+scambio interlayer, e non autorizza `N_LAYERS=2`.
+
 ## 3. Verifiche obbligatorie durante l'implementazione
 
 1. **Single-layer invariato:** test quantitativi, EXAMPLES rappresentativi, input, ordine Lie, sorgenti, deposizione, restart/NetCDF e OpenMP per le parti toccate; nessuna variazione fisica o di floating-point non autorizzata.

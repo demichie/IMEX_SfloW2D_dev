@@ -83,9 +83,12 @@ CONTAINS
         DO i=1,SIZE(groups)
 
             IF (groups(i)%scope<SOURCE_SCOPE_L1 .OR. groups(i)%scope>SOURCE_SCOPE_INTERLAYER) RETURN
-            ! Interlayer sources need their own registered physical descriptors.
-            ! Do not silently run a layer-local law as an interlayer transfer.
-            IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER) RETURN
+            ! Never silently reinterpret a layer-local law as an interlayer transfer.
+            ! Paired-rate descriptors and both-recipient limiting are not implemented.
+            IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER) THEN
+                error='TL07: INTERLAYER source descriptors and paired transfer kernels not yet implemented'
+                RETURN
+            END IF
             layer=groups(i)%scope
             IF (i>1) THEN
                 IF (groups(i)%id<groups(i-1)%id) RETURN
