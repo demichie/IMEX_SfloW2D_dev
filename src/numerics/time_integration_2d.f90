@@ -347,13 +347,15 @@ CONTAINS
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
         IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
-        ! Publish only the active worklist; inactive cells remain unchanged.
+        ! Publish all active layer slots from one accepted transaction, using
+        ! only the shared solve worklist. The TL07 coupled source guard above
+        ! prevents reaching this commit before both layers are source-complete.
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k)
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
-            state%q(:,1,j,k)=this%q_trial(:,1,j,k)
-            state%qp(:,1,j,k)=this%qp_trial(:,1,j,k)
+            state%q(:,:,j,k)=this%q_trial(:,:,j,k)
+            state%qp(:,:,j,k)=this%qp_trial(:,:,j,k)
         END DO
         !$OMP END PARALLEL DO
         ! The source executor refreshed substrate aggregates after its cell sweep.
