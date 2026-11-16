@@ -30,7 +30,7 @@ MODULE hyperbolic_2d
 
     PRIVATE
 
-    PUBLIC :: add_interlayer_terms
+    PUBLIC :: add_interlayer_terms, eval_total_depth_face_speed_bounds
 
     !> \brief Persistent wave speeds, oriented face contributions and cell paths.
     !> \details Face arrays distinguish the contribution seen by either adjacent
@@ -66,6 +66,63 @@ MODULE hyperbolic_2d
     END TYPE hyperbolic_workspace_type
 
 CONTAINS
+
+    !> @brief Estimate a shared two-layer wave envelope using the total depth.
+    !> @details Each physically present layer uses the existing single-layer
+    !> local-speed kernel with h=h1+h2. This reproduces single-layer speeds
+    !> for equal material and velocity. It is a preliminary envelope, NOT a
+    !> validated coupled eigensystem for shear or unequal density.
+    !> @param[in] q1_left,q2_left Primitive L1/L2 traces on the negative side.
+    !> @param[in] q1_right,q2_right Primitive L1/L2 traces on the positive side.
+    !> @param[in] metric Large-slope gravity factor at the shared face.
+    !> @param[in] normal Normal velocity index (idx_u or idx_v).
+    !> @param[out] a_minus,a_plus Common preliminary wave bounds.
+    SUBROUTINE eval_total_depth_face_speed_bounds(q1_left,q2_left,q1_right,q2_right, &
+        metric,normal,a_minus,a_plus)
+        USE equation_terms_2d, ONLY : eval_local_speeds_direction
+        REAL(wp), INTENT(IN) :: q1_left(n_vars),q2_left(n_vars),q1_right(n_vars),q2_right(n_vars)
+        REAL(wp), INTENT(IN) :: metric
+        INTEGER, INTENT(IN) :: normal
+        REAL(wp), INTENT(OUT) :: a_minus,a_plus
+        REAL(wp) :: q(n_vars),depth,lo,hi
+        INTEGER :: endpoint,layer
+
+        a_minus=0.0_wp
+        a_plus=0.0_wp
+
+        DO endpoint=1,2
+            IF (endpoint==1) THEN
+                depth=q1_left(1)+q2_left(1)
+            ELSE
+                depth=q1_right(1)+q2_right(1)
+            END IF
+
+            IF (depth<=dry_thickness_tolerance) CYCLE
+
+            DO layer=1,2
+                IF (endpoint==1) THEN
+                    IF (layer==1) THEN
+                        q=q1_left
+                    ELSE
+                        q=q2_left
+                    END IF
+                ELSE
+                    IF (layer==1) THEN
+                        q=q1_right
+                    ELSE
+                        q=q2_right
+                    END IF
+                END IF
+
+                ! A dry layer cannot contribute an independent wave.
+                IF (q(1)<=dry_thickness_tolerance) CYCLE
+                q(1)=depth
+                CALL eval_local_speeds_direction(q,metric,normal,lo,hi)
+                a_minus=MIN(a_minus,lo)
+                a_plus=MAX(a_plus,hi)
+            END DO
+        END DO
+    END SUBROUTINE eval_total_depth_face_speed_bounds
 
     !> @brief Accumulate coupled interlayer face and within-cell pressure in both residuals.
     !> @details Reuses the common pressure kernel and requires validated coupled

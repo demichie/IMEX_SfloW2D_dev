@@ -15,7 +15,8 @@ PROGRAM test_spatial_operator
   USE state_conversions, ONLY : primitive_to_conservative
   USE state_fields, ONLY : state_type
   USE init_2d, ONLY : init_empty
-  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_terms
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_terms, &
+      eval_total_depth_face_speed_bounds
   USE pccu_2d, ONLY : eval_pccu_advective_flux, eval_central_upwind_flux, eval_oriented_pccu_pair, &
       eval_interlayer_pressure_path, eval_interlayer_pressure_correction, eval_hydrostatic_path, &
       eval_interlayer_oriented_face
@@ -101,6 +102,7 @@ PROGRAM test_spatial_operator
      END DO
   END DO
   CALL spatial%compute_timestep(q,qp,0.0_wp,dt,domain)
+  CALL check_total_depth_cfl_equivalence
   IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) ERROR STOP 'invalid production timestep'
   IF (ANY(qp(1,:,:) < 0.0_wp)) ERROR STOP 'physical cache was not refreshed'
   CALL same_bits('timestep input is read-only',RESHAPE(q,[SIZE(q)]),RESHAPE(q0,[SIZE(q0)]))
@@ -466,6 +468,113 @@ CONTAINS
         CALL lower%finalize
         WRITE(*,*) 'PASS: within-cell interlayer pressure residual and active mask'
     END SUBROUTINE check_interlayer_cell_assembly
+
+    !> @brief Verify identical-material total-depth bounds and CFL equivalence.
+    !> @details Reuses a physically converted wet primitive state, including
+    !> its temperature and composition. Tests both directions and dry limits.
+    SUBROUTINE check_total_depth_cfl_equivalence
+        REAL(wp) :: total(n_vars),lower(n_vars),upper(n_vars),dry(n_vars)
+        REAL(wp) :: alo,ahi,reflo,refhi
+        REAL(wp) :: xn(comp_interfaces_x,comp_cells_y),xp(comp_interfaces_x,comp_cells_y)
+        REAL(wp) :: yn(comp_cells_x,comp_interfaces_y),yp(comp_cells_x,comp_interfaces_y)
+        REAL(wp) :: step,expected,cfl_limit,rate,xspeed,yspeed
+        REAL(wp) :: xlo,xhi,ylo,yhi
+        CHARACTER(LEN=LEN(cfl_policy)) :: old_policy
+        INTEGER :: j,k,jwet,kwet,dir,case_number,normal
+
+        jwet=0
+        kwet=0
+        DO k=1,ny
+            DO j=1,nx
+                IF (jwet==0 .AND. qp(1,j,k)>10.0_wp*dry_thickness_tolerance) THEN
+                    jwet=j
+                    kwet=k
+                END IF
+            END DO
+        END DO
+        IF (jwet==0) RETURN
+
+        total=qp(:,jwet,kwet)
+        dry=0.0_wp
+        lower=total
+        upper=total
+        lower(1)=0.5_wp*total(1)
+        upper(1)=total(1)-lower(1)
+
+        DO dir=1,2
+            normal=idx_u
+            IF (dir==2) normal=idx_v
+
+            DO case_number=1,4
+                SELECT CASE(case_number)
+                CASE(1)
+                    CONTINUE
+                CASE(2)
+                    lower=total
+                    upper=dry
+                CASE(3)
+                    lower=dry
+                    upper=total
+                CASE(4)
+                    lower=dry
+                    upper=dry
+                END SELECT
+
+                CALL eval_total_depth_face_speed_bounds(lower,upper,lower,upper, &
+                    1.0_wp,normal,alo,ahi)
+                IF (case_number==4) THEN
+                    IF (alo/=0.0_wp .OR. ahi/=0.0_wp) &
+                        ERROR STOP 'Dry two-layer face generated wave speeds'
+                ELSE
+                    CALL eval_local_speeds_direction(total,1.0_wp,normal,reflo,refhi)
+                    CALL same_bits('total-depth negative wave bound', &
+                        [alo],[MIN(0.0_wp,reflo)])
+                    CALL same_bits('total-depth positive wave bound', &
+                        [ahi],[MAX(0.0_wp,refhi)])
+                END IF
+            END DO
+
+            lower=total
+            upper=total
+            lower(1)=0.5_wp*total(1)
+            upper(1)=total(1)-lower(1)
+        END DO
+
+        CALL eval_total_depth_face_speed_bounds(lower,upper,lower,upper, &
+            1.0_wp,idx_u,xlo,xhi)
+        CALL eval_total_depth_face_speed_bounds(lower,upper,lower,upper, &
+            1.0_wp,idx_v,ylo,yhi)
+        xn=xlo
+        xp=xhi
+        yn=ylo
+        yp=yhi
+        xspeed=MAX(-xlo,xhi)
+        yspeed=MAX(-ylo,yhi)
+        old_policy=cfl_policy
+        cfl_limit=MIN(cfl,0.25_wp)
+
+        DO case_number=1,2
+            expected=max_dt
+            cfl_policy='directional_min'
+            IF (case_number==2) cfl_policy='combined'
+            IF (case_number==1) THEN
+                IF (nx>1 .AND. xspeed>0.0_wp) expected=MIN(expected,cfl_limit*dx/xspeed)
+                IF (ny>1 .AND. yspeed>0.0_wp) expected=MIN(expected,cfl_limit*dy/yspeed)
+            ELSEIF (ny==1) THEN
+                IF (nx>1 .AND. xspeed>0.0_wp) expected=MIN(expected,cfl_limit*dx/xspeed)
+            ELSEIF (nx==1) THEN
+                IF (yspeed>0.0_wp) expected=MIN(expected,cfl_limit*dy/yspeed)
+            ELSE
+                rate=xspeed/dx+yspeed/dy
+                IF (rate>0.0_wp) expected=MIN(expected,cfl_limit/rate)
+            END IF
+
+            CALL spatial%compute_coupled_timestep(domain,xn,xp,yn,yp,step)
+            CALL same_bits('homogeneous coupled CFL equals total-depth CFL',[step],[expected])
+        END DO
+        cfl_policy=old_policy
+        WRITE(*,*) 'PASS: total-depth wave bounds and homogeneous CFL equivalence'
+    END SUBROUTINE check_total_depth_cfl_equivalence
 
     !> @brief Check shared coupled-face CFL reduction against both policy formulas.
     !> @details This tests face-rate reduction only, not coupled eigenvalues.
