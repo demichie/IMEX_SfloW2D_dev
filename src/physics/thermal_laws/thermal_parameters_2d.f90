@@ -22,7 +22,7 @@ MODULE thermal_parameters_2d
     END TYPE thermal_config_type
 
     TYPE(thermal_config_type), TARGET :: thermal_l1
-    TYPE(thermal_config_type) :: thermal_l2
+    TYPE(thermal_config_type), TARGET :: thermal_l2
 CONTAINS
     !> \brief Reproduce the radiative coefficient without a cached global copy.
     PURE REAL(wp) FUNCTION thermal_radiative_coefficient(config) RESULT(coefficient)

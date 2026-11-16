@@ -16,10 +16,10 @@ MODULE simulation_2d
     USE source_configuration_2d, ONLY : initialize_configured_sources
     USE diagnostics_2d, ONLY : fatal_error
 
-    USE rheology_parameters_2d, ONLY : rheology_l1
-    USE thermal_parameters_2d, ONLY : thermal_l1
-    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
-    USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
+    USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
+    USE thermal_parameters_2d, ONLY : thermal_l1,thermal_l2
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2,pore_pressure_cache_l1
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type
 
@@ -118,8 +118,17 @@ CONTAINS
             pore_pressure_l1,mass_exchange_l1,source_error)
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
-        CALL initialize_configured_sources(this%source_registry,source_error, &
-            rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+        IF (this%model_layout%n_layers==2) THEN
+            CALL this%layer_physics(2)%initialize(rheology_flag,rheology_l2,thermal_l2, &
+                pore_pressure_l2,mass_exchange_l2,source_error)
+            IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
+            CALL initialize_configured_sources(this%source_registry,source_error, &
+                rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+                rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+        ELSE
+            CALL initialize_configured_sources(this%source_registry,source_error, &
+                rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+        END IF
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL this%state%initialize( this%model_layout )
