@@ -231,19 +231,19 @@ CONTAINS
             WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',layer_status
             IF (n_layers==2) WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE layer=',failed_layer
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
-                'LIE_SPATIAL_FAILURE mass_before=',state%q(idx_totMassEqn,1,j,k), &
-                ' mass_after=',this%q_trial(idx_totMassEqn,1,j,k)
+                'LIE_SPATIAL_FAILURE mass_before=',state%q(idx_totMassEqn,failed_layer,j,k), &
+                ' mass_after=',this%q_trial(idx_totMassEqn,failed_layer,j,k)
             WRITE(*,'(A,ES23.15,A,ES23.15)') &
                 'LIE_SPATIAL_FAILURE components_before=', &
-                SUM(state%q(idx_solidEqn_first:idx_solidEqn_last,1,j,k))+ &
-                SUM(state%q(idx_add_gas_first:idx_add_gas_last,1,j,k)), &
+                SUM(state%q(idx_solidEqn_first:idx_solidEqn_last,failed_layer,j,k))+ &
+                SUM(state%q(idx_add_gas_first:idx_add_gas_last,failed_layer,j,k)), &
                 ' components_after=', &
-                SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,1,j,k))+ &
-                SUM(this%q_trial(idx_add_gas_first:idx_add_gas_last,1,j,k))
+                SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,failed_layer,j,k))+ &
+                SUM(this%q_trial(idx_add_gas_first:idx_add_gas_last,failed_layer,j,k))
             DO eq=1,n_eqns
                 WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
-                    ' before/rate/after=',state%q(eq,1,j,k), &
-                    this%spatial_rate(eq,1,j,k),this%q_trial(eq,1,j,k)
+                    ' before/rate/after=',state%q(eq,failed_layer,j,k), &
+                    this%spatial_rate(eq,failed_layer,j,k),this%q_trial(eq,failed_layer,j,k)
                 CALL spatial_operators(failed_layer)%diagnose_cell(j,k,eq)
             END DO
             IF (layer_status==1)                                                                                      &
