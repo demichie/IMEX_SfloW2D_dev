@@ -16,6 +16,8 @@ import sys
 
 import numpy as np
 
+from coupled_characteristic_audit import run as audit_coupled_characteristics
+
 REFERENCE = Path(__file__).parent / "reference"
 CORE_HASHES = {
     "hp_pccu_1d_core.py": "c35f8ec13f1b0c8e93eb1e31c02e6308bcf679bf182bd00eb265ca3f54ee7f38",
@@ -287,6 +289,7 @@ def negative_controls(fields, q, vertices, bed, params):
 
 
 def main():
+    audit_coupled_characteristics()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path)
     parser.add_argument("profile")
