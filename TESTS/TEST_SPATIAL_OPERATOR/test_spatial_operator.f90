@@ -354,49 +354,21 @@ PROGRAM test_spatial_operator
 
 CONTAINS
 
-    !> @brief Check a conservative two-layer spatial trial before Lie coupling.
-    !> @details The shared OR workset and both residuals are already prepared.
-    !> A closed boundary collar carries zero mass, energy and constituent flux.
-    !> This test does not publish a state or bypass the Lie source transaction.
+    !> @brief Check a two-layer conservative trial using the actual face budgets.
+    !> @details Neumann boundaries are not impermeable: balance each conserved
+    !> quantity against net outward flux across the active workset, not zero.
+    !> The interlayer pressure acts only on momentum, never on these budgets.
     SUBROUTINE check_coupled_spatial_trial
-        REAL(wp) :: residual_sum(2),residual_scale(2),step,updated(n_eqns)
-        REAL(wp) :: tol,scale
-        INTEGER :: layer,l,j,k,i,eq
+        REAL(wp) :: step,updated(n_eqns)
+        INTEGER :: l,j,k
 
         step=MIN(coupled_dt*0.01_wp,1.0E-5_wp)
         IF (step<=0.0_wp) ERROR STOP 'Coupled spatial trial has invalid timestep'
-        DO layer=1,2
-            DO i=1,3
-                SELECT CASE(i)
-                CASE(1)
-                    eq=idx_totMassEqn
-                CASE(2)
-                    eq=idx_engyEqn
-                CASE(3)
-                    eq=idx_solidEqn_first
-                END SELECT
-                residual_sum=0.0_wp
-                residual_scale=0.0_wp
-                DO l=1,domain%solve_cells
-                    j=domain%j_cent(l)
-                    k=domain%k_cent(l)
-                    IF (layer==1) THEN
-                        residual_sum(1)=residual_sum(1)+direct(eq,j,k)
-                        residual_scale(1)=residual_scale(1)+ABS(direct(eq,j,k))
-                    ELSE
-                        residual_sum(2)=residual_sum(2)+slot2_term(eq,j,k)
-                        residual_scale(2)=residual_scale(2)+ABS(slot2_term(eq,j,k))
-                    END IF
-                END DO
-                scale=MAX(1.0_wp,MAXVAL(residual_scale))
-                tol=4096.0_wp*EPSILON(1.0_wp)*scale
-                IF (MAXVAL(ABS(residual_sum))>tol) &
-                    ERROR STOP 'Two-layer spatial trial violates closed-collar conservation'
-            END DO
-        END DO
 
-        ! Check both physical candidates, including the dry state, without
-        ! touching either authoritative state or the production Lie executor.
+        CALL check_layer_spatial_budget(spatial%hp_pccu,direct)
+        CALL check_layer_spatial_budget(slot2_spatial%hp_pccu,slot2_term)
+
+        ! Validate both trial states without publishing or invoking Lie sources.
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
@@ -407,8 +379,80 @@ CONTAINS
             IF (.NOT.conservative_mass_admissible(updated)) &
                 ERROR STOP 'Coupled L2 spatial candidate is inadmissible'
         END DO
-        WRITE(*,*) 'PASS: coupled spatial trial conserves mass, energy, constituents'
+        WRITE(*,*) 'PASS: coupled spatial trial conserves face budgets and candidate admissibility'
     END SUBROUTINE check_coupled_spatial_trial
+
+    !> @brief Check telescoping of the conservative mass, thermal and solid face fluxes.
+    SUBROUTINE check_layer_spatial_budget(hp,residual)
+        TYPE(hyperbolic_workspace_type), INTENT(IN) :: hp
+        REAL(wp), INTENT(IN) :: residual(n_eqns,nx,ny)
+        REAL(wp) :: budget,actual,scale,tol,flux_left,flux_right
+        LOGICAL :: left_active,right_active
+        INTEGER :: i,eq,l,j,k
+
+        DO i=1,3
+            SELECT CASE(i)
+            CASE(1)
+                eq=idx_totMassEqn
+            CASE(2)
+                eq=idx_engyEqn
+            CASE(3)
+                eq=idx_solidEqn_first
+            END SELECT
+
+            actual=0.0_wp
+            scale=0.0_wp
+            DO l=1,domain%solve_cells
+                j=domain%j_cent(l)
+                k=domain%k_cent(l)
+                actual=actual+residual(eq,j,k)
+                scale=scale+ABS(residual(eq,j,k))
+            END DO
+
+            budget=0.0_wp
+            DO l=1,domain%solve_interfaces_x
+                j=domain%j_stag_x(l)
+                k=domain%k_stag_x(l)
+                left_active=.FALSE.
+                right_active=.FALSE.
+                IF (j>1) left_active=domain%solve_mask(j-1,k)
+                IF (j<=nx) right_active=domain%solve_mask(j,k)
+                flux_left=hp%G_interface_xL(eq,j,k)
+                flux_right=hp%G_interface_xR(eq,j,k)
+                IF (left_active .AND. right_active) THEN
+                    tol=1024.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(flux_left),ABS(flux_right))
+                    IF (ABS(flux_left-flux_right)>tol) &
+                        ERROR STOP 'Coupled spatial internal conservative face mismatch'
+                ELSEIF (left_active) THEN
+                    budget=budget+flux_left*one_by_dx
+                ELSEIF (right_active) THEN
+                    budget=budget-flux_right*one_by_dx
+                END IF
+            END DO
+            DO l=1,domain%solve_interfaces_y
+                j=domain%j_stag_y(l)
+                k=domain%k_stag_y(l)
+                left_active=.FALSE.
+                right_active=.FALSE.
+                IF (k>1) left_active=domain%solve_mask(j,k-1)
+                IF (k<=ny) right_active=domain%solve_mask(j,k)
+                flux_left=hp%G_interface_yB(eq,j,k)
+                flux_right=hp%G_interface_yT(eq,j,k)
+                IF (left_active .AND. right_active) THEN
+                    tol=1024.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(flux_left),ABS(flux_right))
+                    IF (ABS(flux_left-flux_right)>tol) &
+                        ERROR STOP 'Coupled spatial internal conservative face mismatch'
+                ELSEIF (left_active) THEN
+                    budget=budget+flux_left*one_by_dy
+                ELSEIF (right_active) THEN
+                    budget=budget-flux_right*one_by_dy
+                END IF
+            END DO
+            tol=4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,scale,ABS(budget))
+            IF (ABS(actual-budget)>tol) &
+                ERROR STOP 'Two-layer spatial trial violates conservative boundary flux budget'
+        END DO
+    END SUBROUTINE check_layer_spatial_budget
 
     !> @brief Quantify stratified-rest residuals on flat, affine and curved beds.
     !> @details Two constant free surfaces eta1 and eta2 give stationary layers.
