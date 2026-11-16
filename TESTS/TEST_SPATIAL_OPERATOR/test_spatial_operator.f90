@@ -352,16 +352,18 @@ PROGRAM test_spatial_operator
 
 CONTAINS
 
-    !> @brief Verify that one shared interface updates only its two adjacent cells.
-    !> @details The same oriented PCCU face kernel provides the reference values.
-    !> The workset is deliberately sparse; no global coupled dynamics are enabled.
+    !> @brief Verify an interlayer face on two active cells for all four layer states.
+    !> @details Compare directly with the oriented PCCU pressure kernel, check
+    !> that only momentum changes and that the sparse workset is respected.
+    !> This checks spatial assembly, not the eventual coupled time integrator.
     SUBROUTINE check_interlayer_face_residual
         TYPE(reconstruction_workspace_type) :: l1,l2
         TYPE(hyperbolic_workspace_type) :: hp2
         REAL(wp) :: r1(n_eqns,nx,ny),r2(n_eqns,nx,ny)
         REAL(wp) :: fl1(n_eqns),fr1(n_eqns),fl2(n_eqns),fr2(n_eqns)
-        REAL(wp) :: tol,scale
+        REAL(wp) :: h1a,h1b,h2a,h2b,am,ap,tol,scale
         LOGICAL :: active(nx,ny)
+        INTEGER :: case_number,i
 
         IF (nx<3 .OR. ny<3) RETURN
 
@@ -371,44 +373,91 @@ CONTAINS
         active=.FALSE.
         active(1,2)=.TRUE.
         active(2,2)=.TRUE.
-        r1=0.0_wp
-        r2=0.0_wp
-        l1%h_selected_interfaceL(2,2)=1.2_wp
-        l1%h_selected_interfaceR(2,2)=1.4_wp
-        l2%h_selected_interfaceL(2,2)=0.8_wp
-        l2%h_selected_interfaceR(2,2)=0.6_wp
-        l2%eta_interfaceL(2,2)=2.0_wp
-        l2%eta_interfaceR(2,2)=2.0_wp
-        hp2%gamma_interface_xL(2,2)=4.0_wp
-        hp2%gamma_interface_xR(2,2)=6.0_wp
-        hp2%a_interface_xNeg=-2.0_wp
-        hp2%a_interface_xPos=3.0_wp
 
-        CALL eval_interlayer_oriented_face(1, &
-            1.2_wp,0.8_wp,4.0_wp,2.0_wp,1.4_wp,0.6_wp,6.0_wp,2.0_wp, &
-            grav_coeff_stag_x(2,2),-2.0_wp,3.0_wp,fl1,fr1,fl2,fr2)
-        CALL add_interlayer_terms(l1,l2,hp2,r1,r2,active,0,[INTEGER::],[INTEGER::],qp, &
-            1,[2],[2],0,[INTEGER::],[INTEGER::], &
-            hp2%a_interface_xNeg,hp2%a_interface_xPos, &
-            hp2%a_interface_yNeg,hp2%a_interface_yPos)
+        DO case_number=1,4
+            h1a=1.2_wp
+            h1b=1.4_wp
+            h2a=0.8_wp
+            h2b=0.6_wp
+            am=-2.0_wp
+            ap=3.0_wp
 
-        scale=MAX(1.0_wp,MAXVAL(ABS(fl1)),MAXVAL(ABS(fr1)), &
-            MAXVAL(ABS(fl2)),MAXVAL(ABS(fr2)))
-        tol=128.0_wp*EPSILON(1.0_wp)*scale*one_by_dx
-        IF (ANY(ABS(r1(:,1,2)-fl1*one_by_dx)>tol) .OR. &
-            ANY(ABS(r2(:,1,2)-fl2*one_by_dx)>tol) .OR. &
-            ANY(ABS(r1(:,2,2)+fr1*one_by_dx)>tol) .OR. &
-            ANY(ABS(r2(:,2,2)+fr2*one_by_dx)>tol)) &
-            ERROR STOP 'Interlayer oriented face not assembled in adjacent cells'
-        r1(:,1:2,2)=0.0_wp
-        r2(:,1:2,2)=0.0_wp
-        IF (ANY(r1/=0.0_wp) .OR. ANY(r2/=0.0_wp)) &
-            ERROR STOP 'Interlayer face modified an inactive cell'
+            SELECT CASE(case_number)
+            CASE(1)
+                ! Both layers present with nonuniform upper pressure.
+                CONTINUE
+            CASE(2)
+                ! Only L1 present, including its shoreline pressure path.
+                h2a=0.0_wp
+                h2b=0.0_wp
+            CASE(3)
+                ! Only L2 present, with no lower-layer pressure.
+                h1a=0.0_wp
+                h1b=0.0_wp
+            CASE(4)
+                ! Both layers dry: the characteristic interval is degenerate.
+                h1a=0.0_wp
+                h1b=0.0_wp
+                h2a=0.0_wp
+                h2b=0.0_wp
+                am=0.0_wp
+                ap=0.0_wp
+            END SELECT
+
+            r1=0.0_wp
+            r2=0.0_wp
+            l1%h_selected_interfaceL(2,2)=h1a
+            l1%h_selected_interfaceR(2,2)=h1b
+            l2%h_selected_interfaceL(2,2)=h2a
+            l2%h_selected_interfaceR(2,2)=h2b
+            l2%eta_interfaceL(2,2)=h1a+h2a
+            l2%eta_interfaceR(2,2)=h1b+h2b
+            hp2%gamma_interface_xL(2,2)=4.0_wp
+            hp2%gamma_interface_xR(2,2)=6.0_wp
+            hp2%a_interface_xNeg(2,2)=am
+            hp2%a_interface_xPos(2,2)=ap
+
+            CALL eval_interlayer_oriented_face(1, &
+                h1a,h2a,4.0_wp,h1a+h2a,h1b,h2b,6.0_wp,h1b+h2b, &
+                grav_coeff_stag_x(2,2),am,ap,fl1,fr1,fl2,fr2)
+            CALL add_interlayer_terms(l1,l2,hp2,r1,r2,active,0,[INTEGER::],[INTEGER::],qp, &
+                1,[2],[2],0,[INTEGER::],[INTEGER::], &
+                hp2%a_interface_xNeg,hp2%a_interface_xPos, &
+                hp2%a_interface_yNeg,hp2%a_interface_yPos)
+
+            scale=MAX(1.0_wp,MAXVAL(ABS(fl1)),MAXVAL(ABS(fr1)), &
+                MAXVAL(ABS(fl2)),MAXVAL(ABS(fr2)))
+            tol=128.0_wp*EPSILON(1.0_wp)*scale*one_by_dx
+            IF (ANY(ABS(r1(:,1,2)-fl1*one_by_dx)>tol) .OR. &
+                ANY(ABS(r2(:,1,2)-fl2*one_by_dx)>tol) .OR. &
+                ANY(ABS(r1(:,2,2)+fr1*one_by_dx)>tol) .OR. &
+                ANY(ABS(r2(:,2,2)+fr2*one_by_dx)>tol)) &
+                ERROR STOP 'Interlayer oriented face not assembled in adjacent cells'
+
+            ! The interlayer operator exchanges pressure momentum only.
+            ! Neither layer can gain mass, energy or scalar constituents here.
+            DO i=1,n_eqns
+                IF (i==2) CYCLE
+                IF (r1(i,1,2)/=0.0_wp .OR. r1(i,2,2)/=0.0_wp .OR. &
+                    r2(i,1,2)/=0.0_wp .OR. r2(i,2,2)/=0.0_wp) &
+                    ERROR STOP 'Interlayer face changed a non-momentum equation'
+            END DO
+
+            IF (case_number>1) THEN
+                IF (ANY(r1/=0.0_wp) .OR. ANY(r2/=0.0_wp)) &
+                    ERROR STOP 'Absent interlayer contact generated pressure'
+            END IF
+
+            r1(:,1:2,2)=0.0_wp
+            r2(:,1:2,2)=0.0_wp
+            IF (ANY(r1/=0.0_wp) .OR. ANY(r2/=0.0_wp)) &
+                ERROR STOP 'Interlayer face modified an inactive cell'
+        END DO
 
         CALL hp2%finalize
         CALL l1%finalize
         CALL l2%finalize
-        WRITE(*,*) 'PASS: shared interlayer face residual and sparse workset'
+        WRITE(*,*) 'PASS: four layer-presence cases, face momentum and sparse workset'
     END SUBROUTINE check_interlayer_face_residual
 
     !> @brief Check within-cell pressure assembly without any active coupling face.
