@@ -296,7 +296,7 @@ CONTAINS
   SUBROUTINE initialize_physics
     n_solid=ns; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
     kt_trace_reconstruction = 'froude_blend'
-    n_vars=nq; n_eqns=nq
+    n_vars=nq; n_eqns=nq; n_layers=1
     CALL configure_canonical_state_indices()
     gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.
     rheology_l1%stochastic_rheology_flag=.FALSE.; pore_pressure_l1%pore_pressure_flag=.FALSE.
@@ -553,6 +553,7 @@ CONTAINS
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
+    REAL(wp) :: q_work(nq,1,nx,ny),qp_work(nq,1,nx,ny)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: bed_before(nx+1,ny+1),available_before(ns,nx,ny)
     REAL(wp) :: pressure,fluid_delta,solid_delta,inventory_delta
@@ -574,19 +575,20 @@ CONTAINS
        END DO
     END DO
     q_before=q;qp_before=qp
+    q_work(:,1,:,:)=q;qp_work(:,1,:,:)=qp
     deposited_before=state%deposit;eroded_before=state%erosion
     bed_before=B_vertex;available_before=state%erodible
     CALL initialize_lie_source_executor(executor,registry)
     ! The standalone executor test owns the same sparse geometry
     ! transaction as the production Lie timestep driver.
     CALL begin_geometry_transaction(sparse=.TRUE.)
-    CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
-         q_original=q_before,qp_original=qp_before, &
-         step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
-          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1, &
-          mass_config=mass_exchange_l1, &
-           transport_stochastic=.FALSE.,pore_enabled=pore_pressure_l1%pore_pressure_flag, &
-           stochastic_enabled=rheology_l1%stochastic_rheology_flag)
+    CALL execute_lie_source_groups(executor,state,q_work,qp_work,1.0_wp,domain, &
+         q_original=RESHAPE(q_before,[nq,1,nx,ny]),qp_original=RESHAPE(qp_before,[nq,1,nx,ny]), &
+         step_failed=failed,failure_message=message,thermal=[thermal_l1],rheology=[rheology_l1], &
+          pore_pressure=[pore_pressure_l1],pore_cache=[pore_pressure_cache_l1], &
+          mass_config=[mass_exchange_l1], &
+           transport_stochastic=[.FALSE.],pore_enabled=[pore_pressure_l1%pore_pressure_flag], &
+           stochastic_enabled=[rheology_l1%stochastic_rheology_flag])
     IF (failed) THEN
        CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
@@ -595,6 +597,7 @@ CONTAINS
        ERROR STOP 'Lie exchange transaction rejected'
     END IF
     CALL commit_geometry_transaction
+    q=q_work(:,1,:,:);qp=qp_work(:,1,:,:)
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
     solid_delta=SUM(q(5:6,:,:)-q_before(5:6,:,:))
     inventory_delta=SUM(state%erosion-eroded_before)
@@ -630,6 +633,7 @@ CONTAINS
     TYPE(substrate_snapshot_type) :: substrate_before
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
     REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq,nx,ny)
+    REAL(wp) :: q_work(nq,1,nx,ny),qp_work(nq,1,nx,ny)
     REAL(wp) :: qp_invalid(nq,nx,ny)
     REAL(wp) :: bed_before(nx+1,ny+1)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
@@ -659,6 +663,7 @@ CONTAINS
     erodible_before=state%erodible;lava_before=state%deposit_tot
     centers_before=B_cent;slope_before=B_prime_x_geom
     q_trial=q_before;qp_trial=qp_before
+    q_work(:,1,:,:)=q_trial;qp_work(:,1,:,:)=qp_trial
     ! Cell 2 is rejected after cell 1 has been considered for transfer.
     ! An independent immutable pre-spatial input avoids aliasing an INTENT(INOUT)
     ! candidate with the executor's INTENT(IN) GROUP-0 reference.
@@ -667,13 +672,13 @@ CONTAINS
     CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
     CALL initialize_lie_source_executor(executor,registry)
-    CALL execute_lie_source_groups(executor,state,q_trial,qp_trial,1.0_wp,domain, &
-         q_original=q_before,qp_original=qp_invalid, &
-         step_failed=failed,failure_message=message,thermal=thermal_l1,rheology=rheology_l1, &
-          pore_pressure=pore_pressure_l1,pore_cache=pore_pressure_cache_l1, &
-          mass_config=mass_exchange_l1, &
-           transport_stochastic=.FALSE.,pore_enabled=pore_pressure_l1%pore_pressure_flag, &
-           stochastic_enabled=rheology_l1%stochastic_rheology_flag)
+    CALL execute_lie_source_groups(executor,state,q_work,qp_work,1.0_wp,domain, &
+         q_original=RESHAPE(q_before,[nq,1,nx,ny]),qp_original=RESHAPE(qp_invalid,[nq,1,nx,ny]), &
+         step_failed=failed,failure_message=message,thermal=[thermal_l1],rheology=[rheology_l1], &
+          pore_pressure=[pore_pressure_l1],pore_cache=[pore_pressure_cache_l1], &
+          mass_config=[mass_exchange_l1], &
+           transport_stochastic=[.FALSE.],pore_enabled=[pore_pressure_l1%pore_pressure_flag], &
+           stochastic_enabled=[rheology_l1%stochastic_rheology_flag])
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
     CALL state%restore_substrate(substrate_before)

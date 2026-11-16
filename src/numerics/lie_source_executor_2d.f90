@@ -15,7 +15,7 @@ MODULE lie_source_executor_2d
         idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
     USE domain_2d, ONLY : domain_type
-    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1
+    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
         SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
     USE state_fields, ONLY : state_type
@@ -23,6 +23,8 @@ MODULE lie_source_executor_2d
         initialize_physical_state_real, initialize_physical_state_complex
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
     USE mass_injection_coefficients_2d, ONLY : injection_material_set_type,prepare_injection_materials
+    USE layer_contacts_2d, ONLY : layer_contacts_type,evaluate_layer_contacts
+    USE parameters_2d, ONLY : n_layers
 
     IMPLICIT NONE
 
@@ -89,10 +91,9 @@ CONTAINS
         IF (executor%initialized) CALL fatal_error('Lie source executor already initialized')
         ! Cache the groups and classify their methods once per simulation.
         executor%groups=source_registry%groups()
-        ! The legacy rank-3 executor may only consume L1 descriptors.
-        ! Coupled groups require the atomic rank-4 cell transaction (TL07-B).
-        IF (ANY(executor%groups%scope/=SOURCE_SCOPE_L1)) &
-            CALL fatal_error('TL07: two-layer source scopes require the coupled Lie executor')
+        ! Reject a group that cannot address an allocated layer state.
+        IF (ANY(executor%groups%scope>n_layers)) &
+            CALL fatal_error('TL07: Lie source group addresses an inactive layer')
         ALLOCATE(executor%exchange_group(SIZE(executor%groups)),                                                       &
             executor%dry_noop_group(SIZE(executor%groups)),                                                           &
             executor%non_exchange_groups(SIZE(executor%groups)))
@@ -245,8 +246,8 @@ CONTAINS
     !>          frozen until all cells succeed; failure triggers caller rollback.
     !> @param[in,out] executor Configured Lie groups and reusable work arrays.
     !> @param[in,out] state Owns substrate inventories and aggregate fields.
-    !> @param[in,out] q Conservative cell states (component,x-cell,y-cell).
-    !> @param[in,out] qp Primitive cell states (component,x-cell,y-cell).
+    !> @param[in,out] q Conservative candidates (component,layer,x-cell,y-cell).
+    !> @param[in,out] qp Primitive candidates (component,layer,x-cell,y-cell).
     !> @param[in] time_step Positive Lie substep duration [s].
     !> @param[in] domain Active cell list and per-cell coordinate lookup.
     !> @param[in] stochastic_values Optional stochastic cell samples.
@@ -255,14 +256,14 @@ CONTAINS
     !> @param[in] qp_original Pre-spatial primitive snapshot (read-only).
     !> @param[out] step_failed True when candidate group state is rejected.
     !> @param[out] failure_message Optional diagnostic describing rejected group.
-    !> @param[in] thermal Immutable thermal configuration for the selected material layer.
-    !> @param[in] rheology Immutable rheology configuration for the selected material layer.
-    !> @param[in] pore_pressure Immutable Darcy closure for the selected layer.
-    !> @param[in] pore_cache Derived Pascal coefficients, passed by reference.
-    !> @param[in] mass_config Immutable combined mass-exchange closure for this layer.
-    !> @param[in] transport_stochastic Selected layer stochastic transport.
-    !> @param[in] pore_enabled Selected layer pore pressure.
-    !> @param[in] stochastic_enabled Selected layer stochastic rheology activation.
+    !> @param[in] thermal Immutable thermal configurations indexed by layer.
+    !> @param[in] rheology Immutable rheology configurations indexed by layer.
+    !> @param[in] pore_pressure Immutable Darcy configurations indexed by layer.
+    !> @param[in] pore_cache Derived Pascal coefficients indexed by layer.
+    !> @param[in] mass_config Immutable mass-exchange closures indexed by layer.
+    !> @param[in] transport_stochastic Layer-specific stochastic transport switches.
+    !> @param[in] pore_enabled Layer-specific pore pressure switches.
+    !> @param[in] stochastic_enabled Layer-specific stochastic rheology switches.
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
         step_start_time,q_original,qp_original,step_failed,failure_message,thermal,rheology,pore_pressure,pore_cache, &
         mass_config,transport_stochastic,pore_enabled,stochastic_enabled)
@@ -283,31 +284,34 @@ CONTAINS
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(source_cell_context_type) :: cell_context
-        TYPE(thermal_config_type), INTENT(IN) :: thermal
-        TYPE(rheology_config_type), INTENT(IN) :: rheology
-        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
-        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
-        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,stochastic_enabled
-        REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
+        TYPE(thermal_config_type), INTENT(IN) :: thermal(:)
+        TYPE(rheology_config_type), INTENT(IN) :: rheology(:)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure(:)
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache(:)
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config(:)
+        LOGICAL, INTENT(IN) :: transport_stochastic(:),pore_enabled(:),stochastic_enabled(:)
+        REAL(wp), INTENT(INOUT) :: q(n_vars,n_layers,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars,n_layers,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
         CLASS(domain_type), INTENT(IN) :: domain
         REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
         REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
-        REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(IN) :: qp_original(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: q_original(n_vars,n_layers,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp_original(n_vars,n_layers,comp_cells_x,comp_cells_y)
         LOGICAL, INTENT(OUT) :: step_failed
         CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
         REAL(wp) :: qpentry(n_vars),q_candidate(n_vars),qp_candidate(n_vars)
         REAL(wp) :: q_local(n_vars),qp_local(n_vars)
+        REAL(wp) :: q_layers(n_vars,n_layers),qp_layers(n_vars,n_layers)
+        TYPE(layer_contacts_type) :: contacts
+        LOGICAL :: contacts_valid
         REAL(wp) :: deposit_local(n_solid),erosion_local(n_solid),erodible_local(n_solid),lava_local
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),source_time,noise
         LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
-        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
+        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,layer
         INTEGER :: changed_jmin,changed_jmax,changed_kmin,changed_kmax
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
         REAL(wp) :: cell_mass,cell_components
@@ -416,7 +420,8 @@ CONTAINS
         first_failure=HUGE(0)
         !$OMP PARALLEL DEFAULT(SHARED)                                                                              &
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
-        !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local,                                 &
+        !$OMP& q_local,qp_local,q_layers,qp_layers,layer,contacts,contacts_valid,                                    &
+        !$OMP& deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
@@ -445,10 +450,11 @@ CONTAINS
             IF (sea_mass_removal_flag .AND. B_zone(j,k)==1) CYCLE cell_loop
             ! No configured group can create mass in a dry cell in this case.
             IF (executor%all_groups_dry_noop) THEN
-                IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. q_original(idx_totMassEqn,j,k)<=0.0_wp) CYCLE cell_loop
+                IF (ALL(q(idx_totMassEqn,:,j,k)<=0.0_wp) .AND. &
+                    ALL(q_original(idx_totMassEqn,:,j,k)<=0.0_wp)) CYCLE cell_loop
             END IF
-            q_local=q(:,j,k)
-            qp_local=qp(:,j,k)
+            q_layers=q(:,:,j,k)
+            qp_layers=qp(:,:,j,k)
             IF (executor%has_exchange_group) THEN
                 deposit_local=state%deposit(j,k,1:n_solid)
                 erosion_local=state%erosion(j,k,1:n_solid)
@@ -469,6 +475,14 @@ CONTAINS
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
+                layer=executor%groups(group_index)%scope
+                CALL evaluate_layer_contacts(qp_layers(idx_h,:),contacts,contacts_valid)
+                IF (.NOT.contacts_valid) THEN
+                    cell_error=16
+                    EXIT group_loop
+                END IF
+                q_local=q_layers(:,layer)
+                qp_local=qp_layers(:,layer)
                 ! The buoyancy sink precedes admissibility checks in the next
                 ! source transaction. Evaluate only accepted local states:
                 ! never interpret an inadmissible conservative candidate as
@@ -488,13 +502,16 @@ CONTAINS
                         END IF
                         q_local=0.0_wp
                         CALL initialize_dry_physical_cell(qp_local)
-                        EXIT group_loop
+                        q_layers(:,layer)=q_local
+                        qp_layers(:,layer)=qp_local
+                        IF (n_layers==1) EXIT group_loop
+                        CYCLE group_loop
                     END IF
                 END IF
                 ! Group zero reads the pre-spatial primitive state; subsequent
                 ! groups read the previous group's accepted local state.
                 IF (executor%groups(group_index)%id==0) THEN
-                    qpentry=qp_original(:,j,k)
+                    qpentry=qp_original(:,layer,j,k)
                 ELSE
                     qpentry=qp_local
                 END IF
@@ -532,8 +549,9 @@ CONTAINS
                         cell_arc_n_y(j,k),dx*dy,                                                                     &
                         executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
-                        q_original(1:n_eqns,j,k),executor%injection_materials,thermal,rheology,mass_config, &
-                         transport_stochastic,pore_enabled,stochastic_enabled)
+                        q_original(1:n_eqns,layer,j,k),executor%injection_materials, &
+                        thermal(layer),rheology(layer),mass_config(layer), &
+                        transport_stochastic(layer),pore_enabled(layer),stochastic_enabled(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -604,6 +622,8 @@ CONTAINS
                     END IF
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
+                    q_layers(:,layer)=q_local
+                    qp_layers(:,layer)=qp_local
                     IF (executor%diagnostics_enabled .AND. executor%groups(group_index)%id==0) THEN
                         IF (cell_arc_perim(j,k)>0.0_wp) THEN
                             executor%injection_mass(cell)=q_local(idx_totMassEqn)
@@ -623,12 +643,13 @@ CONTAINS
                     ! Group 0 evaluates on the immutable pre-spatial state;
                     ! its increment is applied to the post-spatial group candidate.
                     analytic_input=q_local
-                    IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,j,k)
+                    IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,layer,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
-                        time_step, analytic_rate, status, executor%source_physical_scratch(tid),thermal,rheology, &
-                        pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
+                        time_step, analytic_rate, status, executor%source_physical_scratch(tid), &
+                        thermal(layer),rheology(layer),pore_pressure(layer),pore_cache(layer), &
+                        pore_enabled(layer),stochastic_enabled(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -645,13 +666,14 @@ CONTAINS
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
                     ! Solve the coupled implicit update on a cell-local candidate.
-                    IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+                    IF (q(idx_totMassEqn,layer,j,k)<=0.0_wp) CYCLE
                     q_candidate=q_local
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
                         cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
                         iterations, ok, linear_info, failed, executor%source_complex_scratch(tid),                    &
-                        executor%source_physical_scratch(tid),thermal,rheology,pore_enabled,stochastic_enabled)
+                        executor%source_physical_scratch(tid),thermal(layer),rheology(layer), &
+                        pore_enabled(layer),stochastic_enabled(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -705,6 +727,8 @@ CONTAINS
                 END IF
 
                 q_local=q_candidate
+                q_layers(:,layer)=q_local
+                qp_layers(:,layer)=qp_local
                 IF (profiling_enabled) THEN
                     CALL SYSTEM_CLOCK(profile_tock)
                     thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &
@@ -716,7 +740,11 @@ CONTAINS
             ! Check buoyancy again after the final source group, including
             ! cases with no subsequent group to trigger the early sink.
             ! This is a physical sink, not a numerical limiter on source rates.
-            IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
+            DO layer=1,n_layers
+                IF (cell_error/=0) EXIT
+                q_local=q_layers(:,layer)
+                qp_local=qp_layers(:,layer)
+                IF (q_local(idx_totMassEqn)<=0.0_wp) CYCLE
                 CALL evaluate_density_from_qp(qp_local,rho_mix,red_grav,conversion_ok,remove_buoyant)
                 IF (.NOT.conversion_ok) THEN
                     cell_error=15
@@ -731,13 +759,15 @@ CONTAINS
                         CALL initialize_dry_physical_cell(qp_local)
                     END IF
                 END IF
-            END IF
+                q_layers(:,layer)=q_local
+                qp_layers(:,layer)=qp_local
+            END DO
             ! Check finiteness only for cells actually changed by the complete
             ! spatial + Lie update. Test once, after all groups and buoyancy,
             ! before publishing the local fluid/substrate candidate.
             IF (cell_error==0) THEN
-                cell_updated=ANY(q_local/=q_original(:,j,k))
-                IF (.NOT.cell_updated) cell_updated=ANY(qp_local/=qp_original(:,j,k))
+                cell_updated=ANY(q_layers/=q_original(:,:,j,k))
+                IF (.NOT.cell_updated) cell_updated=ANY(qp_layers/=qp_original(:,:,j,k))
                 IF (executor%has_exchange_group .AND. .NOT.cell_updated) THEN
                     cell_updated=ANY(deposit_local/=state%deposit(j,k,1:n_solid)) .OR.                              &
                         ANY(erosion_local/=state%erosion(j,k,1:n_solid)) .OR.                                        &
@@ -747,8 +777,10 @@ CONTAINS
                 IF (executor%has_bed_group .AND. .NOT.cell_updated)                                                  &
                     cell_updated=executor%bed_rate_cell(j,k)/=0.0_wp
                 IF (cell_updated) THEN
-                    IF (.NOT.ALL(finite_real_value(q_local)) .OR. .NOT.physical_cell_state_finite(qp_local))         &
-                        cell_error=2
+                    DO layer=1,n_layers
+                        IF (.NOT.ALL(finite_real_value(q_layers(:,layer))) .OR. &
+                            .NOT.physical_cell_state_finite(qp_layers(:,layer))) cell_error=2
+                    END DO
                     IF (executor%has_exchange_group .AND. cell_error==0) THEN
                         IF (.NOT.ALL(finite_real_value(deposit_local)) .OR.                                           &
                             .NOT.ALL(finite_real_value(erosion_local)) .OR.                                           &
@@ -759,8 +791,8 @@ CONTAINS
             END IF
             ! Publish this cell only after the final numerical check.
             IF (cell_error==0) THEN
-                q(:,j,k)=q_local
-                qp(:,j,k)=qp_local
+                q(:,:,j,k)=q_layers
+                qp(:,:,j,k)=qp_layers
                 IF (executor%has_exchange_group) THEN
                     state%deposit(j,k,1:n_solid)=deposit_local
                     state%erosion(j,k,1:n_solid)=erosion_local
@@ -839,6 +871,8 @@ CONTAINS
             SELECT CASE(executor%failure_code(first_failure))
             CASE(1)
                 failure_reason='D19: non-finite source-group geometry'
+            CASE(16)
+                failure_reason='TL07: invalid candidate layer contacts'
             CASE(2)
                 failure_reason='D19: non-finite source-group physical input'
             CASE(3)

@@ -17,6 +17,7 @@ MODULE time_integration_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE layer_physics_2d, ONLY : layer_physics_type
     USE source_registry_2d, ONLY : source_registry_type
     USE stochastic_module, ONLY : stochastic_workspace_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
@@ -87,13 +88,10 @@ CONTAINS
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operators Per-layer HP-PCCU workspaces; only slot 1 executes today.
-    !> @param[in] thermal Immutable selected layer thermal configuration.
-    !> @param[in] rheology Immutable selected layer rheology configuration.
-    !> @param[in] pore_pressure Immutable layer Darcy configuration.
-    !> @param[in] pore_cache Derived Pascal coefficient cache for this layer.
-    !> @param[in] mass_config Immutable layer combined mass-exchange configuration.
+    !> @param[in] layer_physics Canonical per-layer physical descriptors.
+    !> @param[in] pore_caches Derived Pascal coefficients for active layers.
     SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operators,pre_spatial_primitives_ready, &
-        stochastic_prepared_hook,thermal,rheology,pore_pressure,pore_cache,mass_config)
+        stochastic_prepared_hook,layer_physics,pore_caches)
         CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
         CLASS(state_type), TARGET, INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt
@@ -101,11 +99,13 @@ CONTAINS
         PROCEDURE(stochastic_stage_observer), OPTIONAL :: stochastic_prepared_hook
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operators(:)
-        TYPE(thermal_config_type), INTENT(IN) :: thermal
-        TYPE(rheology_config_type), INTENT(IN) :: rheology
-        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
-        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
-        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        TYPE(layer_physics_type), INTENT(IN) :: layer_physics(:)
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_caches(:)
+        TYPE(thermal_config_type) :: thermal(n_layers)
+        TYPE(rheology_config_type) :: rheology(n_layers)
+        TYPE(pore_pressure_config_type) :: pore_pressure(n_layers)
+        TYPE(mass_exchange_config_type) :: mass_config(n_layers)
+        LOGICAL :: transport_stochastic(n_layers),pore_enabled(n_layers),stochastic_enabled(n_layers)
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
         REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:),qp_pre2(:,:,:),qp_pre_all(:,:,:,:)
@@ -120,6 +120,20 @@ CONTAINS
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
         LOGICAL :: check_injected_rollback,had_bed_change
+        IF (SIZE(layer_physics)<n_layers .OR. SIZE(pore_caches)<n_layers) &
+            CALL fatal_error('TL07: missing physical descriptor or Darcy cache for layer')
+        DO layer=1,n_layers
+            IF (.NOT.layer_physics(layer)%is_initialized()) &
+                CALL fatal_error('TL07: uninitialized layer physical configuration')
+            thermal(layer)=layer_physics(layer)%thermal_configuration()
+            rheology(layer)=layer_physics(layer)%rheology_configuration()
+            pore_pressure(layer)=layer_physics(layer)%pore_pressure_configuration()
+            mass_config(layer)=layer_physics(layer)%mass_exchange_configuration()
+            transport_stochastic(layer)=.FALSE.
+            pore_enabled(layer)=pore_pressure(layer)%pore_pressure_flag
+            stochastic_enabled(layer)=rheology(layer)%stochastic_rheology_flag
+        END DO
+        transport_stochastic(1)=stochastic%config%stochastic_transport_flag
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
@@ -265,7 +279,7 @@ CONTAINS
         ! are valid only on the solve worklist, so stochastic%prepare_timestep
         ! uses the published state for inactive cells. Keep both published
         ! fluid arrays untouched until the final Lie transaction commits.
-        IF (rheology%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
+        IF (rheology(1)%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
             IF (.NOT.ALLOCATED(this%stochastic_Z_before)) THEN
                 ALLOCATE(this%stochastic_Z_before(comp_cells_x,comp_cells_y))
                 ALLOCATE(this%stochastic_effective_before(comp_cells_x,comp_cells_y))
@@ -291,10 +305,10 @@ CONTAINS
             this%profile_substrate_snapshot=this%profile_substrate_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
             tick=tock
         END IF
-        CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),dt,domain, &
-            stochastic%effective_Z,t,state%q(:,1,:,:),qp_pre,source_step_failed,source_failure,thermal,rheology, &
-            pore_pressure,pore_cache,mass_config,stochastic%config%stochastic_transport_flag, &
-            pore_pressure%pore_pressure_flag,rheology%stochastic_rheology_flag)
+        CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
+            stochastic%effective_Z,t,state%q,qp_pre_all,source_step_failed,source_failure, &
+            thermal,rheology,pore_pressure,pore_caches,mass_config, &
+            transport_stochastic,pore_enabled,stochastic_enabled)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -303,7 +317,7 @@ CONTAINS
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
             IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
-            IF (rheology%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
+            IF (rheology(1)%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
                 stochastic%Z=this%stochastic_Z_before
                 stochastic%effective_Z=this%stochastic_effective_before
             END IF

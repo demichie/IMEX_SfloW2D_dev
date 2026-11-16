@@ -18,7 +18,8 @@ MODULE simulation_2d
 
     USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
     USE thermal_parameters_2d, ONLY : thermal_l1,thermal_l2
-    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2,pore_pressure_cache_l1
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2, &
+        pore_pressure_cache_l1,pore_pressure_cache_l2
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type
@@ -180,20 +181,14 @@ CONTAINS
                 this%stochastic,this%domains(1),this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
-                thermal=this%layer_physics(1)%thermal_configuration(), &
-                rheology=this%layer_physics(1)%rheology_configuration(), &
-                pore_pressure=this%layer_physics(1)%pore_pressure_configuration(), &
-                pore_cache=pore_pressure_cache_l1, &
-                mass_config=this%layer_physics(1)%mass_exchange_configuration())
+                layer_physics=this%layer_physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
                 this%stochastic,this%domains(1),this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
-                thermal=this%layer_physics(1)%thermal_configuration(), &
-                rheology=this%layer_physics(1)%rheology_configuration(), &
-                pore_pressure=this%layer_physics(1)%pore_pressure_configuration(), &
-                pore_cache=pore_pressure_cache_l1, &
-                mass_config=this%layer_physics(1)%mass_exchange_configuration())
+                layer_physics=this%layer_physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
         END IF
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 
