@@ -155,6 +155,7 @@ PROGRAM test_spatial_operator
         0.0_wp,domain,coupled_dt)
     IF (.NOT.ieee_is_finite(coupled_dt) .OR. coupled_dt<=0.0_wp) &
         ERROR STOP 'Invalid total-depth coupled CFL'
+    CALL check_coupled_spatial_trial
     DO l=1,domain%solve_cells
         j=domain%j_cent(l)
         k=domain%k_cent(l)
@@ -352,6 +353,62 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> @brief Check a conservative two-layer spatial trial before Lie coupling.
+    !> @details The shared OR workset and both residuals are already prepared.
+    !> A closed boundary collar carries zero mass, energy and constituent flux.
+    !> This test does not publish a state or bypass the Lie source transaction.
+    SUBROUTINE check_coupled_spatial_trial
+        REAL(wp) :: residual_sum(2),residual_scale(2),step,updated(n_eqns)
+        REAL(wp) :: tol,scale
+        INTEGER :: layer,l,j,k,i,eq
+
+        step=MIN(coupled_dt*0.01_wp,1.0E-5_wp)
+        IF (step<=0.0_wp) ERROR STOP 'Coupled spatial trial has invalid timestep'
+        DO layer=1,2
+            DO i=1,3
+                SELECT CASE(i)
+                CASE(1)
+                    eq=idx_totMassEqn
+                CASE(2)
+                    eq=idx_engyEqn
+                CASE(3)
+                    eq=idx_solidEqn_first
+                END SELECT
+                residual_sum=0.0_wp
+                residual_scale=0.0_wp
+                DO l=1,domain%solve_cells
+                    j=domain%j_cent(l)
+                    k=domain%k_cent(l)
+                    IF (layer==1) THEN
+                        residual_sum(1)=residual_sum(1)+direct(eq,j,k)
+                        residual_scale(1)=residual_scale(1)+ABS(direct(eq,j,k))
+                    ELSE
+                        residual_sum(2)=residual_sum(2)+slot2_term(eq,j,k)
+                        residual_scale(2)=residual_scale(2)+ABS(slot2_term(eq,j,k))
+                    END IF
+                END DO
+                scale=MAX(1.0_wp,MAXVAL(residual_scale))
+                tol=4096.0_wp*EPSILON(1.0_wp)*scale
+                IF (MAXVAL(ABS(residual_sum))>tol) &
+                    ERROR STOP 'Two-layer spatial trial violates closed-collar conservation'
+            END DO
+        END DO
+
+        ! Check both physical candidates, including the dry state, without
+        ! touching either authoritative state or the production Lie executor.
+        DO l=1,domain%solve_cells
+            j=domain%j_cent(l)
+            k=domain%k_cent(l)
+            updated=slot_q(1:n_eqns,1,j,k)-step*direct(:,j,k)
+            IF (.NOT.conservative_mass_admissible(updated)) &
+                ERROR STOP 'Coupled L1 spatial candidate is inadmissible'
+            updated=slot_q(1:n_eqns,2,j,k)-step*slot2_term(:,j,k)
+            IF (.NOT.conservative_mass_admissible(updated)) &
+                ERROR STOP 'Coupled L2 spatial candidate is inadmissible'
+        END DO
+        WRITE(*,*) 'PASS: coupled spatial trial conserves mass, energy, constituents'
+    END SUBROUTINE check_coupled_spatial_trial
 
     !> @brief Quantify stratified-rest residuals on flat, affine and curved beds.
     !> @details Two constant free surfaces eta1 and eta2 give stationary layers.
