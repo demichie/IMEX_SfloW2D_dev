@@ -339,6 +339,7 @@ PROGRAM test_spatial_operator
        reconstruction%h_froude_interfaceR, reconstruction%h_froude_interfaceB, &
        reconstruction%h_froude_interfaceT
   CLOSE(output_unit)
+  CALL check_stratified_rest_geometry
   ! Keep this state-mutating BC fixture separate from the reference payload.
   ! It runs after serialization so it cannot perturb the measured spatial fields.
   CALL check_layer_local_dirichlet_inlet
@@ -351,6 +352,107 @@ PROGRAM test_spatial_operator
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
+
+    !> @brief Quantify stratified-rest residuals on flat, affine and curved beds.
+    !> @details Two constant free surfaces eta1 and eta2 give stationary layers.
+    !> Flat and affine geometry must balance within roundoff; curved geometry
+    !> is measured without assuming exact momentum well-balancing.
+    !> Original shared geometry is restored before other tests run.
+    SUBROUTINE check_stratified_rest_geometry
+        TYPE(domain_type) :: paired
+        TYPE(spatial_operator_type) :: lower,upper
+        REAL(wp) :: saved_b(nx+1,ny+1)
+        REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+        REAL(wp) :: p1(n_vars,nx,ny),p2(n_vars,nx,ny)
+        REAL(wp) :: r1(n_eqns,nx,ny),r2(n_eqns,nx,ny)
+        REAL(wp) :: primitive(n_vars),eta1,dt1,dt2,dt_pair
+        REAL(wp) :: max_m1,max_m2,max_other,scale,tolerance
+        INTEGER :: terrain,j,k,l,i
+        LOGICAL :: accepted
+
+        IF (nx<8 .OR. ny<8) RETURN
+        saved_b=B_vertex
+        CALL paired%initialize
+        CALL lower%initialize(1)
+        CALL upper%initialize(2)
+        primitive=0.0_wp
+        primitive(idx_T)=T_ambient
+
+        DO terrain=1,3
+            DO k=1,ny+1
+                DO j=1,nx+1
+                    SELECT CASE(terrain)
+                    CASE(1)
+                        B_vertex(j,k)=1.0_wp
+                    CASE(2)
+                        B_vertex(j,k)=1.0_wp+0.01_wp*x_stag(j)+0.02_wp*y_stag(k)
+                    CASE(3)
+                        B_vertex(j,k)=1.0_wp+0.002_wp*x_stag(j)**2+0.003_wp*y_stag(k)**2
+                    END SELECT
+                END DO
+            END DO
+            CALL refresh_topography_geometry
+
+            eta1=MAXVAL(B_cent)+2.0_wp
+            DO k=1,ny
+                DO j=1,nx
+                    primitive(idx_h)=eta1-B_cent(j,k)
+                    CALL primitive_to_conservative(primitive,q1(:,j,k),accepted=accepted)
+                    IF (.NOT.accepted) ERROR STOP 'Invalid lower stratified-rest state'
+                    primitive(idx_h)=0.7_wp
+                    CALL primitive_to_conservative(primitive,q2(:,j,k),accepted=accepted)
+                    IF (.NOT.accepted) ERROR STOP 'Invalid upper stratified-rest state'
+                END DO
+            END DO
+
+            CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+            CALL lower%prepare_hp_workset(paired)
+            CALL upper%prepare_hp_workset(paired)
+            p1=0.0_wp
+            p2=0.0_wp
+            CALL lower%compute_timestep(q1,p1,0.0_wp,dt1,paired)
+            CALL upper%compute_timestep(q2,p2,0.0_wp,dt2,paired, &
+                lower_operator=lower,h_lower=p1(idx_h,:,:))
+            CALL lower%evaluate_coupled(upper,p1,p2,r1,r2,0.0_wp,paired,dt_pair)
+            IF (.NOT.ieee_is_finite(dt_pair) .OR. dt_pair<=0.0_wp) &
+                ERROR STOP 'Invalid stratified-rest coupled timestep'
+
+            max_m1=0.0_wp
+            max_m2=0.0_wp
+            max_other=0.0_wp
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                IF (.NOT.ALL(ieee_is_finite(r1(:,j,k))) .OR. &
+                    .NOT.ALL(ieee_is_finite(r2(:,j,k)))) &
+                    ERROR STOP 'Nonfinite stratified-rest spatial residual'
+                ! Exclude the imposed boundary collar from equilibrium estimates.
+                IF (j<=3 .OR. j>=nx-2 .OR. k<=3 .OR. k>=ny-2) CYCLE
+                max_m1=MAX(max_m1,MAXVAL(ABS(r1(idx_uEqn:idx_vEqn,j,k))))
+                max_m2=MAX(max_m2,MAXVAL(ABS(r2(idx_uEqn:idx_vEqn,j,k))))
+                DO i=1,n_eqns
+                    IF (i==idx_uEqn .OR. i==idx_vEqn) CYCLE
+                    max_other=MAX(max_other,ABS(r1(i,j,k)),ABS(r2(i,j,k)))
+                END DO
+            END DO
+
+            scale=grav*MAXVAL(eta1-B_cent+0.7_wp)*MAX(one_by_dx,one_by_dy)
+            tolerance=1.0E-9_wp*MAX(1.0_wp,scale)
+            IF (max_other>tolerance) &
+                ERROR STOP 'Stratified rest created scalar transport'
+            IF (terrain<=2 .AND. (max_m1>tolerance .OR. max_m2>tolerance)) &
+                ERROR STOP 'Flat/affine stratified equilibrium failed'
+            WRITE(*,'(A,I0,A,3(ES13.5,1X))') 'STRATIFIED_REST terrain=',terrain, &
+                ' momentum_L1_L2_other=',max_m1,max_m2,max_other
+        END DO
+
+        B_vertex=saved_b
+        CALL refresh_topography_geometry
+        CALL upper%finalize
+        CALL lower%finalize
+        CALL paired%finalize
+        WRITE(*,*) 'PASS: stratified rest on flat, affine, curved Q1 beds'
+    END SUBROUTINE check_stratified_rest_geometry
 
     !> @brief Verify an interlayer face on two active cells for all four layer states.
     !> @details Compare directly with the oriented PCCU pressure kernel, check
