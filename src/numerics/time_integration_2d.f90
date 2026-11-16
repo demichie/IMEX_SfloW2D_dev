@@ -182,45 +182,13 @@ CONTAINS
         ! The spatial step is conservative; only admissibility is checked.
         CALL spatial_operators(1)%evaluate(qp_pre,this%spatial_rate(:,1,:,:),t,domain, &
             reuse_cfl_traces=reuse_cfl_traces)
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,conversion_ok)
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k)
         DO l=1,domain%solve_cells
-            this%cell_status(l)=0
             j=domain%j_cent(l)
             k=domain%k_cent(l)
-            ! Fuse candidate initialization and conservative update in one sweep.
-            this%q_trial(1:n_eqns,1,j,k)=state%q(1:n_eqns,1,j,k)-dt*this%spatial_rate(:,1,j,k)
-            IF (n_vars>n_eqns) this%q_trial(n_eqns+1:n_vars,1,j,k)=state%q(n_eqns+1:n_vars,1,j,k)
-            ! Spatial admissibility check. Do not limit or clip its conservative rate.
-            IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,1,j,k))) THEN
-                this%cell_status(l)=1
-                CYCLE
-
-            END IF
-
-            ! A sea cell is an absorbing sink after the spatial step, before ALL Lie sources.
-            ! Keep this inside the existing OpenMP sweep and synchronize q/qp.
-            IF (sea_mass_removal_flag .AND. B_zone(j,k)==1) THEN
-                this%q_trial(:,1,j,k)=0.0_wp
-                CALL initialize_dry_physical_cell(this%qp_trial(:,1,j,k))
-                CYCLE
-            END IF
-
-            IF (this%q_trial(idx_totMassEqn,1,j,k)>0.0_wp) THEN
-                ! The numerical primitive of an unchanged conservative state
-                ! was already prepared for the spatial operator (CFL or
-                ! explicit halo preflight). Reuse the same state version.
-                IF (ALL(this%q_trial(:,1,j,k)==state%q(:,1,j,k))) THEN
-                    this%qp_trial(:,1,j,k)=qp_pre(:,j,k)
-                ELSE
-                    CALL conservative_to_primitive(this%q_trial(:,1,j,k),this%qp_trial(:,1,j,k),                        &
-                        accepted=conversion_ok)
-                    IF (.NOT.conversion_ok) this%cell_status(l)=2
-                END IF
-            ELSE
-                CALL initialize_dry_physical_cell(this%qp_trial(:,1,j,k))
-
-            END IF
-
+            CALL update_spatial_cell(state%q(:,1,j,k),qp_pre(:,j,k),this%spatial_rate(:,1,j,k),dt, &
+                sea_mass_removal_flag .AND. B_zone(j,k)==1, &
+                this%q_trial(:,1,j,k),this%qp_trial(:,1,j,k),this%cell_status(l))
         END DO
         !$OMP END PARALLEL DO
         first_failure=MINLOC(this%cell_status(1:domain%solve_cells),1,                                                &
@@ -364,6 +332,44 @@ CONTAINS
             this%profile_publish=this%profile_publish+REAL(tock-tick,wp)/REAL(tick_rate,wp)
         END IF
     END SUBROUTINE advance_lie
+
+    !> @brief Assemble and validate one layer's post-spatial cell candidate.
+    !> @details Identical kernel for either layer; no committed state is changed.
+    !> An invalid conservative candidate is rejected before sea removal, as in
+    !> the original Lie stage. Status is 0 (accepted), 1 (inadmissible mass) or
+    !> 2 (failed primitive conversion).
+    SUBROUTINE update_spatial_cell(q_before,qp_before,rate,dt,sea_cell,q_candidate,qp_candidate,status)
+        REAL(wp), INTENT(IN) :: q_before(n_vars),qp_before(n_vars),rate(n_eqns),dt
+        LOGICAL, INTENT(IN) :: sea_cell
+        REAL(wp), INTENT(OUT) :: q_candidate(n_vars),qp_candidate(n_vars)
+        INTEGER, INTENT(OUT) :: status
+        LOGICAL :: conversion_ok
+
+        status=0
+        q_candidate(1:n_eqns)=q_before(1:n_eqns)-dt*rate
+        IF (n_vars>n_eqns) q_candidate(n_eqns+1:n_vars)=q_before(n_eqns+1:n_vars)
+        IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
+            status=1
+            RETURN
+        END IF
+
+        IF (sea_cell) THEN
+            q_candidate=0.0_wp
+            CALL initialize_dry_physical_cell(qp_candidate)
+            RETURN
+        END IF
+
+        IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
+            IF (ALL(q_candidate==q_before)) THEN
+                qp_candidate=qp_before
+            ELSE
+                CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok)
+                IF (.NOT.conversion_ok) status=2
+            END IF
+        ELSE
+            CALL initialize_dry_physical_cell(qp_candidate)
+        END IF
+    END SUBROUTINE update_spatial_cell
 
     !> @brief Release previously allocated integration workspaces.
     !> @param[in,out] this Integration workspace to release.
