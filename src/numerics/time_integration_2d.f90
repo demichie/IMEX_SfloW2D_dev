@@ -7,10 +7,9 @@ MODULE time_integration_2d
             idx_add_gas_first,idx_add_gas_last,sea_mass_removal_flag,n_layers
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
-            rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
-            B_prime_x_geom,B_prime_y_geom,grav_coeff,B_zone
+            B_zone
     USE state_conversions, ONLY : conservative_to_primitive
-    USE state_fields, ONLY : state_type,substrate_snapshot_type,initialize_dry_physical_cell
+    USE state_fields, ONLY : state_type,initialize_dry_physical_cell
     USE state_composition, ONLY : conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
     USE thermal_parameters_2d, ONLY : thermal_config_type
@@ -39,17 +38,12 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: qp_before(:,:,:,:)
         !> Candidate fields: only worklist entries are initialized or published.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:,:), qp_trial(:,:,:,:)
-        ! Persistent OU rollback buffers; only used when stochastic physics is on.
-        REAL(wp), ALLOCATABLE :: stochastic_Z_before(:,:), stochastic_effective_before(:,:)
         !> Persistent status worklist for primitive and spatial checks.
         INTEGER, ALLOCATABLE :: cell_status(:)
         TYPE(lie_source_executor_type) :: lie_executor
-        ! Retain rollback storage between steps to avoid repeated allocation/free.
-        TYPE(substrate_snapshot_type) :: substrate_before
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
-        REAL(wp) :: profile_state_snapshot=0.0_wp,profile_substrate_snapshot=0.0_wp
         REAL(wp) :: profile_source_executor=0.0_wp,profile_publish=0.0_wp
     CONTAINS
         PROCEDURE :: initialize => initialize_time_integration
@@ -114,12 +108,7 @@ CONTAINS
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
-        LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
-        REAL(wp), ALLOCATABLE :: q_authoritative(:,:,:,:),qp_authoritative(:,:,:,:),                              &
-            bed_before(:,:), &
-            bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                      &
-            slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
-        LOGICAL :: check_injected_rollback,had_bed_change
+        LOGICAL :: needs_geometry_update
         IF (SIZE(layer_physics)<n_layers .OR. SIZE(pore_caches)<n_layers) &
             CALL fatal_error('TL07: missing physical descriptor or Darcy cache for layer')
         DO layer=1,n_layers
@@ -138,22 +127,6 @@ CONTAINS
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
         END IF
-        ! Snapshot all layer slots only for the D20 injected rollback test.
-        check_injected_rollback=this%lie_executor%reject_active
-
-        IF (check_injected_rollback) THEN
-            q_authoritative=state%q
-            qp_authoritative=state%qp
-            bed_before=B_vertex
-            bed_cent_before=B_cent
-            bed_face_x_before=B_face_x
-            bed_face_y_before=B_face_y
-            slope_x_before=B_prime_x_geom
-            slope_y_before=B_prime_y_geom
-            gravity_before=grav_coeff
-
-        END IF
-
         ! The conservative state remains immutable until commit. Trial buffers
         ! are initialized only on active cells, avoiding four full-grid copies.
         ! Production CFL already converted this unchanged pre-spatial state.
@@ -280,31 +253,15 @@ CONTAINS
         ! uses the published state for inactive cells. Keep both published
         ! fluid arrays untouched until the final Lie transaction commits.
         IF (rheology(1)%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
-            IF (.NOT.ALLOCATED(this%stochastic_Z_before)) THEN
-                ALLOCATE(this%stochastic_Z_before(comp_cells_x,comp_cells_y))
-                ALLOCATE(this%stochastic_effective_before(comp_cells_x,comp_cells_y))
-            END IF
-            this%stochastic_Z_before=stochastic%Z
-            this%stochastic_effective_before=stochastic%effective_Z
             CALL stochastic%prepare_timestep(state,dt,stochastic%config%stochastic_transport_flag, &
                 this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),domain)
         END IF
         IF (PRESENT(stochastic_prepared_hook)) CALL stochastic_prepared_hook()
-        ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
-        ! Later groups evaluate from each predecessor's updated state.
-        ! Geometry stays frozen for all source groups; retain authoritative
-        ! fields until the full trial succeeds.
-        ! Snapshot only fields a configured source can actually change.
-        ! The metadata is immutable within a timestep; no per-cell scan is needed.
-        needs_substrate_snapshot=this%lie_executor%has_exchange_group
-        needs_geometry_snapshot=this%lie_executor%has_bed_group
-        IF (needs_substrate_snapshot) CALL state%snapshot_substrate(this%substrate_before)
-        IF (needs_geometry_snapshot) CALL begin_geometry_transaction(sparse=.TRUE.)
-        IF (this%profile_enabled) THEN
-            CALL SYSTEM_CLOCK(tock)
-            this%profile_substrate_snapshot=this%profile_substrate_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
-            tick=tock
-        END IF
+        ! Group 0 evaluates q^n but limits and applies to post-spatial q*.
+        ! The geometry transaction supports deferred topography updates;
+        ! it is not a recoverable timestep or retry mechanism.
+        needs_geometry_update=this%lie_executor%has_bed_group
+        IF (needs_geometry_update) CALL begin_geometry_transaction(sparse=.TRUE.)
         CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
             stochastic%effective_Z,t,state%q,qp_pre_all,source_step_failed,source_failure, &
             thermal,rheology,pore_pressure,pore_caches,mass_config, &
@@ -314,45 +271,8 @@ CONTAINS
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
         END IF
 
-        IF (source_step_failed) THEN
-            had_bed_change=.FALSE.
-            IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
-            IF (rheology(1)%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
-                stochastic%Z=this%stochastic_Z_before
-                stochastic%effective_Z=this%stochastic_effective_before
-            END IF
-            IF (needs_substrate_snapshot) CALL state%restore_substrate(this%substrate_before)
-            IF (needs_geometry_snapshot) CALL rollback_geometry_transaction
-
-            IF (check_injected_rollback) THEN
-                IF (TRIM(source_failure)/='D20_INJECTED_LATE_LIE_FAILURE')                                             &
-                    CALL fatal_error('D20 rollback: failpoint did not trigger')
-                IF (.NOT.had_bed_change)                                                                               &
-                    CALL fatal_error('D20 rollback: failpoint had no prior bed change')
-                IF (.NOT.ALL(state%q==q_authoritative) .OR.                                                           &
-                    .NOT.ALL(state%qp==qp_authoritative))                                                             &
-                    CALL fatal_error('D20 rollback: published layer state changed')
-                IF (.NOT.ALL(state%deposit==this%substrate_before%deposit) .OR.                                             &
-                    .NOT.ALL(state%erosion==this%substrate_before%erosion) .OR.                                             &
-                    .NOT.ALL(state%erodible==this%substrate_before%erodible) .OR.                                           &
-                    .NOT.ALL(state%deposit_tot==this%substrate_before%deposit_tot) .OR.                                     &
-                    .NOT.ALL(state%erosion_tot==this%substrate_before%erosion_tot))                                         &
-                    CALL fatal_error('D20 rollback: physical inventories not restored')
-                IF (.NOT.ALL(B_vertex==bed_before) .OR.                                                                &
-                    .NOT.ALL(B_cent==bed_cent_before) .OR.                                                             &
-                    .NOT.ALL(B_face_x==bed_face_x_before) .OR.                                                         &
-                    .NOT.ALL(B_face_y==bed_face_y_before) .OR.                                                         &
-                    .NOT.ALL(B_prime_x_geom==slope_x_before) .OR.                                                      &
-                    .NOT.ALL(B_prime_y_geom==slope_y_before) .OR.                                                      &
-                    .NOT.ALL(grav_coeff==gravity_before))                                                              &
-                    CALL fatal_error('D20 rollback: geometry not restored')
-                WRITE(*,'(A)') 'D20_FULL_STEP_ROLLBACK_PASS'
-
-            END IF
-
-            CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
-
-        END IF
+        ! A source failure is fatal: no restoration or timestep retry.
+        IF (source_step_failed) CALL fatal_error('Lie timestep failed: '//TRIM(source_failure))
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
@@ -374,7 +294,7 @@ CONTAINS
         !$OMP END PARALLEL DO
         ! The source executor refreshed substrate aggregates after its cell sweep.
         ! Recomputing them here would traverse the whole domain a second time.
-        IF (needs_geometry_snapshot) CALL commit_geometry_transaction
+        IF (needs_geometry_update) CALL commit_geometry_transaction
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_publish=this%profile_publish+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -428,24 +348,15 @@ CONTAINS
             WRITE(*,'(A,I0)') 'LIE_PROFILE steps=',this%profile_calls
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE spatial_update_seconds=',this%profile_spatial
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_groups_seconds=',this%profile_sources
-            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE state_snapshot_seconds=',this%profile_state_snapshot
-            WRITE(*,'(A,ES15.7)') 'LIE_PROFILE substrate_geometry_snapshot_seconds=',this%profile_substrate_snapshot
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_executor_seconds=',this%profile_source_executor
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE publish_seconds=',this%profile_publish
         END IF
         CALL finalize_lie_source_executor(this%lie_executor)
-        IF (ALLOCATED(this%stochastic_Z_before)) DEALLOCATE(this%stochastic_Z_before)
-        IF (ALLOCATED(this%stochastic_effective_before)) DEALLOCATE(this%stochastic_effective_before)
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
         IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
         IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
         IF (ALLOCATED(this%cell_status)) DEALLOCATE(this%cell_status)
-        IF (ALLOCATED(this%substrate_before%deposit)) DEALLOCATE(this%substrate_before%deposit)
-        IF (ALLOCATED(this%substrate_before%erosion)) DEALLOCATE(this%substrate_before%erosion)
-        IF (ALLOCATED(this%substrate_before%erodible)) DEALLOCATE(this%substrate_before%erodible)
-        IF (ALLOCATED(this%substrate_before%deposit_tot)) DEALLOCATE(this%substrate_before%deposit_tot)
-        IF (ALLOCATED(this%substrate_before%erosion_tot)) DEALLOCATE(this%substrate_before%erosion_tot)
     END SUBROUTINE finalize_time_integration
 
 END MODULE time_integration_2d

@@ -243,7 +243,7 @@ CONTAINS
     !> @details Each OpenMP iteration processes one cell and visits the groups
     !>          sequentially. Group zero reads the pre-spatial snapshot while
     !>          incrementing the post-spatial trial state. Geometry remains
-    !>          frozen until all cells succeed; failure triggers caller rollback.
+    !>          frozen until all cells succeed; failure is fatal to the caller.
     !> @param[in,out] executor Configured Lie groups and reusable work arrays.
     !> @param[in,out] state Owns substrate inventories and aggregate fields.
     !> @param[in,out] q Conservative candidates (component,layer,x-cell,y-cell).
@@ -818,7 +818,7 @@ CONTAINS
         END DO cell_loop
         !$OMP END DO
         !$OMP END PARALLEL
-        ! Keep dirty bed rates even on a rejected source sweep; retry must clear them.
+        ! Track dirty bed rates for clearing before the next accepted sweep.
         IF (executor%has_bed_group) THEN
             changed_jmin=comp_cells_x+1; changed_jmax=0
             changed_kmin=comp_cells_y+1; changed_kmax=0
@@ -976,8 +976,8 @@ CONTAINS
             CALL SYSTEM_CLOCK(tock)
             profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)
         END IF
-        ! Inject after the deferred geometry refresh, so the D20 rollback
-        ! witness still verifies restoration of genuinely changed geometry.
+        ! Inject after the deferred geometry refresh to verify fatal
+        ! termination without any state restoration or timestep retry.
         IF (executor%reject_active) THEN
             step_failed=.TRUE.
             failure_reason='D20_INJECTED_LATE_LIE_FAILURE'

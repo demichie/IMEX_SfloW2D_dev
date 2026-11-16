@@ -9,8 +9,8 @@ Do not clip or limit the spatial conservative update.
 
 ## Rules
 
-- The integrator owns the pre-step fluid snapshot, trial fluid state,
-  substrate snapshot and geometry transaction.
+- The integrator owns the immutable pre-spatial state, trial fluid state and
+  deferred geometry update. Failure is fatal; no snapshot is restored or retried.
 - Source groups apply changes directly to the integrator-owned trial
   arrays. Distinct OpenMP workers update distinct cells. No per-group
   full-domain `q_group` or `qp_group` copies.
@@ -120,3 +120,15 @@ scaling certification.
 **Status:** time-step-only Lie transaction migration validated and closed.
 Remaining work on trial-state allocations or CFL/spatial operator profiling
 is an optional new optimization phase, not a prerequisite for closure.
+
+## 2026-11-16 — Failure contract correction
+
+The previous D20 rollback evidence is historical and is not the current runtime
+contract. A source failure terminates the simulation without restoring the
+substrate, stochastic state or geometry, and without retrying the step.
+Whole-state validity is checked after the ordered Lie groups; local checks
+required by explicit rate limiting, conservative-to-primitive conversions,
+Newton convergence or physical inventory availability remain in place.
+The late injected failure regression now checks the fatal stop and OpenMP
+team rather than a rollback witness. The geometry transaction is currently
+retained for deferred bed-cache updates and does not imply a restart path.

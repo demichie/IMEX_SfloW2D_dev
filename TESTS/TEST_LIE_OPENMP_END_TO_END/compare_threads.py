@@ -167,9 +167,9 @@ def run_case(solver, fixture, root, case, threads, evidence):
     return read_fields(target)
 
 
-def verify_full_step_rollback(solver, fixture, root, threads, evidence):
-    """Require an actual production Lie rollback after a committed bed-changing group."""
-    target = root / "rollback" / str(threads)
+def verify_late_lie_fatal_stop(solver, fixture, root, threads, evidence):
+    """Require fatal termination after a late bed-changing Lie group."""
+    target = root / "fatal_lie" / str(threads)
     shutil.copytree(fixture, target)
     env = os.environ.copy()
     env.update(OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
@@ -178,19 +178,19 @@ def verify_full_step_rollback(solver, fixture, root, threads, evidence):
     result = subprocess.run([str(solver)], cwd=target, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=240)
-    log_path = evidence / f"rollback-threads-{threads}.log"
+    log_path = evidence / f"fatal-lie-threads-{threads}.log"
     log_path.write_text(result.stdout)
     if result.returncode == 0:
-        raise AssertionError(f"rollback/{threads}: injected failure unexpectedly accepted")
-    expected = ("D20_FULL_STEP_ROLLBACK_PASS", "D20_INJECTED_LATE_LIE_FAILURE")
+        raise AssertionError(f"fatal_lie/{threads}: injected failure unexpectedly accepted")
+    expected = ("Lie timestep failed:", "D20_INJECTED_LATE_LIE_FAILURE")
     if not all(token in result.stdout for token in expected):
-        raise AssertionError(f"rollback/{threads}: no exact full-step rollback witness; "
+        raise AssertionError(f"fatal_lie/{threads}: no fatal stop witness; "
                              f"log={log_path}; tail:\n" +
                              "\n".join(result.stdout.splitlines()[-35:]))
     if not re.search(r"Parallel run:\s*number of threads used\s+"
                      + str(threads) + r"\b", result.stdout):
-        raise AssertionError(f"rollback/{threads}: actual OpenMP team not demonstrated")
-    print(f"PASS full-step injected rollback with {threads} threads")
+        raise AssertionError(f"fatal_lie/{threads}: actual OpenMP team not demonstrated")
+    print(f"PASS fatal Lie stop with {threads} threads")
 
 
 def compare(case, baseline, candidate, threads):
@@ -241,9 +241,9 @@ def main():
                                          "comparisons": results}
                 print(f"PASS {case}: {len(baseline)} fields, teams 1/2/4")
             for threads in THREADS:
-                verify_full_step_rollback(solver, root / "fixtures" / "EXAMPLE_2D_TOPO",
+                verify_late_lie_fatal_stop(solver, root / "fixtures" / "EXAMPLE_2D_TOPO",
                                           root, threads, evidence)
-            report["rollback"] = {"verified_threads": THREADS,
+            report["fatal_lie"] = {"verified_threads": THREADS,
                                   "injected_after_group": 4}
     except Exception as error:
         report["failure"] = str(error)
