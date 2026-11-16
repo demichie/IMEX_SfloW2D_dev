@@ -478,7 +478,9 @@ CONTAINS
         REAL(wp) :: xn(comp_interfaces_x,comp_cells_y),xp(comp_interfaces_x,comp_cells_y)
         REAL(wp) :: yn(comp_cells_x,comp_interfaces_y),yp(comp_cells_x,comp_interfaces_y)
         REAL(wp) :: step,expected,cfl_limit,rate,xspeed,yspeed
-        REAL(wp) :: xlo,xhi,ylo,yhi
+        REAL(wp) :: xlo,xhi,ylo,yhi,face_lo,face_hi
+        TYPE(reconstruction_workspace_type) :: rec1,rec2
+        TYPE(hyperbolic_workspace_type) :: speed_cache
         CHARACTER(LEN=LEN(cfl_policy)) :: old_policy
         INTEGER :: j,k,jwet,kwet,dir,case_number,normal
 
@@ -544,6 +546,48 @@ CONTAINS
             1.0_wp,idx_u,xlo,xhi)
         CALL eval_total_depth_face_speed_bounds(lower,upper,lower,upper, &
             1.0_wp,idx_v,ylo,yhi)
+        ! Verify the face pass reuses the canonical workspace, not a shadow array.
+        CALL rec1%initialize(layer=1)
+        CALL rec2%initialize(layer=2)
+        CALL speed_cache%initialize
+        IF (nx>1) THEN
+            rec1%qp_adv_interfaceL(:,2,1)=lower
+            rec1%qp_adv_interfaceR(:,2,1)=lower
+            rec2%qp_adv_interfaceL(:,2,1)=upper
+            rec2%qp_adv_interfaceR(:,2,1)=upper
+            rec1%h_selected_interfaceL(2,1)=lower(1)
+            rec1%h_selected_interfaceR(2,1)=lower(1)
+            rec2%h_selected_interfaceL(2,1)=upper(1)
+            rec2%h_selected_interfaceR(2,1)=upper(1)
+            CALL speed_cache%evaluate_total_depth_speeds(rec1,rec2,1,[2],[1], &
+                0,[INTEGER::],[INTEGER::])
+            CALL eval_total_depth_face_speed_bounds(lower,upper,lower,upper, &
+                grav_coeff_stag_x(2,1),idx_u,face_lo,face_hi)
+            CALL same_bits('shared x-face total-depth bounds', &
+                [speed_cache%a_interface_xNeg(2,1),speed_cache%a_interface_xPos(2,1)], &
+                [face_lo,face_hi])
+        END IF
+        IF (ny>1) THEN
+            rec1%qp_adv_interfaceB(:,1,2)=lower
+            rec1%qp_adv_interfaceT(:,1,2)=lower
+            rec2%qp_adv_interfaceB(:,1,2)=upper
+            rec2%qp_adv_interfaceT(:,1,2)=upper
+            rec1%h_selected_interfaceB(1,2)=lower(1)
+            rec1%h_selected_interfaceT(1,2)=lower(1)
+            rec2%h_selected_interfaceB(1,2)=upper(1)
+            rec2%h_selected_interfaceT(1,2)=upper(1)
+            CALL speed_cache%evaluate_total_depth_speeds(rec1,rec2,0,[INTEGER::],[INTEGER::], &
+                1,[1],[2])
+            CALL eval_total_depth_face_speed_bounds(lower,upper,lower,upper, &
+                grav_coeff_stag_y(1,2),idx_v,face_lo,face_hi)
+            CALL same_bits('shared y-face total-depth bounds', &
+                [speed_cache%a_interface_yNeg(1,2),speed_cache%a_interface_yPos(1,2)], &
+                [face_lo,face_hi])
+        END IF
+        CALL speed_cache%finalize
+        CALL rec2%finalize
+        CALL rec1%finalize
+
         xn=xlo
         xp=xhi
         yn=ylo

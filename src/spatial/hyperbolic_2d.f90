@@ -62,6 +62,7 @@ MODULE hyperbolic_2d
         PROCEDURE :: finalize => finalize_hyperbolic
         PROCEDURE :: evaluate_terms => eval_hyperbolic_terms
         PROCEDURE :: evaluate_speeds => eval_speeds
+        PROCEDURE :: evaluate_total_depth_speeds => eval_total_depth_speeds
         PROCEDURE :: diagnose_cell => diagnose_hyperbolic_cell
     END TYPE hyperbolic_workspace_type
 
@@ -123,6 +124,65 @@ CONTAINS
             END DO
         END DO
     END SUBROUTINE eval_total_depth_face_speed_bounds
+
+    !> @brief Populate canonical face-speed storage using the total-depth envelope.
+    !> @details Both reconstruction workspaces must be current on the shared OR
+    !> face workset. The single-layer speed path is unchanged. These bounds
+    !> remain preliminary pending a coupled hyperbolicity analysis.
+    !> @param[in,out] this Existing HP-PCCU face-speed workspace.
+    !> @param[in] lower,upper Prepared reconstructed layer traces.
+    !> @param[in] nxfaces,nyfaces Numbers of active x/y faces.
+    !> @param[in] jx,kx,jy,ky Shared compact face indices.
+    SUBROUTINE eval_total_depth_speeds(this,lower,upper,nxfaces,jx,kx,nyfaces,jy,ky)
+        CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+        CLASS(reconstruction_workspace_type), INTENT(IN) :: lower,upper
+        INTEGER, INTENT(IN) :: nxfaces,nyfaces,jx(:),kx(:),jy(:),ky(:)
+        REAL(wp) :: q1a(n_vars),q1b(n_vars),q2a(n_vars),q2b(n_vars)
+        INTEGER :: l,j,k
+
+        IF (lower%layer/=1 .OR. upper%layer/=2) &
+            ERROR STOP 'Total-depth bounds require both prepared layer reconstructions'
+
+        IF (comp_cells_x>1) THEN
+            !$OMP PARALLEL DO PRIVATE(l,j,k,q1a,q1b,q2a,q2b)
+            DO l=1,nxfaces
+                j=jx(l)
+                k=kx(l)
+                q1a=lower%qp_adv_interfaceL(:,j,k)
+                q1b=lower%qp_adv_interfaceR(:,j,k)
+                q2a=upper%qp_adv_interfaceL(:,j,k)
+                q2b=upper%qp_adv_interfaceR(:,j,k)
+                q1a(1)=lower%h_selected_interfaceL(j,k)
+                q1b(1)=lower%h_selected_interfaceR(j,k)
+                q2a(1)=upper%h_selected_interfaceL(j,k)
+                q2b(1)=upper%h_selected_interfaceR(j,k)
+                CALL eval_total_depth_face_speed_bounds(q1a,q2a,q1b,q2b, &
+                    grav_coeff_stag_x(j,k),idx_u, &
+                    this%a_interface_xNeg(j,k),this%a_interface_xPos(j,k))
+            END DO
+            !$OMP END PARALLEL DO
+        END IF
+
+        IF (comp_cells_y>1) THEN
+            !$OMP PARALLEL DO PRIVATE(l,j,k,q1a,q1b,q2a,q2b)
+            DO l=1,nyfaces
+                j=jy(l)
+                k=ky(l)
+                q1a=lower%qp_adv_interfaceB(:,j,k)
+                q1b=lower%qp_adv_interfaceT(:,j,k)
+                q2a=upper%qp_adv_interfaceB(:,j,k)
+                q2b=upper%qp_adv_interfaceT(:,j,k)
+                q1a(1)=lower%h_selected_interfaceB(j,k)
+                q1b(1)=lower%h_selected_interfaceT(j,k)
+                q2a(1)=upper%h_selected_interfaceB(j,k)
+                q2b(1)=upper%h_selected_interfaceT(j,k)
+                CALL eval_total_depth_face_speed_bounds(q1a,q2a,q1b,q2b, &
+                    grav_coeff_stag_y(j,k),idx_v, &
+                    this%a_interface_yNeg(j,k),this%a_interface_yPos(j,k))
+            END DO
+            !$OMP END PARALLEL DO
+        END IF
+    END SUBROUTINE eval_total_depth_speeds
 
     !> @brief Accumulate coupled interlayer face and within-cell pressure in both residuals.
     !> @details Reuses the common pressure kernel and requires validated coupled
