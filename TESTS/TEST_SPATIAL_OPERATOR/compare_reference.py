@@ -347,6 +347,11 @@ def main():
                     details.append(f"{key}{position}: 1-thread={left[position]!r}, 4-thread={right[position]!r}")
                 raise AssertionError(f"{tag}: production 1/4-thread payloads differ: "
                                      + "; ".join(details))
+            integrated = [Path(tag)/f"threads-{threads}"/"integrated_lie.bin" for threads in (1, 4)]
+            if not integrated[0].is_file() or not integrated[1].is_file():
+                raise AssertionError(f"{tag}: missing integrated two-layer Lie timestep payload")
+            if integrated[0].read_bytes() != integrated[1].read_bytes():
+                raise AssertionError(f"{tag}: integrated two-layer Lie state differs between 1 and 4 threads")
             print(f"PASS: {args.profile} {tag}, complete residual/geometry/traces/directional CFL, actual 1/4 threads", flush=True)
             for record in results:
                 print("N7_SPATIAL_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)

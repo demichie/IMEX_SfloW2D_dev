@@ -26,6 +26,18 @@ PROGRAM test_spatial_operator
   USE mass_injection_coefficients_2d, ONLY : injection_material_set_type, prepare_injection_materials
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_group_type
+  USE time_integration_2d, ONLY : time_integration_workspace_type
+  USE source_registry_2d, ONLY : source_registry_type, &
+      SOURCE_SCOPE_L1,SOURCE_SCOPE_L2,SOURCE_SCOPE_INTERLAYER
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC
+  USE layer_physics_2d, ONLY : layer_physics_type
+  USE thermal_parameters_2d, ONLY : thermal_l2
+  USE rheology_parameters_2d, ONLY : rheology_l2
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l2
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l2,pore_pressure_cache_l1,pore_pressure_cache_l2
+  USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
+      interlayer_momentum_exchange_config_type
+  USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1,stochastic_l2
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -377,6 +389,177 @@ CONTAINS
         WRITE(*,*) 'PASS: coupled Euler trial admissibility for both layers'
     END SUBROUTINE check_coupled_spatial_trial
 
+    !> @brief Execute the production spatial-Lie-commit path on both layers.
+    !> @details A zero-drag reference and an identical Chezy step must have
+    !>          the same mass, solids and thermal energy per layer; their
+    !>          momentum differences must cancel pairwise. This test bypasses
+    !>          only the model-layout production gate, not the timestep code.
+    SUBROUTINE check_integrated_coupled_lie_timestep(paired,q1,q2,p1,p2,dt_bound)
+        TYPE(domain_type), INTENT(IN) :: paired
+        REAL(wp), INTENT(IN) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+        REAL(wp), INTENT(IN) :: p1(n_vars,nx,ny),p2(n_vars,nx,ny),dt_bound
+        TYPE(spatial_operator_type) :: operators(2)
+        TYPE(time_integration_workspace_type) :: workspace
+        TYPE(source_registry_type) :: registry
+        TYPE(source_group_type) :: groups(3)
+        TYPE(layer_physics_type) :: physics(2)
+        TYPE(state_type) :: coupled_state
+        TYPE(stochastic_workspace_type) :: stochastic
+        TYPE(interlayer_momentum_exchange_config_type) :: old_drag
+        REAL(wp) :: base_q(n_vars,2,nx,ny),before_q(n_vars,2,nx,ny)
+        REAL(wp) :: before_qp(n_vars,2,nx,ny)
+        REAL(wp) :: pt1(n_vars,nx,ny),pt2(n_vars,nx,ny)
+        REAL(wp) :: bound1,bound2,dt_step,momentum_difference,drag_difference,scale
+        INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit
+        LOGICAL :: created_zone,created_arc
+        CHARACTER(LEN=256) :: error
+
+        original_layers=n_layers
+        n_layers=2
+        old_drag=interlayer_momentum_exchange
+        ! Both layers are configured from the canonical physics objects.
+        CALL physics(1)%initialize(.FALSE.,rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L1 physics in integrated Lie fixture'
+        CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L2 physics in integrated Lie fixture'
+
+        groups(1)%id=0
+        groups(1)%scope=SOURCE_SCOPE_L1
+        groups(1)%method=SOURCE_METHOD_EXPLICIT
+        groups(1)%source_names=[CHARACTER(LEN=64)::]
+        groups(1)%equation_ids=[(eq,eq=1,n_eqns)]
+        groups(2)=groups(1)
+        groups(2)%scope=SOURCE_SCOPE_L2
+        groups(3)%id=5
+        groups(3)%scope=SOURCE_SCOPE_INTERLAYER
+        groups(3)%method=SOURCE_METHOD_ANALYTIC
+        groups(3)%source_names=[CHARACTER(LEN=64)::'interlayer_drag']
+        groups(3)%equation_ids=[INTEGER::]
+        CALL registry%initialize(n_eqns,0,groups,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid integrated Lie group registry'
+
+        ALLOCATE(coupled_state%q(n_vars,2,nx,ny),coupled_state%qp(n_vars,2,nx,ny))
+        ALLOCATE(coupled_state%deposit(nx,ny,n_solid),coupled_state%erosion(nx,ny,n_solid))
+        ALLOCATE(coupled_state%erodible(n_solid,nx,ny))
+        ALLOCATE(coupled_state%deposit_tot(nx,ny),coupled_state%erosion_tot(nx,ny))
+        coupled_state%deposit=0.0_wp
+        coupled_state%erosion=0.0_wp
+        coupled_state%erodible=0.0_wp
+        coupled_state%deposit_tot=0.0_wp
+        coupled_state%erosion_tot=0.0_wp
+
+        created_zone=.NOT.ALLOCATED(B_zone)
+        IF (created_zone) ALLOCATE(B_zone(nx,ny))
+        B_zone=0
+        created_arc=.NOT.ALLOCATED(cell_arc_perim)
+        IF (created_arc) ALLOCATE(cell_arc_perim(nx,ny))
+        cell_arc_perim=0.0_wp
+
+        ! The existing single-layer OU field is merely a zero-valued input;
+        ! no stochastic source is active in either layer in this fixture.
+        stochastic_l1%stochastic_transport_flag=.FALSE.
+        stochastic_l2%stochastic_transport_flag=.FALSE.
+        stochastic%config=>stochastic_l1
+        stochastic%rheology=>rheology_l1
+        ALLOCATE(stochastic%effective_Z(nx,ny))
+        stochastic%effective_Z=0.0_wp
+
+        CALL operators(1)%initialize(1)
+        CALL operators(2)%initialize(2)
+        CALL operators(1)%prepare_hp_workset(paired)
+        CALL operators(2)%prepare_hp_workset(paired)
+        CALL workspace%initialize(registry)
+        interlayer_momentum_exchange%model='CHEZY'
+        interlayer_momentum_exchange%method='ANALYTIC'
+        interlayer_momentum_exchange%group=5
+
+        OPEN(NEWUNIT=integrated_unit,FILE='integrated_lie.bin',ACCESS='STREAM', &
+            FORM='UNFORMATTED',STATUS='REPLACE')
+        ! The original union workset safely covers each subset of wet cells.
+        ! Test both wet, L1 only, L2 only, and both dry without rebuilding
+        ! the source schedule or replacing the production timestep.
+        DO scenario=1,4
+            before_q(:,1,:,:)=q1
+            before_q(:,2,:,:)=q2
+            before_qp(:,1,:,:)=p1
+            before_qp(:,2,:,:)=p2
+            IF (scenario==2 .OR. scenario==4) THEN
+                before_q(:,2,:,:)=0.0_wp
+                before_qp(:,2,:,:)=0.0_wp
+                before_qp(idx_T,2,:,:)=T_ambient
+            END IF
+            IF (scenario==3 .OR. scenario==4) THEN
+                before_q(:,1,:,:)=0.0_wp
+                before_qp(:,1,:,:)=0.0_wp
+                before_qp(idx_T,1,:,:)=T_ambient
+            END IF
+            pt1=before_qp(:,1,:,:)
+            pt2=before_qp(:,2,:,:)
+            CALL operators(1)%compute_timestep(before_q(:,1,:,:),pt1,0.0_wp,bound1,paired)
+            CALL operators(2)%compute_timestep(before_q(:,2,:,:),pt2,0.0_wp,bound2,paired, &
+                lower_operator=operators(1),h_lower=pt1(idx_h,:,:))
+            dt_step=MIN(1.0E-5_wp,0.01_wp*MIN(dt_bound,bound1,bound2))
+            IF (dt_step<=0.0_wp) ERROR STOP 'Invalid integrated two-layer timestep'
+            before_qp(:,1,:,:)=pt1
+            before_qp(:,2,:,:)=pt2
+
+            interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            base_q=coupled_state%q
+
+            interlayer_momentum_exchange%chezy_drag_coeff=0.05_wp
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+
+            drag_difference=0.0_wp
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                DO eq=1,n_eqns
+                    IF (eq==idx_uEqn .OR. eq==idx_vEqn) CYCLE
+                    IF (coupled_state%q(eq,1,j,k)/=base_q(eq,1,j,k) .OR. &
+                        coupled_state%q(eq,2,j,k)/=base_q(eq,2,j,k)) &
+                        ERROR STOP 'Interlayer drag changed mass, composition or thermal energy'
+                END DO
+                DO eq=idx_uEqn,idx_vEqn
+                    momentum_difference=SUM(coupled_state%q(eq,:,j,k)-base_q(eq,:,j,k))
+                    scale=MAX(1.0_wp,SUM(ABS(base_q(eq,:,j,k))))
+                    IF (ABS(momentum_difference)>1.0E-10_wp*scale) &
+                        ERROR STOP 'Integrated interlayer drag did not conserve paired momentum'
+                    drag_difference=drag_difference+SUM(ABS(coupled_state%q(eq,:,j,k)-base_q(eq,:,j,k)))
+                END DO
+                IF (.NOT.ALL(ieee_is_finite(coupled_state%qp(:,:,j,k)))) &
+                    ERROR STOP 'Non-finite primitive state after integrated two-layer Lie timestep'
+            END DO
+            IF (scenario==1 .AND. drag_difference<=0.0_wp) &
+                ERROR STOP 'Integrated wet/wet interlayer drag had no momentum effect'
+            IF (scenario/=1 .AND. drag_difference/=0.0_wp) &
+                ERROR STOP 'Integrated drag acted without two wet layers'
+            ! Compare the complete accepted timestep payload across 1/4 threads.
+            WRITE(integrated_unit) coupled_state%q,coupled_state%qp
+        END DO
+        CLOSE(integrated_unit)
+
+        CALL workspace%finalize()
+        CALL operators(1)%finalize()
+        CALL operators(2)%finalize()
+        CALL registry%finalize()
+        CALL physics(1)%finalize()
+        CALL physics(2)%finalize()
+        IF (created_zone) DEALLOCATE(B_zone)
+        IF (created_arc) DEALLOCATE(cell_arc_perim)
+        interlayer_momentum_exchange=old_drag
+        n_layers=original_layers
+        WRITE(*,*) 'PASS: coupled spatial-Lie-commit, four wet/dry cases, conservative interlayer drag'
+    END SUBROUTINE check_integrated_coupled_lie_timestep
+
     !> @brief Check exact global conservative budgets for compact-support layers.
     !> @details Both layers are dry in a collar, so no boundary flux is present.
     !> Only the mass, thermal and constituent equations have no pressure paths.
@@ -451,6 +634,7 @@ CONTAINS
                     ERROR STOP 'Compact two-layer spatial conservative budget mismatch'
             END DO
         END DO
+        CALL check_integrated_coupled_lie_timestep(paired,q1,q2,p1,p2,dt_pair)
         CALL lower%finalize
         CALL upper%finalize
         CALL paired%finalize

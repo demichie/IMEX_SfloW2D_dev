@@ -222,6 +222,19 @@ incrociato del rumore L1, l'eventuale reologia/trasporto stochastic L2
 non e' ancora abilitata. Questo collegamento richiede test di passo
 accoppiato con invarianti fisici prima di essere considerato concluso.
 
+**TL07 - regressione integrata del timestep:** `TEST_SPATIAL_OPERATOR`
+esercita ora direttamente `time_integration_workspace_type%advance`
+su un supporto compatto a due layer e sull'unico workset comune.
+Per ciascuna delle quattro configurazioni wet/dry confronta lo stesso
+passo con coefficiente Chézy nullo e positivo, controllando il bilancio
+locale del momento tra i layer e l'invarianza di massa, solidi ed
+energia termica per effetto del solo drag. I profili strict/optimized
+usano lo script esistente, che confronta ora anche i payload del passo
+accoppiato tra OpenMP 1 e 4 thread. Questa prova non abilita
+`N_LAYERS=2` e non sostituisce le future regressioni di cold-start
+con mass exchange, gruppi 0 interlayer, sorgenti di terreno,
+variabili opzionali e restart.
+
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
 Poi TL13a e TL13b. Non dichiarare una fase conclusa sulla base
