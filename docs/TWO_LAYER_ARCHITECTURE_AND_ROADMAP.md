@@ -1,172 +1,242 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Stato:** 16 novembre 2026 · branch `feature/two-layer` · `N_LAYERS=2` disabilitato in produzione.  
-**Obiettivo:** completare il modello con L1 inferiore e L2 superiore, conservando il comportamento single-layer. Questa e' la roadmap operativa; non e' un registro dei commit. L'audit dettagliato e' in [TWO_LAYER_CODE_AUDIT.md](TWO_LAYER_CODE_AUDIT.md).
+**Stato:** 17 novembre 2026 · branch `feature/two-layer` · `N_LAYERS=2` disabilitato in produzione.
+**Obiettivo:** completare L1 inferiore e L2 superiore preservando comportamento, input e risultati single-layer.
+Questa e' la specifica operativa delle scelte e del lavoro residuo, non una cronologia dei commit.
+L'evidenza tecnica delle fasi precedenti e' in [TWO_LAYER_CODE_AUDIT.md](TWO_LAYER_CODE_AUDIT.md).
 
-## 1. Principi e architettura vincolante
+## 1. Architettura e invarianti
 
-- **Una sola rappresentazione autorevole:** `q/qp(component,layer,x,y)` e workspace rank-4; indici di componente comuni ai due layer; slot opzionali presenti se richiesti da almeno un layer (OR dei flag) e **esattamente nulli** nel layer che non li usa. Nessuna copia persistente sincronizzata, coefficiente globale duplicato o architettura transitoria.
-- **Proprieta' chiare:** configurazioni e attivazioni reologiche, termiche, pore/Darcy, stochastic/OU e mass exchange appartengono al layer; topografia `B`, geometria, atmosfera, substrato, `deposit_tot`, `T_ground`, `T_ambient` e proprieta' delle specie solide sono condivisi. Distinguere packing di ammissibilita', hindrance e packing fisico.
-- **Due layer, strumenti esistenti:** riutilizzare HP-PCCU, ricostruzione, quadratura dei path, registro Lie, classificazione dei contatti e assemblatore mass exchange; workspace distinti solo dove serve uno stato per layer. Non introdurre framework a N layer, dispatcher, cache o wrapper equivalenti a oggetti gia' presenti.
-- **Responsabilita':** `physics` contiene leggi e rate cell-local, senza indici di griglia; `spatial` contiene flussi e termini non conservativi; `numerics` gestisce workset, contatti, candidati, splitting Lie e controllo finale. Nessuna formula fisica nel Lie.
-- **Contatti:** riutilizzare direttamente i quattro casi locali (entrambi, nessuno, solo L1, solo L2). Prima di ogni gruppo usare i candidati correnti, determinare all'esterno di `physics` le esposizioni a terreno/atmosfera e passarle alle leggi locali. Anche L2 solo puo' toccare il terreno e L1 solo l'atmosfera. Non duplicare contatti o inventari.
-- **Compatibilita':** mantenere i nomi di input single-layer concordati (`<FAMILY>_PARAMETERS` oppure `<FAMILY>_L1_PARAMETERS`, mutuamente esclusivi sullo stesso oggetto L1); per two-layer richiedere configurazioni esplicite L1/L2. BC canoniche `bc(component,layer)` su W/E/S/N; BC omogenee per slot inattivi. Nessuna interfaccia interna obsoleta conservata per compatibilita'.
+- **Stato unico:** `q/qp(component,layer,x,y)` rank-4, indici conservativi comuni ai layer; layout opzionale
+  definito dall'OR delle attivazioni L1/L2, con componenti inattive esattamente nulle. Nessuna copia
+  sincronizzata, coefficiente globale duplicato o struttura transitoria.
+- **Proprieta' fisiche:** reologia, termica, Darcy/pore, stochastic/OU e scambi esterni configurati
+  per layer. Topografia `B`, geometria, atmosfera, substrato, `deposit_tot`, `T_ground`,
+  `T_ambient` e proprieta' delle specie solide sono condivisi. I parametri interlayer
+  appartengono allo scambio L1/L2, non sono duplicati nelle due configurazioni.
+- **Responsabilita':** `physics` contiene leggi e rate **cell-local**, senza indici di griglia;
+  `spatial` contiene flussi e termini non conservativi; `numerics` gestisce candidati,
+  workset, contatti, ordine Lie e controlli. Riutilizzare gli operatori, le strutture dati
+  e i kernel matematici esistenti, senza framework paralleli o formule duplicate.
+- **Contatti:** `layer_contacts_2d` classifica entrambi wet, entrambi dry, solo L1, solo L2.
+  L2 isolato puo' toccare il terreno e L1 isolato puo' essere esposto all'atmosfera.
+  I contatti derivano dai candidati correnti prima dei gruppi successivi e sono passati
+  alle leggi interessate; non creare duplicati o flag persistenti sincronizzati.
+  L'assenza di contatto L1/L2 non vieta il **cold-start** da un trasferimento interlayer.
+- **Compatibilita':** mantenere le alternative input single-layer `<FAMILY>_PARAMETERS` e
+  `<FAMILY>_L1_PARAMETERS` sullo stesso oggetto L1, mutuamente esclusive; per two-layer
+  richiedere la configurazione esplicita dei layer. BC `bc(component,layer)` sui quattro lati,
+  con slot inattivi omogenei. Non conservare interfacce interne obsolete.
 
-### Contratto fisico e numerico
+### Spaziale accoppiato
 
-- Riferimento: *IMEX_SfloW2D_v3*. Preservare equazioni, dimensioni, conservazione, path, splitting, limitatori, regolarizzazioni e ordine numerico senza approvazione per modifiche scientifiche.
-- Superfici **derivate**: `eta1=B+h1` ed `eta2=B+h1+h2`. La metrica condivisa `G=1/(1+B_x^2+B_y^2)` e la curvatura derivano da `B`, non da `B+h1`; velocita' e sorgenti cinematiche restano specifiche del layer.
-- Pressioni interlayer, con `L=rho_m2*gprime2*h2`: `S_inter1=-G*h1*d_j(L)`, `S_inter2=-L*d_j(G*h1)`. Evitare il doppio conteggio del contributo gia' incluso nel path idrostatico L2. Il clamp L2 della pressione buoyant resta quello autorizzato; non compensare artificialmente eventuali difetti di bilancio.
-- Un solo Lie del primo ordine con timestep comune, gruppo 0, ordine dei gruppi, cell-outer/OpenMP e arresto fatale su errore, senza rollback o retry. I controlli complessivi si eseguono a fine integratore; i controlli intermedi restano solo se richiesti dal limitatore, dalle conversioni o dal solver. Scope `L1`, `L2`, `INTERLAYER`; ogni scambio interno usa un unico rate sullo stesso snapshot, trasferimenti opposti e disponibilita' condivise e controllo conclusivo dei candidati e delle risorse SHARED.
+Le superfici sono derivate: `eta1=B+h1`, `eta2=B+h1+h2`; metrica
+`G=1/(1+B_x^2+B_y^2)` e curvatura derivano da `B`, non da `B+h1`.
+Per `L=rho_m2*gprime2*h2`, i contributi di pressione interlayer sono
+`S_inter1=-G*h1*d_j(L)` e `S_inter2=-L*d_j(G*h1)`; non duplicare il termine
+gia' compreso nel path idrostatico di L2. Conservare il clamp buoyant L2
+previsto dal modello, senza introdurre compensazioni artificiali.
+La pressione interlayer e' un termine **spaziale**, non una sorgente Lie.
 
-#### Semantica vincolante del gruppo 0 (spaziale + sorgenti esplicite)
+### Contratto dell'integratore Lie
 
-Il **gruppo 0 comprende l'operatore spaziale e le sorgenti esplicite assegnate al gruppo 0**.
-L'operatore spaziale e' eseguito per primo. I rate delle sorgenti del gruppo 0 vengono
-**valutati sullo stato iniziale** `q^n/qp^n`, mentre il loro contributo viene applicato
-**al candidato dopo lo stadio spaziale** `q^*`. Questi due stati non sono intercambiabili.
+Un solo timestep, un solo esecutore **cell-outer/OpenMP**, gruppi ordinati con
+`scope=L1|L2|INTERLAYER` e metodo `EXPLICIT|NEWTON|ANALYTIC` secondo le capacita'
+del catalogo. La directory fisica non impone ne' metodo ne' gruppo: sorgenti dello
+stesso gruppo condividono il metodo; sorgenti in gruppi diversi possono usarne
+di distinti. Il drag non deve condividere necessariamente il metodo del mass exchange.
 
-Con `L` definito come contributo spaziale con il segno gia' adottato dall'integratore,
-la sequenza concettuale e':
+**Gruppo 0:** lo spaziale opera per primo; le sorgenti assegnate al gruppo 0
+sono **valutate su `q^n/qp^n`**, limitate rispetto ai candidati post-spaziali
+`q^*` e agli inventari pertinenti, quindi applicate a `q^*`:
 
 ```text
 q*       = q^n + dt * L(q^n)
-R0       = S0(q^n, qp^n, ... )
-R0_limit = Limit(R0, q*, dt, inventari e vincoli fisici)
+R0       = S0(q^n, qp^n, ...)
+R0_limit = Limit(R0, q*, dt, inventories)
 q^(0)    = q* + dt * R0_limit
 ```
 
-**Il limitatore interviene prima dell'aggiornamento**: considera congiuntamente i
-rate proposti, la disponibilita' nel candidato destinatario `q^*`, il passo
-temporale e gli inventari pertinenti. Non e' corretto limitare i rate utilizzando
-solo `q^n`, ne' valutarli su `q^*` al posto di `q^n`. Per i processi accoppiati,
-la limitazione deve mantenere coerenti rate e trasferimenti associati, senza
-alterare i bilanci di massa, specie, momento ed energia previsti dalle leggi fisiche.
-Restano applicabili i vincoli specifici sui prelievi e sulle disponibilita'
-preesistenti gia' stabiliti dai kernel, incluso il divieto di consumare nello
-stesso passo materiale appena iniettato, dove previsto: non sostituirli con
-un nuovo limitatore generico.
+I gruppi successivi leggono i candidati aggiornati dai gruppi precedenti.
+Ogni scambio interlayer legge uno stesso snapshot per i due layer e applica
+contributi accoppiati ai due candidati. Il limitatore opera **prima** di ogni
+aggiornamento; niente clipping ex post, rollback o retry. Un errore invalida
+il passo e provoca stop fatale. I controlli complessivi sono a fine integratore,
+con verifiche intermedie solo dove necessarie a limiter, conversioni o solver.
+Preservare l'ordine di valutazione single-layer e le regole esistenti sui
+prelievi dal substrato e dal materiale preesistente.
 
-Per `N_LAYERS=2`, la stessa sequenza vale per entrambi i candidati L1/L2 sul
-**medesimo timestep**. Le sorgenti locali usano i rispettivi stati iniziali
-e le configurazioni di layer; i trasferimenti interlayer usano un unico rate
-calcolato sul medesimo snapshot, con contributi opposti e limitazione
-**congiunta** rispetto ai candidati destinatari di entrambi i layer e alle
-risorse condivise. I contatti per i gruppi successivi si ricavano invece dai
-candidati correnti, dopo l'accettazione del gruppo precedente. Gli stati locali sono aggiornati in sequenza; un errore arresta il programma senza ripristini o tentativi di recupero.
+## 2. Scambi fisici interlayer
 
-I gruppi `1,2,...` seguono in ordine, valutando le proprie sorgenti sullo
-stato candidato aggiornato dai gruppi precedenti e usando il metodo configurato.
-La separazione tra `spatial` e `lie_source_executor` e' organizzativa, non
-cambia l'appartenenza matematica dello spaziale al gruppo 0.
-**La migrazione all'esecutore unico L1/L2 non deve cambiare questa semantica,
-il limitatore esistente, la sequenza di valutazione o l'ordine floating-point
-senza un'esplicita decisione numerica e le relative regressioni.**
-- Verificare ogni modifica con audit delle dipendenze (chiamanti, `.inc` REAL/COMPLEX, Makefile, input, I/O, test), stile `docs/FORTRAN_STYLE.md`, build optimized/strict e regressioni pertinenti. Non correggere la fisica per far passare i test. Nessun merge in `master` senza autorizzazione.
+### Organizzazione dei moduli e dei gruppi
 
-## 2. Stato effettivo e lavoro di implementazione
+`src/physics/mass_exchange/` rimane responsabile delle sorgenti locali di
+un layer verso terreno e atmosfera. Gli scambi interni L1/L2 appartengono a
+`src/physics/interlayer_exchange/`, con leggi **separate** per settling
+L2→L1, elutriazione L1→L2 e drag. I moduli indicativi sono
+`interlayer_settling_2d.f90`, `interlayer_elutriation_2d.f90` e
+`interlayer_drag_2d.f90`; introdurli insieme alle leggi effettive, senza
+file segnaposto. Condividere i kernel fisici gia' esistenti se equivalenti,
+senza assimilare la deposizione nel substrato al trasferimento interlayer.
 
-**Priorita' attuale: completare il percorso two-layer end-to-end.** Le verifiche strutturali e di integrita' restano obbligatorie durante lo sviluppo; l'analisi scientifica estesa e' una fase successiva. "Predisposto" non significa abilitato o validato in produzione.
+**Settling ed elutriazione** producono rate fisici indipendenti e sono
+coordinati da `interlayer_exchange_2d.f90` per i limiti di inventario e
+packing, analogamente al coordinatore `mass_exchange_2d.f90` esistente.
+Il coordinatore ha una responsabilita' effettiva, non introduce un nuovo
+integratore o una seconda sorgente autorevole. Si prevede un **gruppo
+esplicito comune per gli scambi di massa**, cosi' i rate condividono
+lo snapshot e sono limitati congiuntamente; verificare al momento
+dell'integrazione l'interazione con gli altri gruppi del registro.
 
-| Fase | Stato | Completamento richiesto |
+**Drag** e' un processo distinto, senza scambio di massa, e usa un gruppo
+separato. Dall'equazione quadratica del riferimento deriva un candidato
+integratore analitico conservativo del momento, da verificare per masse
+e coefficienti congelati nel sottopasso; il metodo `ANALYTIC` non e'
+ancora approvato o implementato. Un metodo implicito, se necessario,
+deve risolvere **entrambi** i momenti accoppiati, non due problemi locali.
+Ordine dei gruppi e budget della dissipazione energetica richiedono
+verifica scientifica prima dell'attivazione.
+
+### Solidi, carrier e composizione della corrente elutriata
+
+Le leggi del riferimento `IMEX_v3.pdf` determinano i flussi solidi
+per specie di settling (L2→L1) ed elutriazione (L1→L2). Si conserva la
+massa di ogni specie **con un solo rate per processo** e contributi
+opposti nei due layer; momento ed energia termica sono trasferiti
+secondo le velocita' e temperature fisiche dei rispettivi processi.
+
+**Elutriazione:** il parametro di input
+`elutriation_solid_volume_fraction`, con `0 < alpha_lift <= 1`, indica
+la frazione volumetrica solida **della corrente trasferita**, non
+la concentrazione finale di L2. Dato un volume solido proposto
+`dV_s`, il volume di carrier richiesto e'
+`dV_c_req = (1-alpha_lift)/alpha_lift * dV_s`; `alpha_lift=1`
+corrisponde a nessun carrier associato. Non fissare ancora un
+default numerico per `alpha_lift` senza giustificazione.
+
+Il secondo input `elutriation_carrier_mode` seleziona:
+
+- `LIMIT_SOLIDS`: in assenza di carrier sufficiente, ridurre insieme il
+  flusso solido e quello di carrier per rispettare la composizione prescritta.
+- `ALLOW_CONCENTRATED`: mantenere il flusso solido per quanto ammissibile,
+  trasferendo il carrier disponibile; la **corrente** puo' essere piu'
+  concentrata del valore prescritto, ma gli stati finali devono sempre
+  rispettare packing, inventari e ammissibilita'. Non creare carrier.
+
+I modi non cambiano la legge fisica che propone il rate solido e non
+introducono un vincolo di composizione finale su L2. La diluizione
+atmosferica resta un processo esterno distinto.
+
+**Settling:** trasferire i solidi e soltanto il carrier L2→L1
+eventualmente necessario a non superare il packing di L1, tenendo
+conto **anche dell'elutriazione simultanea e del suo co-lift**.
+Non aggiungere gas interstiziale senza il corrispondente prelievo
+da L2 (approssimazione non conservativa descritta nel riferimento).
+Il packing riguarda gli stati risultanti; il carrier associato
+all'elutriazione riguarda invece la composizione della **corrente**.
+Distinguere sempre packing di ammissibilita', packing della chiusura
+fisica e fattore di hindered settling.
+
+### Coordinatore e limitazione congiunta
+
+Come in `mass_exchange`, le singole leggi restituiscono rate,
+poi **un solo coordinatore cell-local** valuta prima dell'applicazione
+la competizione per gli inventari di solidi e carrier e limita i
+trasferimenti congiuntamente. I due layer sono simultaneamente
+donatori e destinatari: non e' sufficiente applicare due limiter
+monolayer indipendenti.
+
+- Calcolare i flussi **lordi** di solidi per specie nelle due direzioni,
+  la richiesta di carrier del co-lift e il carrier eventualmente
+  necessario al settling. Per il gruppo 0 rispettare la distinzione
+  rate su `q^n` / disponibilita' sul candidato `q^*`.
+- Imporre disponibilita' dei donatori, non negativita', packing e
+  ammissibilita' di **entrambi** i candidati, usando lo stesso
+  timestep; considerare le disponibilita' condivise senza sottrarre
+  piu' volte lo stesso materiale. Non compensare automaticamente
+  apporti e prelievi lordi prima della verifica delle disponibilita'.
+  La possibile riutilizzabilita' simultanea del materiale trasferito
+  va decisa esplicitamente, senza dipendenza nascosta dall'ordine.
+- Consentire fattori di riduzione **distinti** per settling,
+  elutriazione e, in `ALLOW_CONCENTRATED`, carrier, ma calcolarli
+  nello stesso problema di ammissibilita'. In `LIMIT_SOLIDS`
+  il rate di co-lift mantiene la proporzione prescritta.
+- Applicare solo i trasferimenti accettati, con debiti e crediti
+  uguali per le **masse** di specie/carrier. Non ridurre il problema
+  a un unico flusso *netto* di carrier quando i due flussi lordi
+  trasportano momento o energia termica diversi. Convertire
+  volumi e masse con le densita' coerenti con lo stato termodinamico.
+- Coprire i quattro stati wet/dry: settling puo' formare L1 da L2;
+  elutriazione puo' formare L2 da L1 senza contatto interlayer
+  preesistente; drag richiede entrambi i layer presenti.
+  Nessuna correzione arbitraria dello stato dopo il trasferimento.
+
+La scelta tra `LIMIT_SOLIDS` e `ALLOW_CONCENTRATED` e' un'opzione
+fisica di input; non autorizza a violare vincoli conservativi o di
+ammissibilita'. Il contratto delle soglie wet/dry e delle chiusure
+termodinamiche deve essere verificato nelle implementazioni.
+
+## 3. Stato e sequenza di lavoro
+
+**Priorita': completare il percorso two-layer end-to-end.** La
+predisposizione architetturale e i test isolati non equivalgono ad
+abilitazione in produzione.
+
+| Fase | Stato | Lavoro residuo / gate |
 |---|---|---|
-| **TL00–TL04 — Stato, configurazioni e fisica per layer** | Predisposti | Layout canonico e ownership L1/L2, migrazioni REAL/COMPLEX e SHARED presenti. Chiudere i percorsi non ancora esercitati: slot opzionali, alias/parser, sorgenti, IC/BC e regressioni single-layer. |
-| **TL05 — OperatorI L2 isolati** | Predisposti e testati | Ricostruzione HP, BC, pressioni e trasporto L2 isolati; completare copertura integrata di stati dry, sorgenti e variabili opzionali senza creare un secondo operatore. |
-| **TL06 — Spaziale accoppiato** | **Implementazione parziale verificata** | `evaluate_coupled`, workset OR, bound preliminari con `h1+h2`, CFL comune, path e residui interlayer sono presenti e testati isolatamente (quattro stati wet/dry, stratified rest, geometrie Q1). Il trial Euler verifica l'ammissibilita' dei due candidati; un caso separato a supporto compatto verifica bilanci globali di massa, energia e specie senza flussi di contorno. **Collegare l'operatore alla transazione Lie completa** (TL07), quindi verificare i bilanci negli stadi con sorgenti e i casi dry/BC. |
-| **TL07 — Lie accoppiato** | **Avviato** | Il candidato spaziale per cella/layer usa un unico kernel privato dell'integratore; il test D20 ora verifica lo stop fatale dopo un errore tardivo, senza ripristinare lo stato. La transazione Lie richiama ora `evaluate_coupled` e verifica entrambi i candidati sul workset OR, con tracce CFL L1/L2 gia' preparate; il percorso L1 resta invariato. Il percorso L2 si interrompe esplicitamente prima delle sorgenti e del commit, fino a TL07-B. La pubblicazione finale dei campi fluidi comprende tutti gli slot attivi in un'unica transazione, ma resta bloccata per L2 fino all'esecutore scoped completo. Il coordinatore mass exchange riceve ora direttamente i due flag locali di contatto dai candidati correnti: terreno per erosione, deposizione esterna, perdita di carrier, vaporizzazione e immobilizzazione lava; atmosfera per entrainment. Per la produzione single-layer le autorizzazioni rimangono equivalenti al comportamento preesistente. Una regressione copre le quattro configurazioni locali verificando i rate di perdita di carrier ed entrainment. Restano da integrare e validare i gruppi scoped nel percorso end-to-end, gli scambi `INTERLAYER`, la buoyancy L2 e i controlli conclusivi; i descrittori Lie ora distinguono L1/L2 e accettano la stessa identita' di gruppo nei due layer; il configuratore registra entrambi i layer usando lo stesso percorso e `simulation_2d` inizializza i descrittori fisici L1/L2 quando richiesti, l'esecutore ha ora candidati rank-4, usa un unico ciclo cell-outer per gruppi L1/L2 e conserva lo stesso limitatore del gruppo 0; la chiamata two-layer dall'integratore resta bloccata fino al passaggio dei contatti alle leggi di scambio, alla fisica interlayer e alla validazione end-to-end; nessun fallback silenzioso tra metodi. |
-| **TL08–TL11 — Scambi e chiusure** | Da integrare | Settling L2→L1, elutriazione L1→L2 e cold-start, drag interlayer, entrainment e scambi esterni con terreno/atmosfera. Condividere disponibilita' del substrato e depositi; verificare specie, momento, energia/termica e limiti di ammissibilita'. |
-| **TL12 — I/O e integrazione** | Parziale (input/BC) | Input two-layer completo, output/diagnostiche, NetCDF, restart e continuazione; casi representative EXAMPLES; preservare input e risultati single-layer. |
-| **TL13a — Gate funzionale** | Non superato | Percorso end-to-end coerente, nessuna struttura obsoleta, controlli essenziali del §3 superati in build strict/optimized, OpenMP e regressioni. Solo dopo, valutare l'abilitazione **controllata** di `N_LAYERS=2` per test integrati; non equivale a validazione scientifica o rilascio. |
-| **TL13b — Validazione scientifica e rilascio** | Successiva al gate funzionale | Benchmark fisici, convergenza spazio/tempo, regimi critici, iperbolicita' e shear, prestazioni, limiti delle chiusure e verifica di soluzioni fisicamente affidabili. Eventuali modifiche alle equazioni richiedono decisione scientifica separata. Abilitazione generale solo dopo approvazione. |
+| **TL00–TL04 — Stato e fisica per layer** | Base predisposta | Verificare i percorsi integrati ancora scoperti: slot opzionali, IC/BC, input, output e regressioni L1/L2. |
+| **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
+| **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
+| **TL07 — Lie accoppiato** | Integrazione parziale | Registro scoped L1/L2 e candidati rank-4 predisposti; contatti propagati al mass exchange esterno. Completare la transazione end-to-end, gruppi interlayer, limitazione accoppiata e controlli finali. Il percorso di produzione L2 e' ancora bloccato. |
+| **TL08–TL11 — Chiusure e scambi** | Da implementare | Settling, elutriazione, co-lift configurabile, limiter congiunto, cold-start, drag, budget di momento/energia; verificare interazioni con terreno, atmosfera e inventari condivisi. |
+| **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
+| **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
+| **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
-**Sequenza:** chiudere TL06 e TL07, poi TL08–TL11; completare in parallelo le lacune TL00–TL05 e TL12 senza bloccare lavori indipendenti. Successivamente TL13a e TL13b. Non dichiarare chiusa una fase sulla base dei soli test di un kernel isolato.
+**Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
+coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
+Poi TL13a e TL13b. Non dichiarare una fase conclusa sulla base
+del solo test di un kernel.
 
-### Organizzazione approvata degli scambi interlayer
+## 4. Verifica e questioni scientifiche aperte
 
-**Decisione architetturale:** introdurre `src/physics/interlayer_exchange/`
-come cartella separata da `src/physics/mass_exchange/`. La seconda
-continua a gestire le sorgenti locali di un layer verso terreno e
-atmosfera; la prima ospitera' soltanto le leggi fisiche accoppiate
-L1/L2 (settling, elutriazione e drag).
+- **Regressione:** nessuna variazione non autorizzata dei risultati
+  single-layer, delle formule, del floating-point, dei metodi o
+  degli input esistenti. Test su quattro configurazioni wet/dry,
+  cold-start L1/L2, limiti packing, solidi per classe, carrier nei
+  due modi, inventari esauriti, substrato/deposito e assenza di
+  creazione o distruzione di massa.
+- **Budget:** conservazione interlayer di massa totale, specie e
+  carrier; momento e trasferimenti termici coerenti con ogni legge;
+  contabilizzare la dissipazione del drag, senza conversioni
+  termiche inventate. Test di rate, limiter e candidati distinti,
+  inclusa la semantica `q^n`/`q^*` del gruppo 0.
+- **Integrazione:** build optimized e strict/debug, consistenza
+  REAL/COMPLEX dove richiesta, OpenMP 1/4 thread, CFL, geometrie
+  piano/inclinato/curvo, stratified rest, BC e casi EXAMPLES.
+  Audit completo di chiamanti, `.inc`, Makefile, parsing,
+  diagnostiche, I/O e restart per ogni nuova interfaccia.
+- **Validazione:** il bound preliminare `h1+h2` non certifica
+  l'iperbolicita' del sistema continuo; il CFL non risolve
+  eventuali autovalori complessi. In TL13b verificare regimi con
+  shear, contrasti di densita', composizioni variabili e wet/dry.
+  Non introdurre soglie, viscosita' o forze correttive per
+  mascherare problemi fisici.
 
-Le leggi saranno in moduli distinti, ad esempio
-`interlayer_settling_2d.f90`, `interlayer_elutriation_2d.f90`
-e `interlayer_drag_2d.f90`, **da creare solo quando si implementano
-le corrispondenti formulazioni**. L'eventuale configurazione degli
-scambi interlayer sara' un solo oggetto autorevole, non duplicato
-nelle configurazioni L1 e L2. Non creare coordinatori, dispatcher o
-contenitori intermedi se l'assemblatore delle sorgenti esistente
-e' sufficiente.
+**Da definire scientificamente prima dell'implementazione:**
+default numerico di `elutriation_solid_volume_fraction`,
+possibile utilizzo di apporti simultanei nei budget lordi,
+chiusura dei volumi di carrier comprimibile, parametri effettivi
+di settling/elutriazione, soglie e dissipazione del drag,
+ordine definitivo dei gruppi e vincoli di eventuali metodi
+impliciti. Resta da valutare la copertura Darcy L2,
+packing/consolidazione e carrier combinati. Fare riferimento
+alle formulazioni di `IMEX_v3.pdf` distinguendo equazioni
+fisiche e approssimazioni non conservative dell'implementazione
+precedente; nessuna modifica scientifica implicita.
 
-**La collocazione dei moduli non determina gruppo, metodo o ordine Lie.**
-Ogni sorgente interlayer potra' essere associata indipendentemente
-a un gruppo con scope `INTERLAYER` e metodo `EXPLICIT`,
-`NEWTON` oppure `ANALYTIC`, esclusivamente dove tale metodo
-e' supportato dalla legge e dal catalogo. Restano le regole comuni:
-stesso gruppo => stesso metodo; gruppi diversi => metodi distinti
-ammessi. Settling ed elutriazione non devono essere accorpati
-automaticamente; il drag non e' costretto al loro stesso trattamento.
-L'ordine e il possibile accoppiamento saranno definiti sulla base
-delle equazioni di `IMEX_v3.pdf` e dei bilanci di massa, specie,
-momento ed energia.
-
-Si mantengono **un unico catalogo/registro Lie, un unico esecutore
-cell-outer e un'unica logica temporale**. I trasferimenti accoppiati
-usano i due candidati della cella e un solo rate per ciascun processo,
-con contributi coerenti ai due layer e limitazione congiunta ove
-richiesta. Un drag con soluzione implicita o analitica deve risolvere
-il problema accoppiato, non due problemi monolayer indipendenti.
-Condividere i kernel fisici esistenti quando le formule coincidono,
-senza duplicare la matematica o confondere la deposizione nel
-substrato con il trasferimento L2->L1. Nessuna nuova legge fisica
-o assegnazione definitiva di metodo e gruppo e' autorizzata
-dalla sola decisione di directory.
-
-### Contratto degli scambi `INTERLAYER` (non ancora eseguibili)
-
-Lo scope `INTERLAYER` e' gia' definito, ma **nessuna sorgente fisica
-interlayer e' registrata nel catalogo**. Il registro deve rifiutare
-con diagnostica esplicita un gruppo con tale scope, anche se vuoto
-o contenente una legge locale L1/L2. Non introdurre gruppi segnaposto
-o dispatcher senza leggi fisiche.
-
-Per attivare uno scambio occorrono:
-
-1. Legge **cell-local** definita scientificamente per settling L2->L1,
-   elutriazione L1->L2 o drag, compresi parametri, unita' e comportamento
-   quando un layer e' inizialmente asciutto.
-2. **Un solo rate per trasferimento**, con contributi opposti alle
-   grandezze conservate nei due layer; budget di momento ed energia,
-   compresa la dissipazione, esplicitamente definiti.
-3. **Limitazione congiunta** prima dell'applicazione in funzione
-   dei due candidati destinatari, del timestep e degli inventari
-   condivisi. Per il gruppo 0 i rate si valutano su `q^n`, ma
-   si limitano e applicano al candidato post-spaziale `q^*`.
-4. Un'unica iterazione cell-outer nell'ordine Lie, con aggiornamento
-   dei due candidati locali, nessun rollback e stop fatale su errore.
-5. Regressioni su conservazione di massa/specie, momento, energia,
-   wet/dry nei quattro casi, cold-start, risorse saturate,
-   REAL/COMPLEX e OpenMP, senza alterare i risultati single-layer.
-
-Il solo scope nel registro **non** equivale a implementare uno
-scambio interlayer, e non autorizza `N_LAYERS=2`.
-
-## 3. Verifiche obbligatorie durante l'implementazione
-
-1. **Single-layer invariato:** test quantitativi, EXAMPLES rappresentativi, input, ordine Lie, sorgenti, deposizione, restart/NetCDF e OpenMP per le parti toccate; nessuna variazione fisica o di floating-point non autorizzata.
-2. **Ammissibilita' e wet/dry:** tutti e quattro i casi locali, ingressi Dirichlet su celle asciutte, comparsa/scomparsa dei layer, nessuna profondita' o composizione non valida; slot inattivi nulli in REAL/COMPLEX, flussi, sorgenti, IC/BC e I/O.
-3. **Bilanci e limitazione del gruppo 0:** massa totale e per specie, trasporto, momento e variabili termiche secondo il contratto fisico; verificare separatamente il rate valutato su `q^n`, la limitazione rispetto a `q^*` e agli inventari, e il candidato `q^(0)` dopo l'applicazione. Per gli scambi, controllare rate unico, trasferimenti interlayer opposti, disponibilita' condivise, assenza di doppio conteggio di `deposit_tot` e substrato, dissipazione e scambi esterni distinti. Verificare stop fatale e risorse condivise.
-4. **Spaziale e tempo:** stabilita' e finitezza nei casi di sviluppo ammessi, CFL condiviso, topografia piana/inclinata/curva, stratified rest e limiti wet/dry; rispettare il residuo ammesso su terreno curvo. Il bound `h1+h2` e' **provvisorio**, non una garanzia universale di iperbolicita'.
-5. **Evidenze:** build optimized e strict/debug, regressioni fisiche, test REAL/COMPLEX, OpenMP 1/4 thread e casi integrati pertinenti. Registrare SHA e test effettivamente superati; CI precedente non valida un nuovo commit.
-
-## 4. Validazione scientifica differita e decisioni aperte
-
-La perdita di iperbolicita' e' un limite potenziale del **sistema continuo**, non un difetto risolvibile in generale riducendo il CFL. Le scansioni preliminari a coefficienti congelati evidenziano regimi con autovalori complessi e forniscono controlli utili, ma **non certificano** le equazioni con composizione variabile, shear, clamp, geometria curva o interfacce dry/wet.
-
-**Durante lo sviluppo:** mantenere i bound preliminari solo per i test controllati; rilevare stati non finiti/non ammissibili e non attribuire validita' fisica a un semplice run riuscito. Non introdurre nuovi solver, viscosita' artificiale, attrito correttivo, soglie arbitrarie o regolarizzazioni per mascherare i casi non iperbolici.
-
-**In TL13b:** studiare autovalori e iperbolicita' nei regimi fisici rilevanti, robustezza e convergenza al raffinamento, limiti di shear, contrasti di densita', wet/dry e pressione/clamp; confrontare con benchmark e manoscritto. Solo allora decidere, con approvazione scientifica, se servano limitazioni di applicabilita', scambi dissipativi motivati fisicamente o una formulazione differente.
-
-Restano da definire dove non gia' specificati dal modello: dettagli di settling, elutriazione, drag e budget energetici; eventuale Darcy in L2, packing/consolidazione, carrier combinati e contratti dei metodi impliciti. Nessuna di queste scelte va introdotta solo per convenienza implementativa.
-
-**Definizione di completamento:** architettura semplice e definitiva, catena delle dipendenze aggiornata, test pertinenti effettivamente superati e separazione esplicita tra **software funzionalmente completo** e **modello scientificamente validato**. `N_LAYERS=2` resta disabilitato fino al gate e alla relativa autorizzazione.
+**Definizione di completamento:** architettura definitiva senza
+duplicazioni, dipendenze coerenti, test realmente superati sul
+commit interessato e distinzione tra software funzionalmente
+integrato e modello scientificamente validato. `N_LAYERS=2`
+resta disabilitato fino al gate e alla relativa autorizzazione.
