@@ -22,6 +22,8 @@ IMEX_SfloW2D_SOURCES = \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
                 physics/mass_exchange/mass_exchange_parameters_2d.f90 \
+                physics/interlayer_exchange/interlayer_exchange_parameters_2d.f90 \
+                physics/interlayer_exchange/interlayer_exchange_2d.f90 \
                 numerics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
@@ -639,3 +641,9 @@ physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): physics/ma
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+
+# Pair-wide cell-local limiter and canonical input: explicit module dependencies.
+physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/interlayer_exchange/interlayer_exchange_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)

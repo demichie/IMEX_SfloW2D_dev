@@ -47,5 +47,13 @@ for profile in strict optimized; do
     cat newmodel-numerics.log
     ./test_source_registry > results.log
     cat results.log
+    "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $netcdf_fflags -c "$test_dir/test_interlayer_exchange.f90"
+    "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      parameters_2d.o mass_exchange_parameters_2d.o \
+      interlayer_exchange_parameters_2d.o interlayer_exchange_2d.o \
+      source_input_2d.o test_interlayer_exchange.o -o test_interlayer_exchange
+    ./test_interlayer_exchange > interlayer-results.log
+    cat interlayer-results.log
 done
 printf 'D17 evidence directory: %s\n' "$work_dir"

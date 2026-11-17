@@ -66,6 +66,7 @@
     ! -- Variables for the namelist NUMERIC_PARAMETERS
     USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff
     USE source_input_2d, ONLY: read_mass_exchange_parameters, write_mass_exchange_parameters,                          &
+            read_interlayer_exchange_parameters, write_interlayer_exchange_parameters,                                  &
             bottom_circular_method, bottom_circular_group,                                                             &
             bottom_fissural_method, bottom_fissural_group,                                                             &
             radial_injection_method, radial_injection_group,                                                           &
@@ -1201,6 +1202,8 @@
 
         ! Read mass-exchange process values before transport validation.
         CALL read_mass_exchange_parameters(input_unit,source_input_error)
+        IF (LEN_TRIM(source_input_error)>0) ERROR STOP TRIM(source_input_error)
+        CALL read_interlayer_exchange_parameters(input_unit,source_input_error)
         IF (LEN_TRIM(source_input_error)>0) ERROR STOP TRIM(source_input_error)
 
         ! ------- READ gas_transport_parameters NAMELIST --------------------------
@@ -5129,6 +5132,7 @@
 
 
         CALL write_mass_exchange_parameters(backup_unit)
+        CALL write_interlayer_exchange_parameters(backup_unit)
         WRITE (backup_unit, solid_transport_parameters)
         WRITE (backup_unit, substrate_parameters)
         WRITE (backup_unit, gas_transport_parameters)

@@ -4,6 +4,8 @@
 MODULE source_input_2d
     USE parameters_2d, ONLY : wp, n_layers
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type, mass_exchange_l1, mass_exchange_l2
+    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type, interlayer_exchange
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
     CHARACTER(LEN=16), PUBLIC :: bottom_circular_method=''
@@ -20,7 +22,9 @@ MODULE source_input_2d
     NAMELIST /mass_exchange_parameters/ mass_exchange
     NAMELIST /mass_exchange_l1_parameters/ mass_exchange_l1
     NAMELIST /mass_exchange_l2_parameters/ mass_exchange_l2
+    NAMELIST /interlayer_exchange_parameters/ interlayer_exchange
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
+    PUBLIC :: read_interlayer_exchange_parameters, write_interlayer_exchange_parameters
     PUBLIC :: uppercase_source_text
 
 CONTAINS
@@ -154,6 +158,90 @@ CONTAINS
             END IF
         END IF
     END SUBROUTINE validate_mass_exchange_configuration
+
+
+    !> @brief Read canonical pair-wide mass exchange settings from one optional NAMELIST.
+    !> @details Single-layer input must not contain interlayer settings. A single
+    !>          pair owns these settings; neither L1 nor L2 is a surrogate owner.
+    SUBROUTINE read_interlayer_exchange_parameters(input_unit,error)
+        INTEGER, INTENT(IN) :: input_unit
+        CHARACTER(*), INTENT(OUT) :: error
+        CHARACTER(LEN=2048) :: line
+        INTEGER :: ios,count
+        error=''
+        count=0
+        REWIND(input_unit,IOSTAT=ios)
+        IF (ios/=0) THEN
+            error='Unable to scan INTERLAYER_EXCHANGE_PARAMETERS'
+            RETURN
+        END IF
+        DO
+            READ(input_unit,'(A)',IOSTAT=ios) line
+            IF (ios<0) EXIT
+            IF (ios>0) THEN
+                error='Unable to scan INTERLAYER_EXCHANGE_PARAMETERS'
+                RETURN
+            END IF
+            line=uppercase_source_text(ADJUSTL(line))
+            IF (INDEX(line,'&INTERLAYER_EXCHANGE_PARAMETERS')==1 .OR. &
+                INDEX(line,'$INTERLAYER_EXCHANGE_PARAMETERS')==1) count=count+1
+        END DO
+        IF (count>1) THEN
+            error='Duplicate INTERLAYER_EXCHANGE_PARAMETERS'
+            RETURN
+        END IF
+        IF (n_layers/=2 .AND. count/=0) THEN
+            error='INTERLAYER_EXCHANGE_PARAMETERS requires N_LAYERS=2'
+            RETURN
+        END IF
+        IF (count==1) THEN
+            REWIND(input_unit)
+            READ(input_unit,NML=interlayer_exchange_parameters,IOSTAT=ios)
+            IF (ios/=0) THEN
+                error='Invalid INTERLAYER_EXCHANGE_PARAMETERS NAMELIST'
+                RETURN
+            END IF
+        END IF
+        CALL validate_interlayer_exchange_configuration(interlayer_exchange,error)
+        REWIND(input_unit,IOSTAT=ios)
+        IF (ios/=0 .AND. LEN_TRIM(error)==0) error='Unable to rewind after interlayer NAMELIST'
+    END SUBROUTINE read_interlayer_exchange_parameters
+
+    !> @brief Validate pair-wide co-lift parameters without enabling an unimplemented source.
+    SUBROUTINE validate_interlayer_exchange_configuration(config,error)
+        TYPE(interlayer_exchange_config_type), INTENT(INOUT) :: config
+        CHARACTER(*), INTENT(OUT) :: error
+        error=''
+        config%method=uppercase_source_text(ADJUSTL(config%method))
+        config%elutriation_carrier_mode=uppercase_source_text(ADJUSTL(config%elutriation_carrier_mode))
+        IF (config%method/='EXPLICIT' .OR. config%group<0) THEN
+            error='Interlayer mass exchange currently supports EXPLICIT groups only'
+            RETURN
+        END IF
+        SELECT CASE(TRIM(config%elutriation_carrier_mode))
+        CASE('LIMIT_SOLIDS','ALLOW_CONCENTRATED')
+        CASE DEFAULT
+            error='Invalid ELUTRIATION_CARRIER_MODE'
+            RETURN
+        END SELECT
+        IF (config%elutriation_flag) THEN
+            IF (.NOT.ieee_is_finite(config%elutriation_solid_volume_fraction)) THEN
+                error='Invalid ELUTRIATION_SOLID_VOLUME_FRACTION'
+                RETURN
+            END IF
+            IF (config%elutriation_solid_volume_fraction<=0.0_wp .OR. &
+                config%elutriation_solid_volume_fraction>1.0_wp) THEN
+                error='ELUTRIATION_SOLID_VOLUME_FRACTION must be in (0,1]'
+                RETURN
+            END IF
+        END IF
+    END SUBROUTINE validate_interlayer_exchange_configuration
+
+    !> @brief Write the unique canonical interlayer configuration for two-layer restarts.
+    SUBROUTINE write_interlayer_exchange_parameters(output_unit)
+        INTEGER, INTENT(IN) :: output_unit
+        IF (n_layers==2) WRITE(output_unit,NML=interlayer_exchange_parameters)
+    END SUBROUTINE write_interlayer_exchange_parameters
 
     !> @brief Convert ASCII lowercase source-input text to uppercase.
     !> @param[in] text Input characters.
