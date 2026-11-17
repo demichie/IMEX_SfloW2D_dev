@@ -72,11 +72,12 @@ prelievi dal substrato e dal materiale preesistente.
 
 `src/physics/mass_exchange/` rimane responsabile delle sorgenti locali di
 un layer verso terreno e atmosfera. Gli scambi interni L1/L2 appartengono a
-`src/physics/interlayer_exchange/`, con leggi **separate** per settling
-L2→L1, elutriazione L1→L2 e drag. I moduli indicativi sono
-`interlayer_settling_2d.f90`, `interlayer_elutriation_2d.f90` e
-`interlayer_drag_2d.f90`; introdurli insieme alle leggi effettive, senza
-file segnaposto. Condividere i kernel fisici gia' esistenti se equivalenti,
+`src/physics/interlayer_exchange/` per settling L2→L1 ed elutriazione L1→L2.
+Il drag e' fisicamente distinto e appartiene a
+`src/physics/interlayer_momentum_exchange/`, con il coordinatore
+`interlayer_momentum_exchange_2d.f90` e la legge
+`interlayer_drag_chezy_2d.f90`. Aggiungere nuove leggi soltanto quando
+servono, senza interfacce transitorie. Condividere i kernel fisici gia' esistenti se equivalenti,
 senza assimilare la deposizione nel substrato al trasferimento interlayer.
 
 **Settling ed elutriazione** producono rate fisici indipendenti e sono
@@ -88,14 +89,17 @@ esplicito comune per gli scambi di massa**, cosi' i rate condividono
 lo snapshot e sono limitati congiuntamente; verificare al momento
 dell'integrazione l'interazione con gli altri gruppi del registro.
 
-**Drag** e' un processo distinto, senza scambio di massa, e usa un gruppo
-separato. Dall'equazione quadratica del riferimento deriva un candidato
-integratore analitico conservativo del momento, da verificare per masse
-e coefficienti congelati nel sottopasso; il metodo `ANALYTIC` non e'
-ancora approvato o implementato. Un metodo implicito, se necessario,
-deve risolvere **entrambi** i momenti accoppiati, non due problemi locali.
-Ordine dei gruppi e budget della dissipazione energetica richiedono
-verifica scientifica prima dell'attivazione.
+**Drag** e' un processo distinto, senza scambio di massa. La legge
+quadratica Chézy dell'equazione (63) e' integrata analiticamente
+in un sottopasso a masse e coefficienti costanti, conservando il momento
+totale e lasciando invariati massa, composizione ed energia termica
+di ogni layer, come approvato. Il coordinatore possiede l'unica
+configurazione pair-wide e la legge e' un kernel puro; la soglia di
+contatto e' `h1,h2 > 1e-3 m`. Il drag usa un gruppo `ANALYTIC` separato
+con id positivo: il gruppo zero non e' previsto per questa integrazione
+nonlineare esatta. I due moduli sono predisposti e testati direttamente;
+il collegamento a input, registro ed esecutore Lie resta da completare
+prima di attivare la fisica in produzione.
 
 ### Solidi, carrier e composizione della corrente elutriata
 

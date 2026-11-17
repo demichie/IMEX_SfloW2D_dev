@@ -65,5 +65,12 @@ for profile in strict optimized; do
       $netcdf_flibs $netcdf_clibs -o test_interlayer_lie_transaction
     ./test_interlayer_lie_transaction > interlayer-lie-results.log
     cat interlayer-lie-results.log
+    "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $netcdf_fflags -c "$test_dir/test_interlayer_momentum_exchange.f90"
+    "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $production_objects test_interlayer_momentum_exchange.o -llapack \
+      $netcdf_flibs $netcdf_clibs -o test_interlayer_momentum_exchange
+    ./test_interlayer_momentum_exchange > interlayer-momentum-results.log
+    cat interlayer-momentum-results.log
 done
 printf 'D17 evidence directory: %s\n' "$work_dir"
