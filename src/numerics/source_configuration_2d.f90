@@ -6,7 +6,8 @@
 !********************************************************************************
 MODULE source_configuration_2d
     USE source_catalog_2d
-    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2, SOURCE_SCOPE_INTERLAYER
+    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2,      &
+        SOURCE_SCOPE_INTERLAYER
     USE source_input_2d
     USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                                               &
             curvature_term_flag, bottom_radial_source_flag,                                        &
@@ -17,7 +18,7 @@ MODULE source_configuration_2d
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type,interlayer_exchange
+    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources
