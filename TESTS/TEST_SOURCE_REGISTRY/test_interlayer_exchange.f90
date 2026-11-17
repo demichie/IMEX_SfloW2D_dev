@@ -1,8 +1,16 @@
 !> @brief Cell-local paired transfer budgets and co-lift input regressions.
 PROGRAM test_interlayer_exchange
-    USE parameters_2d, ONLY : wp,n_layers
+    USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns
+    USE parameters_2d, ONLY : n_stoch_vars,n_pore_vars,gas_flag,sutherland_flag
+    USE parameters_2d, ONLY : configure_canonical_state_indices,idx_solidEqn_first
     USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type, interlayer_exchange
-    USE interlayer_exchange_2d, ONLY : limit_interlayer_mass_transfer
+    USE interlayer_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_exchange_explicit
+    USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
+    USE state_types, ONLY : physical_state_real,initialize_physical_state_real
+    USE solid_transport_parameters_2d, ONLY : rho_s,sp_heat_s,diam_s,maximum_solid_packing
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE constitutive_parameters_2d, ONLY : grav,kin_visc_c,rho_a_amb,vonK
     USE source_input_2d, ONLY : read_interlayer_exchange_parameters
     IMPLICIT NONE
     TYPE(interlayer_exchange_config_type) :: config
@@ -96,10 +104,144 @@ PROGRAM test_interlayer_exchange
     CALL require(interlayer_exchange%elutriation_carrier_mode=='ALLOW_CONCENTRATED', &
         'read and normalize carrier mode')
     CLOSE(unit)
+    CALL test_density_asymmetry()
+    CALL test_physical_sources()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
 
 CONTAINS
+
+
+    !> @brief Verify carrier MASS conservation with distinct carrier densities.
+    SUBROUTINE test_density_asymmetry()
+        LOGICAL :: valid
+        REAL(wp) :: sd(2),ed(2),cd,cu
+        s1=0.0_wp
+        s2=[0.12_wp,0.08_wp]
+        carrier1=0.0_wp
+        carrier2=0.5_wp
+        settle=[0.03_wp,0.02_wp]
+        elut=0.0_wp
+        config%elutriation_carrier_mode='LIMIT_SOLIDS'
+        CALL limit_interlayer_mass_transfer(s1,s2,carrier1,carrier2,settle,elut, &
+            dt,pack,config,sd,ed,cd,cu,valid,rho_carrier_l1=2.0_wp,rho_carrier_l2=1.0_wp)
+        CALL require(valid,'unequal carrier densities are admissible')
+        CALL close(cd,2.0_wp*(1.0_wp-pack)/pack*SUM(sd),'unequal density cold-start packing')
+        CALL close(2.0_wp*(carrier1+0.5_wp*dt*cd-dt*cu)+ &
+            (carrier2+dt*(2.0_wp*cu-cd)),2.0_wp*carrier1+carrier2, &
+            'unequal density carrier mass conservation')
+    END SUBROUTINE test_density_asymmetry
+
+    !> @brief Exercise physics and antisymmetric paired mass, momentum and energy.
+    SUBROUTINE test_physical_sources()
+        TYPE(physical_state_real) :: l1,l2
+        TYPE(interlayer_exchange_config_type) :: phys_config
+        TYPE(mass_exchange_config_type) :: mass_l2
+        TYPE(rheology_config_type) :: rheology_l2
+        REAL(wp) :: source1(6),source2(6),elut_rates(2)
+        LOGICAL :: valid
+        INTEGER :: i
+
+        n_solid=2; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
+        n_vars=6; n_eqns=6
+        CALL configure_canonical_state_indices()
+        gas_flag=.TRUE.
+        sutherland_flag=.FALSE.
+        rho_a_amb=1.0_wp; grav=9.81_wp; vonK=0.41_wp
+        kin_visc_c=1.0E-5_wp; maximum_solid_packing=0.6_wp
+        ALLOCATE(rho_s(2),sp_heat_s(2),diam_s(2))
+        rho_s=[2200.0_wp,2500.0_wp]
+        sp_heat_s=[800.0_wp,900.0_wp]
+        diam_s=[2.0E-5_wp,5.0E-5_wp]
+        CALL initialize_physical_state_real(l1)
+        CALL initialize_physical_state_real(l2)
+        l1%h=1.0_wp; l1%alphas=[0.15_wp,0.05_wp]
+        l1%rho_c=1.0_wp; l1%rho_m=455.8_wp
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        l1%cp_c=1000.0_wp; l1%T=500.0_wp; l1%u=10.0_wp; l1%v=1.0_wp
+        l2%h=0.0_wp; l2%alphas=0.0_wp
+        l2%rho_c=1.0_wp; l2%rho_m=1.0_wp
+        l2%cp_c=1000.0_wp; l2%T=300.0_wp
+        phys_config%elutriation_flag=.TRUE.
+        phys_config%elutriation_solid_volume_fraction=0.1_wp
+
+        CALL eval_interlayer_elutriation_explicit(phys_config,mass_l2,l1,l2,dt,elut_rates)
+        CALL require(ALL(elut_rates>0.0_wp),'cold-start elutriation generates both grain rates')
+        phys_config%elutriation_law='SHEAR_POWER'
+        phys_config%shields_critical=0.05_wp
+        phys_config%shields_exponent=1.0_wp
+        phys_config%lift_length_diameters=10.0_wp
+        CALL eval_interlayer_elutriation_explicit(phys_config,mass_l2,l1,l2,dt,elut_rates)
+        CALL require(ALL(elut_rates>0.0_wp),'shear-power and Shields rate in dry L2 cold-start')
+        phys_config%elutriation_law='LINEAR_USTAR'
+        CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt,source1,source2,valid)
+        CALL require(valid,'cold-start L2 paired physical transfer accepted')
+        CALL require(source1(idx_solidEqn_first)<0.0_wp .AND. &
+            source2(idx_solidEqn_first)>0.0_wp,'elutriation solid donor and recipient')
+        CALL require(source1(1)<0.0_wp .AND. source2(1)>0.0_wp,'elutriation gas included')
+
+        DO i=1,6
+            CALL close(source1(i)+source2(i),0.0_wp,'elutriation antisymmetric conservative rate')
+        END DO
+        CALL close(source2(2),-source1(1)*l1%u,'elutriation donor velocity')
+        CALL close(source2(3),-source1(1)*l1%v,'elutriation donor transverse velocity')
+
+        ! Settling is independent of external basal deposition activation.
+        phys_config%elutriation_flag=.FALSE.
+        phys_config%settling_flag=.TRUE.
+        l1%h=0.0_wp; l1%alphas=0.0_wp; l1%xs=0.0_wp
+        l2%h=1.0_wp; l2%alphas=[0.10_wp,0.05_wp]
+        l2%rho_m=1.0_wp+SUM((rho_s-1.0_wp)*l2%alphas)
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l2%u=3.0_wp; l2%v=-1.0_wp
+        CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt,source1,source2,valid)
+        CALL require(valid,'cold-start L1 settling accepted')
+        CALL require(source1(idx_solidEqn_first)>0.0_wp,'settling creates L1 solids')
+        CALL require(source1(1)>0.0_wp .AND. source2(1)<0.0_wp,'settling carrier is withdrawn')
+        DO i=1,6
+            CALL close(source1(i)+source2(i),0.0_wp,'settling antisymmetric conservative rate')
+        END DO
+
+        ! Both kernels can be evaluated at the same snapshot without state mutation.
+        phys_config%elutriation_flag=.TRUE.
+        l1%h=1.0_wp; l1%alphas=[0.15_wp,0.05_wp]
+        l1%rho_m=1.0_wp+SUM((rho_s-1.0_wp)*l1%alphas)
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt,source1,source2,valid)
+        CALL require(valid,'simultaneous source-rate assembly accepted')
+        DO i=1,6
+            CALL close(source1(i)+source2(i),0.0_wp,'simultaneous antisymmetric conservative rate')
+        END DO
+
+        ! The additional gas species follows the donor carrier composition.
+        BLOCK
+            REAL(wp) :: augmented1(7),augmented2(7)
+            n_add_gas=1; n_vars=7; n_eqns=7
+            CALL configure_canonical_state_indices()
+            CALL initialize_physical_state_real(l1)
+            CALL initialize_physical_state_real(l2)
+            l1%h=1.0_wp; l1%alphas=[0.15_wp,0.05_wp]
+            l1%rho_c=1.0_wp; l1%rho_m=455.8_wp
+            l1%xs=rho_s*l1%alphas/l1%rho_m
+            l1%xg=[0.0005_wp]
+            l1%cp_c=1000.0_wp; l1%T=500.0_wp; l1%u=10.0_wp; l1%v=1.0_wp
+            l2%h=0.0_wp; l2%rho_c=1.0_wp; l2%rho_m=1.0_wp
+            l2%alphas=0.0_wp; l2%cp_c=1000.0_wp; l2%T=300.0_wp
+            phys_config%settling_flag=.FALSE.
+            CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+                l1,l2,l1,l2,dt,augmented1,augmented2,valid)
+            CALL require(valid,'co-lift with additional gas species accepted')
+            CALL require(augmented1(7)<0.0_wp .AND. augmented2(7)>0.0_wp, &
+                'additional gas constituent leaves donor and enters recipient')
+            DO i=1,7
+                CALL close(augmented1(i)+augmented2(i),0.0_wp, &
+                    'additional gas pairwise conservation')
+            END DO
+        END BLOCK
+    END SUBROUTINE test_physical_sources
 
     SUBROUTINE execute(expected_valid)
         LOGICAL, INTENT(IN) :: expected_valid

@@ -23,7 +23,6 @@ IMEX_SfloW2D_SOURCES = \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
                 physics/mass_exchange/mass_exchange_parameters_2d.f90 \
                 physics/interlayer_exchange/interlayer_exchange_parameters_2d.f90 \
-                physics/interlayer_exchange/interlayer_exchange_2d.f90 \
                 numerics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
@@ -58,6 +57,9 @@ IMEX_SfloW2D_SOURCES = \
                 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.f90 \
                 physics/mass_exchange/mass_exchange_erosion_2d.f90 \
                 physics/mass_exchange/mass_exchange_deposition_2d.f90 \
+                physics/interlayer_exchange/interlayer_settling_2d.f90 \
+                physics/interlayer_exchange/interlayer_elutriation_2d.f90 \
+                physics/interlayer_exchange/interlayer_exchange_2d.f90 \
                 physics/mass_exchange/mass_exchange_lava_deposition_2d.f90 \
                 numerics/source_input_2d.f90 \
                 physics/mass_exchange/mass_exchange_vaporization_2d.f90 \
@@ -644,6 +646,14 @@ physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): physics/mass_e
 
 # Pair-wide cell-local limiter and canonical input: explicit module dependencies.
 physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-physics/interlayer_exchange/interlayer_exchange_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)
+physics/interlayer_exchange/interlayer_settling_2d.$(OBJEXT): \
+    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT)
+physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT): \
+    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT)
+physics/interlayer_exchange/interlayer_exchange_2d.$(OBJEXT): \
+    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_exchange/interlayer_settling_2d.$(OBJEXT) \
+    physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT) state/state_types.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)

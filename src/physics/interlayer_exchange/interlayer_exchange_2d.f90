@@ -4,12 +4,20 @@
 !>          before returning any accepted flux. It does not update conservative
 !>          states, own grid indices or perform a Lie timestep.
 MODULE interlayer_exchange_2d
-    USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_eqns
+    USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
+    USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
+    USE state_types, ONLY : physical_state_real
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE solid_transport_parameters_2d, ONLY : rho_s,sp_heat_s,maximum_solid_packing
+    USE interlayer_settling_2d, ONLY : eval_interlayer_settling_explicit
+    USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
     USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
-    PUBLIC :: limit_interlayer_mass_transfer
+    PUBLIC :: limit_interlayer_mass_transfer, eval_interlayer_exchange_explicit
 
 CONTAINS
 
@@ -21,25 +29,39 @@ CONTAINS
     !>          LIMIT_SOLIDS preserves the parcel solid fraction; ALLOW_CONCENTRATED
     !>          may reduce co-lift independently. Downward carrier is the minimum
     !>          required to keep L1 admissible after both solid fluxes and co-lift.
-    !> @param[in] solid_l1,solid_l2 Existing per-class solid volume inventories [m].
-    !> @param[in] carrier_l1,carrier_l2 Existing carrier volume inventories [m].
-    !> @param[in] settling,elutriation Proposed per-class positive solid rates [m/s].
+    !> @param[in] solid_l1 Existing L1 per-class solid volume inventories [m].
+    !> @param[in] solid_l2 Existing L2 per-class solid volume inventories [m].
+    !> @param[in] carrier_l1 Existing L1 carrier volume inventory [m].
+    !> @param[in] carrier_l2 Existing L2 carrier volume inventory [m].
+    !> @param[in] settling Proposed per-class downward solid rates [m/s].
+    !> @param[in] elutriation Proposed per-class upward solid rates [m/s].
     !> @param[in] dt Common timestep [s].
     !> @param[in] packing Maximum admissible solid volume fraction of either layer.
     !> @param[in] config Canonical pair-wide co-lift configuration.
-    !> @param[out] accepted_settling,accepted_elutriation Limited solid fluxes [m/s].
-    !> @param[out] carrier_down,carrier_up Limited carrier volume fluxes [m/s].
+    !> @param[out] accepted_settling Limited downward solid fluxes [m/s].
+    !> @param[out] accepted_elutriation Limited upward solid fluxes [m/s].
+    !> @param[out] carrier_down Limited downward carrier volume flux [m/s].
+    !> @param[out] carrier_up Limited upward carrier volume flux [m/s].
     !> @param[out] valid False on invalid input; outputs are then zero.
+    !> @param[in] rho_carrier_l1 Optional L1 carrier donor density [kg/m3].
+    !> @param[in] rho_carrier_l2 Optional L2 carrier donor density [kg/m3].
+    !> @param[in] candidate_rho_l1 Optional L1 recipient carrier density [kg/m3].
+    !> @param[in] candidate_rho_l2 Optional L2 recipient carrier density [kg/m3].
+    !>          Omitted densities default to unity or their corresponding donors.
     PURE SUBROUTINE limit_interlayer_mass_transfer(solid_l1,solid_l2,carrier_l1,carrier_l2, &
             settling,elutriation,dt,packing,config,accepted_settling,accepted_elutriation, &
-            carrier_down,carrier_up,valid)
+            carrier_down,carrier_up,valid,rho_carrier_l1,rho_carrier_l2,candidate_rho_l1,candidate_rho_l2)
         REAL(wp), INTENT(IN) :: solid_l1(:),solid_l2(:),carrier_l1,carrier_l2
         REAL(wp), INTENT(IN) :: settling(:),elutriation(:),dt,packing
         TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
         REAL(wp), INTENT(OUT) :: accepted_settling(:),accepted_elutriation(:),carrier_down,carrier_up
         LOGICAL, INTENT(OUT) :: valid
+        REAL(wp), INTENT(IN), OPTIONAL :: rho_carrier_l1,rho_carrier_l2
+        REAL(wp), INTENT(IN), OPTIONAL :: candidate_rho_l1,candidate_rho_l2
+        REAL(wp) :: donor_rho1,donor_rho2,receiver_rho1,receiver_rho2
+        REAL(wp) :: up_to_l1,down_to_l1,up_to_l2,down_to_l2,available_up,available_down
         REAL(wp) :: f_settle,f_elut,co_lift,requested,alpha_lift,beta,lo,hi,mid,scale
-        REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2,unused_down,unused_up
+        REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2
         INTEGER :: i,k,n
 
         accepted_settling=0.0_wp
@@ -58,6 +80,23 @@ CONTAINS
         IF (ANY(solid_l1<0.0_wp) .OR. ANY(solid_l2<0.0_wp) .OR. &
             ANY(settling<0.0_wp) .OR. ANY(elutriation<0.0_wp)) RETURN
         IF (carrier_l1<0.0_wp .OR. carrier_l2<0.0_wp) RETURN
+        donor_rho1=1.0_wp
+        donor_rho2=1.0_wp
+        IF (PRESENT(rho_carrier_l1)) donor_rho1=rho_carrier_l1
+        IF (PRESENT(rho_carrier_l2)) donor_rho2=rho_carrier_l2
+        receiver_rho1=donor_rho1
+        receiver_rho2=donor_rho2
+        IF (PRESENT(candidate_rho_l1)) receiver_rho1=candidate_rho_l1
+        IF (PRESENT(candidate_rho_l2)) receiver_rho2=candidate_rho_l2
+        IF (.NOT.ieee_is_finite(donor_rho1) .OR. .NOT.ieee_is_finite(donor_rho2)) RETURN
+        IF (.NOT.ieee_is_finite(receiver_rho1) .OR. .NOT.ieee_is_finite(receiver_rho2)) RETURN
+        IF (MIN(donor_rho1,donor_rho2,receiver_rho1,receiver_rho2)<=0.0_wp) RETURN
+        up_to_l1=donor_rho1/receiver_rho1
+        down_to_l1=donor_rho2/receiver_rho1
+        up_to_l2=donor_rho1/receiver_rho2
+        down_to_l2=donor_rho2/receiver_rho2
+        available_up=carrier_l1/(dt*up_to_l1)
+        available_down=carrier_l2/(dt*down_to_l2)
         IF (.NOT.config%settling_flag .AND. ANY(settling>0.0_wp)) RETURN
         IF (.NOT.config%elutriation_flag .AND. ANY(elutriation>0.0_wp)) RETURN
         IF (config%elutriation_flag) THEN
@@ -102,20 +141,19 @@ CONTAINS
                 accepted_elutriation=0.0_wp
                 RETURN
             END IF
-            IF (config%elutriation_carrier_mode=='LIMIT_SOLIDS' .AND. requested>c1/dt) THEN
-                f_elut=(c1/dt)/requested
+            IF (config%elutriation_carrier_mode=='LIMIT_SOLIDS' .AND. requested>available_up) THEN
+                f_elut=available_up/requested
                 accepted_elutriation=f_elut*accepted_elutriation
                 elut_total=SUM(accepted_elutriation)
                 co_lift=(1.0_wp-alpha_lift)/alpha_lift*elut_total
             ELSE
-                co_lift=MIN(requested,c1/dt)
+                co_lift=MIN(requested,available_up)
             END IF
         END IF
 
         ! Final packing uses the combined changes, but no gross donor withdrawal
         ! can use a simultaneous credit. The feasible shared scale interval
         ! contains zero; bisection is entered only for a binding packing bound.
-        CALL candidate_flux(1.0_wp,unused_down,unused_up)
         IF (.NOT.feasible(1.0_wp)) THEN
             lo=0.0_wp
             hi=1.0_wp
@@ -136,31 +174,179 @@ CONTAINS
         accepted_elutriation=scale*accepted_elutriation
         carrier_up=scale*co_lift
         carrier_down=MAX(0.0_wp,(beta*(s1+dt* &
-            (SUM(accepted_settling)-SUM(accepted_elutriation)))-c1+dt*carrier_up)/dt)
+            (SUM(accepted_settling)-SUM(accepted_elutriation)))-c1+dt*up_to_l1*carrier_up)/(dt*down_to_l1))
         IF (.NOT.ieee_is_finite(carrier_down)) RETURN
-        IF (carrier_down>c2/dt+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,c2/dt)) RETURN
+        IF (carrier_down>available_down+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,available_down)) RETURN
         valid=.TRUE.
 
     CONTAINS
 
+        !> @brief Evaluate simultaneous upward/downward carrier rates at common scaling.
+        !> @param[in] f Common physical transfer scale in [0,1].
+        !> @param[out] down Required downward carrier rate [m/s].
+        !> @param[out] up Prescribed upward carrier rate [m/s].
         PURE SUBROUTINE candidate_flux(f,down,up)
             REAL(wp), INTENT(IN) :: f
             REAL(wp), INTENT(OUT) :: down,up
             up=f*co_lift
-            down=MAX(0.0_wp,(beta*(s1+dt*f*(settle_total-elut_total))-c1+dt*up)/dt)
+            down=MAX(0.0_wp,(beta*(s1+dt*f*(settle_total-elut_total))-c1+dt*up_to_l1*up)/ &
+                (dt*down_to_l1))
         END SUBROUTINE candidate_flux
 
+        !> @brief Check L2 carrier inventory and packing at the proposed common scale.
+        !> @param[in] f Common physical transfer scale in [0,1].
+        !> @return Whether the candidate carrier exchange is admissible in L2.
         PURE LOGICAL FUNCTION feasible(f) RESULT(ok)
             REAL(wp), INTENT(IN) :: f
             REAL(wp) :: down,up,solid2_after,carrier2_after,tol
             CALL candidate_flux(f,down,up)
             solid2_after=s2+dt*f*(elut_total-settle_total)
-            carrier2_after=c2+dt*(up-down)
+            carrier2_after=c2+dt*(up_to_l2*up-down_to_l2*down)
             tol=128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)
             ok=ieee_is_finite(down) .AND. ieee_is_finite(carrier2_after)
             IF (.NOT.ok) RETURN
-            ok=down<=c2/dt+tol/dt .AND. &
+            ok=down<=available_down+tol/dt .AND. &
                 carrier2_after>=-tol .AND. beta*solid2_after<=carrier2_after+tol
         END FUNCTION feasible
     END SUBROUTINE limit_interlayer_mass_transfer
+
+    !> @brief Evaluate physical rates and assemble a conservative paired exchange.
+    !> @details Law evaluations use one common source snapshot. A separate pair of
+    !>          post-spatial candidate states supplies inventories and packing bounds,
+    !>          preserving the Lie group-0 evaluation/recipient distinction. The
+    !>          two source vectors are antisymmetric for mass, species, momentum
+    !>          and donor-state thermal content; no terrain or atmosphere is touched.
+    !> @param[in] config Pair-wide physical source configuration.
+    !> @param[in] rheology_l2 Donor L2 rheology closure used by settling.
+    !> @param[in] mass_l2 L2 particle settling drag and carrier properties.
+    !> @param[in] eval_l1 L1 physical state for source evaluation.
+    !> @param[in] eval_l2 L2 physical state for source evaluation.
+    !> @param[in] limit_l1 L1 recipient state for inventory checks.
+    !> @param[in] limit_l2 L2 recipient state for inventory checks.
+    !> @param[in] dt Physical Lie-substep duration [s].
+    !> @param[out] source_l1 Signed L1 conservative rate vector.
+    !> @param[out] source_l2 Signed L2 conservative rate vector.
+    !> @param[out] valid Whether an admissible paired rate has been assembled.
+    SUBROUTINE eval_interlayer_exchange_explicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
+            limit_l1,limit_l2,dt,source_l1,source_l2,valid)
+        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_real), INTENT(IN) :: eval_l1,eval_l2,limit_l1,limit_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
+        LOGICAL, INTENT(OUT) :: valid
+        REAL(wp) :: proposed_s(n_solid),proposed_e(n_solid)
+        REAL(wp) :: limited_s(n_solid),limited_e(n_solid)
+        REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
+        REAL(wp) :: down,up,chi,interfacial_u,interfacial_v,solid_mass,carrier_mass
+        REAL(wp) :: donor_xg(n_add_gas),gas_mass_fraction
+        INTEGER :: i
+
+        source_l1=0.0_wp
+        source_l2=0.0_wp
+        valid=.FALSE.
+        IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
+        IF (limit_l1%rho_c<=0.0_wp .OR. limit_l2%rho_c<=0.0_wp) RETURN
+        IF (config%settling_flag .AND. eval_l2%h>0.0_wp) THEN
+            CALL eval_interlayer_settling_explicit(config,rheology_l2,mass_l2,eval_l2,dt,proposed_s)
+        ELSE
+            proposed_s=0.0_wp
+        END IF
+        IF (config%elutriation_flag .AND. eval_l1%h>0.0_wp) THEN
+            CALL eval_interlayer_elutriation_explicit(config,mass_l2,eval_l1,eval_l2,dt,proposed_e)
+        ELSE
+            proposed_e=0.0_wp
+        END IF
+        solid1=limit_l1%h*limit_l1%alphas
+        solid2=limit_l2%h*limit_l2%alphas
+        carrier1=limit_l1%h*MAX(0.0_wp,1.0_wp-SUM(limit_l1%alphas))
+        carrier2=limit_l2%h*MAX(0.0_wp,1.0_wp-SUM(limit_l2%alphas))
+        CALL limit_interlayer_mass_transfer(solid1,solid2,carrier1,carrier2,proposed_s,proposed_e, &
+            dt,maximum_solid_packing,config,limited_s,limited_e,down,up,valid, &
+            rho_carrier_l1=eval_l1%rho_c,rho_carrier_l2=eval_l2%rho_c, &
+            candidate_rho_l1=limit_l1%rho_c,candidate_rho_l2=limit_l2%rho_c)
+        IF (.NOT.valid) RETURN
+
+        ! The same interface velocity is debited from L2 and credited to L1.
+        chi=config%settling_velocity_weight+(1.0_wp-config%settling_velocity_weight)* &
+            config%settling_plug_thickness/(MAX(0.0_wp,eval_l2%h)+config%settling_plug_thickness)
+        interfacial_u=eval_l1%u+chi*(eval_l2%u-eval_l1%u)
+        interfacial_v=eval_l1%v+chi*(eval_l2%v-eval_l1%v)
+        DO i=1,n_solid
+            solid_mass=rho_s(i)*limited_s(i)
+            CALL add_pair(solid_mass,interfacial_u,interfacial_v, &
+                solid_mass*sp_heat_s(i)*eval_l2%T,1.0_wp,idx_solidEqn_first+i-1)
+            solid_mass=rho_s(i)*limited_e(i)
+            CALL add_pair(solid_mass,eval_l1%u,eval_l1%v, &
+                solid_mass*sp_heat_s(i)*eval_l1%T,-1.0_wp,idx_solidEqn_first+i-1)
+        END DO
+
+        carrier_mass=eval_l2%rho_c*down
+        IF (carrier_mass>0.0_wp) THEN
+            donor_xg=eval_l2%xg
+            gas_mass_fraction=1.0_wp-SUM(eval_l2%xs)
+            IF (gas_mass_fraction<=0.0_wp) THEN
+                valid=.FALSE.
+                source_l1=0.0_wp
+                source_l2=0.0_wp
+                RETURN
+            END IF
+            CALL add_pair(carrier_mass,eval_l2%u,eval_l2%v, &
+                carrier_mass*eval_l2%cp_c*eval_l2%T,1.0_wp,0)
+            DO i=1,n_add_gas
+                CALL add_gas(carrier_mass*donor_xg(i)/gas_mass_fraction,1.0_wp,i)
+            END DO
+        END IF
+        carrier_mass=eval_l1%rho_c*up
+        IF (carrier_mass>0.0_wp) THEN
+            donor_xg=eval_l1%xg
+            gas_mass_fraction=1.0_wp-SUM(eval_l1%xs)
+            IF (gas_mass_fraction<=0.0_wp) THEN
+                valid=.FALSE.
+                source_l1=0.0_wp
+                source_l2=0.0_wp
+                RETURN
+            END IF
+            CALL add_pair(carrier_mass,eval_l1%u,eval_l1%v, &
+                carrier_mass*eval_l1%cp_c*eval_l1%T,-1.0_wp,0)
+            DO i=1,n_add_gas
+                CALL add_gas(carrier_mass*donor_xg(i)/gas_mass_fraction,-1.0_wp,i)
+            END DO
+        END IF
+
+    CONTAINS
+        !> @brief Add a signed, paired mass, momentum and thermal energy transfer.
+        !> @param[in] mass Positive transferred phase mass rate [kg/m2/s].
+        !> @param[in] ux Transfer horizontal x velocity [m/s].
+        !> @param[in] uy Transfer horizontal y velocity [m/s].
+        !> @param[in] thermal Donor-state sensible thermal rate [J/m2/s].
+        !> @param[in] direction Positive L2-to-L1, negative L1-to-L2.
+        !> @param[in] species_eq Species equation index, zero for carrier.
+        SUBROUTINE add_pair(mass,ux,uy,thermal,direction,species_eq)
+            REAL(wp), INTENT(IN) :: mass,ux,uy,thermal,direction
+            INTEGER, INTENT(IN) :: species_eq
+            source_l1(idx_totMassEqn)=source_l1(idx_totMassEqn)+direction*mass
+            source_l1(idx_uEqn)=source_l1(idx_uEqn)+direction*mass*ux
+            source_l1(idx_vEqn)=source_l1(idx_vEqn)+direction*mass*uy
+            source_l1(idx_engyEqn)=source_l1(idx_engyEqn)+direction*thermal
+            IF (species_eq>0) source_l1(species_eq)=source_l1(species_eq)+direction*mass
+            source_l2(idx_totMassEqn)=source_l2(idx_totMassEqn)-direction*mass
+            source_l2(idx_uEqn)=source_l2(idx_uEqn)-direction*mass*ux
+            source_l2(idx_vEqn)=source_l2(idx_vEqn)-direction*mass*uy
+            source_l2(idx_engyEqn)=source_l2(idx_engyEqn)-direction*thermal
+            IF (species_eq>0) source_l2(species_eq)=source_l2(species_eq)-direction*mass
+        END SUBROUTINE add_pair
+
+        !> @brief Add equal and opposite transported additional-carrier species mass.
+        !> @param[in] mass Additional carrier constituent mass rate [kg/m2/s].
+        !> @param[in] direction Positive L2-to-L1, negative L1-to-L2.
+        !> @param[in] index Additional gas species index (1-based).
+        SUBROUTINE add_gas(mass,direction,index)
+            REAL(wp), INTENT(IN) :: mass,direction
+            INTEGER, INTENT(IN) :: index
+            source_l1(idx_addGasEqn_first+index-1)=source_l1(idx_addGasEqn_first+index-1)+direction*mass
+            source_l2(idx_addGasEqn_first+index-1)=source_l2(idx_addGasEqn_first+index-1)-direction*mass
+        END SUBROUTINE add_gas
+    END SUBROUTINE eval_interlayer_exchange_explicit
 END MODULE interlayer_exchange_2d

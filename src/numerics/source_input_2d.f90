@@ -214,6 +214,7 @@ CONTAINS
         error=''
         config%method=uppercase_source_text(ADJUSTL(config%method))
         config%elutriation_carrier_mode=uppercase_source_text(ADJUSTL(config%elutriation_carrier_mode))
+        config%elutriation_law=uppercase_source_text(ADJUSTL(config%elutriation_law))
         IF (config%method/='EXPLICIT' .OR. config%group<0) THEN
             error='Interlayer mass exchange currently supports EXPLICIT groups only'
             RETURN
@@ -224,6 +225,53 @@ CONTAINS
             error='Invalid ELUTRIATION_CARRIER_MODE'
             RETURN
         END SELECT
+        IF (config%settling_velocity_weight<0.0_wp .OR. config%settling_velocity_weight>1.0_wp .OR. &
+            config%settling_plug_thickness<=0.0_wp) THEN
+            error='Invalid interlayer settling transfer velocity parameters'
+            RETURN
+        END IF
+        IF (config%elutriation_flag) THEN
+            SELECT CASE(TRIM(config%elutriation_law))
+            CASE('LINEAR_USTAR','SHEAR_POWER')
+            CASE DEFAULT
+                error='Unsupported ELUTRIATION_LAW'
+                RETURN
+            END SELECT
+            IF (.NOT.ieee_is_finite(config%elutriation_efficiency) .OR. &
+                .NOT.ieee_is_finite(config%shear_interlayer) .OR. &
+                .NOT.ieee_is_finite(config%shear_surface) .OR. &
+                .NOT.ieee_is_finite(config%upper_depth_gate) .OR. &
+                .NOT.ieee_is_finite(config%rouse_critical) .OR. &
+                .NOT.ieee_is_finite(config%rouse_exponent) .OR. &
+                .NOT.ieee_is_finite(config%bed_availability_exponent) .OR. &
+                .NOT.ieee_is_finite(config%sediment_diffusivity_ratio) .OR. &
+                .NOT.ieee_is_finite(config%elutriation_donor_cap)) THEN
+                error='Nonfinite elutriation coefficient'
+                RETURN
+            END IF
+            IF (config%elutriation_efficiency<0.0_wp .OR. config%shear_interlayer<0.0_wp .OR. &
+                config%shear_surface<0.0_wp .OR. config%upper_depth_gate<=0.0_wp .OR. &
+                config%rouse_critical<=0.0_wp .OR. config%rouse_exponent<=0.0_wp .OR. &
+                config%bed_availability_exponent<=0.0_wp .OR. &
+                config%sediment_diffusivity_ratio<=0.0_wp .OR. &
+                config%elutriation_donor_cap<=0.0_wp .OR. config%elutriation_donor_cap>1.0_wp) THEN
+                error='Invalid elutriation physical coefficient'
+                RETURN
+            END IF
+            IF (config%elutriation_law=='SHEAR_POWER') THEN
+                IF (.NOT.ieee_is_finite(config%shields_critical) .OR. &
+                    .NOT.ieee_is_finite(config%shields_exponent) .OR. &
+                    .NOT.ieee_is_finite(config%lift_length_diameters)) THEN
+                    error='Invalid SHEAR_POWER coefficient'
+                    RETURN
+                END IF
+                IF (config%shields_critical<0.0_wp .OR. config%shields_exponent<=0.0_wp .OR. &
+                    config%lift_length_diameters<=0.0_wp) THEN
+                    error='SHEAR_POWER requires explicit Shields and lift-length coefficients'
+                    RETURN
+                END IF
+            END IF
+        END IF
         IF (config%elutriation_flag) THEN
             IF (.NOT.ieee_is_finite(config%elutriation_solid_volume_fraction)) THEN
                 error='Invalid ELUTRIATION_SOLID_VOLUME_FRACTION'

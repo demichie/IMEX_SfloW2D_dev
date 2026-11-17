@@ -49,10 +49,13 @@ for profile in strict optimized; do
     cat results.log
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       $netcdf_fflags -c "$test_dir/test_interlayer_exchange.f90"
+    # The paired physical coordinator uses the existing deposition and state
+    # modules: link the entire production module closure, excluding test mains.
+    production_objects=$(printf '%s\n' $sources | sed -n \
+      -e 's|.*/||;s/\.f90$/.o/p' -e 's|.*/||;s/\.c$/.o/p' | tr '\n' ' ')
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-      parameters_2d.o mass_exchange_parameters_2d.o \
-      interlayer_exchange_parameters_2d.o interlayer_exchange_2d.o \
-      source_input_2d.o test_interlayer_exchange.o -o test_interlayer_exchange
+      $production_objects test_interlayer_exchange.o -llapack \
+      $netcdf_flibs $netcdf_clibs -o test_interlayer_exchange
     ./test_interlayer_exchange > interlayer-results.log
     cat interlayer-results.log
 done

@@ -127,6 +127,16 @@ I modi non cambiano la legge fisica che propone il rate solido e non
 introducono un vincolo di composizione finale su L2. La diluizione
 atmosferica resta un processo esterno distinto.
 
+Le due leggi disponibili nel percorso cell-local comprendono il
+settling derivato dal kernel condiviso della deposizione e l'elutriazione
+`LINEAR_USTAR` o `SHEAR_POWER` del riferimento. I coefficienti Shields
+e di lunghezza di sollevamento della seconda chiusura richiedono input
+esplicito e calibrazione; non dedurre valori fisici dal solo successo dei test.
+Le sorgenti termiche usano il calore specifico e la temperatura del donatore;
+il momento del settling usa la velocita' interfaciale comune, quello
+dell'elutriazione la velocita' del donatore. Il vettore accoppiato cell-local
+non implica ancora l'esecuzione dallo scope Lie `INTERLAYER`.
+
 **Settling:** trasferire i solidi e soltanto il carrier L2→L1
 eventualmente necessario a non superare il packing di L1, tenendo
 conto **anche dell'elutriazione simultanea e del suo co-lift**.
@@ -188,7 +198,7 @@ abilitazione in produzione.
 | **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
 | **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
 | **TL07 — Lie accoppiato** | Integrazione parziale | Registro scoped L1/L2 e candidati rank-4 predisposti; contatti propagati al mass exchange esterno. Completare la transazione end-to-end, gruppi interlayer, limitazione accoppiata e controlli finali. Il percorso di produzione L2 e' ancora bloccato. |
-| **TL08–TL11 — Chiusure e scambi** | Limiter cell-local predisposto | Configurazione pair-wide e limitazione congiunta dei flussi proposti di solidi/carrier, con i due modi di co-lift e test isolati. Restano i kernel fisici, l'assemblaggio conservativo di momento/energia, l'integrazione Lie, il drag e la verifica integrata. |
+| **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano integrazione nel registro/Lie, variabili opzionali per layer, validazione degli stati termodinamici finali, drag e test two-layer end-to-end. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |

@@ -24,6 +24,7 @@ MODULE mass_exchange_deposition_2d
     PUBLIC :: solve_mass_exchange_deposition_analytic
     PUBLIC :: settling_velocity
     PUBLIC :: eval_settling_fluid_properties
+    PUBLIC :: eval_deposition_volume_kernel
     PUBLIC :: eval_solid_deposition_rate
     PUBLIC :: eval_lahar_deposition_rate
     PUBLIC :: eval_hindered_settling_deposition_rate
@@ -129,14 +130,18 @@ CONTAINS
         !> @param[in] r_rho_c Carrier density [kg/m3].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] deposition_rate Solid deposition thickness flux for each species [m/s].
+        !> @param[in] enable_settling Optional interlayer override: the same physical law
+        !>          is evaluated without enabling external deposition in the donor layer.
     SUBROUTINE eval_deposition_volume_kernel(config,mass_config,r_h,r_T,r_alphas,alphas_tot,r_rho_m, &
-        r_rho_c, dt, deposition_rate)
+        r_rho_c, dt, deposition_rate,enable_settling)
             TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
 
             REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
             REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
             REAL(wp), INTENT(OUT) :: deposition_rate(n_solid)
+            LOGICAL, INTENT(IN), OPTIONAL :: enable_settling
+            LOGICAL :: enabled
             REAL(wp) :: alpha_max, hind_exp, kin_visc_c_local
             REAL(wp) :: dyn_visc_c, rho_c, rhoc, inv_kin_visc, settling_vel
             INTEGER :: i_solid
@@ -145,6 +150,8 @@ CONTAINS
             hind_exp = 4.65_wp
             kin_visc_c_local = kin_visc_c
             deposition_rate = 0.0_wp
+            enabled=mass_config%deposition%settling_flag
+            IF (PRESENT(enable_settling)) enabled=enable_settling
 
             ! For the gas carrier, use temperature-dependent viscosity and ideal-gas density.
             IF ( gas_flag .AND. sutherland_flag ) THEN
@@ -162,7 +169,7 @@ CONTAINS
 
             DO i_solid=1,n_solid
 
-                    IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( mass_config%deposition%settling_flag ) ) THEN
+                    IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( enabled ) ) THEN
 
                             settling_vel = settling_velocity(mass_config,diam_s(i_solid),rho_s(i_solid), &
                                         rhoc , inv_kin_visc )
