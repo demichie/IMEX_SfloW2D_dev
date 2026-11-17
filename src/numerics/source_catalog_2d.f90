@@ -128,7 +128,7 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.),                                    &
             source_term_type('interlayer_mass_exchange',.TRUE.,.FALSE.,.FALSE.,                                        &
                 default_method=SOURCE_METHOD_EXPLICIT,                                                                 &
-                    allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE())                                     &
+                    allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.)                                     &
             ]
 CONTAINS
     !> Resolve source names at initialization only, never in cell kernels.
