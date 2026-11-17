@@ -12,7 +12,7 @@ MODULE lie_source_executor_2d
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange
-    USE interlayer_exchange_2d, ONLY : eval_interlayer_exchange_explicit
+    USE interlayer_exchange_2d, ONLY : apply_interlayer_lie_group
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
         idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
@@ -280,7 +280,7 @@ CONTAINS
             B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
             dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
-        USE state_physical, ONLY : evaluate_density_from_qp, build_physical_state_from_qp
+        USE state_physical, ONLY : evaluate_density_from_qp
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON
         USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
         USE state_conversions, ONLY : conservative_to_primitive
@@ -311,8 +311,6 @@ CONTAINS
         REAL(wp) :: qpentry(n_vars),q_candidate(n_vars),qp_candidate(n_vars)
         REAL(wp) :: q_local(n_vars),qp_local(n_vars)
         REAL(wp) :: q_layers(n_vars,n_layers),qp_layers(n_vars,n_layers)
-        REAL(wp) :: paired_rate_l1(n_eqns),paired_rate_l2(n_eqns)
-        REAL(wp) :: paired_q(n_vars,2),paired_qp(n_vars,2)
         TYPE(layer_contacts_type) :: contacts
         LOGICAL :: contacts_valid
         REAL(wp) :: deposit_local(n_solid),erosion_local(n_solid),erodible_local(n_solid),lava_local
@@ -320,7 +318,7 @@ CONTAINS
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),source_time,noise
-        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated,paired_valid
+        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,layer
         INTEGER :: changed_jmin,changed_jmax,changed_kmin,changed_kmax
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
@@ -444,8 +442,7 @@ CONTAINS
         first_failure=HUGE(0)
         !$OMP PARALLEL DEFAULT(SHARED)                                                                              &
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
-        !$OMP& q_local,qp_local,q_layers,qp_layers,paired_q,paired_qp,paired_rate_l1,paired_rate_l2, &
-        !$OMP& paired_valid,layer,contacts,contacts_valid,                                    &
+        !$OMP& q_local,qp_local,q_layers,qp_layers,layer,contacts,contacts_valid,                                    &
         !$OMP& deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
@@ -502,80 +499,17 @@ CONTAINS
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
                 layer=executor%groups(group_index)%scope
                 IF (layer==SOURCE_SCOPE_INTERLAYER) THEN
-                    ! Both donor laws use the same group snapshot. For group 0
-                    ! evaluate pre-spatial states but limit post-spatial recipients.
+                    ! The shared cell transaction evaluates both donors and
+                    ! commits both recipients only after paired validation.
                     IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) THEN
                         cell_error=17
                         EXIT group_loop
                     END IF
-                    IF (executor%groups(group_index)%id==0) THEN
-                        CALL build_physical_state_from_qp(qp_original(:,1,j,k), &
-                            executor%interlayer_physical_scratch(1,tid),accepted=ok)
-                        IF (.NOT.ok) THEN
-                            cell_error=18
-                            EXIT group_loop
-                        END IF
-                        CALL build_physical_state_from_qp(qp_original(:,2,j,k), &
-                            executor%interlayer_physical_scratch(2,tid),accepted=ok)
-                    ELSE
-                        CALL build_physical_state_from_qp(qp_layers(:,1), &
-                            executor%interlayer_physical_scratch(1,tid),accepted=ok)
-                        IF (.NOT.ok) THEN
-                            cell_error=18
-                            EXIT group_loop
-                        END IF
-                        CALL build_physical_state_from_qp(qp_layers(:,2), &
-                            executor%interlayer_physical_scratch(2,tid),accepted=ok)
-                    END IF
-                    IF (.NOT.ok) THEN
-                        cell_error=18
-                        EXIT group_loop
-                    END IF
-                    CALL build_physical_state_from_qp(qp_layers(:,1), &
-                        executor%interlayer_physical_scratch(3,tid),accepted=ok)
-                    IF (.NOT.ok) THEN
-                        cell_error=18
-                        EXIT group_loop
-                    END IF
-                    CALL build_physical_state_from_qp(qp_layers(:,2), &
-                        executor%interlayer_physical_scratch(4,tid),accepted=ok)
-                    IF (.NOT.ok) THEN
-                        cell_error=18
-                        EXIT group_loop
-                    END IF
-                    CALL eval_interlayer_exchange_explicit(interlayer_exchange,rheology(2),mass_config(2), &
-                        executor%interlayer_physical_scratch(1,tid),executor%interlayer_physical_scratch(2,tid), &
-                        executor%interlayer_physical_scratch(3,tid),executor%interlayer_physical_scratch(4,tid), &
-                        time_step,paired_rate_l1,paired_rate_l2,paired_valid)
-                    IF (.NOT.paired_valid) THEN
-                        cell_error=19
-                        EXIT group_loop
-                    END IF
-                    paired_q=q_layers(:,1:2)
-                    paired_q(1:n_eqns,1)=paired_q(1:n_eqns,1)+time_step*paired_rate_l1
-                    paired_q(1:n_eqns,2)=paired_q(1:n_eqns,2)+time_step*paired_rate_l2
-                    IF (.NOT.conservative_mass_admissible(paired_q(1:n_eqns,1)) .OR. &
-                        .NOT.conservative_mass_admissible(paired_q(1:n_eqns,2))) THEN
-                        cell_error=20
-                        EXIT group_loop
-                    END IF
-                    paired_qp=qp_layers(:,1:2)
-                    DO layer=1,2
-                        IF (ANY(paired_q(:,layer)/=q_layers(:,layer))) THEN
-                            IF (paired_q(idx_totMassEqn,layer)>0.0_wp) THEN
-                                CALL conservative_to_primitive(paired_q(:,layer),paired_qp(:,layer),accepted=ok)
-                                IF (.NOT.ok) EXIT
-                            ELSE
-                                CALL initialize_dry_physical_cell(paired_qp(:,layer))
-                            END IF
-                        END IF
-                    END DO
-                    IF (.NOT.ok) THEN
-                        cell_error=21
-                        EXIT group_loop
-                    END IF
-                    q_layers(:,1:2)=paired_q
-                    qp_layers(:,1:2)=paired_qp
+                    CALL apply_interlayer_lie_group(interlayer_exchange,rheology(2),mass_config(2), &
+                        qp_original(:,1:2,j,k),executor%groups(group_index)%id==0,time_step, &
+                        q_layers(:,1:2),qp_layers(:,1:2), &
+                        executor%interlayer_physical_scratch(:,tid),cell_error)
+                    IF (cell_error/=0) EXIT group_loop
                     IF (profiling_enabled) thread_evaluations(group_index,tid)= &
                         thread_evaluations(group_index,tid)+1
                     CYCLE group_loop

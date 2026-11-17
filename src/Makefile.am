@@ -655,7 +655,10 @@ physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT): \
 physics/interlayer_exchange/interlayer_exchange_2d.$(OBJEXT): \
     physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
     physics/interlayer_exchange/interlayer_settling_2d.$(OBJEXT) \
-    physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT) state/state_types.$(OBJEXT)
+    physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT) \
+    state/state_types.$(OBJEXT) state/state_physical.$(OBJEXT) \
+    state/state_conversions.$(OBJEXT) state/state_composition.$(OBJEXT) \
+    state/state_fields.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)
 
 # The paired source shares the canonical physics kernel and existing Lie executor.

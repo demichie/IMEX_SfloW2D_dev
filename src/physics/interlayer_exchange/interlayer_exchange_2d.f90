@@ -8,6 +8,10 @@ MODULE interlayer_exchange_2d
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
     USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
     USE state_types, ONLY : physical_state_real
+    USE state_physical, ONLY : build_physical_state_from_qp
+    USE state_conversions, ONLY : conservative_to_primitive
+    USE state_composition, ONLY : conservative_mass_admissible
+    USE state_fields, ONLY : initialize_dry_physical_cell
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE solid_transport_parameters_2d, ONLY : rho_s,sp_heat_s,maximum_solid_packing
@@ -18,6 +22,7 @@ MODULE interlayer_exchange_2d
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: limit_interlayer_mass_transfer, eval_interlayer_exchange_explicit
+    PUBLIC :: apply_interlayer_lie_group
 
 CONTAINS
 
@@ -349,4 +354,81 @@ CONTAINS
             source_l2(idx_addGasEqn_first+index-1)=source_l2(idx_addGasEqn_first+index-1)-direction*mass
         END SUBROUTINE add_gas
     END SUBROUTINE eval_interlayer_exchange_explicit
+
+    !> @brief Perform one paired cell-local Lie transfer as an atomic transaction.
+    !> @details The physical law uses the group-zero pre-spatial snapshot when
+    !>          requested, but always withdraws from the post-spatial/current
+    !>          recipients. All four physical workspaces are owned by the caller
+    !>          (one quartet per OpenMP worker). No grid indices, allocations or
+    !>          additional time integrator are introduced.
+    !> @param[in] config Canonical interlayer configuration.
+    !> @param[in] rheology_l2 Settling rheology of the donor upper layer.
+    !> @param[in] mass_l2 Upper-layer deposition/settling closure.
+    !> @param[in] pre_spatial_qp Pre-spatial primitives for both layers.
+    !> @param[in] group_zero True to evaluate on the pre-spatial snapshot.
+    !> @param[in] dt Positive shared Lie timestep [s].
+    !> @param[in,out] q Both conservative candidates, unchanged on failure.
+    !> @param[in,out] qp Both primitive candidates, unchanged on failure.
+    !> @param[in,out] physical Four caller-owned physical-state workspaces.
+    !> @param[out] status Zero on success; 18-21 identify rejected transactions.
+    SUBROUTINE apply_interlayer_lie_group(config,rheology_l2,mass_l2,pre_spatial_qp, &
+            group_zero,dt,q,qp,physical,status)
+        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        REAL(wp), INTENT(IN) :: pre_spatial_qp(n_vars,2)
+        LOGICAL, INTENT(IN) :: group_zero
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(INOUT) :: q(n_vars,2),qp(n_vars,2)
+        TYPE(physical_state_real), INTENT(INOUT) :: physical(4)
+        INTEGER, INTENT(OUT) :: status
+        REAL(wp) :: candidate_q(n_vars,2),candidate_qp(n_vars,2)
+        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns)
+        LOGICAL :: ok
+        INTEGER :: layer
+
+        status=18
+        IF (group_zero) THEN
+            CALL build_physical_state_from_qp(pre_spatial_qp(:,1),physical(1),accepted=ok)
+        ELSE
+            CALL build_physical_state_from_qp(qp(:,1),physical(1),accepted=ok)
+        END IF
+        IF (.NOT.ok) RETURN
+        IF (group_zero) THEN
+            CALL build_physical_state_from_qp(pre_spatial_qp(:,2),physical(2),accepted=ok)
+        ELSE
+            CALL build_physical_state_from_qp(qp(:,2),physical(2),accepted=ok)
+        END IF
+        IF (.NOT.ok) RETURN
+        CALL build_physical_state_from_qp(qp(:,1),physical(3),accepted=ok)
+        IF (.NOT.ok) RETURN
+        CALL build_physical_state_from_qp(qp(:,2),physical(4),accepted=ok)
+        IF (.NOT.ok) RETURN
+
+        status=19
+        CALL eval_interlayer_exchange_explicit(config,rheology_l2,mass_l2, &
+            physical(1),physical(2),physical(3),physical(4),dt,rate_l1,rate_l2,ok)
+        IF (.NOT.ok) RETURN
+        candidate_q=q
+        candidate_q(1:n_eqns,1)=candidate_q(1:n_eqns,1)+dt*rate_l1
+        candidate_q(1:n_eqns,2)=candidate_q(1:n_eqns,2)+dt*rate_l2
+        status=20
+        IF (.NOT.conservative_mass_admissible(candidate_q(1:n_eqns,1)) .OR. &
+            .NOT.conservative_mass_admissible(candidate_q(1:n_eqns,2))) RETURN
+
+        candidate_qp=qp
+        status=21
+        DO layer=1,2
+            IF (.NOT.ANY(candidate_q(:,layer)/=q(:,layer))) CYCLE
+            IF (candidate_q(idx_totMassEqn,layer)>0.0_wp) THEN
+                CALL conservative_to_primitive(candidate_q(:,layer),candidate_qp(:,layer),accepted=ok)
+                IF (.NOT.ok) RETURN
+            ELSE
+                CALL initialize_dry_physical_cell(candidate_qp(:,layer))
+            END IF
+        END DO
+        q=candidate_q
+        qp=candidate_qp
+        status=0
+    END SUBROUTINE apply_interlayer_lie_group
 END MODULE interlayer_exchange_2d
