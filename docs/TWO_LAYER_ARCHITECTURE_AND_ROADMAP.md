@@ -81,6 +81,47 @@ senza un'esplicita decisione numerica e le relative regressioni.**
 
 **Sequenza:** chiudere TL06 e TL07, poi TL08–TL11; completare in parallelo le lacune TL00–TL05 e TL12 senza bloccare lavori indipendenti. Successivamente TL13a e TL13b. Non dichiarare chiusa una fase sulla base dei soli test di un kernel isolato.
 
+### Organizzazione approvata degli scambi interlayer
+
+**Decisione architetturale:** introdurre `src/physics/interlayer_exchange/`
+come cartella separata da `src/physics/mass_exchange/`. La seconda
+continua a gestire le sorgenti locali di un layer verso terreno e
+atmosfera; la prima ospitera' soltanto le leggi fisiche accoppiate
+L1/L2 (settling, elutriazione e drag).
+
+Le leggi saranno in moduli distinti, ad esempio
+`interlayer_settling_2d.f90`, `interlayer_elutriation_2d.f90`
+e `interlayer_drag_2d.f90`, **da creare solo quando si implementano
+le corrispondenti formulazioni**. L'eventuale configurazione degli
+scambi interlayer sara' un solo oggetto autorevole, non duplicato
+nelle configurazioni L1 e L2. Non creare coordinatori, dispatcher o
+contenitori intermedi se l'assemblatore delle sorgenti esistente
+e' sufficiente.
+
+**La collocazione dei moduli non determina gruppo, metodo o ordine Lie.**
+Ogni sorgente interlayer potra' essere associata indipendentemente
+a un gruppo con scope `INTERLAYER` e metodo `EXPLICIT`,
+`NEWTON` oppure `ANALYTIC`, esclusivamente dove tale metodo
+e' supportato dalla legge e dal catalogo. Restano le regole comuni:
+stesso gruppo => stesso metodo; gruppi diversi => metodi distinti
+ammessi. Settling ed elutriazione non devono essere accorpati
+automaticamente; il drag non e' costretto al loro stesso trattamento.
+L'ordine e il possibile accoppiamento saranno definiti sulla base
+delle equazioni di `IMEX_v3.pdf` e dei bilanci di massa, specie,
+momento ed energia.
+
+Si mantengono **un unico catalogo/registro Lie, un unico esecutore
+cell-outer e un'unica logica temporale**. I trasferimenti accoppiati
+usano i due candidati della cella e un solo rate per ciascun processo,
+con contributi coerenti ai due layer e limitazione congiunta ove
+richiesta. Un drag con soluzione implicita o analitica deve risolvere
+il problema accoppiato, non due problemi monolayer indipendenti.
+Condividere i kernel fisici esistenti quando le formule coincidono,
+senza duplicare la matematica o confondere la deposizione nel
+substrato con il trasferimento L2->L1. Nessuna nuova legge fisica
+o assegnazione definitiva di metodo e gruppo e' autorizzata
+dalla sola decisione di directory.
+
 ### Contratto degli scambi `INTERLAYER` (non ancora eseguibili)
 
 Lo scope `INTERLAYER` e' gia' definito, ma **nessuna sorgente fisica
