@@ -218,21 +218,24 @@ CONTAINS
 
         ! The additional gas species follows the donor carrier composition.
         BLOCK
+            TYPE(physical_state_real) :: gas_l1,gas_l2
             REAL(wp) :: augmented1(7),augmented2(7)
             n_add_gas=1; n_vars=7; n_eqns=7
             CALL configure_canonical_state_indices()
-            CALL initialize_physical_state_real(l1)
-            CALL initialize_physical_state_real(l2)
-            l1%h=1.0_wp; l1%alphas=[0.15_wp,0.05_wp]
-            l1%rho_c=1.0_wp; l1%rho_m=455.8_wp
-            l1%xs=rho_s*l1%alphas/l1%rho_m
-            l1%xg=[0.0005_wp]
-            l1%cp_c=1000.0_wp; l1%T=500.0_wp; l1%u=10.0_wp; l1%v=1.0_wp
-            l2%h=0.0_wp; l2%rho_c=1.0_wp; l2%rho_m=1.0_wp
-            l2%alphas=0.0_wp; l2%cp_c=1000.0_wp; l2%T=300.0_wp
+            ! A physical-state workspace has an immutable component layout.
+            ! Construct separate states after changing the test-only layout.
+            CALL initialize_physical_state_real(gas_l1)
+            CALL initialize_physical_state_real(gas_l2)
+            gas_l1%h=1.0_wp; gas_l1%alphas=[0.15_wp,0.05_wp]
+            gas_l1%rho_c=1.0_wp; gas_l1%rho_m=455.8_wp
+            gas_l1%xs=rho_s*gas_l1%alphas/gas_l1%rho_m
+            gas_l1%xg=[0.0005_wp]
+            gas_l1%cp_c=1000.0_wp; gas_l1%T=500.0_wp; gas_l1%u=10.0_wp; gas_l1%v=1.0_wp
+            gas_l2%h=0.0_wp; gas_l2%rho_c=1.0_wp; gas_l2%rho_m=1.0_wp
+            gas_l2%alphas=0.0_wp; gas_l2%cp_c=1000.0_wp; gas_l2%T=300.0_wp
             phys_config%settling_flag=.FALSE.
             CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
-                l1,l2,l1,l2,dt,augmented1,augmented2,valid)
+                gas_l1,gas_l2,gas_l1,gas_l2,dt,augmented1,augmented2,valid)
             CALL require(valid,'co-lift with additional gas species accepted')
             CALL require(augmented1(7)<0.0_wp .AND. augmented2(7)>0.0_wp, &
                 'additional gas constituent leaves donor and enters recipient')
