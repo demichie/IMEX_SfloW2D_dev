@@ -4,7 +4,7 @@
 !>          before returning any accepted flux. It does not update conservative
 !>          states, own grid indices or perform a Lie timestep.
 MODULE interlayer_exchange_2d
-    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_eqns
+    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
     USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
     USE state_types, ONLY : physical_state_real
