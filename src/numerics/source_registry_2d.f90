@@ -83,10 +83,9 @@ CONTAINS
         DO i=1,SIZE(groups)
 
             IF (groups(i)%scope<SOURCE_SCOPE_L1 .OR. groups(i)%scope>SOURCE_SCOPE_INTERLAYER) RETURN
-            ! Never silently reinterpret a layer-local law as an interlayer transfer.
-            ! Paired-rate descriptors and both-recipient limiting are not implemented.
-            IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER) THEN
-                error='TL07: INTERLAYER source descriptors and paired transfer kernels not yet implemented'
+            ! A paired mass-transfer source is never a layer-local source.
+            IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER .AND. groups(i)%method/=SOURCE_METHOD_EXPLICIT) THEN
+                error='TL07: INTERLAYER mass exchange requires EXPLICIT'
                 RETURN
             END IF
             layer=groups(i)%scope
@@ -121,6 +120,15 @@ CONTAINS
             DO j=1,SIZE(groups(i)%source_names)
                 term=source_term_descriptor_by_name(groups(i)%source_names(j))
                 IF (LEN_TRIM(term%name)==0) RETURN
+                IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER) THEN
+                    IF (term%name/='interlayer_mass_exchange') THEN
+                        error='TL07: only paired mass exchange is supported in INTERLAYER'
+                        RETURN
+                    END IF
+                ELSEIF (term%name=='interlayer_mass_exchange') THEN
+                    error='TL07: paired mass exchange requires INTERLAYER scope'
+                    RETURN
+                END IF
 
                 IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
                     ! Inventory-coupled mass exchange currently supports only an

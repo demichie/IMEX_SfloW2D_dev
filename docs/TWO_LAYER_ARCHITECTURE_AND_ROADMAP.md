@@ -135,7 +135,8 @@ esplicito e calibrazione; non dedurre valori fisici dal solo successo dei test.
 Le sorgenti termiche usano il calore specifico e la temperatura del donatore;
 il momento del settling usa la velocita' interfaciale comune, quello
 dell'elutriazione la velocita' del donatore. Il vettore accoppiato cell-local
-non implica ancora l'esecuzione dallo scope Lie `INTERLAYER`.
+e' collegato allo scope Lie `INTERLAYER` nell'esecutore cell-outer,
+mentre il percorso di produzione L2 rimane bloccato fino al gate funzionale.
 
 **Settling:** trasferire i solidi e soltanto il carrier L2→L1
 eventualmente necessario a non superare il packing di L1, tenendo
@@ -197,8 +198,8 @@ abilitazione in produzione.
 | **TL00–TL04 — Stato e fisica per layer** | Base predisposta | Verificare i percorsi integrati ancora scoperti: slot opzionali, IC/BC, input, output e regressioni L1/L2. |
 | **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
 | **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
-| **TL07 — Lie accoppiato** | Integrazione parziale | Registro scoped L1/L2 e candidati rank-4 predisposti; contatti propagati al mass exchange esterno. Completare la transazione end-to-end, gruppi interlayer, limitazione accoppiata e controlli finali. Il percorso di produzione L2 e' ancora bloccato. |
-| **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano integrazione nel registro/Lie, variabili opzionali per layer, validazione degli stati termodinamici finali, drag e test two-layer end-to-end. |
+| **TL07 — Lie accoppiato** | Transazione interlayer predisposta | Catalogo, registro e percorso `INTERLAYER` dell'esecutore usano un gruppo esplicito accoppiato e due candidati valutati prima dell'accettazione. Mancano test integrati di Lie sui candidati, semantica delle variabili opzionali e rimozione del blocco di produzione L2 dopo il gate. |
+| **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano validazione della transazione Lie effettiva, variabili opzionali per layer, stati termodinamici finali, drag e test two-layer end-to-end. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |

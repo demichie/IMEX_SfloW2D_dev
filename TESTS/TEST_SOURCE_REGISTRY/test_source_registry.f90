@@ -10,6 +10,7 @@ PROGRAM test_source_registry
   USE source_input_2d
   USE parameters_2d
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
+  USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
@@ -249,6 +250,20 @@ PROGRAM test_source_registry
   CALL require(ANY(groups%scope==SOURCE_SCOPE_L2 .AND. groups%id==3), &
        'L2 Darcy source configured at its own group')
   CALL registry%finalize()
+  interlayer_exchange%elutriation_flag=.TRUE.
+  interlayer_exchange%method='EXPLICIT'
+  interlayer_exchange%group=4
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+       rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+  CALL require(LEN_TRIM(error)==0,'two-layer coupled group configuration: '//TRIM(error))
+  groups=registry%groups()
+  CALL require(COUNT(groups%scope==SOURCE_SCOPE_INTERLAYER)==1, &
+       'one paired interlayer group for the two transfer laws')
+  CALL require(ANY(groups%scope==SOURCE_SCOPE_INTERLAYER .AND. groups%id==4), &
+       'interlayer mass exchange preserves configured Lie group')
+  CALL registry%finalize()
+  interlayer_exchange%elutriation_flag=.FALSE.
   CALL initialize_configured_sources(registry,error, &
        rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
        rheology_l2=rheology_l2)

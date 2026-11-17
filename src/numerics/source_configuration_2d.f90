@@ -6,7 +6,7 @@
 !********************************************************************************
 MODULE source_configuration_2d
     USE source_catalog_2d
-    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2
+    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2, SOURCE_SCOPE_INTERLAYER
     USE source_input_2d
     USE parameters_2d, ONLY : wp, n_eqns, rheology_flag,                                                               &
             curvature_term_flag, bottom_radial_source_flag,                                        &
@@ -17,6 +17,7 @@ MODULE source_configuration_2d
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type,interlayer_exchange
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources
@@ -320,6 +321,21 @@ CONTAINS
                 RETURN
             END IF
         END DO
+        ! One shared mass-transfer group owns both directions and their carrier
+        ! budget; distinct physical laws never become separate Lie transactions.
+        IF (last_layer==2 .AND. (interlayer_exchange%settling_flag .OR. &
+            interlayer_exchange%elutriation_flag)) THEN
+            IF (interlayer_exchange%method/='EXPLICIT' .OR. interlayer_exchange%group<0) THEN
+                error='TL07: interlayer mass exchange requires an EXPLICIT Lie group'
+                RETURN
+            END IF
+            g%id=interlayer_exchange%group
+            g%scope=SOURCE_SCOPE_INTERLAYER
+            g%method=SOURCE_METHOD_EXPLICIT
+            g%source_names=[CHARACTER(LEN=64)::'interlayer_mass_exchange']
+            g%equation_ids=[(n,n=1,n_eqns)]
+            groups=[groups,g]
+        END IF
 
         DO i=1,SIZE(groups)
 
