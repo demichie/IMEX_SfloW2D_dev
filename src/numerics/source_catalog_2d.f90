@@ -23,6 +23,7 @@ MODULE source_catalog_2d
     INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_ENTRAINMENT=22
     INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_VAPORIZATION=23
     INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_INTERLAYER_MASS_EXCHANGE=24
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_INTERLAYER_DRAG=25
     INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_NEWTON_BLOCK=1, SOURCE_SOLVE_ANALYTIC_VELOCITY=2
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_ANALYTIC_TEMPERATURE=3, SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE=4
@@ -55,7 +56,7 @@ MODULE source_catalog_2d
     INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_MUI=9
     INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_MUI_VOELLMY=10
     INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_NEWMODEL=11
-    INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
+    INTEGER, PARAMETER :: SOURCE_TERM_COUNT=25
     TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[                                           &
             source_term_type('rheology_voellmy',.TRUE.,.TRUE.,.TRUE.,                                                  &
                     default_method=SOURCE_METHOD_NEWTON,                                                               &
@@ -128,6 +129,9 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.),                                    &
             source_term_type('interlayer_mass_exchange',.TRUE.,.FALSE.,.FALSE.,                                        &
                 default_method=SOURCE_METHOD_EXPLICIT,                                                                 &
+                    allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                    &
+            source_term_type('interlayer_drag',.FALSE.,.FALSE.,.TRUE., &
+                default_method=SOURCE_METHOD_ANALYTIC,                                                                 &
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.)                                     &
             ]
 CONTAINS

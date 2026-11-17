@@ -83,11 +83,8 @@ CONTAINS
         DO i=1,SIZE(groups)
 
             IF (groups(i)%scope<SOURCE_SCOPE_L1 .OR. groups(i)%scope>SOURCE_SCOPE_INTERLAYER) RETURN
-            ! A paired mass-transfer source is never a layer-local source.
-            IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER .AND. groups(i)%method/=SOURCE_METHOD_EXPLICIT) THEN
-                error='TL07: INTERLAYER mass exchange requires EXPLICIT'
-                RETURN
-            END IF
+            ! Interlayer groups may use explicit mass transfer or analytic drag,
+            ! each in an independently scheduled, single-source group.
             layer=groups(i)%scope
             IF (i>1) THEN
                 IF (groups(i)%id<groups(i-1)%id) RETURN
@@ -121,12 +118,23 @@ CONTAINS
                 term=source_term_descriptor_by_name(groups(i)%source_names(j))
                 IF (LEN_TRIM(term%name)==0) RETURN
                 IF (groups(i)%scope==SOURCE_SCOPE_INTERLAYER) THEN
-                    IF (term%name/='interlayer_mass_exchange') THEN
-                        error='TL07: only paired mass exchange is supported in INTERLAYER'
+                    SELECT CASE(TRIM(term%name))
+                    CASE('interlayer_mass_exchange')
+                        IF (groups(i)%method/=SOURCE_METHOD_EXPLICIT) THEN
+                            error='TL07: INTERLAYER mass exchange requires EXPLICIT'
+                            RETURN
+                        END IF
+                    CASE('interlayer_drag')
+                        IF (groups(i)%method/=SOURCE_METHOD_ANALYTIC .OR. groups(i)%id==0) THEN
+                            error='TL09: interlayer drag requires a positive ANALYTIC group'
+                            RETURN
+                        END IF
+                    CASE DEFAULT
+                        error='TL07: only paired mass exchange or drag is supported in INTERLAYER'
                         RETURN
-                    END IF
-                ELSEIF (term%name=='interlayer_mass_exchange') THEN
-                    error='TL07: paired mass exchange requires INTERLAYER scope'
+                    END SELECT
+                ELSEIF (term%name=='interlayer_mass_exchange' .OR. term%name=='interlayer_drag') THEN
+                    error='TL07: paired interlayer source requires INTERLAYER scope'
                     RETURN
                 END IF
 

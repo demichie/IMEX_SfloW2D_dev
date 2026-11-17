@@ -76,9 +76,12 @@ un layer verso terreno e atmosfera. Gli scambi interni L1/L2 appartengono a
 Il drag e' fisicamente distinto e appartiene a
 `src/physics/interlayer_momentum_exchange/`, con il coordinatore
 `interlayer_momentum_exchange_2d.f90` e la legge
-`interlayer_drag_chezy_2d.f90`. Il NAMELIST storico
-`INTERLAYER_EXCHANGE_PARAMETERS` mantiene la sintassi per compatibilita' input.
-Aggiungere nuove leggi soltanto quando
+`interlayer_drag_chezy_2d.f90`. Il NAMELIST canonico
+`INTERLAYER_PARAMETERS` include i due oggetti indipendenti
+`interlayer_mass_exchange` e `interlayer_momentum_exchange`, con metodi e
+gruppi Lie separati; `INTERLAYER_EXCHANGE_PARAMETERS` rimane un alias storico
+per il solo mass exchange e le due sintassi sono mutuamente esclusive.
+Il backup produce soltanto la forma canonica. Aggiungere nuove leggi soltanto quando
 servono, senza interfacce transitorie. Condividere i kernel fisici gia' esistenti se equivalenti,
 senza assimilare la deposizione nel substrato al trasferimento interlayer.
 
@@ -99,9 +102,10 @@ di ogni layer, come approvato. Il coordinatore possiede l'unica
 configurazione pair-wide e la legge e' un kernel puro; la soglia di
 contatto e' `h1,h2 > 1e-3 m`. Il drag usa un gruppo `ANALYTIC` separato
 con id positivo: il gruppo zero non e' previsto per questa integrazione
-nonlineare esatta. I due moduli sono predisposti e testati direttamente;
-il collegamento a input, registro ed esecutore Lie resta da completare
-prima di attivare la fisica in produzione.
+nonlineare esatta. L'input, il registro e l'esecutore Lie condividono
+ora il coordinatore fisico, e le regressioni verificano le configurazioni
+separate. Resta da validare l'intero timestep two-layer prima di
+attivare la fisica in produzione.
 
 ### Solidi, carrier e composizione della corrente elutriata
 

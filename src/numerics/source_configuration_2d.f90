@@ -19,6 +19,7 @@ MODULE source_configuration_2d
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
+    USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources
@@ -335,6 +336,28 @@ CONTAINS
             g%method=SOURCE_METHOD_EXPLICIT
             g%source_names=[CHARACTER(LEN=64)::'interlayer_mass_exchange']
             g%equation_ids=[(n,n=1,n_eqns)]
+            groups=[groups,g]
+        END IF
+
+        ! Drag is an independent, exclusive analytic Lie group. Distinct
+        ! source-group IDs preserve the configured ordering of mass and drag.
+        IF (last_layer==2 .AND. interlayer_momentum_exchange%chezy_drag_coeff>0.0_wp) THEN
+            IF (interlayer_momentum_exchange%model/='CHEZY' .OR. &
+                interlayer_momentum_exchange%method/='ANALYTIC' .OR. &
+                interlayer_momentum_exchange%group<=0) THEN
+                error='TL09: interlayer Chezy drag requires a positive ANALYTIC group'
+                RETURN
+            END IF
+            IF ((interlayer_exchange%settling_flag .OR. interlayer_exchange%elutriation_flag) .AND. &
+                interlayer_momentum_exchange%group==interlayer_exchange%group) THEN
+                error='TL09: mass exchange and drag require distinct Lie groups'
+                RETURN
+            END IF
+            g%id=interlayer_momentum_exchange%group
+            g%scope=SOURCE_SCOPE_INTERLAYER
+            g%method=SOURCE_METHOD_ANALYTIC
+            g%source_names=[CHARACTER(LEN=64)::'interlayer_drag']
+            g%equation_ids=[INTEGER::]
             groups=[groups,g]
         END IF
 

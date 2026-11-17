@@ -5,6 +5,8 @@ MODULE source_input_2d
     USE parameters_2d, ONLY : wp, n_layers
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type, mass_exchange_l1, mass_exchange_l2
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_exchange
+    USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange_config_type, &
+        interlayer_momentum_exchange
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
@@ -22,8 +24,10 @@ MODULE source_input_2d
     NAMELIST /mass_exchange_parameters/ mass_exchange
     NAMELIST /mass_exchange_l1_parameters/ mass_exchange_l1
     NAMELIST /mass_exchange_l2_parameters/ mass_exchange_l2
-    ! Keep the existing NAMELIST identity and the single authoritative configuration.
+    ! Both NAMELIST spellings address one canonical mass-exchange object.
+    TYPE(interlayer_mass_exchange_config_type), POINTER :: interlayer_mass_exchange => interlayer_exchange
     NAMELIST /interlayer_exchange_parameters/ interlayer_exchange
+    NAMELIST /interlayer_parameters/ interlayer_mass_exchange,interlayer_momentum_exchange
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
     PUBLIC :: read_interlayer_exchange_parameters, write_interlayer_exchange_parameters
     PUBLIC :: uppercase_source_text
@@ -168,44 +172,61 @@ CONTAINS
         INTEGER, INTENT(IN) :: input_unit
         CHARACTER(*), INTENT(OUT) :: error
         CHARACTER(LEN=2048) :: line
-        INTEGER :: ios,count
+        INTEGER :: ios,legacy_count,canonical_count
         error=''
-        count=0
+        legacy_count=0
+        canonical_count=0
         REWIND(input_unit,IOSTAT=ios)
         IF (ios/=0) THEN
-            error='Unable to scan INTERLAYER_EXCHANGE_PARAMETERS'
+            error='Unable to scan INTERLAYER_PARAMETERS'
             RETURN
         END IF
         DO
             READ(input_unit,'(A)',IOSTAT=ios) line
             IF (ios<0) EXIT
             IF (ios>0) THEN
-                error='Unable to scan INTERLAYER_EXCHANGE_PARAMETERS'
+                error='Unable to scan INTERLAYER_PARAMETERS'
                 RETURN
             END IF
             line=uppercase_source_text(ADJUSTL(line))
             IF (INDEX(line,'&INTERLAYER_EXCHANGE_PARAMETERS')==1 .OR. &
-                INDEX(line,'$INTERLAYER_EXCHANGE_PARAMETERS')==1) count=count+1
+                INDEX(line,'$INTERLAYER_EXCHANGE_PARAMETERS')==1) legacy_count=legacy_count+1
+            IF (INDEX(line,'&INTERLAYER_PARAMETERS')==1 .OR. &
+                INDEX(line,'$INTERLAYER_PARAMETERS')==1) canonical_count=canonical_count+1
         END DO
-        IF (count>1) THEN
-            error='Duplicate INTERLAYER_EXCHANGE_PARAMETERS'
+        IF (legacy_count>1 .OR. canonical_count>1) THEN
+            error='Duplicate interlayer NAMELIST'
             RETURN
         END IF
-        IF (n_layers/=2 .AND. count/=0) THEN
-            error='INTERLAYER_EXCHANGE_PARAMETERS requires N_LAYERS=2'
+        IF (legacy_count+canonical_count>1) THEN
+            error='INTERLAYER_PARAMETERS and INTERLAYER_EXCHANGE_PARAMETERS are mutually exclusive'
             RETURN
         END IF
-        IF (count==1) THEN
+        IF (n_layers/=2 .AND. legacy_count+canonical_count/=0) THEN
+            error='Interlayer parameters require N_LAYERS=2'
+            RETURN
+        END IF
+        IF (legacy_count==1) THEN
             REWIND(input_unit)
             READ(input_unit,NML=interlayer_exchange_parameters,IOSTAT=ios)
             IF (ios/=0) THEN
                 error='Invalid INTERLAYER_EXCHANGE_PARAMETERS NAMELIST'
                 RETURN
             END IF
+        ELSEIF (canonical_count==1) THEN
+            REWIND(input_unit)
+            READ(input_unit,NML=interlayer_parameters,IOSTAT=ios)
+            IF (ios/=0) THEN
+                error='Invalid INTERLAYER_PARAMETERS NAMELIST'
+                RETURN
+            END IF
         END IF
         CALL validate_interlayer_exchange_configuration(interlayer_exchange,error)
+        IF (LEN_TRIM(error)>0) RETURN
+        CALL validate_interlayer_momentum_exchange_configuration(interlayer_momentum_exchange,error)
+        IF (LEN_TRIM(error)>0) RETURN
         REWIND(input_unit,IOSTAT=ios)
-        IF (ios/=0 .AND. LEN_TRIM(error)==0) error='Unable to rewind after interlayer NAMELIST'
+        IF (ios/=0) error='Unable to rewind after interlayer NAMELIST'
     END SUBROUTINE read_interlayer_exchange_parameters
 
     !> @brief Validate pair-wide co-lift parameters without enabling an unimplemented source.
@@ -286,10 +307,39 @@ CONTAINS
         END IF
     END SUBROUTINE validate_interlayer_exchange_configuration
 
+    !> @brief Validate the independently scheduled pair-wide Chezy momentum source.
+    !> @param[in,out] config Canonical momentum-exchange settings; method and model normalized.
+    !> @param[out] error Empty on valid configuration, otherwise a descriptive diagnostic.
+    SUBROUTINE validate_interlayer_momentum_exchange_configuration(config,error)
+        TYPE(interlayer_momentum_exchange_config_type), INTENT(INOUT) :: config
+        CHARACTER(*), INTENT(OUT) :: error
+        error=''
+        config%model=uppercase_source_text(ADJUSTL(config%model))
+        config%method=uppercase_source_text(ADJUSTL(config%method))
+        IF (config%model/='CHEZY') THEN
+            error='Unsupported interlayer momentum exchange model'
+            RETURN
+        END IF
+        IF (config%method/='ANALYTIC' .OR. config%group<=0) THEN
+            error='Interlayer Chezy drag requires ANALYTIC method and positive GROUP'
+            RETURN
+        END IF
+        IF (.NOT.ieee_is_finite(config%chezy_drag_coeff) .OR. config%chezy_drag_coeff<0.0_wp) THEN
+            error='Invalid CHEZY_DRAG_COEFF'
+            RETURN
+        END IF
+        IF (config%chezy_drag_coeff>0.0_wp .AND. &
+            config%group==interlayer_exchange%group .AND. &
+            (interlayer_exchange%settling_flag .OR. interlayer_exchange%elutriation_flag)) THEN
+            error='Interlayer mass and momentum exchange require different Lie groups'
+            RETURN
+        END IF
+    END SUBROUTINE validate_interlayer_momentum_exchange_configuration
+
     !> @brief Write the unique canonical interlayer configuration for two-layer restarts.
     SUBROUTINE write_interlayer_exchange_parameters(output_unit)
         INTEGER, INTENT(IN) :: output_unit
-        IF (n_layers==2) WRITE(output_unit,NML=interlayer_exchange_parameters)
+        IF (n_layers==2) WRITE(output_unit,NML=interlayer_parameters)
     END SUBROUTINE write_interlayer_exchange_parameters
 
     !> @brief Convert ASCII lowercase source-input text to uppercase.

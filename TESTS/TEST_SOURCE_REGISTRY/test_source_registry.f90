@@ -10,7 +10,8 @@ PROGRAM test_source_registry
   USE source_input_2d
   USE parameters_2d
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
-  USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange
+  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
+  USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
@@ -209,7 +210,7 @@ PROGRAM test_source_registry
   CALL require(LEN_TRIM(error)>0,'duplicate group and source within L1 rejected')
   groups(3)%scope=SOURCE_SCOPE_INTERLAYER
   CALL registry%initialize(5,0,groups,error)
-  CALL require(INDEX(error,'only paired mass exchange')>0, &
+  CALL require(INDEX(error,'only paired mass exchange or drag')>0, &
        'layer-local source rejected in INTERLAYER scope')
   CALL require(.NOT.registry%is_initialized(), &
        'invalid interlayer group must not leave an active registry')
@@ -222,8 +223,8 @@ PROGRAM test_source_registry
   groups(3)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
   groups(3)%method=SOURCE_METHOD_NEWTON
   CALL registry%initialize(5,0,groups,error)
-  CALL require(INDEX(error,'INTERLAYER mass exchange requires EXPLICIT')>0, &
-       'Newton method rejected for interlayer group')
+  CALL require(LEN_TRIM(error)>0, &
+       'Newton method rejected for non-Newton interlayer group')
   CALL require(.NOT.registry%is_initialized(),'interlayer Newton leaves no registry')
   groups(3)%method=SOURCE_METHOD_EXPLICIT
   groups(3)%source_names=[CHARACTER(LEN=64)::'interlayer_mass_exchange']
@@ -274,6 +275,30 @@ PROGRAM test_source_registry
   CALL require(ANY(groups%scope==SOURCE_SCOPE_INTERLAYER .AND. groups%id==4), &
        'interlayer mass exchange preserves configured Lie group')
   CALL registry%finalize()
+  ! The same Lie registry supports a second paired analytic source,
+  ! independently scheduled from the explicitly integrated mass exchange.
+  interlayer_momentum_exchange%chezy_drag_coeff=0.03_wp
+  interlayer_momentum_exchange%method='ANALYTIC'
+  interlayer_momentum_exchange%group=5
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+       rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+  CALL require(LEN_TRIM(error)==0,'independent mass and drag groups: '//TRIM(error))
+  groups=registry%groups()
+  CALL require(COUNT(groups%scope==SOURCE_SCOPE_INTERLAYER)==2,'two paired Lie groups')
+  CALL require(ANY(groups%scope==SOURCE_SCOPE_INTERLAYER .AND. groups%id==5 .AND. &
+       groups%method==SOURCE_METHOD_ANALYTIC),'analytic drag uses its own Lie group')
+  CALL require(group_contains_name(groups(SIZE(groups)),'interlayer_drag'), &
+       'drag is the last configured source')
+  CALL registry%finalize()
+  interlayer_momentum_exchange%group=4
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+       rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+  CALL require(INDEX(error,'distinct Lie groups')>0,'same-group mass and drag are rejected')
+  CALL require(.NOT.registry%is_initialized(),'conflicting groups leave no registry')
+  interlayer_momentum_exchange%group=5
+  interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
   interlayer_exchange%elutriation_flag=.FALSE.
   CALL initialize_configured_sources(registry,error, &
        rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &

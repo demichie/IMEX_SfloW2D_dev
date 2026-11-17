@@ -31,5 +31,5 @@ MODULE interlayer_mass_exchange_parameters_2d
         INTEGER :: group=4                              !< Paired mass-transfer Lie group.
     END TYPE interlayer_mass_exchange_config_type
 
-    TYPE(interlayer_mass_exchange_config_type) :: interlayer_exchange
+    TYPE(interlayer_mass_exchange_config_type), TARGET :: interlayer_exchange
 END MODULE interlayer_mass_exchange_parameters_2d

@@ -13,6 +13,8 @@ MODULE lie_source_executor_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
+    USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
+        apply_interlayer_momentum_exchange_analytic
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
         idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
@@ -499,16 +501,29 @@ CONTAINS
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
                 layer=executor%groups(group_index)%scope
                 IF (layer==SOURCE_SCOPE_INTERLAYER) THEN
-                    ! The shared cell transaction evaluates both donors and
-                    ! commits both recipients only after paired validation.
-                    IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) THEN
+                    ! The same cell-local Lie order applies to both paired laws.
+                    ! Each update commits both recipients only after validation.
+                    IF (ANY(executor%groups(group_index)%source_names=='interlayer_mass_exchange')) THEN
+                        IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) THEN
+                            cell_error=17
+                            EXIT group_loop
+                        END IF
+                        CALL apply_interlayer_lie_group(interlayer_exchange,rheology(2),mass_config(2), &
+                            qp_original(:,1:2,j,k),executor%groups(group_index)%id==0,time_step, &
+                            q_layers(:,1:2),qp_layers(:,1:2), &
+                            executor%interlayer_physical_scratch(:,tid),cell_error)
+                    ELSEIF (ANY(executor%groups(group_index)%source_names=='interlayer_drag')) THEN
+                        IF (executor%groups(group_index)%method/=SOURCE_METHOD_ANALYTIC .OR. &
+                            executor%groups(group_index)%id==0) THEN
+                            cell_error=17
+                            EXIT group_loop
+                        END IF
+                        CALL apply_interlayer_momentum_exchange_analytic(interlayer_momentum_exchange,time_step, &
+                            q_layers(:,1:2),qp_layers(:,1:2),ok)
+                        IF (.NOT.ok) cell_error=22
+                    ELSE
                         cell_error=17
-                        EXIT group_loop
                     END IF
-                    CALL apply_interlayer_lie_group(interlayer_exchange,rheology(2),mass_config(2), &
-                        qp_original(:,1:2,j,k),executor%groups(group_index)%id==0,time_step, &
-                        q_layers(:,1:2),qp_layers(:,1:2), &
-                        executor%interlayer_physical_scratch(:,tid),cell_error)
                     IF (cell_error/=0) EXIT group_loop
                     IF (profiling_enabled) thread_evaluations(group_index,tid)= &
                         thread_evaluations(group_index,tid)+1

@@ -661,14 +661,18 @@ physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): \
     state/state_types.$(OBJEXT) state/state_physical.$(OBJEXT) \
     state/state_conversions.$(OBJEXT) state/state_composition.$(OBJEXT) \
     state/state_fields.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
 
 # The paired source shares the canonical physics kernel and existing Lie executor.
 numerics/source_configuration_2d.$(OBJEXT): \
-    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT)
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT) \
-    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT)
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
 
 # Analytic pair momentum exchange: coordinator depends only on the Chezy law.
 physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
