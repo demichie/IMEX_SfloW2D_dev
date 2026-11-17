@@ -208,11 +208,19 @@ abilitazione in produzione.
 | **TL00–TL04 — Stato e fisica per layer** | Base predisposta | Verificare i percorsi integrati ancora scoperti: slot opzionali, IC/BC, input, output e regressioni L1/L2. |
 | **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
 | **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
-| **TL07 — Lie accoppiato** | Transazione interlayer e test cell-local Lie | Il gruppo `INTERLAYER` usa una sola transazione comune all'esecutore e ai test: gruppo 0 da snapshot pre-spaziale, inventari post-spaziali, quattro casi wet/dry, conservazione, ammissibilita' e rifiuto atomico. Restano verifica dell'intero timestep produttivo, variabili opzionali per layer e gate L2. |
+| **TL07 — Lie accoppiato** | Percorso spaziale-Lie-commit collegato, da verificare | Il trial L1/L2 entra nell'esecutore Lie condiviso e pubblica i due layer sul workset comune; il gate di layout resta attivo. Gruppo 0 da snapshot pre-spaziale, inventari post-spaziali e transazione interlayer sono implementati. Restano regressioni integrate del timestep, optional slots, OpenMP e gate L2. La fisica stochastic L2 e' esplicitamente rifiutata finche' manca il workspace OU L2. |
 | **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano validazione della transazione Lie effettiva, variabili opzionali per layer, stati termodinamici finali, drag e test two-layer end-to-end. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
+
+**TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
+post-spaziale in `time_integration_2d%advance` e' stato rimosso: lo stesso
+percorso sorgenti e commit viene ora attraversato da L1 e L2. Il layout
+continua a rifiutare `N_LAYERS=2` nei run produttivi. Per evitare l'uso
+incrociato del rumore L1, l'eventuale reologia/trasporto stochastic L2
+non e' ancora abilitata. Questo collegamento richiede test di passo
+accoppiato con invarianti fisici prima di essere considerato concluso.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.

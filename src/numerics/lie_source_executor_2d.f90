@@ -929,7 +929,9 @@ CONTAINS
             CASE(16)
                 failure_reason='TL07: invalid candidate layer contacts'
             CASE(17)
-                failure_reason='TL07: interlayer mass exchange requires EXPLICIT'
+                failure_reason='TL07: interlayer Lie source and method mismatch'
+            CASE(22)
+                failure_reason='TL09: paired analytic interlayer drag rejected'
             CASE(18)
                 failure_reason='TL07: interlayer source or recipient physical state invalid'
             CASE(19)

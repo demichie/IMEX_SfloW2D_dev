@@ -18,7 +18,7 @@ MODULE time_integration_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE layer_physics_2d, ONLY : layer_physics_type
     USE source_registry_2d, ONLY : source_registry_type
-    USE stochastic_module, ONLY : stochastic_workspace_type
+    USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l2
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
@@ -81,7 +81,7 @@ CONTAINS
     !> @param[in] stochastic_values Per-cell stochastic input array.
     !> @param[in] source_registry Ordered Lie source groups.
     !> @param[in] domain Active and reconstruction cell worklists.
-    !> @param[in,out] spatial_operators Per-layer HP-PCCU workspaces; only slot 1 executes today.
+    !> @param[in,out] spatial_operators Per-layer HP-PCCU workspaces; both slots execute for L1/L2.
     !> @param[in] layer_physics Canonical per-layer physical descriptors.
     !> @param[in] pore_caches Derived Pascal coefficients for active layers.
     SUBROUTINE advance_lie(this,state,t,dt,stochastic,domain,spatial_operators,pre_spatial_primitives_ready, &
@@ -123,6 +123,12 @@ CONTAINS
             stochastic_enabled(layer)=rheology(layer)%stochastic_rheology_flag
         END DO
         transport_stochastic(1)=stochastic%config%stochastic_transport_flag
+        ! The OU workspace is still L1-owned. Never reuse its effective field
+        ! for an independently configured L2 stochastic rheology.
+        IF (n_layers==2) THEN
+            IF (stochastic_enabled(2) .OR. stochastic_l2%stochastic_transport_flag) &
+                CALL fatal_error('TL07: L2 stochastic physics requires its own OU workspace')
+        END IF
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
@@ -244,9 +250,9 @@ CONTAINS
             this%profile_spatial=this%profile_spatial+REAL(tock-tick,wp)/REAL(tick_rate,wp)
             tick=tock
         END IF
-        ! TL07-B must extend the existing Lie groups to L1/L2/INTERLAYER before
-        ! the coupled trial may reach the source executor or the atomic commit.
-        IF (n_layers==2) CALL fatal_error('TL07 coupled spatial trial ready; coupled Lie sources not yet implemented')
+        ! The two-layer spatial candidates now enter the same ordered Lie
+        ! executor as L1. The model-layout gate still prevents production use;
+        ! no alternative timestep or layer-specific commit path is introduced.
 
         ! OU is now the post-spatial fractional stage.  q_trial/qp_trial
         ! are valid only on the solve worklist, so stochastic%prepare_timestep
@@ -281,9 +287,8 @@ CONTAINS
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
         IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
-        ! Publish all active layer slots from one accepted transaction, using
-        ! only the shared solve worklist. The TL07 coupled source guard above
-        ! prevents reaching this commit before both layers are source-complete.
+        ! Publish both layer slots from one accepted transaction, using
+        ! only the shared solve worklist after every source group succeeded.
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k)
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
