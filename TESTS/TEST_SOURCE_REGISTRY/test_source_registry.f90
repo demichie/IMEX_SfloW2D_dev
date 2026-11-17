@@ -17,7 +17,6 @@ PROGRAM test_source_registry
   TYPE(source_registry_type) :: registry
   TYPE(source_group_type), ALLOCATABLE :: groups(:)
   CHARACTER(LEN=256) :: error
-  INTEGER :: i,idx
   LOGICAL :: contact_valid
   REAL(wp) :: thermal_rate_l1,thermal_rate_l2
   COMPLEX(wp) :: thermal_rate_complex
@@ -210,24 +209,36 @@ PROGRAM test_source_registry
   CALL require(LEN_TRIM(error)>0,'duplicate group and source within L1 rejected')
   groups(3)%scope=SOURCE_SCOPE_INTERLAYER
   CALL registry%initialize(5,0,groups,error)
-  CALL require(INDEX(error,'INTERLAYER source descriptors')>0, &
-       'interlayer source rejected with explicit reason')
+  CALL require(INDEX(error,'only paired mass exchange')>0, &
+       'layer-local source rejected in INTERLAYER scope')
   CALL require(.NOT.registry%is_initialized(), &
        'invalid interlayer group must not leave an active registry')
-  ! Neither an empty group nor a layer-local Newton law may bypass the
-  ! physical INTERLAYER contract.
+  ! An empty group or non-explicit method cannot bypass the paired contract.
   groups(3)%source_names=[CHARACTER(LEN=64)::]
   CALL registry%initialize(5,0,groups,error)
-  CALL require(INDEX(error,'INTERLAYER source descriptors')>0, &
+  CALL require(LEN_TRIM(error)>0, &
        'empty interlayer group rejected without fallback')
   CALL require(.NOT.registry%is_initialized(),'empty interlayer group leaves no registry')
   groups(3)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
   groups(3)%method=SOURCE_METHOD_NEWTON
   CALL registry%initialize(5,0,groups,error)
-  CALL require(INDEX(error,'INTERLAYER source descriptors')>0, &
-       'layer-local Newton law cannot become an interlayer source')
+  CALL require(INDEX(error,'INTERLAYER mass exchange requires EXPLICIT')>0, &
+       'Newton method rejected for interlayer group')
   CALL require(.NOT.registry%is_initialized(),'interlayer Newton leaves no registry')
   groups(3)%method=SOURCE_METHOD_EXPLICIT
+  groups(3)%source_names=[CHARACTER(LEN=64)::'interlayer_mass_exchange']
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(LEN_TRIM(error)==0,'registered paired interlayer mass exchange: '//TRIM(error))
+  CALL require(registry%is_initialized(),'paired source preserved by registry')
+  groups=registry%groups()
+  CALL require(group_contains_name(groups(3),'interlayer_mass_exchange'), &
+       'paired source identity is preserved')
+  CALL registry%finalize()
+  groups(3)%scope=SOURCE_SCOPE_L2
+  CALL registry%initialize(5,0,groups,error)
+  CALL require(INDEX(error,'requires INTERLAYER scope')>0, &
+       'paired source rejected in layer-local scope')
+  CALL require(.NOT.registry%is_initialized(),'wrong paired source scope leaves no registry')
   groups(3)%scope=99
   CALL registry%initialize(5,0,groups,error)
   CALL require(LEN_TRIM(error)>0,'invalid source scope rejected')
