@@ -203,7 +203,11 @@ CONTAINS
             RETURN
         END IF
         IF (n_layers/=2 .AND. legacy_count+canonical_count/=0) THEN
-            error='Interlayer parameters require N_LAYERS=2'
+            IF (legacy_count==1) THEN
+                error='INTERLAYER_EXCHANGE_PARAMETERS requires N_LAYERS=2'
+            ELSE
+                error='INTERLAYER_PARAMETERS requires N_LAYERS=2'
+            END IF
             RETURN
         END IF
         IF (legacy_count==1) THEN
