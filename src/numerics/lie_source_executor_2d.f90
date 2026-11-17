@@ -11,8 +11,8 @@ MODULE lie_source_executor_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange
-    USE interlayer_exchange_2d, ONLY : apply_interlayer_lie_group
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
+    USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
         idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y

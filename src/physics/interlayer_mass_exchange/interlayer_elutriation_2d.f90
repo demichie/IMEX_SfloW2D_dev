@@ -7,7 +7,7 @@ MODULE interlayer_elutriation_2d
     USE constitutive_parameters_2d, ONLY : grav,kin_visc_c,rho_a_amb,vonK
     USE solid_transport_parameters_2d, ONLY : rho_s,diam_s,maximum_solid_packing
     USE state_types, ONLY : physical_state_real
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE mass_exchange_deposition_2d, ONLY : settling_velocity
     IMPLICIT NONE
@@ -22,7 +22,7 @@ CONTAINS
     !> @param[in] dt Common source timestep [s].
     !> @param[out] elutriation Per-class upward solid volume rates [m/s].
     SUBROUTINE eval_interlayer_elutriation_explicit(config,mass_l2,state_l1,state_l2,dt,elutriation)
-        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
         TYPE(physical_state_real), INTENT(IN) :: state_l1,state_l2
         REAL(wp), INTENT(IN) :: dt

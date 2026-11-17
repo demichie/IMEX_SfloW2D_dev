@@ -4,7 +4,7 @@
 MODULE source_input_2d
     USE parameters_2d, ONLY : wp, n_layers
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type, mass_exchange_l1, mass_exchange_l2
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type, interlayer_exchange
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_exchange
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
@@ -22,6 +22,7 @@ MODULE source_input_2d
     NAMELIST /mass_exchange_parameters/ mass_exchange
     NAMELIST /mass_exchange_l1_parameters/ mass_exchange_l1
     NAMELIST /mass_exchange_l2_parameters/ mass_exchange_l2
+    ! Keep the existing NAMELIST identity and the single authoritative configuration.
     NAMELIST /interlayer_exchange_parameters/ interlayer_exchange
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
     PUBLIC :: read_interlayer_exchange_parameters, write_interlayer_exchange_parameters
@@ -209,7 +210,7 @@ CONTAINS
 
     !> @brief Validate pair-wide co-lift parameters without enabling an unimplemented source.
     SUBROUTINE validate_interlayer_exchange_configuration(config,error)
-        TYPE(interlayer_exchange_config_type), INTENT(INOUT) :: config
+        TYPE(interlayer_mass_exchange_config_type), INTENT(INOUT) :: config
         CHARACTER(*), INTENT(OUT) :: error
         error=''
         config%method=uppercase_source_text(ADJUSTL(config%method))

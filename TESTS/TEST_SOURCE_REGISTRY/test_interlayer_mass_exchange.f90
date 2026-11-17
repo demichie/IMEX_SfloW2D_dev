@@ -1,10 +1,10 @@
 !> @brief Cell-local paired transfer budgets and co-lift input regressions.
-PROGRAM test_interlayer_exchange
+PROGRAM test_interlayer_mass_exchange
     USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : n_stoch_vars,n_pore_vars,gas_flag,sutherland_flag
     USE parameters_2d, ONLY : configure_canonical_state_indices,idx_solidEqn_first
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type, interlayer_exchange
-    USE interlayer_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_exchange_explicit
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_exchange
+    USE interlayer_mass_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_mass_exchange_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
     USE state_types, ONLY : physical_state_real,initialize_physical_state_real
     USE solid_transport_parameters_2d, ONLY : rho_s,sp_heat_s,diam_s,maximum_solid_packing
@@ -13,7 +13,7 @@ PROGRAM test_interlayer_exchange
     USE constitutive_parameters_2d, ONLY : grav,kin_visc_c,rho_a_amb,vonK
     USE source_input_2d, ONLY : read_interlayer_exchange_parameters
     IMPLICIT NONE
-    TYPE(interlayer_exchange_config_type) :: config
+    TYPE(interlayer_mass_exchange_config_type) :: config
     REAL(wp) :: s1(2),s2(2),settle(2),elut(2),accepted_s(2),accepted_e(2)
     REAL(wp) :: down,up,dt,carrier1,carrier2,pack,strict_lift,concentrated_lift
     CHARACTER(LEN=256) :: error
@@ -135,7 +135,7 @@ CONTAINS
     !> @brief Exercise physics and antisymmetric paired mass, momentum and energy.
     SUBROUTINE test_physical_sources()
         TYPE(physical_state_real) :: l1,l2
-        TYPE(interlayer_exchange_config_type) :: phys_config
+        TYPE(interlayer_mass_exchange_config_type) :: phys_config
         TYPE(mass_exchange_config_type) :: mass_l2
         TYPE(rheology_config_type) :: rheology_l2
         REAL(wp) :: source1(6),source2(6),elut_rates(2)
@@ -174,7 +174,7 @@ CONTAINS
         CALL eval_interlayer_elutriation_explicit(phys_config,mass_l2,l1,l2,dt,elut_rates)
         CALL require(ALL(elut_rates>0.0_wp),'shear-power and Shields rate in dry L2 cold-start')
         phys_config%elutriation_law='LINEAR_USTAR'
-        CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+        CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
             l1,l2,l1,l2,dt,source1,source2,valid)
         CALL require(valid,'cold-start L2 paired physical transfer accepted')
         CALL require(source1(idx_solidEqn_first)<0.0_wp .AND. &
@@ -195,7 +195,7 @@ CONTAINS
         l2%rho_m=1.0_wp+SUM((rho_s-1.0_wp)*l2%alphas)
         l2%xs=rho_s*l2%alphas/l2%rho_m
         l2%u=3.0_wp; l2%v=-1.0_wp
-        CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+        CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
             l1,l2,l1,l2,dt,source1,source2,valid)
         CALL require(valid,'cold-start L1 settling accepted')
         CALL require(source1(idx_solidEqn_first)>0.0_wp,'settling creates L1 solids')
@@ -209,7 +209,7 @@ CONTAINS
         l1%h=1.0_wp; l1%alphas=[0.15_wp,0.05_wp]
         l1%rho_m=1.0_wp+SUM((rho_s-1.0_wp)*l1%alphas)
         l1%xs=rho_s*l1%alphas/l1%rho_m
-        CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+        CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
             l1,l2,l1,l2,dt,source1,source2,valid)
         CALL require(valid,'simultaneous source-rate assembly accepted')
         DO i=1,6
@@ -234,7 +234,7 @@ CONTAINS
             gas_l2%h=0.0_wp; gas_l2%rho_c=1.0_wp; gas_l2%rho_m=1.0_wp
             gas_l2%alphas=0.0_wp; gas_l2%cp_c=1000.0_wp; gas_l2%T=300.0_wp
             phys_config%settling_flag=.FALSE.
-            CALL eval_interlayer_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
                 gas_l1,gas_l2,gas_l1,gas_l2,dt,augmented1,augmented2,valid)
             CALL require(valid,'co-lift with additional gas species accepted')
             CALL require(augmented1(7)<0.0_wp .AND. augmented2(7)>0.0_wp, &
@@ -291,4 +291,4 @@ CONTAINS
             ERROR STOP 1
         END IF
     END SUBROUTINE require
-END PROGRAM test_interlayer_exchange
+END PROGRAM test_interlayer_mass_exchange

@@ -22,7 +22,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/thermal_laws/thermal_parameters_2d.f90 \
                 physics/pore_pressure/pore_pressure_parameters_2d.f90 \
                 physics/mass_exchange/mass_exchange_parameters_2d.f90 \
-                physics/interlayer_exchange/interlayer_exchange_parameters_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.f90 \
                 numerics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
@@ -57,9 +57,9 @@ IMEX_SfloW2D_SOURCES = \
                 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.f90 \
                 physics/mass_exchange/mass_exchange_erosion_2d.f90 \
                 physics/mass_exchange/mass_exchange_deposition_2d.f90 \
-                physics/interlayer_exchange/interlayer_settling_2d.f90 \
-                physics/interlayer_exchange/interlayer_elutriation_2d.f90 \
-                physics/interlayer_exchange/interlayer_exchange_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_settling_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_elutriation_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.f90 \
                 physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.f90 \
                 physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.f90 \
                 physics/mass_exchange/mass_exchange_lava_deposition_2d.f90 \
@@ -647,28 +647,28 @@ physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): physics/mass_exch
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 
 # Pair-wide cell-local limiter and canonical input: explicit module dependencies.
-physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-physics/interlayer_exchange/interlayer_settling_2d.$(OBJEXT): \
-    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
+physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
     physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT)
-physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT): \
-    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
+physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
     physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT)
-physics/interlayer_exchange/interlayer_exchange_2d.$(OBJEXT): \
-    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT) \
-    physics/interlayer_exchange/interlayer_settling_2d.$(OBJEXT) \
-    physics/interlayer_exchange/interlayer_elutriation_2d.$(OBJEXT) \
+physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT) \
+    physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT) \
     state/state_types.$(OBJEXT) state/state_physical.$(OBJEXT) \
     state/state_conversions.$(OBJEXT) state/state_composition.$(OBJEXT) \
     state/state_fields.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT)
 
 # The paired source shares the canonical physics kernel and existing Lie executor.
 numerics/source_configuration_2d.$(OBJEXT): \
-    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): \
-    physics/interlayer_exchange/interlayer_exchange_2d.$(OBJEXT) \
-    physics/interlayer_exchange/interlayer_exchange_parameters_2d.$(OBJEXT)
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT) \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT)
 
 # Analytic pair momentum exchange: coordinator depends only on the Chezy law.
 physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)

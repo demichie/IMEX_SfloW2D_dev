@@ -1,12 +1,13 @@
 !> @brief Canonical physical options for paired L1/L2 mass transfers.
+!> @details The canonical object retains its historical NAMELIST input spelling.
 !> @details The interlayer exchange belongs to the layer pair, never to either layer.
-MODULE interlayer_exchange_parameters_2d
+MODULE interlayer_mass_exchange_parameters_2d
     USE parameters_2d, ONLY : wp
     IMPLICIT NONE
     PRIVATE
-    PUBLIC :: interlayer_exchange_config_type, interlayer_exchange
+    PUBLIC :: interlayer_mass_exchange_config_type, interlayer_exchange
 
-    TYPE :: interlayer_exchange_config_type
+    TYPE :: interlayer_mass_exchange_config_type
         LOGICAL :: settling_flag=.FALSE.                 !< Transfer solids from L2 to L1.
         LOGICAL :: elutriation_flag=.FALSE.              !< Transfer solids from L1 to L2.
         REAL(wp) :: elutriation_solid_volume_fraction=-1.0_wp !< Solid fraction in lifted parcel.
@@ -28,7 +29,7 @@ MODULE interlayer_exchange_parameters_2d
         REAL(wp) :: settling_plug_thickness=0.02_wp !< Thin-layer plug blend [m].
         CHARACTER(LEN=16) :: method='EXPLICIT'           !< Paired mass-transfer Lie method.
         INTEGER :: group=4                              !< Paired mass-transfer Lie group.
-    END TYPE interlayer_exchange_config_type
+    END TYPE interlayer_mass_exchange_config_type
 
-    TYPE(interlayer_exchange_config_type) :: interlayer_exchange
-END MODULE interlayer_exchange_parameters_2d
+    TYPE(interlayer_mass_exchange_config_type) :: interlayer_exchange
+END MODULE interlayer_mass_exchange_parameters_2d

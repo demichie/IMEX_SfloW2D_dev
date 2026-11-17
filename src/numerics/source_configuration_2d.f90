@@ -18,7 +18,7 @@ MODULE source_configuration_2d
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: initialize_configured_sources

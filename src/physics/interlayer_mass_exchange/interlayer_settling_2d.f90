@@ -7,7 +7,7 @@ MODULE interlayer_settling_2d
     USE state_types, ONLY : physical_state_real
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
     USE mass_exchange_deposition_2d, ONLY : eval_deposition_volume_kernel
     IMPLICIT NONE
     PRIVATE
@@ -21,7 +21,7 @@ CONTAINS
     !> @param[in] dt Common physical timestep [s].
     !> @param[out] settling Per-class downward solid volume flux [m/s].
     SUBROUTINE eval_interlayer_settling_explicit(config,rheology_l2,mass_l2,state_l2,dt,settling)
-        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
         TYPE(physical_state_real), INTENT(IN) :: state_l2

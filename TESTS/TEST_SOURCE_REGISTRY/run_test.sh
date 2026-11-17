@@ -48,15 +48,15 @@ for profile in strict optimized; do
     ./test_source_registry > results.log
     cat results.log
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-      $netcdf_fflags -c "$test_dir/test_interlayer_exchange.f90"
+      $netcdf_fflags -c "$test_dir/test_interlayer_mass_exchange.f90"
     # The paired physical coordinator uses the existing deposition and state
     # modules: link the entire production module closure, excluding test mains.
     production_objects=$(printf '%s\n' $sources | sed -n \
       -e 's|.*/||;s/\.f90$/.o/p' -e 's|.*/||;s/\.c$/.o/p' | tr '\n' ' ')
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-      $production_objects test_interlayer_exchange.o -llapack \
-      $netcdf_flibs $netcdf_clibs -o test_interlayer_exchange
-    ./test_interlayer_exchange > interlayer-results.log
+      $production_objects test_interlayer_mass_exchange.o -llapack \
+      $netcdf_flibs $netcdf_clibs -o test_interlayer_mass_exchange
+    ./test_interlayer_mass_exchange > interlayer-results.log
     cat interlayer-results.log
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       $netcdf_fflags -c "$test_dir/test_interlayer_lie_transaction.f90"

@@ -3,7 +3,7 @@
 !>          The coordinator limits both donors, carrier co-lift and final packing
 !>          before returning any accepted flux. It does not update conservative
 !>          states, own grid indices or perform a Lie timestep.
-MODULE interlayer_exchange_2d
+MODULE interlayer_mass_exchange_2d
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
     USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
@@ -17,11 +17,11 @@ MODULE interlayer_exchange_2d
     USE solid_transport_parameters_2d, ONLY : rho_s,sp_heat_s,maximum_solid_packing
     USE interlayer_settling_2d, ONLY : eval_interlayer_settling_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
-    PUBLIC :: limit_interlayer_mass_transfer, eval_interlayer_exchange_explicit
+    PUBLIC :: limit_interlayer_mass_transfer, eval_interlayer_mass_exchange_explicit
     PUBLIC :: apply_interlayer_lie_group
 
 CONTAINS
@@ -58,7 +58,7 @@ CONTAINS
             carrier_down,carrier_up,valid,rho_carrier_l1,rho_carrier_l2,candidate_rho_l1,candidate_rho_l2)
         REAL(wp), INTENT(IN) :: solid_l1(:),solid_l2(:),carrier_l1,carrier_l2
         REAL(wp), INTENT(IN) :: settling(:),elutriation(:),dt,packing
-        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         REAL(wp), INTENT(OUT) :: accepted_settling(:),accepted_elutriation(:),carrier_down,carrier_up
         LOGICAL, INTENT(OUT) :: valid
         REAL(wp), INTENT(IN), OPTIONAL :: rho_carrier_l1,rho_carrier_l2
@@ -232,9 +232,9 @@ CONTAINS
     !> @param[out] source_l1 Signed L1 conservative rate vector.
     !> @param[out] source_l2 Signed L2 conservative rate vector.
     !> @param[out] valid Whether an admissible paired rate has been assembled.
-    SUBROUTINE eval_interlayer_exchange_explicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
+    SUBROUTINE eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
             limit_l1,limit_l2,dt,source_l1,source_l2,valid)
-        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
         TYPE(physical_state_real), INTENT(IN) :: eval_l1,eval_l2,limit_l1,limit_l2
@@ -353,7 +353,7 @@ CONTAINS
             source_l1(idx_addGasEqn_first+index-1)=source_l1(idx_addGasEqn_first+index-1)+direction*mass
             source_l2(idx_addGasEqn_first+index-1)=source_l2(idx_addGasEqn_first+index-1)-direction*mass
         END SUBROUTINE add_gas
-    END SUBROUTINE eval_interlayer_exchange_explicit
+    END SUBROUTINE eval_interlayer_mass_exchange_explicit
 
     !> @brief Perform one paired cell-local Lie transfer as an atomic transaction.
     !> @details The physical law uses the group-zero pre-spatial snapshot when
@@ -373,7 +373,7 @@ CONTAINS
     !> @param[out] status Zero on success; 18-21 identify rejected transactions.
     SUBROUTINE apply_interlayer_lie_group(config,rheology_l2,mass_l2,pre_spatial_qp, &
             group_zero,dt,q,qp,physical,status)
-        TYPE(interlayer_exchange_config_type), INTENT(IN) :: config
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
         REAL(wp), INTENT(IN) :: pre_spatial_qp(n_vars,2)
@@ -406,7 +406,7 @@ CONTAINS
         IF (.NOT.ok) RETURN
 
         status=19
-        CALL eval_interlayer_exchange_explicit(config,rheology_l2,mass_l2, &
+        CALL eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2, &
             physical(1),physical(2),physical(3),physical(4),dt,rate_l1,rate_l2,ok)
         IF (.NOT.ok) RETURN
         candidate_q=q
@@ -431,4 +431,4 @@ CONTAINS
         qp=candidate_qp
         status=0
     END SUBROUTINE apply_interlayer_lie_group
-END MODULE interlayer_exchange_2d
+END MODULE interlayer_mass_exchange_2d

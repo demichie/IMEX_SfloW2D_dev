@@ -9,14 +9,14 @@ PROGRAM test_interlayer_lie_transaction
     USE state_types, ONLY : physical_state_real,initialize_physical_state_real
     USE state_physical, ONLY : build_physical_state_from_qp
     USE state_conversions, ONLY : primitive_to_conservative
-    USE interlayer_exchange_2d, ONLY : apply_interlayer_lie_group
-    USE interlayer_exchange_parameters_2d, ONLY : interlayer_exchange_config_type
+    USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE rheology_parameters_2d, ONLY : rheology_config_type
     IMPLICIT NONE
 
     TYPE(physical_state_real) :: scratch(4),check1,check2
-    TYPE(interlayer_exchange_config_type) :: config
+    TYPE(interlayer_mass_exchange_config_type) :: config
     TYPE(mass_exchange_config_type) :: mass_l2
     TYPE(rheology_config_type) :: rheology_l2
     REAL(wp) :: q(6,2),qp(6,2),before(6,2),primitives(6,2),snapshot(6,2)

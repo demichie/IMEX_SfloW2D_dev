@@ -72,16 +72,18 @@ prelievi dal substrato e dal materiale preesistente.
 
 `src/physics/mass_exchange/` rimane responsabile delle sorgenti locali di
 un layer verso terreno e atmosfera. Gli scambi interni L1/L2 appartengono a
-`src/physics/interlayer_exchange/` per settling L2→L1 ed elutriazione L1→L2.
+`src/physics/interlayer_mass_exchange/` per settling L2→L1 ed elutriazione L1→L2.
 Il drag e' fisicamente distinto e appartiene a
 `src/physics/interlayer_momentum_exchange/`, con il coordinatore
 `interlayer_momentum_exchange_2d.f90` e la legge
-`interlayer_drag_chezy_2d.f90`. Aggiungere nuove leggi soltanto quando
+`interlayer_drag_chezy_2d.f90`. Il NAMELIST storico
+`INTERLAYER_EXCHANGE_PARAMETERS` mantiene la sintassi per compatibilita' input.
+Aggiungere nuove leggi soltanto quando
 servono, senza interfacce transitorie. Condividere i kernel fisici gia' esistenti se equivalenti,
 senza assimilare la deposizione nel substrato al trasferimento interlayer.
 
 **Settling ed elutriazione** producono rate fisici indipendenti e sono
-coordinati da `interlayer_exchange_2d.f90` per i limiti di inventario e
+coordinati da `interlayer_mass_exchange_2d.f90` per i limiti di inventario e
 packing, analogamente al coordinatore `mass_exchange_2d.f90` esistente.
 Il coordinatore ha una responsabilita' effettiva, non introduce un nuovo
 integratore o una seconda sorgente autorevole. Si prevede un **gruppo
