@@ -42,6 +42,13 @@ PROGRAM test_spatial_operator
   USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
       interlayer_momentum_exchange_config_type,apply_interlayer_momentum_exchange_analytic
   USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_config_type,stochastic_l1,stochastic_l2
+  USE runtime_2d, ONLY : runtime_state_type
+  USE output_paths, ONLY : initialize_output_paths,output_file_path,snapshot_file_path
+  USE inpout_2d, ONLY : write_restart_file,read_restart_file,read_solution,n_restart_files,restart_files
+  USE inpout_2d, ONLY : init_netcdf_output,write_netcdf_timestep,close_netcdf
+  USE inpout_2d, ONLY : write_two_layer_budget,run_name,restart,output_runout_flag,output_solution
+  USE inpout_2d, ONLY : output_cons_flag,output_esri_flag,output_netcdf_flag
+  USE inpout_2d, ONLY : output_idx,dt_runout,eps_stop,alphas_threshold,x0_runout,y0_runout
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -369,6 +376,7 @@ PROGRAM test_spatial_operator
   CALL domain%finalize
   CALL check_optional_layer_spatial_slots
   CALL check_optional_layer_lie_timestep
+  CALL check_two_layer_io_roundtrip
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
@@ -3180,6 +3188,230 @@ CONTAINS
         n_layers=old_layers
         WRITE(*,*) 'PASS: two-layer Lie with independent L1 Darcy and L2 stochastic transport'
     END SUBROUTINE check_optional_layer_lie_timestep
+
+  !> @brief Round-trip the real v8 checkpoint and the five-dimensional NetCDF schema.
+  !> @details The structural two-layer fixture bypasses the production layout gate.
+  !>          It tests the existing I/O implementations and shared substrate ownership.
+  SUBROUTINE check_two_layer_io_roundtrip
+    USE netcdf
+    USE init_2d, ONLY : erodible_init,thickness_init
+    TYPE(state_type) :: states
+    TYPE(domain_type) :: io_domain
+    TYPE(runtime_state_type) :: clock
+    TYPE(stochastic_workspace_type) :: noise(2)
+    TYPE(stochastic_config_type) :: saved_stochastic_l2
+    REAL(wp), ALLOCATABLE :: original_q(:,:,:,:),original_b(:,:)
+    REAL(wp), ALLOCATABLE :: stored_q(:,:,:,:,:),stored_qp(:,:,:,:,:)
+    REAL(wp), ALLOCATABLE :: stored_total(:,:,:)
+    REAL(wp) :: primitive(n_vars),total_before
+    INTEGER :: unit_budget
+    REAL(wp) :: budget(11)
+    CHARACTER(LEN=256) :: header
+    INTEGER :: saved_layers,ios,netcdf_id,variable_id,seed_size
+    INTEGER, ALLOCATABLE :: old_rng(:)
+    LOGICAL :: accepted,found_file,saved_pore_l1,created_erodible,created_erodible_fract
+    CHARACTER(LEN=256) :: message
+
+    IF (nx<12 .OR. ny<12) RETURN
+    saved_layers=n_layers
+    saved_stochastic_l2=stochastic_l2
+    saved_pore_l1=pore_pressure_l1%pore_pressure_flag
+    n_layers=2
+    pore_pressure_l1%pore_pressure_flag=.TRUE.
+    stochastic_l2%stochastic_transport_flag=.TRUE.
+    stochastic_l2%tau_stochastic=2.0_wp
+    stochastic_l2%std_max=0.05_wp
+    stochastic_l2%length_spatial_corr=0.0_wp
+    stochastic_l2%stochastic_seed=271828
+    substrate%erodible_porosity=0.25_wp
+    output_runout_flag=.FALSE.
+    restart=.FALSE.
+    output_idx=1
+    dt_runout=0.0_wp
+    eps_stop=0.0_wp
+    alphas_threshold=0.0_wp
+    x0_runout=0.0_wp
+    y0_runout=0.0_wp
+    run_name='two_layer_io'
+    CALL initialize_output_paths('.',TRIM(run_name),.FALSE.,.FALSE.)
+
+    ALLOCATE(states%q(n_vars,2,nx,ny),states%qp(n_vars,2,nx,ny))
+    ALLOCATE(states%erodible(n_solid,nx,ny),states%deposit(nx,ny,n_solid),states%erosion(nx,ny,n_solid))
+    ALLOCATE(states%deposit_tot(nx,ny),states%erosion_tot(nx,ny))
+    ALLOCATE(states%hpos(nx,ny),states%hpos_old(nx,ny))
+    ALLOCATE(states%hmax(nx,ny),states%pdynmax(nx,ny),states%mod_vel_max(nx,ny))
+    ALLOCATE(states%vuln_table(0,nx,ny))
+    states%q=0.0_wp
+    states%qp=0.0_wp
+    states%qp(idx_T,:,:,:)=T_ambient
+    states%erodible=0.0_wp
+    states%deposit=0.0_wp
+    states%erosion=0.0_wp
+    states%deposit_tot=0.0_wp
+    states%erosion_tot=0.0_wp
+    states%hpos=.FALSE.
+    states%hpos_old=.FALSE.
+    states%hmax=0.0_wp
+    states%pdynmax=0.0_wp
+    states%mod_vel_max=0.0_wp
+    states%vuln_table=.FALSE.
+    states%erodible(1,5,5)=0.08_wp
+    states%deposit(5,5,1)=0.02_wp
+    states%erosion(5,5,1)=0.01_wp
+    CALL states%refresh_substrate_totals()
+
+    DO k=4,ny-3
+        DO j=4,nx-3
+            primitive=0.0_wp
+            primitive(idx_h)=0.7_wp
+            primitive(idx_T)=T_ambient
+            primitive(idx_u)=0.1_wp
+            primitive(idx_pore)=0.1_wp
+            states%qp(:,1,j,k)=primitive
+            CALL primitive_to_conservative(primitive,states%q(:,1,j,k),accepted=accepted)
+            IF (.NOT.accepted) ERROR STOP 'Invalid L1 I/O primitive'
+            primitive(idx_h)=0.3_wp
+            primitive(idx_u)=-0.2_wp
+            primitive(idx_pore)=0.0_wp
+            primitive(idx_stoch)=0.2_wp
+            states%qp(:,2,j,k)=primitive
+            CALL primitive_to_conservative(primitive,states%q(:,2,j,k),accepted=accepted)
+            IF (.NOT.accepted) ERROR STOP 'Invalid L2 I/O primitive'
+        END DO
+    END DO
+    ALLOCATE(original_q(n_vars,2,nx,ny),original_b(nx+1,ny+1))
+    original_q=states%q
+    original_b=B_vertex
+    total_before=dx*dy*SUM(states%q(idx_totMassEqn,:,:,:))
+
+    CALL io_domain%initialize()
+    CALL noise(1)%initialize(stochastic_l1,rheology_l1,layer=1)
+    CALL noise(2)%initialize(stochastic_l2,rheology_l2,layer=2)
+    noise(2)%Z=0.125_wp
+    CALL noise(2)%refresh_effective()
+    IF (.NOT.ALLOCATED(noise(2)%rng_state)) ERROR STOP 'L2 RNG not initialized for checkpoint test'
+    seed_size=SIZE(noise(2)%rng_state)
+    ALLOCATE(old_rng(seed_size))
+    old_rng=noise(2)%rng_state
+    clock%t=3.25_wp
+    clock%dt=0.005_wp
+    clock%dt_old=0.006_wp
+    clock%dt_old_old=0.007_wp
+    clock%t_output=4.0_wp
+    CALL write_restart_file('two_layer_io_v8.bin',clock,noise,states,io_domain)
+    states%q=0.0_wp
+    B_vertex=0.0_wp
+    noise(2)%Z=0.0_wp
+    noise(2)%rng_state=0
+    clock%t=0.0_wp
+    CALL read_restart_file('two_layer_io_v8.bin',clock,noise,states,io_domain)
+    IF (ANY(states%q/=original_q)) ERROR STOP 'L1/L2 conservative restart round-trip mismatch'
+    IF (ANY(B_vertex/=original_b)) ERROR STOP 'Shared bed checkpoint round-trip mismatch'
+    IF (ANY(noise(2)%Z/=0.125_wp)) ERROR STOP 'L2 OU checkpoint mismatch'
+    IF (ANY(noise(2)%rng_state/=old_rng)) ERROR STOP 'Independent L2 RNG checkpoint mismatch'
+    IF (clock%t/=3.25_wp .OR. clock%dt_old_old/=0.007_wp) &
+        ERROR STOP 'Two-layer timestep history checkpoint mismatch'
+
+    CALL init_netcdf_output()
+    CALL write_netcdf_timestep(clock%t,states)
+    CALL close_netcdf()
+    ios=nf90_open(output_file_path('fields',TRIM(run_name)//'.nc'),NF90_NOWRITE,netcdf_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot open two-layer NetCDF'
+    ALLOCATE(stored_q(n_vars,2,nx,ny,1),stored_qp(n_vars,2,nx,ny,1))
+    ios=nf90_inq_varid(netcdf_id,'q_layers',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF conservative layer tensor'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_q)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read canonical NetCDF conservative tensor'
+    IF (ANY(stored_q(:,:,:,:,1)/=original_q)) ERROR STOP 'NetCDF q_layers values mismatch'
+    ios=nf90_inq_varid(netcdf_id,'qp_layers',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF primitive layer tensor'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_qp)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read canonical NetCDF primitive tensor'
+    IF (ANY(stored_qp(:,:,:,:,1)/=states%qp)) ERROR STOP 'NetCDF qp_layers values mismatch'
+    ALLOCATE(stored_total(nx,ny,1))
+    ios=nf90_inq_varid(netcdf_id,'mass_total',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing total mass NetCDF diagnostic'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read total mass NetCDF diagnostic'
+    IF (ANY(stored_total(:,:,1)/=states%q(idx_totMassEqn,1,:,:)+ &
+        states%q(idx_totMassEqn,2,:,:))) ERROR STOP 'NetCDF total mass differs from layer sum'
+    ios=nf90_inq_varid(netcdf_id,'eta_L2',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing upper free-surface NetCDF field'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read upper free-surface NetCDF field'
+    IF (ANY(stored_total(:,:,1)/=B_cent+states%qp(idx_h,1,:,:)+states%qp(idx_h,2,:,:))) &
+        ERROR STOP 'NetCDF upper surface is not B+h1+h2'
+    ios=nf90_inq_varid(netcdf_id,'h_total',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing combined depth NetCDF field'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read combined depth NetCDF field'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_h,1,:,:)+states%qp(idx_h,2,:,:))) &
+        ERROR STOP 'NetCDF total depth is not h1+h2'
+    ios=nf90_close(netcdf_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Closing two-layer NetCDF failed'
+
+    CALL write_two_layer_budget(clock%t,states,'0000')
+    INQUIRE(FILE=output_file_path('fields',TRIM(run_name)//'_budget_0000.csv'),EXIST=found_file)
+    IF (.NOT.found_file) ERROR STOP 'Missing two-layer budget CSV'
+    OPEN(NEWUNIT=unit_budget,FILE=output_file_path('fields', &
+        TRIM(run_name)//'_budget_0000.csv'),STATUS='OLD')
+    READ(unit_budget,'(A)') header
+    IF (INDEX(header,'mass_L1,mass_L2,mass_total')==0) &
+        ERROR STOP 'Two-layer budget header does not identify both layers'
+    READ(unit_budget,*) budget
+    CLOSE(unit_budget)
+    IF (ABS(budget(4)-budget(2)-budget(3))>1.0E-11_wp*MAX(1.0_wp,ABS(budget(4)))) &
+        ERROR STOP 'Two-layer budget mass is not additive'
+    IF (ABS(budget(11)-budget(8)-budget(9)-budget(10))> &
+        1.0E-11_wp*MAX(1.0_wp,ABS(budget(11)))) &
+        ERROR STOP 'Two-layer total solid mass excludes or duplicates shared substrate'
+    IF (total_before/=dx*dy*SUM(states%q(idx_totMassEqn,:,:,:))) &
+        ERROR STOP 'Restart changed total mass budget'
+
+    ! Exercise the production conservative snapshot writer, including the
+    ! additional L2 file, and feed those exact files into the L1/L2 reader.
+    output_cons_flag=.TRUE.
+    output_esri_flag=.FALSE.
+    output_netcdf_flag=.FALSE.
+    output_idx=0
+    dt_output=1.0_wp
+    CALL output_solution(clock%t,states,clock)
+    n_restart_files=2
+    restart_files(1)=snapshot_file_path(TRIM(run_name)//'_0000.q_2d')
+    restart_files(2)=snapshot_file_path(TRIM(run_name)//'_L2_0000.q_2d')
+    INQUIRE(FILE=TRIM(restart_files(1)),EXIST=found_file)
+    IF (.NOT.found_file) ERROR STOP 'Missing original L1 conservative snapshot'
+    INQUIRE(FILE=TRIM(restart_files(2)),EXIST=found_file)
+    IF (.NOT.found_file) ERROR STOP 'Missing L2 conservative snapshot'
+    created_erodible=.NOT.ALLOCATED(erodible_init)
+    IF (created_erodible) ALLOCATE(erodible_init(nx,ny))
+    erodible_init=0.0_wp
+    created_erodible_fract=.NOT.ALLOCATED(erodible_fract)
+    IF (created_erodible_fract) ALLOCATE(erodible_fract(n_solid))
+    erodible_fract=1.0_wp
+    states%q=0.0_wp
+    IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
+    CALL read_solution(states,io_domain)
+    IF (MAXVAL(ABS(states%q-original_q))>1.0E-9_wp*MAX(1.0_wp,MAXVAL(ABS(original_q)))) &
+        ERROR STOP 'Two independent L1/L2 .q_2d initial states did not round-trip'
+    IF (.NOT.ANY(states%q(:,1,:,:)/=states%q(:,2,:,:))) &
+        ERROR STOP 'Two-layer text initialization collapsed both layers into one field'
+    IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
+    IF (created_erodible) DEALLOCATE(erodible_init)
+    IF (created_erodible_fract) DEALLOCATE(erodible_fract)
+
+    CALL noise(1)%finalize()
+    CALL noise(2)%finalize()
+    CALL io_domain%finalize()
+    DEALLOCATE(states%q,states%qp,states%erodible,states%deposit,states%erosion)
+    DEALLOCATE(states%deposit_tot,states%erosion_tot,states%hpos,states%hpos_old)
+    DEALLOCATE(states%hmax,states%pdynmax,states%mod_vel_max,states%vuln_table)
+    DEALLOCATE(original_q,original_b,old_rng,stored_q,stored_qp,stored_total)
+    stochastic_l2=saved_stochastic_l2
+    pore_pressure_l1%pore_pressure_flag=saved_pore_l1
+    n_layers=saved_layers
+    WRITE(*,*) 'PASS: two-layer binary v8 restart, OU RNG, NetCDF fields and budgets'
+  END SUBROUTINE check_two_layer_io_roundtrip
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.
   !> \details Uses mixed-sign and near-zero component stencils with a

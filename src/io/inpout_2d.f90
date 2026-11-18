@@ -193,6 +193,7 @@
     CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
     ! Version 5 adds self-contained runout and steady-stop diagnostic history.
     INTEGER, PARAMETER :: restart_format_version = 7
+    INTEGER, PARAMETER :: two_layer_restart_format_version = 8 !< Distinct L1/L2 checkpoint schema.
 
     !> Counter for the output files
     INTEGER :: output_idx
@@ -301,6 +302,10 @@
     ! NC: Variabili condivise per la gestione del file NetCDF
     INTEGER             :: ncid              !< ID for NetCDF file
     INTEGER             :: dimids(3)         !< ID for size of [x, y, time]
+    INTEGER             :: layer_dimids(5) !< Two-layer [component,layer,x,y,time].
+    INTEGER             :: layer_q_varid, layer_qp_varid !< Full two-layer conservative/primitive fields.
+    INTEGER             :: layer_eta_varid, layer_depth_varid !< Upper free surface and total thickness.
+    INTEGER             :: layer_mass_varid(3) !< L1, L2 and total mass-per-area maps.
     INTEGER             :: x_varid, y_varid, t_varid !< ID for x,y
     INTEGER             :: b_varid, eta_varid, w_varid !< IDs for bed, surface, vertical velocity
     INTEGER             :: h_varid           !> ID for h
@@ -5394,7 +5399,7 @@
 
         INTEGER :: i_vars, i_solid
 
-        INTEGER :: i_file
+        INTEGER :: i_file, layer, layer_output_idx
 
         ! The input layout is fixed before populating the conservative and primitive state.
         CALL configure_canonical_state_indices()
@@ -5422,6 +5427,13 @@
         END IF
 
         check_file = restart_file(dot_idx + 1:dot_idx + 3)
+
+        IF (n_layers==2) THEN
+            IF (n_restart_files/=2) &
+                CALL fatal_error('Two-layer text initialization requires exactly two RESTART_FILES')
+            IF (check_file/='q_2') &
+                CALL fatal_error('Two-layer initialization requires separate L1/L2 .q_2d files')
+        END IF
 
         IF (check_file .EQ. 'asc') THEN
 
@@ -5770,55 +5782,79 @@
 
         IF (check_file .EQ. 'q_2') THEN
 
-            OPEN (restart_unit, FILE=restart_file, STATUS='old')
+            DO layer=1,n_layers
 
-            DO k = 1, comp_cells_y
+                restart_file=restart_files(layer)
+                IF (INDEX(TRIM(restart_file),'.q_2d')==0) &
+                    CALL fatal_error('Conservative initialization expects a .q_2d file for each layer')
+                OPEN (restart_unit, FILE=restart_file, STATUS='old')
 
-                DO j = 1, comp_cells_x
+                DO k = 1, comp_cells_y
 
-                    READ (restart_unit, '(2e20.12,100(e20.12))') xj, yk,                                               &
-                    (state%q(i_vars,1, j, k), i_vars=1, n_vars)
+                    DO j = 1, comp_cells_x
 
-                    IF (state%q(idx_totMassEqn,1, j, k) .LE. 0.0_wp) state%q(1:n_vars,1, j, k) = 0.0_wp
+                        READ (restart_unit, '(2e20.12,100(e20.12))') xj, yk, &
+                            (state%q(i_vars,layer,j,k),i_vars=1,n_vars)
 
-                    DO solid_idx = 5, 4 + n_solid
+                        IF (state%q(idx_totMassEqn,layer,j,k)<=0.0_wp) &
+                            state%q(1:n_vars,layer,j,k)=0.0_wp
 
-                        IF (state%q(solid_idx,1, j, k) .LE. 0.0_wp) state%q(solid_idx,1, j, k) = 0.0_wp
+                        DO solid_idx=5,4+n_solid
+                            IF (state%q(solid_idx,layer,j,k)<=0.0_wp) state%q(solid_idx,layer,j,k)=0.0_wp
+                        END DO
 
                     END DO
 
+                    READ (restart_unit, *)
+
                 END DO
 
-                READ (restart_unit, *)
+                IF (idx_stoch>0) THEN
+                    IF (layer==1 .AND. .NOT.stochastic_l1%stochastic_transport_flag) THEN
+                        IF (ANY(state%q(idx_stoch,layer,:,:)/=0.0_wp)) &
+                            CALL fatal_error('Inactive L1 stochastic initial component is nonzero')
+                    ELSEIF (layer==2 .AND. .NOT.stochastic_l2%stochastic_transport_flag) THEN
+                        IF (ANY(state%q(idx_stoch,layer,:,:)/=0.0_wp)) &
+                            CALL fatal_error('Inactive L2 stochastic initial component is nonzero')
+                    END IF
+                END IF
+                IF (idx_pore>0) THEN
+                    IF (layer==1 .AND. .NOT.pore_pressure_l1%pore_pressure_flag) THEN
+                        IF (ANY(state%q(idx_pore,layer,:,:)/=0.0_wp)) &
+                            CALL fatal_error('Inactive L1 Darcy initial component is nonzero')
+                    ELSEIF (layer==2 .AND. .NOT.pore_pressure_l2%pore_pressure_flag) THEN
+                        IF (ANY(state%q(idx_pore,layer,:,:)/=0.0_wp)) &
+                            CALL fatal_error('Inactive L2 Darcy initial component is nonzero')
+                    END IF
+                END IF
+
+                IF (VERBOSE_LEVEL>=0) WRITE (*, *) 'Total mass =', &
+                    dx*dy*SUM(state%q(idx_totMassEqn,layer,:,:))
+
+                DO solid_idx=5,4+n_solid
+                    IF (VERBOSE_LEVEL>=0) WRITE (*, *) 'Total sediment mass =', &
+                        dx*dy*SUM(state%q(solid_idx,layer,:,:))
+                END DO
+
+                j=SCAN(restart_file,'.',.TRUE.)
+                string=TRIM(restart_file(j-4:j-1))
+                READ (string, *) layer_output_idx
+                IF (layer==1) THEN
+                    output_idx=layer_output_idx
+                ELSEIF (layer_output_idx/=output_idx) THEN
+                    CALL fatal_error('L1/L2 initial snapshots have different time indices')
+                END IF
+
+                IF (VERBOSE_LEVEL>=0) THEN
+                    WRITE (*, *)
+                    WRITE (*, *) 'Starting from output index ', output_idx
+                END IF
+
+                CLOSE(restart_unit)
 
             END DO
-
-            IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total mass =', dx*dy*SUM(state%q(idx_totMassEqn,1, :, :))
-
-            DO solid_idx = 5, 4 + n_solid
-
-                IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total sediment mass =',                                        &
-                    dx*dy*SUM(state%q(solid_idx,1, :, :))
-
-            END DO
-
-            j = SCAN(restart_file, '.', .TRUE.)
-
-            string = TRIM(restart_file(j - 4:j - 1))
-            READ (string, *) output_idx
-
-            IF (VERBOSE_LEVEL .GE. 0) THEN
-
-                WRITE (*, *)
-                WRITE (*, *) 'Starting from output index ', output_idx
-
-            END IF
-
-        ! Set this flag to 0 to not overwrite the initial condition
 
         END IF
-
-        CLOSE (restart_unit)
 
         ! Keep aggregate substrate diagnostics consistent with the initial inventory.
         CALL state%refresh_substrate_totals()
@@ -6050,7 +6086,7 @@
 
         INTEGER :: j, k
         INTEGER :: i
-        INTEGER :: i_vars
+        INTEGER :: i_vars,output_layer_unit
 
         output_idx = output_idx + 1
 
@@ -6059,6 +6095,7 @@
             CALL begin_snapshot(output_idx - 1, time, binary_restart_output)
 
         IF (output_netcdf_flag) CALL write_netcdf_timestep(time, state)
+        IF (n_layers==2) CALL write_two_layer_budget(time,state,idx_string)
 
         IF (output_cons_flag) THEN
 
@@ -6067,6 +6104,11 @@
             IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_file_2d)
 
             OPEN (output_unit_2d, FILE=output_file_2d, status='unknown', form='formatted')
+            IF (n_layers==2) THEN
+                OPEN(NEWUNIT=output_layer_unit, &
+                    FILE=snapshot_file_path(TRIM(run_name)//'_L2_'//idx_string//'.q_2d'), &
+                    STATUS='REPLACE',FORM='FORMATTED')
+            END IF
 
             IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
@@ -6112,6 +6154,8 @@
 
                     WRITE (output_unit_2d, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k),                              &
                     (state%q(i_vars,1, j, k), i_vars=1, n_vars)
+                    IF (n_layers==2) WRITE(output_layer_unit,'(2e20.12,100(e20.12))') &
+                        x_comp(j),y_comp(k),(state%q(i_vars,2,j,k),i_vars=1,n_vars)
 
                     IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
@@ -6140,6 +6184,7 @@
                 END DO
 
                 WRITE (output_unit_2d, *) ' '
+                IF (n_layers==2) WRITE(output_layer_unit,*) ' '
 
                 IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
@@ -6158,6 +6203,7 @@
             WRITE (output_unit_2d, *) ' '
 
             CLOSE (output_unit_2d)
+            IF (n_layers==2) CLOSE(output_layer_unit)
 
             IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
@@ -6774,7 +6820,63 @@
 
         RETURN
 
+        IF (n_layers==2) CALL output_two_layer_esri(output_idx,state)
+
     END SUBROUTINE output_esri
+
+    !> @brief Write upper-layer and combined fields using the existing ESRI grid layout.
+    !> @param[in] index Snapshot number, one-based as in output_esri.
+    !> @param[in] state Authoritative primitive two-layer state.
+    SUBROUTINE output_two_layer_esri(index,state)
+        USE geometry_2d, ONLY : B_cent,grid_output
+        INTEGER, INTENT(IN) :: index
+        CLASS(state_type), INTENT(IN) :: state
+        CHARACTER(LEN=:), ALLOCATABLE :: label,filename
+        CHARACTER(LEN=24) :: field_name
+        INTEGER :: field,unit,j
+        REAL(wp), ALLOCATABLE :: depth_total(:,:)
+
+        label=snapshot_index_label(index-1)
+        ALLOCATE(depth_total(comp_cells_x,comp_cells_y))
+        depth_total=state%qp(idx_h,1,:,:)+state%qp(idx_h,2,:,:)
+        DO field=1,4
+            grid_output=-9999.0_wp
+            SELECT CASE(field)
+            CASE(1)
+                field_name='_L2_'
+                WHERE (state%qp(idx_h,2,:,:)>=1.0E-5_wp)
+                    grid_output=state%qp(idx_h,2,:,:)
+                END WHERE
+            CASE(2)
+                field_name='_T_L2_'
+                WHERE (state%qp(idx_h,2,:,:)>=1.0E-5_wp)
+                    grid_output=state%qp(idx_T,2,:,:)
+                END WHERE
+            CASE(3)
+                field_name='_total_depth_'
+                WHERE (depth_total>=1.0E-5_wp)
+                    grid_output=depth_total
+                END WHERE
+            CASE(4)
+                field_name='_eta_L2_'
+                WHERE (depth_total>=1.0E-5_wp)
+                    grid_output=B_cent+depth_total
+                END WHERE
+            END SELECT
+            filename=snapshot_file_path(TRIM(run_name)//TRIM(field_name)//label//'.asc')
+            OPEN(NEWUNIT=unit,FILE=filename,STATUS='REPLACE',FORM='FORMATTED')
+            WRITE(unit,'(A,I5)') 'ncols ',comp_cells_x
+            WRITE(unit,'(A,I5)') 'nrows ',comp_cells_y
+            WRITE(unit,'(A,F15.3)') 'xllcorner ',x0
+            WRITE(unit,'(A,F15.3)') 'yllcorner ',y0
+            WRITE(unit,'(A,F15.3)') 'cellsize ',cell_size
+            WRITE(unit,'(A,I5)') 'NODATA_value ',-9999
+            DO j=comp_cells_y,1,-1
+                WRITE(unit,'(2000ES12.3E3)') grid_output(:,j)
+            END DO
+            CLOSE(unit)
+        END DO
+    END SUBROUTINE output_two_layer_esri
 
     !******************************************************************************
     !> \brief Validate existing runout CSVs without opening them for writing.
@@ -7552,13 +7654,14 @@
     SUBROUTINE init_netcdf_output
 
         USE netcdf
-
+        USE parameters_2d, ONLY : n_vars
         USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, x_comp, y_comp
         IMPLICIT NONE
 
         INTEGER :: i
         CHARACTER(LEN=4) :: idx_string
         LOGICAL :: file_exists
+        INTEGER :: layer_dim,component_dim
         INTEGER :: time_dim_len, expected_time_index
         INTEGER :: status
 
@@ -7662,6 +7765,22 @@
             END DO
 
             CALL check(nf90_inq_varid(ncid, 'inertial_number', inertialNumber_varid))
+            IF (n_layers==2) THEN
+                CALL check(nf90_inq_dimid(ncid,'component',component_dim))
+                CALL check(nf90_inq_dimid(ncid,'layer',layer_dim))
+                layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
+                CALL check(nf90_inq_varid(ncid,'q_layers',layer_q_varid))
+                CALL check(nf90_inq_varid(ncid,'qp_layers',layer_qp_varid))
+                CALL check(nf90_inq_varid(ncid,'eta_L2',layer_eta_varid))
+                CALL check(nf90_inq_varid(ncid,'h_total',layer_depth_varid))
+                CALL check(nf90_inq_varid(ncid,'mass_L1',layer_mass_varid(1)))
+                CALL check(nf90_inq_varid(ncid,'mass_L2',layer_mass_varid(2)))
+                CALL check(nf90_inq_varid(ncid,'mass_total',layer_mass_varid(3)))
+            ELSE
+                status=nf90_inq_varid(ncid,'q_layers',layer_q_varid)
+                IF (status/=nf90_enotvar) &
+                    CALL fatal_error('Cannot append single-layer run to a two-layer NetCDF file')
+            END IF
             RETURN
 
         END IF
@@ -7846,6 +7965,36 @@
         CALL check(nf90_put_att(ncid, inertialNumber_varid, 'units', ''))
         CALL check(nf90_put_att(ncid, inertialNumber_varid, 'long_name', 'granular inertial number'))
 
+        IF (n_layers==2) THEN
+            CALL check(nf90_def_dim(ncid,'component',n_vars,component_dim))
+            CALL check(nf90_def_dim(ncid,'layer',n_layers,layer_dim))
+            layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
+            CALL check(nf90_def_var(ncid,'q_layers',nf90_double,layer_dimids, &
+                layer_q_varid,deflate_level=5,shuffle=.TRUE.))
+            CALL check(nf90_put_att(ncid,layer_q_varid,'long_name', &
+                'conservative variables [component,layer,x,y,time]'))
+            CALL check(nf90_def_var(ncid,'qp_layers',nf90_double,layer_dimids, &
+                layer_qp_varid,deflate_level=5,shuffle=.TRUE.))
+            CALL check(nf90_put_att(ncid,layer_qp_varid,'long_name', &
+                'primitive variables [component,layer,x,y,time]'))
+            CALL check(nf90_def_var(ncid,'eta_L2',nf90_double,dimids,layer_eta_varid, &
+                deflate_level=5,shuffle=.TRUE.))
+            CALL check(nf90_put_att(ncid,layer_eta_varid,'units','meters'))
+            CALL check(nf90_put_att(ncid,layer_eta_varid,'long_name','upper free surface B+h1+h2'))
+            CALL check(nf90_def_var(ncid,'h_total',nf90_double,dimids,layer_depth_varid, &
+                deflate_level=5,shuffle=.TRUE.))
+            CALL check(nf90_put_att(ncid,layer_depth_varid,'units','meters'))
+            CALL check(nf90_def_var(ncid,'mass_L1',nf90_double,dimids,layer_mass_varid(1), &
+                deflate_level=5,shuffle=.TRUE.))
+            CALL check(nf90_def_var(ncid,'mass_L2',nf90_double,dimids,layer_mass_varid(2), &
+                deflate_level=5,shuffle=.TRUE.))
+            CALL check(nf90_def_var(ncid,'mass_total',nf90_double,dimids,layer_mass_varid(3), &
+                deflate_level=5,shuffle=.TRUE.))
+            DO i=1,3
+                CALL check(nf90_put_att(ncid,layer_mass_varid(i),'units','kg/m2'))
+            END DO
+        END IF
+
         ! End define mode. This writes the header to the file.
         CALL check(nf90_enddef(ncid))
 
@@ -7861,6 +8010,50 @@
     END SUBROUTINE init_netcdf_output
 
     !******************************************************************************
+    !> @brief Write one two-layer conservative budget next to the run fields.
+    !> @details Uses only the authoritative conservative states and shared
+    !>          substrate inventories; each record is a separate immutable file,
+    !>          avoiding append ambiguity across binary restarts.
+    !> @param[in] time Simulation output time [s].
+    !> @param[in] state Authoritative layer and substrate inventories.
+    !> @param[in] label Output snapshot index.
+    SUBROUTINE write_two_layer_budget(time,state,label)
+        USE geometry_2d, ONLY : dx,dy
+        USE parameters_2d, ONLY : idx_totMassEqn,idx_solidEqn_first
+        CLASS(state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: time
+        CHARACTER(*), INTENT(IN) :: label
+        REAL(wp) :: masses(2),volumes(2),solids(2),substrate_solids
+        INTEGER :: unit_budget,i,ios
+        CHARACTER(LEN=256) :: message
+        CHARACTER(LEN=:), ALLOCATABLE :: filename
+
+        IF (n_layers/=2 .OR. SIZE(state%q,2)/=2) &
+            CALL fatal_error('Two-layer output budget requires both layer states')
+        DO i=1,2
+            masses(i)=dx*dy*SUM(state%q(idx_totMassEqn,i,:,:))
+            volumes(i)=dx*dy*SUM(state%qp(idx_h,i,:,:))
+            solids(i)=dx*dy*SUM(state%q(idx_solidEqn_first:idx_solidEqn_first+n_solid-1,i,:,:))
+        END DO
+        substrate_solids=0.0_wp
+        DO i=1,n_solid
+            substrate_solids=substrate_solids+dx*dy*rho_s(i)* &
+                (SUM(state%deposit(:,:,i))+SUM(state%erodible(i,:,:)))
+        END DO
+        filename=output_file_path('fields',TRIM(run_name)//'_budget_'//label//'.csv')
+        OPEN(NEWUNIT=unit_budget,FILE=filename,STATUS='REPLACE',ACTION='WRITE', &
+            IOSTAT=ios,IOMSG=message)
+        CALL check_restart_io(ios,message,'opening two-layer budget',filename)
+        WRITE(unit_budget,'(A)') &
+            'time,mass_L1,mass_L2,mass_total,volume_L1,volume_L2,volume_total,'// &
+            'solid_L1,solid_L2,solid_substrate,solid_system'
+        WRITE(unit_budget,'(11(ES24.16,:,","))') time,masses(1),masses(2),SUM(masses), &
+            volumes(1),volumes(2),SUM(volumes),solids(1),solids(2),substrate_solids, &
+            SUM(solids)+substrate_solids
+        CLOSE(unit_budget,IOSTAT=ios,IOMSG=message)
+        CALL check_restart_io(ios,message,'closing two-layer budget',filename)
+    END SUBROUTINE write_two_layer_budget
+
     !> \brief Append one time record of physical, topographic and transport fields to NetCDF.
     !>
     !> \param[in] time_in Simulation time associated with the appended NetCDF record [s].
@@ -7902,6 +8095,8 @@
         REAL(wp), ALLOCATABLE :: alphas2D(:, :, :), alphag2D(:, :, :)
 
         REAL(wp) :: denom
+        REAL(wp), ALLOCATABLE :: layer_tensor(:,:,:,:,:)
+        INTEGER :: layer_start(5),layer_count(5)
 
         WRITE (*, *) 'Writing ', TRIM(nc_filename)
 
@@ -8176,6 +8371,31 @@
 
         CALL check(nf90_put_var(ncid, inertialNumber_varid, inertialNumber, start=start, count=count))
 
+        IF (n_layers==2) THEN
+            IF (SIZE(state%q,2)/=2 .OR. SIZE(state%qp,2)/=2) &
+                CALL fatal_error('Two-layer NetCDF requires two authoritative layer slots')
+            layer_start=[1,1,1,1,nc_time_idx]
+            layer_count=[n_vars,2,comp_cells_x,comp_cells_y,1]
+            ALLOCATE(layer_tensor(n_vars,2,comp_cells_x,comp_cells_y,1))
+            layer_tensor(:,:,:,:,1)=state%q
+            CALL check(nf90_put_var(ncid,layer_q_varid,layer_tensor, &
+                start=layer_start,count=layer_count))
+            layer_tensor(:,:,:,:,1)=state%qp
+            CALL check(nf90_put_var(ncid,layer_qp_varid,layer_tensor, &
+                start=layer_start,count=layer_count))
+            DEALLOCATE(layer_tensor)
+            temp_array=B_cent+state%qp(idx_h,1,:,:)+state%qp(idx_h,2,:,:)
+            CALL check(nf90_put_var(ncid,layer_eta_varid,temp_array,start=start,count=count))
+            temp_array=state%qp(idx_h,1,:,:)+state%qp(idx_h,2,:,:)
+            CALL check(nf90_put_var(ncid,layer_depth_varid,temp_array,start=start,count=count))
+            CALL check(nf90_put_var(ncid,layer_mass_varid(1),state%q(idx_totMassEqn,1,:,:), &
+                start=start,count=count))
+            CALL check(nf90_put_var(ncid,layer_mass_varid(2),state%q(idx_totMassEqn,2,:,:), &
+                start=start,count=count))
+            temp_array=state%q(idx_totMassEqn,1,:,:)+state%q(idx_totMassEqn,2,:,:)
+            CALL check(nf90_put_var(ncid,layer_mass_varid(3),temp_array,start=start,count=count))
+        END IF
+
         ! Increment the time record counter for the next write operation
         nc_time_idx = nc_time_idx + 1
 
@@ -8253,11 +8473,11 @@
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN) :: filename
         CLASS(runtime_state_type), INTENT(IN) :: runtime
-        CLASS(stochastic_workspace_type), INTENT(IN) :: stochastic
+        CLASS(stochastic_workspace_type), INTENT(IN) :: stochastic(:)
         CLASS(state_type), INTENT(IN) :: state
         CLASS(domain_type), INTENT(IN) :: domain
         INTEGER :: unit_rst, ierr
-        INTEGER :: seed_size
+        INTEGER :: seed_size,layer_seed_size
         INTEGER, ALLOCATABLE :: random_seed_state(:)
         CHARACTER(LEN=256) :: io_message
 
@@ -8269,12 +8489,24 @@
 
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_magic
         CALL check_restart_io(ierr, io_message, 'writing header to', filename)
-        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_version
+        IF (n_layers==2) THEN
+            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) two_layer_restart_format_version
+        ELSE
+            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_version
+        END IF
         CALL check_restart_io(ierr, io_message, 'writing version to', filename)
 
-        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x,                                                  &
-            comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars,                                                    &
-            n_pore_vars, n_thickness_levels, n_dyn_pres_levels
+        IF (SIZE(stochastic)/=n_layers .OR. SIZE(state%q,2)/=n_layers) &
+            CALL fatal_error('Restart layer workspaces do not match the configured layout')
+        IF (n_layers==2) THEN
+            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x, &
+                comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars, &
+                n_pore_vars, n_thickness_levels, n_dyn_pres_levels, n_layers
+        ELSE
+            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x, &
+                comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars, &
+                n_pore_vars, n_thickness_levels, n_dyn_pres_levels
+        END IF
         CALL check_restart_io(ierr, io_message, 'writing dimensions to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) &
             (rheology_l1%stochastic_rheology_flag .OR. stochastic_l1%stochastic_transport_flag), &
@@ -8288,7 +8520,11 @@
             runtime%t_output, runtime%t_runout, runtime%t_probes
         CALL check_restart_io(ierr, io_message, 'writing output state to', filename)
 
-        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q(:,1,:,:)
+        IF (n_layers==2) THEN
+            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
+        ELSE
+            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q(:,1,:,:)
+        END IF
         CALL check_restart_io(ierr, io_message, 'writing conservative state to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
         CALL check_restart_io(ierr, io_message, 'writing nodal topography to', filename)
@@ -8312,7 +8548,7 @@
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) domain%solve_mask_time
         CALL check_restart_io(ierr, io_message, 'writing release-time mask to', filename)
 
-        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
+        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic(1)%Z
         CALL check_restart_io(ierr, io_message, 'writing stochastic field to', filename)
 
         seed_size = 0
@@ -8352,6 +8588,19 @@
         END IF
         CALL check_restart_io(ierr, io_message, 'writing lava deposit to', filename)
 
+        IF (n_layers==2) THEN
+            WRITE(unit_rst,IOSTAT=ierr,IOMSG=io_message) stochastic(2)%Z
+            CALL check_restart_io(ierr,io_message,'writing L2 OU field to',filename)
+            layer_seed_size=0
+            IF (ALLOCATED(stochastic(2)%rng_state)) layer_seed_size=SIZE(stochastic(2)%rng_state)
+            WRITE(unit_rst,IOSTAT=ierr,IOMSG=io_message) layer_seed_size
+            CALL check_restart_io(ierr,io_message,'writing L2 RNG length to',filename)
+            IF (layer_seed_size>0) THEN
+                WRITE(unit_rst,IOSTAT=ierr,IOMSG=io_message) stochastic(2)%rng_state
+                CALL check_restart_io(ierr,io_message,'writing L2 RNG state to',filename)
+            END IF
+        END IF
+
         CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
         CALL check_restart_io(ierr, io_message, 'closing', filename)
 
@@ -8390,14 +8639,14 @@
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN) :: filename
         CLASS(runtime_state_type), INTENT(INOUT) :: runtime
-        CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
+        CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic(:)
         CLASS(state_type), INTENT(INOUT) :: state
         CLASS(domain_type), INTENT(INOUT) :: domain
         INTEGER :: unit_rst, ierr
         INTEGER :: format_version
         INTEGER :: nx_check, ny_check, nvars_check, nsolid_check, naddgas_check
         INTEGER :: nstoch_check, npore_check, nthickness_check, ndynpres_check
-        INTEGER :: seed_size, current_seed_size
+        INTEGER :: seed_size, current_seed_size,layer_seed_size,layers_check
         INTEGER, ALLOCATABLE :: random_seed_state(:)
         LOGICAL :: stochastic_check, topo_change_check, runout_check
         LOGICAL :: gas_check, liquid_check, lava_check
@@ -8424,25 +8673,33 @@
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) format_version
         CALL check_restart_io(ierr, io_message, 'reading version from', filename)
 
-        IF (format_version /= restart_format_version) THEN
-            WRITE(*,*) 'ERROR: Unsupported restart format version:', format_version
-            WRITE(*,*) 'The current restart format with lava deposition inventory is required.'
+        IF ((n_layers==1 .AND. format_version/=restart_format_version) .OR. &
+            (n_layers==2 .AND. format_version/=two_layer_restart_format_version)) THEN
+            WRITE(*,*) 'ERROR: Restart format does not match configured layer count:', format_version,n_layers
             ERROR STOP 1
-
         END IF
+        IF (SIZE(stochastic)/=n_layers .OR. SIZE(state%q,2)/=n_layers) &
+            CALL fatal_error('Restart layer workspaces do not match configured layout')
 
         ! Reject incompatible grid/component layouts before reading array payloads.
         ! The checkpoint stores canonical conservative states, not a qp cache.
-        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check,                                             &
-            nvars_check, nsolid_check, naddgas_check, nstoch_check,                                                    &
-            npore_check, nthickness_check, ndynpres_check
+        layers_check=1
+        IF (format_version==two_layer_restart_format_version) THEN
+            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check, &
+                nvars_check, nsolid_check, naddgas_check, nstoch_check, &
+                npore_check, nthickness_check, ndynpres_check, layers_check
+        ELSE
+            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check, &
+                nvars_check, nsolid_check, naddgas_check, nstoch_check, &
+                npore_check, nthickness_check, ndynpres_check
+        END IF
         CALL check_restart_io(ierr, io_message, 'reading dimensions from', filename)
         IF (nx_check /= comp_cells_x .OR. ny_check /= comp_cells_y .OR.                                                &
             nvars_check /= n_vars .OR. nsolid_check /= n_solid .OR.                                                    &
             naddgas_check /= n_add_gas .OR. nstoch_check /= n_stoch_vars .OR.                                          &
             npore_check /= n_pore_vars .OR.                                                                            &
             nthickness_check /= n_thickness_levels .OR.                                                                &
-            ndynpres_check /= n_dyn_pres_levels) THEN
+            ndynpres_check /= n_dyn_pres_levels .OR. layers_check/=n_layers) THEN
             WRITE(*,*) 'ERROR: Restart dimensions or equation layout do not match.'
             ERROR STOP 1
 
@@ -8469,7 +8726,11 @@
             runtime%t_output, runtime%t_runout, runtime%t_probes
         CALL check_restart_io(ierr, io_message, 'reading output state from', filename)
 
-        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q(:,1,:,:)
+        IF (format_version==two_layer_restart_format_version) THEN
+            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
+        ELSE
+            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q(:,1,:,:)
+        END IF
         CALL check_restart_io(ierr, io_message, 'reading conservative state from', filename)
         ! Restore the authoritative nodal bed; shared face/centre elevations and
         ! derivative fields are regenerated later rather than checkpointed separately.
@@ -8495,9 +8756,9 @@
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) domain%solve_mask_time
         CALL check_restart_io(ierr, io_message, 'reading release-time mask from', filename)
 
-        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
+        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic(1)%Z
         CALL check_restart_io(ierr, io_message, 'reading stochastic field from', filename)
-        CALL stochastic%refresh_effective
+        CALL stochastic(1)%refresh_effective
 
         READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
         CALL check_restart_io(ierr, io_message, 'reading random-seed size from', filename)
@@ -8557,6 +8818,26 @@
         CALL state%refresh_substrate_totals()
         IF (output_runout_flag .AND. .NOT. runtime%runout%initialized)                                                 &
             CALL fatal_error('Restart is missing initialized runout diagnostic history.')
+
+        IF (format_version==two_layer_restart_format_version) THEN
+            READ(unit_rst,IOSTAT=ierr,IOMSG=io_message) stochastic(2)%Z
+            CALL check_restart_io(ierr,io_message,'reading L2 OU field from',filename)
+            READ(unit_rst,IOSTAT=ierr,IOMSG=io_message) layer_seed_size
+            CALL check_restart_io(ierr,io_message,'reading L2 RNG length from',filename)
+            IF (ALLOCATED(stochastic(2)%rng_state)) DEALLOCATE(stochastic(2)%rng_state)
+            IF (layer_seed_size<0) CALL fatal_error('Invalid L2 RNG length in restart')
+            IF (layer_seed_size>0) THEN
+                CALL random_seed(SIZE=current_seed_size)
+                IF (layer_seed_size/=current_seed_size) &
+                    CALL fatal_error('L2 restart RNG state is incompatible with this compiler')
+                ALLOCATE(stochastic(2)%rng_state(layer_seed_size))
+                READ(unit_rst,IOSTAT=ierr,IOMSG=io_message) stochastic(2)%rng_state
+                CALL check_restart_io(ierr,io_message,'reading L2 RNG state from',filename)
+            END IF
+            IF ((rheology_l2%stochastic_rheology_flag .OR. stochastic_l2%stochastic_transport_flag) .NEQV. &
+                (layer_seed_size>0)) CALL fatal_error('L2 stochastic restart configuration mismatch')
+            CALL stochastic(2)%refresh_effective()
+        END IF
 
         CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
         CALL check_restart_io(ierr, io_message, 'closing', filename)

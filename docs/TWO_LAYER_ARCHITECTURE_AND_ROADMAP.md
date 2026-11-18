@@ -217,8 +217,8 @@ abilitazione in produzione.
 | **TL05 — Operatori L2** | Percorso spaziale e BC L1/L2 validati nel blocco 3 | Ricostruzione HP e BC per layer, selezione di velocita' L1/L2 e componenti inattive riusano gli operatori canonici; regressioni estese a tutti i lati e alle quattro occupazioni wet/dry. |
 | **TL06 — Spaziale accoppiato** | Regresioni accoppiate validate nel blocco 3 | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
-| **TL08–TL11 — Chiusure e scambi** | Limitatore a fattori indipendenti e validazione integrata predisposti; CI blocco 4 pendente | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
-| **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
+| **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
+| **TL12 — I/O e integrazione** | I/O two-layer implementato; CI blocco 5 pendente | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
@@ -361,6 +361,35 @@ comportamento single-layer non cambiano. Compilazione optimized,
 strict/debug, regressioni e OpenMP sono ancora da verificare sul
 commit finale del blocco. Il gate produttivo `N_LAYERS=2` resta
 chiuso, insieme alle verifiche scientifiche TL13b.
+
+**Blocco 5 - I/O L1/L2, NetCDF e restart (18 novembre 2026):**
+Lo schema storico single-layer rimane invariato. I restart binari L1
+mantengono il formato v7, compreso l'ordine dei record e il flusso RNG
+globale di L1. La versione v8, riservata a N_LAYERS=2, registra il numero
+di layer, lo stato conservativo q dei due layer, il campo OU L2 e la
+successione RNG indipendente di L2; preserva una sola copia di geometria,
+substrato e storia diagnostica. Il lettore rifiuta layout, formato o RNG
+incompatibili e ricostruisce la geometria derivata da B_vertex.
+
+Il cold-start two-layer usa due file conservativi .q_2d indipendenti,
+in RESTART_FILES(1:2), con lo stesso indice di output e slot opzionali
+inattivi nulli. I raster .asc di solo spessore non sono ammessi come
+descrizione two-layer completa senza ulteriori grandezze fisiche.
+Lo snapshot originale q_2d resta quello di L1; L2 e' salvato in un file
+separato con suffisso _L2_. NetCDF conserva i campi storici L1 e aggiunge
+q_layers e qp_layers con dimensioni component,layer,x,y,time, eta_L2,
+h_total e le masse L1/L2/totali. ESRI aggiunge i campi L2 e aggregati
+senza duplicare il DEM. Ogni output two-layer produce un CSV di bilancio
+conservativo L1/L2/totale e inventario solido comprensivo del substrato.
+
+La regressione del modulo TEST_SPATIAL_OPERATOR prepara due layer senza
+aprire il gate di produzione, verifica il round-trip del checkpoint v8
+(compresi B_vertex, tempi, OU e RNG L2), legge i tensor NetCDF prodotti,
+confronta il campo di massa totale e rilegge condizioni iniziali da due
+file .q_2d. Le regressioni single-layer esistenti continuano a coprire
+il formato v7 e le convenzioni di output. La compilazione, strict,
+optimized, OpenMP e gli esempi non sono ancora stati verificati per
+questo commit. Dettagli in docs/NETCDF_OUTPUT.md.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.

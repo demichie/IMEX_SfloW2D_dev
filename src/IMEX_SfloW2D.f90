@@ -82,8 +82,8 @@ PROGRAM IMEX_SfloW2D
     USE substrate_parameters_2d, ONLY : substrate
     USE parameters_2d, ONLY : verbose_level
     USE parameters_2d, ONLY : n_solid
-    USE parameters_2d, ONLY : n_vars
-    USE rheology_parameters_2d, ONLY : rheology_l1
+    USE parameters_2d, ONLY : n_vars,n_layers
+    USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
     USE parameters_2d, ONLY : radial_source_flag
     USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, cfl
     USE parameters_2d, ONLY : collapsing_volume_flag
@@ -110,7 +110,7 @@ PROGRAM IMEX_SfloW2D
     LOGICAL :: thickness_exceeds, pressure_exceeds
     LOGICAL :: stop_flag_old
 
-    INTEGER :: j,k,l
+    INTEGER :: j,k,l,layer
 
     INTEGER :: i_pdyn_lev , i_thk_lev , i_table
 
@@ -212,24 +212,26 @@ PROGRAM IMEX_SfloW2D
             ! CASE 1: BINARY RESTART (Exact)
             ! ---------------------------------------------------------
             WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
-            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic(1), simulation%state, &
+            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state, &
                 simulation%domains(1))
             CALL validate_restart_output_manifest(simulation%runtime)
 
             is_binary_restart = .TRUE.
 
-            ! In a binary restart, Z is already loaded, but we need to allocate the kernel
-            ! if spatial correlation is active
-            IF ((rheology_l1%stochastic_rheology_flag .OR. &
-                simulation%stochastic(1)%config%stochastic_transport_flag) .AND. &
-                simulation%stochastic(1)%config%length_spatial_corr > 0.0_wp) THEN
-                CALL simulation%stochastic(1)%generate_kernel()
-
-            END IF
-
-            IF (rheology_l1%stochastic_rheology_flag .OR. &
-                simulation%stochastic(1)%config%stochastic_transport_flag) &
-                CALL simulation%stochastic(1)%refresh_effective()
+            ! A checkpoint restores each OU state. Regenerate only derived
+            ! correlation kernels and friction maps for active layer slots.
+            DO layer=1,n_layers
+                IF (layer==1) THEN
+                    IF (.NOT.rheology_l1%stochastic_rheology_flag .AND. &
+                        .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+                ELSE
+                    IF (.NOT.rheology_l2%stochastic_rheology_flag .AND. &
+                        .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+                END IF
+                IF (simulation%stochastic(layer)%config%length_spatial_corr>0.0_wp) &
+                    CALL simulation%stochastic(layer)%generate_kernel()
+                CALL simulation%stochastic(layer)%refresh_effective()
+            END DO
 
         ELSE
             ! ---------------------------------------------------------
@@ -260,17 +262,32 @@ PROGRAM IMEX_SfloW2D
 
     IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-    CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
-            simulation%runtime%t, .TRUE.)
+    IF (n_layers==2) THEN
+        CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
+            simulation%runtime%t,.TRUE.,q_other=simulation%state%q(:,2,:,:))
+    ELSE
+        CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
+            simulation%runtime%t,.TRUE.)
+    END IF
     CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domains(1))
 
     ! For a new run or a classic restart, initialize the stochastic field only
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
     ! restart already contains Z and only needs its convolution kernel above.
-    IF ((rheology_l1%stochastic_rheology_flag .OR. &
-            simulation%stochastic(1)%config%stochastic_transport_flag) .AND. (.NOT.is_binary_restart)) &
-            CALL simulation%stochastic(1)%initialize_steady(                                                        &
-            simulation%state, simulation%domains(1),simulation%stochastic(1)%config%stochastic_transport_flag)
+    IF (.NOT.is_binary_restart) THEN
+        DO layer=1,n_layers
+            IF (layer==1) THEN
+                IF (.NOT.rheology_l1%stochastic_rheology_flag .AND. &
+                    .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+            ELSE
+                IF (.NOT.rheology_l2%stochastic_rheology_flag .AND. &
+                    .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+            END IF
+            CALL simulation%stochastic(layer)%initialize_steady( &
+                simulation%state,simulation%domains(1), &
+                simulation%stochastic(layer)%config%stochastic_transport_flag)
+        END DO
+    END IF
 
     IF ( substrate%topo_change_flag ) CALL refresh_topography_geometry
 
@@ -626,7 +643,7 @@ PROGRAM IMEX_SfloW2D
 
                 CALL output_solution(simulation%runtime%t, simulation%state, simulation%runtime)
                 CALL write_restart_file(output_file_path('restart', 'restart.bin'), simulation%runtime,                &
-                    simulation%stochastic(1), simulation%state, simulation%domains(1))
+                    simulation%stochastic, simulation%state, simulation%domains(1))
 
             END IF
 
