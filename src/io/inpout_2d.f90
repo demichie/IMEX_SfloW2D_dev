@@ -5809,7 +5809,7 @@
 
                 END DO
 
-                IF (idx_stoch>0) THEN
+                IF (n_layers==2 .AND. idx_stoch>0) THEN
                     IF (layer==1 .AND. .NOT.stochastic_l1%stochastic_transport_flag) THEN
                         IF (ANY(state%q(idx_stoch,layer,:,:)/=0.0_wp)) &
                             CALL fatal_error('Inactive L1 stochastic initial component is nonzero')
@@ -5818,7 +5818,7 @@
                             CALL fatal_error('Inactive L2 stochastic initial component is nonzero')
                     END IF
                 END IF
-                IF (idx_pore>0) THEN
+                IF (n_layers==2 .AND. idx_pore>0) THEN
                     IF (layer==1 .AND. .NOT.pore_pressure_l1%pore_pressure_flag) THEN
                         IF (ANY(state%q(idx_pore,layer,:,:)/=0.0_wp)) &
                             CALL fatal_error('Inactive L1 Darcy initial component is nonzero')
