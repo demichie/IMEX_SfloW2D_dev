@@ -3194,6 +3194,7 @@ CONTAINS
   !>          It tests the existing I/O implementations and shared substrate ownership.
   SUBROUTINE check_two_layer_io_roundtrip
     USE netcdf
+    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE init_2d, ONLY : erodible_init,thickness_init
     TYPE(state_type) :: states
     TYPE(domain_type) :: io_domain
@@ -3305,21 +3306,21 @@ CONTAINS
     noise(2)%rng_state=0
     clock%t=0.0_wp
     CALL read_restart_file('two_layer_io.bin',clock,noise,states,io_domain)
-    WRITE(*,'(A)') 'CHECK: verifying binary checkpoint payload'
+    WRITE(error_unit,'(A)') 'CHECK: verifying binary checkpoint payload'
     IF (ANY(states%q/=original_q)) ERROR STOP 'L1/L2 conservative restart round-trip mismatch'
     IF (ANY(B_vertex/=original_b)) ERROR STOP 'Shared bed checkpoint round-trip mismatch'
     IF (ANY(noise(2)%Z/=0.125_wp)) ERROR STOP 'L2 OU checkpoint mismatch'
     IF (ANY(noise(2)%rng_state/=old_rng)) ERROR STOP 'Independent L2 RNG checkpoint mismatch'
     IF (clock%t/=3.25_wp .OR. clock%dt_old_old/=0.007_wp) &
         ERROR STOP 'Two-layer timestep history checkpoint mismatch'
-    WRITE(*,'(A)') 'PASS: binary L1/L2 state, bed, OU RNG and timestep history'
+    WRITE(error_unit,'(A)') 'PASS: binary L1/L2 state, bed, OU RNG and timestep history'
 
-    WRITE(*,'(A)') 'CHECK: initializing canonical NetCDF output'
+    WRITE(error_unit,'(A)') 'CHECK: initializing canonical NetCDF output'
     CALL init_netcdf_output()
-    WRITE(*,'(A)') 'CHECK: writing canonical NetCDF output'
+    WRITE(error_unit,'(A)') 'CHECK: writing canonical NetCDF output'
     CALL write_netcdf_timestep(clock%t,states)
     CALL close_netcdf()
-    WRITE(*,'(A)') 'CHECK: reopening canonical NetCDF output'
+    WRITE(error_unit,'(A)') 'CHECK: reopening canonical NetCDF output'
     ios=nf90_open(output_file_path('fields',TRIM(run_name)//'.nc'),NF90_NOWRITE,netcdf_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot open two-layer NetCDF'
     ALLOCATE(stored_q(n_vars,2,nx,ny,1),stored_qp(n_vars,2,nx,ny,1))
@@ -3344,7 +3345,7 @@ CONTAINS
     IF (ios/=nf90_noerr) ERROR STOP 'Missing upper free-surface NetCDF field'
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot read upper free-surface NetCDF field'
-    IF (ANY(stored_total(:,:,1)/=B_cent+states%qp(idx_h,1,:,:)+states%qp(idx_h,2,:,:))) &
+    IF (ANY(stored_total(:,:,1)/=B_cent+SUM(states%qp(idx_h,:,:,:),DIM=1))) &
         ERROR STOP 'NetCDF upper surface is not B+h1+h2'
     ios=nf90_inq_varid(netcdf_id,'h_total',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing combined depth NetCDF field'
