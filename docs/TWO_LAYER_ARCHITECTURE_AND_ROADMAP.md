@@ -462,3 +462,22 @@ Questo non costituisce ancora un end-to-end produttivo a due layer:
 `supported_layer_count` e il parser mantengono intenzionalmente il
 gate chiuso. L'esecuzione delle Actions sulla revisione finale e
 l'approvazione di un test controllato two-layer sono ancora necessarie.
+
+## Etna dense-to-dilute example (preparation, not production activation)
+
+`EXAMPLES/EXAMPLE_ETNA_TWO_LAYER` prepares the unchanged Etna dense avalanche
+as the lower layer and an **exactly dry upper layer**. The prepared L1
+conservative snapshot is copied byte-for-byte from a t=0 run of the current
+single-layer solver with the original `EXAMPLE_ETNA` input and ellipsoidal
+preprocessing. The L2 snapshot shares its grid coordinates and has zero
+conservative components in every cell. No separate particle cloud is
+initially imposed: L2 can form only through configured L1→L2 elutriation.
+
+The example uses the one canonical Etna DEM archive, supplies explicit
+per-layer boundary and closure NAMELISTs and the canonical pair-wide
+`INTERLAYER_PARAMETERS`, and keeps exploratory elutriation coefficients
+separate from scientifically validated Etna calibration. Its lightweight
+snapshot-generation tests are part of `make check`. The solver still rejects
+`N_LAYERS=2`; this example is **not** evidence of two-layer production
+readiness. Future acceptance must verify cold-start physics, conservative
+budgets, restart, netCDF and OpenMP through the actual driver.

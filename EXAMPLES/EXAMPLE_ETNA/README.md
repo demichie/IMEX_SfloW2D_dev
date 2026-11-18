@@ -123,4 +123,6 @@ The paired [`README.txt`](README.txt) is retained as a verbatim archival record.
 
 The archive `DEM/Etna2014_crop.zip` is the only tracked Etna raster
 source. `EXAMPLE_ENSEMBLE_ETNA` copies/extracts it locally; `EXAMPLE_ETNA_LAVA`
-uses its own verified preparation script. Do not commit additional copies.
+uses its own verified preparation script; `EXAMPLE_ETNA_TWO_LAYER` also
+extracts the same archive and reuses the original ellipsoid generator.
+Do not commit additional copies.
