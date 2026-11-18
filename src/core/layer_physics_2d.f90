@@ -20,7 +20,7 @@ MODULE layer_physics_2d
         INTEGER :: rheology_id=RHEOLOGY_ID_NONE
         CHARACTER(LEN=64) :: rheology_source=''
         !> Non-owning canonical rheology configuration.
-        TYPE(rheology_config_type), POINTER :: config => NULL()
+        TYPE(rheology_config_type), POINTER :: rheology => NULL()
         !> Non-owning reference to the canonical thermal configuration.
         TYPE(thermal_config_type), POINTER :: thermal => NULL()
         !> Non-owning reference to the canonical layer Darcy parameters.
@@ -82,7 +82,7 @@ CONTAINS
                 IF (LEN_TRIM(error)>0) RETURN
             END IF
         END IF
-        this%config=>rheology_config
+        this%rheology=>rheology_config
         this%thermal=>thermal_config
         this%pore_pressure=>pore_config
         this%mass_exchange=>mass_config
@@ -94,7 +94,7 @@ CONTAINS
 
     SUBROUTINE finalize_layer_physics(this)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
-        NULLIFY(this%config)
+        NULLIFY(this%rheology)
         NULLIFY(this%thermal)
         NULLIFY(this%pore_pressure)
         NULLIFY(this%mass_exchange)
@@ -118,7 +118,7 @@ CONTAINS
     PURE FUNCTION layer_physics_configuration(this) RESULT(config)
         CLASS(layer_physics_type), INTENT(IN) :: this
         TYPE(rheology_config_type) :: config
-        config=this%config
+        config=this%rheology
     END FUNCTION layer_physics_configuration
 
     !> @brief Read the referenced canonical thermal configuration without exposing its pointer.

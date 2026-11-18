@@ -36,3 +36,25 @@ Comment substantial algorithmic blocks with the reason for ordering and key inva
 The repository already provides `python3 TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py` for Doxygen contract checks, including argument names/directions; it also supports `--check-against-git REF` to compare executable lines. The complementary `python3 tools/docs/check_fortran_style.py src/` checks four-space indentation, TABs and trailing whitespace. Run `python3 tools/docs/check_fortran_style.py --structural-report src/` to collect **non-failing, conservative** warnings for mismatched DO/IF/SELECT/WHERE block indentation. This heuristic intentionally does not rewrite source and may miss or misclassify continued statements; review its findings against the Fortran control-flow structure before editing. All 64 production `.f90` sources have received the first whitespace-only normalization. The documentation suite invokes the style checker over `src/` on every run. Subsequent semantic reviews must still verify true lexical nesting, blank-line grouping and full Doxygen completeness; a multiples-of-four check alone does not prove these.
 
 This is a formatting/documentation phase, not an opportunity to alter formulas or the Lie algorithm.
+
+## Canonical names and scientific ownership
+
+- Give the same physical quantity the same name through producer, caller and
+  callee when meaning, units, representation and time level are identical.
+- Use `rho_m`/`inv_rho_m` and `rho_c`/`inv_rho_c` for mixture/carrier density
+  and its reciprocal in both REAL and COMPLEX physical states.
+- Use `flow_depth`, `total_solid_fraction`, `solid_density`,
+  `carrier_density`, `time_step` at mathematical-kernel interfaces when they
+  describe those physical quantities. Do not rename unrelated local algebra.
+- Use the established global layout vocabulary `n_vars`, `n_eqns`,
+  `n_add_gas`, `n_stoch_vars`, `n_pore_vars` in `model_layout_type`.
+  Distinguish primitive indices (`idx_h`, `idx_T`, `idx_u`, `idx_v`)
+  from conservative equation indices (`idx_totMassEqn`, `idx_uEqn`,
+  `idx_vEqn`, `idx_engyEqn`), even when integer values coincide.
+- Name each owned configuration by its domain: `rheology`, `thermal`,
+  `pore_pressure`, `mass_exchange`. A kernel-local `config` is reasonable
+  when the procedure is exclusively about one explicitly typed law.
+- Never conflate `q` with `qp`, individual layers, pre/post-step values,
+  horizontal/total/squared speeds, or fluid vs mixture density.
+- Renames must not change an arithmetic expression, its evaluation order,
+  mathematical constants, NAMELIST group names or physical thresholds.

@@ -107,26 +107,27 @@ CONTAINS
             CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_erosion_analytic
 
-        !> @brief Compute erosion volumes under the finite erodible-bed inventory constraint.
-        !> @param[in] r_h Mobile flow thickness [m].
-        !> @param[in] mod_vel Slope-corrected flow speed [m/s].
-        !> @param[in] alphas_tot Total solid volume fraction.
-        !> @param[in] erodible Available erodible solid inventory by species [m].
-        !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+        !> @brief Compute erosion volumes under the finite erodible_inventory-bed inventory constraint.
+        !> @param[in] flow_depth Mobile flow thickness [m].
+        !> @param[in] speed Slope-corrected flow speed [m/s].
+        !> @param[in] total_solid_fraction Total solid volume fraction.
+        !> @param[in] erodible_inventory Available erodible_inventory solid inventory by species [m].
+        !> @param[in] time_step Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
         !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
         !> @param[in] mass_config Immutable layer erosion parameters.
-    SUBROUTINE eval_erosion_volume_kernel(mass_config,r_h,mod_vel,alphas_tot,erodible,dt,erosion_rate, &
+    SUBROUTINE eval_erosion_volume_kernel(mass_config,flow_depth,speed,total_solid_fraction,erodible_inventory, &
+            time_step,erosion_rate, &
             carrier_erosion_rate)
 
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-            REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
+            REAL(wp), INTENT(IN) :: flow_depth, speed, total_solid_fraction, erodible_inventory(n_solid), time_step
             REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), carrier_erosion_rate
 
             IF (mass_config%erosion%coefficient .GT. 0.0_wp) THEN
-                    CALL eval_erosion_rates(r_h,mod_vel,alphas_tot,mass_config%erosion%coefficient, &
+                    CALL eval_erosion_rates(flow_depth,speed,total_solid_fraction,mass_config%erosion%coefficient, &
                         substrate%erodible_porosity, &
-                        erodible_fract(1:n_solid), erodible(1:n_solid), dt, erosion_rate(1:n_solid),                   &
+                        erodible_fract(1:n_solid), erodible_inventory(1:n_solid), time_step, erosion_rate(1:n_solid),  &
                         carrier_erosion_rate)
 
             ELSE

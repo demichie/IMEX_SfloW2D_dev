@@ -14,31 +14,31 @@ PROGRAM test_model_layout
 
   CALL assert_true('basic layout initialized', layout%is_initialized())
   CALL assert_true('basic counts', layout%n_layers == 1 .AND.               &
-       layout%n_variables == 6 .AND. layout%n_physical_variables == 6      &
-       .AND. layout%n_equations == 6)
+       layout%n_vars == 6 .AND. layout%n_physical_variables == 6      &
+       .AND. layout%n_eqns == 6)
   CALL assert_true('solid range', layout%idx_solid_first == 5 .AND.         &
        layout%idx_solid_last == 5)
-  CALL assert_true('gas range', layout%idx_additional_gas_first == 6        &
-       .AND. layout%idx_additional_gas_last == 6)
-  CALL assert_true('physical velocity indices', layout%idx_velocity_x == 2 &
-       .AND. layout%idx_velocity_y == 3)
+  CALL assert_true('gas range', layout%idx_add_gas_first == 6        &
+       .AND. layout%idx_add_gas_last == 6)
+  CALL assert_true('physical velocity indices', layout%idx_u == 2 &
+       .AND. layout%idx_v == 3)
 
   ! Reconfigure the same descriptor with every current optional component.
   CALL layout%initialize(1, 9, 9, 2, 1, 1, 1)
 
   CALL assert_true('full layout initialized', layout%is_initialized())
   CALL assert_true('full component counts', layout%n_solid == 2 .AND.       &
-       layout%n_additional_gas == 1 .AND. layout%n_stochastic == 1         &
-       .AND. layout%n_pore_pressure == 1 )
+       layout%n_add_gas == 1 .AND. layout%n_stoch_vars == 1         &
+       .AND. layout%n_pore_vars == 1 )
   CALL assert_true('full solid range', layout%idx_solid_first == 5 .AND.    &
        layout%idx_solid_last == 6)
   CALL assert_true('full optional indices',                                &
-       layout%idx_additional_gas_first == 7 .AND.                          &
-       layout%idx_additional_gas_last == 7 .AND.                           &
-       layout%idx_stochastic == 8 .AND.                                    &
-       layout%idx_pore_pressure == 9)
-  CALL assert_true('full velocity indices', layout%idx_velocity_x == 2    &
-       .AND. layout%idx_velocity_y == 3)
+       layout%idx_add_gas_first == 7 .AND.                          &
+       layout%idx_add_gas_last == 7 .AND.                           &
+       layout%idx_stoch == 8 .AND.                                    &
+       layout%idx_pore == 9)
+  CALL assert_true('full velocity indices', layout%idx_u == 2    &
+       .AND. layout%idx_v == 3)
 
   CALL layout%finalize
   CALL assert_true('layout finalized', .NOT. layout%is_initialized())

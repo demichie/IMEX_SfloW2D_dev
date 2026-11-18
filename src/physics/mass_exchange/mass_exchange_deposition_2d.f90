@@ -122,23 +122,24 @@ CONTAINS
         !> @brief Compute per-species settling and choose carrier-fluid properties.
         !> @param[in] config Layer rheology closure.
         !> @param[in] mass_config Layer mass-exchange closure.
-        !> @param[in] r_h Mobile flow thickness [m].
-        !> @param[in] r_T Local flow temperature [K].
-        !> @param[in] r_alphas Solid volume fractions by species.
-        !> @param[in] alphas_tot Total solid volume fraction.
-        !> @param[in] r_rho_m Mixture density [kg/m3].
-        !> @param[in] r_rho_c Carrier density [kg/m3].
-        !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+        !> @param[in] flow_depth Mobile flow thickness [m].
+        !> @param[in] temperature Local flow temperature [K].
+        !> @param[in] solid_fractions Solid volume fractions by species.
+        !> @param[in] total_solid_fraction Total solid volume fraction.
+        !> @param[in] mixture_density Mixture density [kg/m3].
+        !> @param[in] carrier_density Carrier density [kg/m3].
+        !> @param[in] time_step Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] deposition_rate Solid deposition thickness flux for each species [m/s].
         !> @param[in] enable_settling Optional interlayer override: the same physical law
         !>          is evaluated without enabling external deposition in the donor layer.
-    SUBROUTINE eval_deposition_volume_kernel(config,mass_config,r_h,r_T,r_alphas,alphas_tot,r_rho_m, &
-        r_rho_c, dt, deposition_rate,enable_settling)
+    SUBROUTINE eval_deposition_volume_kernel(config,mass_config,flow_depth,temperature,solid_fractions, &
+        total_solid_fraction,mixture_density, &
+        carrier_density, time_step, deposition_rate,enable_settling)
             TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
 
-            REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-            REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+            REAL(wp), INTENT(IN) :: flow_depth, temperature, solid_fractions(n_solid), total_solid_fraction
+            REAL(wp), INTENT(IN) :: mixture_density, carrier_density, time_step
             REAL(wp), INTENT(OUT) :: deposition_rate(n_solid)
             LOGICAL, INTENT(IN), OPTIONAL :: enable_settling
             LOGICAL :: enabled
@@ -156,28 +157,29 @@ CONTAINS
             ! For the gas carrier, use temperature-dependent viscosity and ideal-gas density.
             IF ( gas_flag .AND. sutherland_flag ) THEN
 
-                    dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *                                            &
-                                ( Tref_Suth + S_mu ) / ( r_T + S_mu )
+                    dyn_visc_c = muRef_Suth * ( temperature / Tref_Suth )**1.5_wp *                                    &
+                                ( Tref_Suth + S_mu ) / ( temperature + S_mu )
 
-                    rho_c = pres / ( sp_gas_const_a * r_T )
+                    rho_c = pres / ( sp_gas_const_a * temperature )
                     kin_visc_c_local = dyn_visc_c / rho_c
 
             END IF
 
-            CALL eval_settling_fluid_properties(config, r_T, alphas_tot, r_rho_m, r_rho_c, kin_visc_c_local,           &
+            CALL eval_settling_fluid_properties(config, temperature, total_solid_fraction, &
+                mixture_density,carrier_density,kin_visc_c_local,           &
                 rhoc, inv_kin_visc)
 
             DO i_solid=1,n_solid
 
-                    IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( enabled ) ) THEN
+                    IF ( ( solid_fractions(i_solid) .GT. 0.0_wp ) .AND. ( enabled ) ) THEN
 
                             settling_vel = settling_velocity(mass_config,diam_s(i_solid),rho_s(i_solid), &
                                         rhoc , inv_kin_visc )
 
                             deposition_rate(i_solid) = eval_solid_deposition_rate(                                     &
-                                        config%rheology_model, r_alphas(i_solid),                                      &
-                                            settling_vel, r_h, dt,                                                     &
-                                        alphas_tot, alpha_max, hind_exp)
+                                        config%rheology_model, solid_fractions(i_solid),                               &
+                                            settling_vel, flow_depth, time_step,                                       &
+                                        total_solid_fraction, alpha_max, hind_exp)
 
                             IF ( deposition_rate(i_solid) .LT. 0.0_wp ) THEN
                                     CALL fatal_error('negative solid deposition rate')
@@ -197,14 +199,15 @@ CONTAINS
         !>          This is a constitutive choice; it replaces the former
         !>          discontinuous shortcut C_D=1 at the *initial* Reynolds.
         !> @param[in] mass_config Layer deposition drag closure.
-        !> @param[in] diam Solid particle diameter [m].
-        !> @param[in] rhos Solid particle density [kg/m3].
-        !> @param[in] rhoc Carrier density [kg/m3].
-        !> @param[in] inv_kin_visc Inverse carrier kinematic viscosity [s/m2].
-        REAL(wp) FUNCTION settling_velocity(mass_config,diam, rhos, rhoc, inv_kin_visc)
+        !> @param[in] particle_diameter Solid particle diameter [m].
+        !> @param[in] solid_density Solid particle density [kg/m3].
+        !> @param[in] carrier_density Carrier density [kg/m3].
+        !> @param[in] inverse_kinematic_viscosity Inverse carrier kinematic viscosity [s/m2].
+        REAL(wp) FUNCTION settling_velocity(mass_config,particle_diameter, solid_density, carrier_density, &
+            inverse_kinematic_viscosity)
 
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
-            REAL(wp), INTENT(IN) :: diam, rhos, rhoc, inv_kin_visc
+            REAL(wp), INTENT(IN) :: particle_diameter, solid_density, carrier_density, inverse_kinematic_viscosity
             REAL(wp), PARAMETER :: transition_re=1000.0_wp
             REAL(wp), PARAMETER :: solver_tolerance=1.0E-11_wp
             REAL(wp) :: drag_transition, initial_re, initial_re_squared
@@ -212,13 +215,13 @@ CONTAINS
             REAL(wp) :: residual, derivative, candidate, reynolds_squared
             INTEGER :: iteration
 
-            IF (rhos <= rhoc) THEN
+            IF (solid_density <= carrier_density) THEN
                 settling_velocity=0.0_wp
                 RETURN
             END IF
 
-            const_part=SQRT((4.0_wp/3.0_wp)*(rhos/rhoc-1.0_wp)*diam*grav)
-            initial_re=diam*const_part*inv_kin_visc
+            const_part=SQRT((4.0_wp/3.0_wp)*(solid_density/carrier_density-1.0_wp)*particle_diameter*grav)
+            initial_re=particle_diameter*const_part*inverse_kinematic_viscosity
             IF (initial_re<=0.0_wp) THEN
                 settling_velocity=0.0_wp
                 RETURN
@@ -285,7 +288,7 @@ CONTAINS
             END DO
             IF (iteration>64) CALL fatal_error('settling: safeguarded Newton did not converge')
 
-            settling_velocity=reynolds/(diam*inv_kin_visc)
+            settling_velocity=reynolds/(particle_diameter*inverse_kinematic_viscosity)
         END FUNCTION settling_velocity
 
         !> @brief Select carrier density and inverse kinematic viscosity for settling.
