@@ -88,3 +88,14 @@ existing authoritative mass- and momentum-exchange configuration
 objects. The additional exchange-only NAMELIST and its conditional
 reader were removed; no shadow configuration or compatibility
 parser remains. Single-layer short NAMELISTs are intentionally retained.
+
+
+## Interlayer configuration regression
+
+`TEST_SOURCE_REGISTRY` now reads one canonical pair-wide NAMELIST with
+distinct mass and drag groups and checks the Chezy coefficient. It verifies
+that the backup writes the canonical group, rejects duplicate occurrences,
+and rejects interlayer input when only one layer is configured. The test
+uses temporary Fortran scratch units and restores both configuration
+objects, so it does not create a parallel configuration or modify other
+test inputs.

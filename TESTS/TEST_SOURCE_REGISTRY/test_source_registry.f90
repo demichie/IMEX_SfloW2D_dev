@@ -10,8 +10,9 @@ PROGRAM test_source_registry
   USE source_input_2d
   USE parameters_2d
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
-  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
-  USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange
+  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange,interlayer_mass_exchange_config_type
+  USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
+       interlayer_momentum_exchange_config_type
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
   IMPLICIT NONE
   TYPE(layer_contacts_type) :: contact_result
@@ -305,8 +306,70 @@ PROGRAM test_source_registry
        rheology_l2=rheology_l2)
   CALL require(LEN_TRIM(error)>0,'incomplete L2 configurations rejected')
   CALL require(.NOT.registry%is_initialized(),'failed L2 setup leaves registry uninitialized')
+  CALL check_interlayer_input
   PRINT *, 'PASS Lie registry complete Newton footprints, ordering and methods'
 CONTAINS
+  !> @brief Verify one canonical pair-wide NAMELIST with independent mass and drag settings.
+  SUBROUTINE check_interlayer_input
+    TYPE(interlayer_mass_exchange_config_type) :: saved_mass
+    TYPE(interlayer_momentum_exchange_config_type) :: saved_drag
+    INTEGER :: unit,saved_layers
+    CHARACTER(LEN=256) :: input_error
+    CHARACTER(LEN=256) :: line
+
+    saved_layers=n_layers
+    saved_mass=interlayer_exchange
+    saved_drag=interlayer_momentum_exchange
+    n_layers=2
+    interlayer_exchange=interlayer_mass_exchange_config_type()
+    interlayer_momentum_exchange=interlayer_momentum_exchange_config_type()
+
+    OPEN(NEWUNIT=unit,STATUS='SCRATCH',FORM='FORMATTED')
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS'
+    WRITE(unit,'(A)') ' interlayer_mass_exchange%group=3,'
+    WRITE(unit,'(A)') ' interlayer_momentum_exchange%group=7,'
+    WRITE(unit,'(A)') ' interlayer_momentum_exchange%chezy_drag_coeff=0.125,'
+    WRITE(unit,'(A)') ' /'
+    REWIND(unit)
+    CALL read_interlayer_parameters(unit,input_error)
+    CALL require(LEN_TRIM(input_error)==0,'canonical interlayer input: '//TRIM(input_error))
+    CALL require(interlayer_exchange%group==3,'interlayer mass group read from canonical pair')
+    CALL require(interlayer_momentum_exchange%group==7,'interlayer drag group read independently')
+    CALL require(interlayer_momentum_exchange%chezy_drag_coeff==0.125_wp, &
+         'interlayer Chezy coefficient read from canonical pair')
+    CLOSE(unit)
+
+    OPEN(NEWUNIT=unit,STATUS='SCRATCH',FORM='FORMATTED')
+    CALL write_interlayer_parameters(unit)
+    REWIND(unit)
+    READ(unit,'(A)') line
+    CALL require(INDEX(uppercase_source_text(ADJUSTL(line)),'&INTERLAYER_PARAMETERS')==1, &
+         'interlayer backup uses canonical NAMELIST')
+    CLOSE(unit)
+
+    OPEN(NEWUNIT=unit,STATUS='SCRATCH',FORM='FORMATTED')
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS /'
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS /'
+    REWIND(unit)
+    CALL read_interlayer_parameters(unit,input_error)
+    CALL require(INDEX(input_error,'Duplicate INTERLAYER_PARAMETERS')>0, &
+         'duplicate pair-wide NAMELIST rejected')
+    CLOSE(unit)
+
+    n_layers=1
+    OPEN(NEWUNIT=unit,STATUS='SCRATCH',FORM='FORMATTED')
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS /'
+    REWIND(unit)
+    CALL read_interlayer_parameters(unit,input_error)
+    CALL require(INDEX(input_error,'requires N_LAYERS=2')>0, &
+         'interlayer NAMELIST rejected for single-layer input')
+    CLOSE(unit)
+
+    n_layers=saved_layers
+    interlayer_exchange=saved_mass
+    interlayer_momentum_exchange=saved_drag
+  END SUBROUTINE check_interlayer_input
+
   !> @brief Check the complete physical column-contact contract.
   !> @param[in] thickness Candidate layer thicknesses in metres.
   !> @param[in] atmosphere Expected atmosphere exposure for L1/L2.

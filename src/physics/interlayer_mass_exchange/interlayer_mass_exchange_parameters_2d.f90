@@ -1,5 +1,4 @@
 !> @brief Canonical physical options for paired L1/L2 mass transfers.
-!> @details The canonical object retains its historical NAMELIST input spelling.
 !> @details The interlayer exchange belongs to the layer pair, never to either layer.
 MODULE interlayer_mass_exchange_parameters_2d
     USE parameters_2d, ONLY : wp
