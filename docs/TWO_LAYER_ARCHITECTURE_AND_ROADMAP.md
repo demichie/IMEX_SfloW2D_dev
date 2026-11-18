@@ -261,6 +261,19 @@ strict/optimized. La verifica CI sul commit che aggiunge il caso
 resta necessaria; non sostituisce i test integrati delle sorgenti
 di erosione/deposizione dal substrato.
 
+**TL07 - sorgenti esterne e scambi interlayer nello stesso timestep:**
+`TEST_SPATIAL_OPERATOR` comprende ora anche i gruppi espliciti
+`mass_exchange_deposition` e `mass_exchange_erosion` per ciascun layer,
+seguiti dallo scambio interlayer e dal gruppo drag. Gli stessi quattro
+scenari wet/dry controllano i depositi nel substrato condiviso, i
+prelievi erodibili, l'ammissibilita' dei candidati e il bilancio della
+massa solida complessiva (L1+L2+substrato), confrontando ciascun caso
+con un passo senza scambio esterno. Sono usati il registro, il workset,
+i contatti e l'esecutore Lie di produzione, senza un integratore
+alternativo. I payload sono confrontati bitwise tra 1 e 4 thread
+OpenMP. I test richiedono ancora esecuzione CI sul commit corrente;
+il gate di produzione L2 resta chiuso.
+
 Il contratto attuale rimane di errore fatale senza retry: q/qp vengono
 pubblicati solo dopo la riuscita del Lie globale, ma il substrato puo'
 essere aggiornato per cella durante il sweep. Non dichiarare un rollback
