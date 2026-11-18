@@ -47,6 +47,8 @@ MODULE stochastic_module
         !> Non-owning canonical OU and matched rheology configurations.
         TYPE(stochastic_config_type), POINTER :: config=>NULL()
         TYPE(rheology_config_type), POINTER :: rheology=>NULL()
+        INTEGER :: layer=1 !< State layer slot owned by this workspace.
+        INTEGER, ALLOCATABLE :: rng_state(:) !< Independent L2 RNG; L1 uses the legacy global stream.
 
         !> Stochastic field at cell centers
         REAL(wp), ALLOCATABLE :: Z(:,:)
@@ -77,13 +79,20 @@ CONTAINS
     !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
     !> @param[in] config Stable-lifetime canonical OU configuration for this layer.
     !> @param[in] rheology Stable-lifetime canonical rheology for the same layer.
+    !> @param[in] layer Optional state layer slot, defaults to L1 for direct calls.
 
-    SUBROUTINE initialize_stochastic_workspace(this,config,rheology)
+    SUBROUTINE initialize_stochastic_workspace(this,config,rheology,layer)
 
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         TYPE(stochastic_config_type), TARGET, INTENT(IN) :: config
         TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology
+        INTEGER, INTENT(IN), OPTIONAL :: layer
+        INTEGER :: seed_size
+        INTEGER, ALLOCATABLE :: global_rng(:)
 
+        this%layer=1
+        IF (PRESENT(layer)) this%layer=layer
+        IF (this%layer<1 .OR. this%layer>2) ERROR STOP 'Invalid stochastic layer slot'
         this%config=>config
         this%rheology=>rheology
         IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
@@ -94,8 +103,21 @@ CONTAINS
         ALLOCATE(this%effective_Z(comp_cells_x,comp_cells_y))
         this%effective_Z = 0.0_wp
 
-        IF (rheology%stochastic_rheology_flag .OR. config%stochastic_transport_flag) &
+        IF (ALLOCATED(this%rng_state)) DEALLOCATE(this%rng_state)
+        IF (rheology%stochastic_rheology_flag .OR. config%stochastic_transport_flag) THEN
+            ! The process-wide generator remains the canonical L1 stream,
+            ! including the state recorded by legacy binary restart files.
+            IF (this%layer==2) THEN
+                CALL random_seed(SIZE=seed_size)
+                ALLOCATE(global_rng(seed_size),this%rng_state(seed_size))
+                CALL random_seed(GET=global_rng)
+            END IF
             CALL initialize_stochastic_rng(config%stochastic_seed)
+            IF (this%layer==2) THEN
+                CALL random_seed(GET=this%rng_state)
+                CALL random_seed(PUT=global_rng)
+            END IF
+        END IF
 
     END SUBROUTINE initialize_stochastic_workspace
 
@@ -110,6 +132,8 @@ CONTAINS
         IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
         IF ( ALLOCATED(this%effective_Z) ) DEALLOCATE(this%effective_Z)
         IF ( ALLOCATED(this%conv_kernel) ) DEALLOCATE(this%conv_kernel)
+        IF (ALLOCATED(this%rng_state)) DEALLOCATE(this%rng_state)
+        this%layer=1
         NULLIFY(this%config,this%rheology)
 
     END SUBROUTINE finalize_stochastic_workspace
@@ -168,8 +192,8 @@ CONTAINS
                 j = domain%j_cent(l)
                 k = domain%k_cent(l)
 
-                state%qp(idx_stoch,1,j,k) = this%Z(j,k)
-                state%q(idx_stoch,1,j,k) = state%q(idx_totMassEqn,1,j,k) *                                                 &
+                state%qp(idx_stoch,this%layer,j,k) = this%Z(j,k)
+                state%q(idx_stoch,this%layer,j,k) = state%q(idx_totMassEqn,this%layer,j,k) *                           &
                     this%Z(j,k)
 
             END DO
@@ -179,8 +203,8 @@ CONTAINS
             WRITE(*,*) 'end stochastic initialization'
 
         ELSEIF (idx_stoch>0) THEN
-            state%q(idx_stoch,1,:,:)=0.0_wp
-            state%qp(idx_stoch,1,:,:)=0.0_wp
+            state%q(idx_stoch,this%layer,:,:)=0.0_wp
+            state%qp(idx_stoch,this%layer,:,:)=0.0_wp
 
         END IF
 
@@ -268,6 +292,7 @@ CONTAINS
         CLASS(domain_type), INTENT(IN), OPTIONAL :: domain
         INTEGER :: j,k
         INTEGER :: noise_size
+        INTEGER, ALLOCATABLE :: global_rng(:)
         REAL(wp), INTENT(IN) :: dt
         REAL(wp) :: sigma_noise
         REAL(wp):: noise(comp_cells_x, comp_cells_y)
@@ -277,8 +302,19 @@ CONTAINS
         ! must not change the random stream associated with a fixed seed.
         ! Generate standard Gaussian noise over the entire domain: N(0,1).
         noise_size = comp_cells_x*comp_cells_y
+        ! Restore and advance only this layer's stream. The Gaussian draws
+        ! remain serial and independent of OpenMP cell scheduling.
+        IF (ALLOCATED(this%rng_state)) THEN
+            ALLOCATE(global_rng(SIZE(this%rng_state)))
+            CALL random_seed(GET=global_rng)
+            CALL random_seed(PUT=this%rng_state)
+        END IF
         noise = RESHAPE(gaussian_noise(noise_size),                                                                    &
             [comp_cells_x, comp_cells_y])
+        IF (ALLOCATED(this%rng_state)) THEN
+            CALL random_seed(GET=this%rng_state)
+            CALL random_seed(PUT=global_rng)
+        END IF
 
         ! Convolve the gaussian noise to introduce spatial correlation if needed
         IF (this%config%length_spatial_corr > 0.0_wp) THEN
@@ -301,10 +337,10 @@ CONTAINS
                         sigma_noise=getSigmaNoise_from_values(trial_q(idx_totMassEqn,j,k),                            &
                             trial_qp(idx_u,j,k)**2+trial_qp(idx_v,j,k)**2,this%config,this%rheology)
                     ELSE
-                        sigma_noise=getSigmaNoise(state,j,k,this%config,this%rheology)
+                        sigma_noise=getSigmaNoise(state,j,k,this%config,this%rheology,this%layer)
                     END IF
                 ELSE
-                    sigma_noise=getSigmaNoise(state,j,k,this%config,this%rheology)
+                    sigma_noise=getSigmaNoise(state,j,k,this%config,this%rheology,this%layer)
                 END IF
                 this%Z(j,k) = EulerMaruyamaScheme(                                                                     &
                     this%Z(j,k), dt, sigma_noise, noise(j,k),this%config)
@@ -345,8 +381,8 @@ CONTAINS
         IF (transport_enabled) THEN
             ! The transported conservative scalar determines Z in wet cells.
             ! Outside the active solve set its published state is authoritative.
-            WHERE (state%q(idx_totMassEqn,1,:,:) > EPSILON(1.0_wp))
-                this%Z=state%q(idx_stoch,1,:,:)/state%q(idx_totMassEqn,1,:,:)
+            WHERE (state%q(idx_totMassEqn,this%layer,:,:) > EPSILON(1.0_wp))
+                this%Z=state%q(idx_stoch,this%layer,:,:)/state%q(idx_totMassEqn,this%layer,:,:)
             END WHERE
             IF (use_trial) THEN
                 DO l=1,domain%solve_cells
@@ -380,12 +416,12 @@ CONTAINS
                 END DO
             ELSE
                 ! Legacy/direct callers retain their published-state contract.
-                WHERE (state%q(idx_totMassEqn,1,:,:) > EPSILON(1.0_wp))
-                    state%q(idx_stoch,1,:,:)=state%q(idx_totMassEqn,1,:,:)*this%Z
-                    state%qp(idx_stoch,1,:,:)=this%Z
+                WHERE (state%q(idx_totMassEqn,this%layer,:,:) > EPSILON(1.0_wp))
+                    state%q(idx_stoch,this%layer,:,:)=state%q(idx_totMassEqn,this%layer,:,:)*this%Z
+                    state%qp(idx_stoch,this%layer,:,:)=this%Z
                 ELSEWHERE
-                    state%q(idx_stoch,1,:,:)=0.0_wp
-                    state%qp(idx_stoch,1,:,:)=0.0_wp
+                    state%q(idx_stoch,this%layer,:,:)=0.0_wp
+                    state%qp(idx_stoch,this%layer,:,:)=0.0_wp
                 END WHERE
             END IF
         ELSEIF (idx_stoch>0) THEN
@@ -398,8 +434,8 @@ CONTAINS
                     trial_qp(idx_stoch,j,k)=0.0_wp
                 END DO
             ELSE
-                state%q(idx_stoch,1,:,:)=0.0_wp
-                state%qp(idx_stoch,1,:,:)=0.0_wp
+                state%q(idx_stoch,this%layer,:,:)=0.0_wp
+                state%qp(idx_stoch,this%layer,:,:)=0.0_wp
             END IF
         END IF
     END SUBROUTINE prepare_stochastic_timestep
@@ -431,18 +467,23 @@ CONTAINS
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] j X index of the current computational cell.
     !> \param[in] k Y index of the current computational cell.
+    !> @param[in] layer Optional material layer slot, defaults to L1.
     !> \return Squared speed [m^2 s^-2], or zero when the cell mass is negligible.
 
-    REAL(wp) FUNCTION VelocitySquared(state,j,k)
+    REAL(wp) FUNCTION VelocitySquared(state,j,k,layer)
     !> Compute |u|^2 at the cell center.
     IMPLICIT NONE
     CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
+    INTEGER, INTENT(IN), OPTIONAL :: layer
+    INTEGER :: selected_layer
 
-    IF (state%q(idx_totMassEqn,1,j,k) > EPSILON(1.0_wp)) THEN
+    selected_layer=1
+    IF (PRESENT(layer)) selected_layer=layer
+    IF (state%q(idx_totMassEqn,selected_layer,j,k) > EPSILON(1.0_wp)) THEN
         ! qp already stores the physical velocities associated with q. Reusing
         ! them avoids repeating the full thermodynamic conversion in every cell.
-        VelocitySquared = state%qp(idx_u,1,j,k)**2 + state%qp(idx_v,1,j,k)**2
+        VelocitySquared = state%qp(idx_u,selected_layer,j,k)**2 + state%qp(idx_v,selected_layer,j,k)**2
     ELSE
         VelocitySquared = 0.0_wp
 
@@ -455,17 +496,23 @@ END FUNCTION VelocitySquared
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] j X index of the current computational cell.
     !> \param[in] k Y index of the current computational cell.
+    !> @param[in] layer Optional state layer slot, defaults to L1.
     !> \return Local OU noise intensity; dry cells use std_max.
 
     !> @param[in] config Canonical OU configuration for this layer.
     !> @param[in] rheology Canonical rheology for the same layer.
-    REAL(wp) FUNCTION getSigmaNoise(state,j,k,config,rheology)
+    REAL(wp) FUNCTION getSigmaNoise(state,j,k,config,rheology,layer)
         CLASS(state_type), INTENT(IN) :: state
         INTEGER, INTENT(IN) :: j,k
         TYPE(stochastic_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology
-        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,1,j,k), &
-            VelocitySquared(state,j,k),config,rheology)
+        INTEGER, INTENT(IN), OPTIONAL :: layer
+        INTEGER :: selected_layer
+
+        selected_layer=1
+        IF (PRESENT(layer)) selected_layer=layer
+        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,selected_layer,j,k), &
+            VelocitySquared(state,j,k,selected_layer),config,rheology)
     END FUNCTION getSigmaNoise
 
     !> @brief Return the OU noise intensity of a cell-local candidate.

@@ -266,9 +266,10 @@ CONTAINS
     !> @param[in] transport_stochastic Layer-specific stochastic transport switches.
     !> @param[in] pore_enabled Layer-specific pore pressure switches.
     !> @param[in] stochastic_enabled Layer-specific stochastic rheology switches.
+    !> @param[in] stochastic_values_l2 Optional independent upper-layer effective OU field.
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
         step_start_time,q_original,qp_original,step_failed,failure_message,thermal,rheology,pore_pressure,pore_cache, &
-        mass_config,transport_stochastic,pore_enabled,stochastic_enabled)
+        mass_config,transport_stochastic,pore_enabled,stochastic_enabled,stochastic_values_l2)
         USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, B_second_xy_geom,                    &
             B_second_yy_geom, grav_coeff, apply_local_bed_rate, B_vertex,        &
             B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
@@ -296,7 +297,7 @@ CONTAINS
         REAL(wp), INTENT(INOUT) :: qp(n_vars,n_layers,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
         CLASS(domain_type), INTENT(IN) :: domain
-        REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
+        REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:),stochastic_values_l2(:,:)
         REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
         REAL(wp), INTENT(IN) :: q_original(n_vars,n_layers,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: qp_original(n_vars,n_layers,comp_cells_x,comp_cells_y)
@@ -503,14 +504,21 @@ CONTAINS
             cell_context%Bsecond_xy=B_second_xy_geom(j,k)
             cell_context%Bsecond_yy=B_second_yy_geom(j,k)
             cell_context%grav_coeff=grav_coeff(j,k)
-            noise=0.0_wp
-            IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
-            cell_context%Zij=noise
+            ! The Lie groups select the OU field for their own layer.
 
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
                 layer=executor%groups(group_index)%scope
+                ! Each layer uses its own OU field. In particular L2 must
+                ! never inherit the effective friction noise of L1.
+                noise=0.0_wp
+                IF (layer==SOURCE_SCOPE_L1) THEN
+                    IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
+                ELSEIF (layer==SOURCE_SCOPE_L2) THEN
+                    IF (PRESENT(stochastic_values_l2)) noise=stochastic_values_l2(j,k)
+                END IF
+                cell_context%Zij=noise
                 IF (layer==SOURCE_SCOPE_INTERLAYER) THEN
                     ! The same cell-local Lie order applies to both paired laws.
                     ! Each update commits both recipients only after validation.

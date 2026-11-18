@@ -14,13 +14,16 @@ PROGRAM test_stochastic_evolution
 
   IMPLICIT NONE
 
-  TYPE(state_type) :: state
-  TYPE(stochastic_workspace_type) :: stochastic
+  TYPE(state_type) :: state,dual_state
+  TYPE(stochastic_workspace_type) :: stochastic,upper,upper_reference
   TYPE(model_layout_type) :: model_layout
   REAL(wp), PARAMETER :: tolerance = 64.0_wp * EPSILON(1.0_wp)
   REAL(wp) :: expected_sigma
   REAL(wp) :: rectangular_field(3,2), identity_kernel(1,1)
   REAL(wp) :: convolution_result(3,2)
+  REAL(wp) :: lower_before(3,2),upper_noise(3,2)
+  INTEGER :: seed_size
+  INTEGER, ALLOCATABLE :: seed_before(:),seed_after(:)
 
   comp_cells_x = 3
   comp_cells_y = 2
@@ -136,6 +139,7 @@ PROGRAM test_stochastic_evolution
 
   ! Independent layer coefficients are not aliased by the live L1 workspace.
   stochastic_l2=stochastic_config_type()
+  rheology_l2%rheology_model='none'
   stochastic_l2%tau_stochastic=4.0_wp
   stochastic_l2%length_spatial_corr=3.0_wp
   CALL assert_close('L2 OU time is independent of L1',stochastic_l1%tau_stochastic,2.0_wp)
@@ -160,6 +164,56 @@ PROGRAM test_stochastic_evolution
   CALL assert_true('L2 and L1 OU configurations remain independent', &
        stochastic_l2%length_spatial_corr/=stochastic_l1%length_spatial_corr)
   CALL assert_true('workspace references canonical L1 OU config',ASSOCIATED(stochastic%config,stochastic_l1))
+
+  ! Exercise independent L2 OU evolution and conservative transport without
+  ! passing through the production-only model-layout gate.
+  ALLOCATE(dual_state%q(n_vars,2,comp_cells_x,comp_cells_y))
+  ALLOCATE(dual_state%qp(n_vars,2,comp_cells_x,comp_cells_y))
+  dual_state%q=0.0_wp
+  dual_state%qp=0.0_wp
+  dual_state%q(1,2,1,1)=2.0_wp
+  dual_state%q(idx_stoch,2,1,1)=6.0_wp
+  dual_state%q(idx_stoch,1,1,1)=11.0_wp
+  stochastic_l2%length_spatial_corr=0.0_wp
+  stochastic_l2%std_max=0.0_wp
+  stochastic_l2%stochastic_seed=246813
+  CALL random_seed(SIZE=seed_size)
+  ALLOCATE(seed_before(seed_size),seed_after(seed_size))
+  CALL random_seed(GET=seed_before)
+  CALL upper%initialize(stochastic_l2,rheology_l2,layer=2)
+  CALL random_seed(GET=seed_after)
+  CALL assert_true('L2 initialization preserves the global L1 random stream',ALL(seed_before==seed_after))
+  lower_before=dual_state%q(idx_stoch,1,:,:)
+  CALL upper%prepare_timestep(dual_state,0.5_wp,.TRUE.)
+  CALL assert_close('L2 OU uses its own correlation time',upper%Z(1,1),2.625_wp)
+  CALL assert_close('L2 conservative transport uses L2 mass',dual_state%q(idx_stoch,2,1,1),5.25_wp)
+  CALL assert_true('L2 OU never changes L1 transported state', &
+       ALL(dual_state%q(idx_stoch,1,:,:)==lower_before))
+  CALL assert_close('L2 sigma uses L2 mass and velocity', &
+       getSigmaNoise(dual_state,1,1,stochastic_l2,rheology_l2,layer=2),0.0_wp)
+
+  ! Equal seeds define equal independent streams even if an L1 update occurs
+  ! between the two L2 updates. Neither stream depends on OpenMP scheduling.
+  stochastic_l2%std_max=1.0_wp
+  CALL upper%initialize(stochastic_l2,rheology_l2,layer=2)
+  CALL upper_reference%initialize(stochastic_l2,rheology_l2,layer=2)
+  CALL random_seed(GET=seed_before)
+  CALL upper%update(dual_state,0.5_wp)
+  CALL random_seed(GET=seed_after)
+  CALL assert_true('L2 update preserves the global L1 random stream',ALL(seed_before==seed_after))
+  upper_noise=upper%Z
+  stochastic_l1%std_max=1.0_wp
+  stochastic_l1%length_spatial_corr=0.0_wp
+  stochastic_l1%stochastic_seed=111
+  CALL stochastic%initialize(stochastic_l1,rheology_l1,layer=1)
+  CALL stochastic%update(state,0.5_wp)
+  CALL upper_reference%update(dual_state,0.5_wp)
+  CALL assert_true('Independent L2 random stream survives intervening L1 update', &
+       ALL(upper_reference%Z==upper_noise))
+  DEALLOCATE(seed_before,seed_after)
+  CALL upper_reference%finalize
+  CALL upper%finalize
+  DEALLOCATE(dual_state%q,dual_state%qp)
 
   CALL stochastic%finalize
   CALL state%finalize

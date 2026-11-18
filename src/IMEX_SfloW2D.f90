@@ -212,7 +212,7 @@ PROGRAM IMEX_SfloW2D
             ! CASE 1: BINARY RESTART (Exact)
             ! ---------------------------------------------------------
             WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
-            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state,    &
+            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic(1), simulation%state, &
                 simulation%domains(1))
             CALL validate_restart_output_manifest(simulation%runtime)
 
@@ -221,15 +221,15 @@ PROGRAM IMEX_SfloW2D
             ! In a binary restart, Z is already loaded, but we need to allocate the kernel
             ! if spatial correlation is active
             IF ((rheology_l1%stochastic_rheology_flag .OR. &
-                simulation%stochastic%config%stochastic_transport_flag) .AND. &
-                simulation%stochastic%config%length_spatial_corr > 0.0_wp) THEN
-                CALL simulation%stochastic%generate_kernel()
+                simulation%stochastic(1)%config%stochastic_transport_flag) .AND. &
+                simulation%stochastic(1)%config%length_spatial_corr > 0.0_wp) THEN
+                CALL simulation%stochastic(1)%generate_kernel()
 
             END IF
 
             IF (rheology_l1%stochastic_rheology_flag .OR. &
-                simulation%stochastic%config%stochastic_transport_flag) &
-                CALL simulation%stochastic%refresh_effective()
+                simulation%stochastic(1)%config%stochastic_transport_flag) &
+                CALL simulation%stochastic(1)%refresh_effective()
 
         ELSE
             ! ---------------------------------------------------------
@@ -268,9 +268,9 @@ PROGRAM IMEX_SfloW2D
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
     ! restart already contains Z and only needs its convolution kernel above.
     IF ((rheology_l1%stochastic_rheology_flag .OR. &
-            simulation%stochastic%config%stochastic_transport_flag) .AND. (.NOT.is_binary_restart)) &
-            CALL simulation%stochastic%initialize_steady(                                                              &
-            simulation%state, simulation%domains(1),simulation%stochastic%config%stochastic_transport_flag)
+            simulation%stochastic(1)%config%stochastic_transport_flag) .AND. (.NOT.is_binary_restart)) &
+            CALL simulation%stochastic(1)%initialize_steady(                                                        &
+            simulation%state, simulation%domains(1),simulation%stochastic(1)%config%stochastic_transport_flag)
 
     IF ( substrate%topo_change_flag ) CALL refresh_topography_geometry
 
@@ -626,7 +626,7 @@ PROGRAM IMEX_SfloW2D
 
                 CALL output_solution(simulation%runtime%t, simulation%state, simulation%runtime)
                 CALL write_restart_file(output_file_path('restart', 'restart.bin'), simulation%runtime,                &
-                    simulation%stochastic, simulation%state, simulation%domains(1))
+                    simulation%stochastic(1), simulation%state, simulation%domains(1))
 
             END IF
 

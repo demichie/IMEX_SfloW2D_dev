@@ -1,11 +1,11 @@
 !> \brief Exercise the production spatial operator, active worksets and CFL API without time stepping.
 PROGRAM test_spatial_operator
-  USE thermal_parameters_2d, ONLY : thermal_l1
-  USE rheology_parameters_2d, ONLY : rheology_l1
+  USE thermal_parameters_2d, ONLY : thermal_l1,thermal_config_type
+  USE rheology_parameters_2d, ONLY : rheology_l1,rheology_config_type
   USE parameters_2d
   USE substrate_parameters_2d, ONLY : substrate,substrate_config_type,erodible_fract
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_config_type
-  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_config_type
   USE constitutive_parameters_2d
   USE solid_transport_parameters_2d
   USE geometry_2d
@@ -41,7 +41,7 @@ PROGRAM test_spatial_operator
   USE state_types, ONLY : physical_state_real,initialize_physical_state_real
   USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
       interlayer_momentum_exchange_config_type,apply_interlayer_momentum_exchange_analytic
-  USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1,stochastic_l2
+  USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_config_type,stochastic_l1,stochastic_l2
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -367,6 +367,7 @@ PROGRAM test_spatial_operator
   CALL reconstruction%finalize
   CALL domain%finalize
   CALL check_optional_layer_spatial_slots
+  CALL check_optional_layer_lie_timestep
   WRITE(*,*) 'PASS: production spatial API, active caches, repeatable CFL and caps'
 
 CONTAINS
@@ -408,7 +409,7 @@ CONTAINS
         TYPE(source_group_type) :: groups(4),external_groups(6)
         TYPE(layer_physics_type) :: physics(2)
         TYPE(state_type) :: coupled_state
-        TYPE(stochastic_workspace_type) :: stochastic
+        TYPE(stochastic_workspace_type) :: stochastic(2)
         TYPE(interlayer_momentum_exchange_config_type) :: old_drag
         TYPE(interlayer_mass_exchange_config_type) :: old_mass
         TYPE(mass_exchange_config_type) :: old_external_l1,old_external_l2
@@ -499,10 +500,13 @@ CONTAINS
         ! no stochastic source is active in either layer in this fixture.
         stochastic_l1%stochastic_transport_flag=.FALSE.
         stochastic_l2%stochastic_transport_flag=.FALSE.
-        stochastic%config=>stochastic_l1
-        stochastic%rheology=>rheology_l1
-        ALLOCATE(stochastic%effective_Z(nx,ny))
-        stochastic%effective_Z=0.0_wp
+        stochastic(1)%config=>stochastic_l1
+        stochastic(1)%rheology=>rheology_l1
+        stochastic(2)%config=>stochastic_l2
+        stochastic(2)%rheology=>rheology_l2
+        ALLOCATE(stochastic(1)%effective_Z(nx,ny),stochastic(2)%effective_Z(nx,ny))
+        stochastic(1)%effective_Z=0.0_wp
+        stochastic(2)%effective_Z=0.0_wp
 
         CALL operators(1)%initialize(1)
         CALL operators(2)%initialize(2)
@@ -2703,6 +2707,210 @@ CONTAINS
     DEALLOCATE(primitive,conservative,residual,source_rate)
     WRITE(*,*) 'PASS: inactive optional L1/L2 initialization, sources, traces and fluxes'
   END SUBROUTINE check_optional_layer_spatial_slots
+
+    !> @brief Exercise one coupled Lie timestep with L1 Darcy and L2 stochastic transport.
+    !> @details Uses the canonical optional equation slots and the production
+    !>          spatial/Lie operators on a compact support, with no L2 production gate change.
+    SUBROUTINE check_optional_layer_lie_timestep
+        TYPE(domain_type) :: paired
+        TYPE(spatial_operator_type) :: operators(2)
+        TYPE(time_integration_workspace_type) :: workspace
+        TYPE(source_registry_type) :: registry
+        TYPE(source_group_type) :: groups(3)
+        TYPE(state_type) :: state
+        TYPE(layer_physics_type) :: physics(2)
+        TYPE(stochastic_workspace_type) :: noise(2)
+        TYPE(stochastic_config_type) :: old_stochastic_l1,old_stochastic_l2
+        TYPE(rheology_config_type) :: old_rheology_l1,old_rheology_l2
+        TYPE(pore_pressure_config_type) :: old_pore_l1,old_pore_l2
+        TYPE(thermal_config_type) :: old_thermal_l2
+        REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+        REAL(wp) :: p1(n_vars,nx,ny),p2(n_vars,nx,ny),primitive(n_vars)
+        REAL(wp) :: dt1,dt2,dt_step
+        REAL(wp) :: baseline_energy(2,nx,ny)
+        INTEGER :: old_layers,j,k,l,eq,output_unit
+        LOGICAL :: accepted,found_pore,found_ou,found_cooling
+        CHARACTER(LEN=256) :: error
+
+        IF (nx<12 .OR. ny<12) RETURN
+        old_layers=n_layers
+        old_stochastic_l1=stochastic_l1
+        old_stochastic_l2=stochastic_l2
+        old_rheology_l1=rheology_l1
+        old_rheology_l2=rheology_l2
+        old_pore_l1=pore_pressure_l1
+        old_pore_l2=pore_pressure_l2
+        old_thermal_l2=thermal_l2
+        n_layers=2
+        rheology_l1%stochastic_rheology_flag=.FALSE.
+        rheology_l2%stochastic_rheology_flag=.FALSE.
+        rheology_l2%rheology_model='none'
+        pore_pressure_l1%pore_pressure_flag=.TRUE.
+        pore_pressure_l2%pore_pressure_flag=.FALSE.
+        stochastic_l1%stochastic_transport_flag=.FALSE.
+        stochastic_l2%stochastic_transport_flag=.TRUE.
+        stochastic_l2%tau_stochastic=2.0_wp
+        stochastic_l2%std_max=0.05_wp
+        stochastic_l2%length_spatial_corr=0.0_wp
+        stochastic_l2%stochastic_seed=271828
+
+        q1=0.0_wp
+        q2=0.0_wp
+        p1=0.0_wp
+        p2=0.0_wp
+        p1(idx_T,:,:)=T_ambient
+        p2(idx_T,:,:)=T_ambient
+        DO k=5,ny-4
+            DO j=5,nx-4
+                primitive=0.0_wp
+                primitive(idx_h)=0.5_wp
+                primitive(idx_T)=T_ambient
+                primitive(idx_u)=0.1_wp
+                primitive(idx_pore)=0.2_wp
+                CALL primitive_to_conservative(primitive,q1(:,j,k),accepted=accepted)
+                IF (.NOT.accepted) ERROR STOP 'Invalid L1 Darcy optional Lie fixture'
+                primitive(idx_h)=0.3_wp
+                primitive(idx_u)=-0.1_wp
+                primitive(idx_pore)=0.0_wp
+                primitive(idx_stoch)=0.4_wp
+                primitive(idx_T)=T_ambient+20.0_wp
+                CALL primitive_to_conservative(primitive,q2(:,j,k),accepted=accepted)
+                IF (.NOT.accepted) ERROR STOP 'Invalid L2 OU optional Lie fixture'
+            END DO
+        END DO
+
+        groups(1)%id=0
+        groups(1)%scope=SOURCE_SCOPE_L1
+        groups(1)%method=SOURCE_METHOD_EXPLICIT
+        groups(1)%source_names=[CHARACTER(LEN=64)::]
+        groups(1)%equation_ids=[(eq,eq=1,n_eqns)]
+        groups(2)=groups(1)
+        groups(2)%scope=SOURCE_SCOPE_L2
+        CALL registry%initialize(n_eqns,idx_pore,groups(1:2),error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid two-layer optional Lie registry'
+        CALL physics(1)%initialize(.FALSE.,rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid optional L1 physics'
+        CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid optional L2 physics'
+
+        ALLOCATE(state%q(n_vars,2,nx,ny),state%qp(n_vars,2,nx,ny))
+        ALLOCATE(state%deposit(nx,ny,n_solid),state%erosion(nx,ny,n_solid))
+        ALLOCATE(state%erodible(n_solid,nx,ny))
+        ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
+        state%q(:,1,:,:)=q1
+        state%q(:,2,:,:)=q2
+        state%deposit=0.0_wp
+        state%erosion=0.0_wp
+        state%erodible=0.0_wp
+        state%deposit_tot=0.0_wp
+        state%erosion_tot=0.0_wp
+
+        CALL paired%initialize
+        CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+        CALL operators(1)%initialize(1)
+        CALL operators(2)%initialize(2)
+        CALL operators(1)%prepare_hp_workset(paired)
+        CALL operators(2)%prepare_hp_workset(paired)
+        CALL operators(1)%compute_timestep(q1,p1,0.0_wp,dt1,paired)
+        CALL operators(2)%compute_timestep(q2,p2,0.0_wp,dt2,paired, &
+            lower_operator=operators(1),h_lower=p1(idx_h,:,:))
+        dt_step=MIN(1.0E-5_wp,0.01_wp*MIN(dt1,dt2))
+        IF (dt_step<=0.0_wp) ERROR STOP 'Invalid optional two-layer timestep'
+        state%qp(:,1,:,:)=p1
+        state%qp(:,2,:,:)=p2
+
+        CALL noise(1)%initialize(stochastic_l1,rheology_l1,layer=1)
+        CALL noise(2)%initialize(stochastic_l2,rheology_l2,layer=2)
+        CALL workspace%initialize(registry)
+        CALL workspace%advance(state,0.0_wp,dt_step,noise,paired,operators, &
+            pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+            pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+
+        found_pore=.FALSE.
+        found_ou=.FALSE.
+        DO l=1,paired%solve_cells
+            j=paired%j_cent(l)
+            k=paired%k_cent(l)
+            IF (state%q(idx_stoch,1,j,k)/=0.0_wp .OR. state%qp(idx_stoch,1,j,k)/=0.0_wp) &
+                ERROR STOP 'Inactive L1 OU slot changed during two-layer timestep'
+            IF (state%q(idx_pore,2,j,k)/=0.0_wp .OR. state%qp(idx_pore,2,j,k)/=0.0_wp) &
+                ERROR STOP 'Inactive L2 Darcy slot changed during two-layer timestep'
+            IF (.NOT.ALL(ieee_is_finite(state%q(:,:,j,k)))) ERROR STOP 'Nonfinite optional two-layer conservative state'
+            IF (.NOT.ALL(ieee_is_finite(state%qp(:,:,j,k)))) ERROR STOP 'Nonfinite optional two-layer primitives'
+            IF (state%q(idx_pore,1,j,k)>0.0_wp) found_pore=.TRUE.
+            IF (state%q(idx_stoch,2,j,k)>0.0_wp) found_ou=.TRUE.
+            IF (state%q(idx_totMassEqn,2,j,k)>0.0_wp) THEN
+                IF (ABS(state%q(idx_stoch,2,j,k) &
+                    -state%q(idx_totMassEqn,2,j,k)*noise(2)%Z(j,k))>1.0E-10_wp) &
+                    ERROR STOP 'L2 OU state disagrees with transported conservative scalar'
+            END IF
+        END DO
+        IF (.NOT.found_pore .OR. .NOT.found_ou) ERROR STOP 'Missing active L1 Darcy or L2 OU transport'
+        IF (ANY(noise(1)%Z/=0.0_wp)) ERROR STOP 'L2 OU process modified the independent L1 field'
+
+        ! Add an explicit L2 thermal group while preserving the same spatial
+        ! and stochastic initial state. L1 energy must not inherit L2 cooling.
+        baseline_energy=state%q(idx_engyEqn,:,:,:)
+        CALL workspace%finalize
+        CALL registry%finalize()
+        thermal_l2%thermal_cooling_flag=.TRUE.
+        thermal_l2%emissivity=0.8_wp
+        thermal_l2%atm_heat_transf_coeff=15.0_wp
+        thermal_l2%exp_area_fract=1.0_wp
+        CALL physics(2)%finalize()
+        CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid optional L2 thermal physics'
+        groups(3)=groups(2)
+        groups(3)%id=2
+        groups(3)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
+        CALL registry%initialize(n_eqns,idx_pore,groups,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid optional L2 thermal Lie registry'
+        CALL workspace%initialize(registry)
+        state%q(:,1,:,:)=q1
+        state%q(:,2,:,:)=q2
+        state%qp(:,1,:,:)=p1
+        state%qp(:,2,:,:)=p2
+        CALL workspace%advance(state,0.0_wp,dt_step,noise,paired,operators, &
+            pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+            pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+        found_cooling=.FALSE.
+        DO l=1,paired%solve_cells
+            j=paired%j_cent(l)
+            k=paired%k_cent(l)
+            IF (state%q(idx_engyEqn,1,j,k)/=baseline_energy(1,j,k)) &
+                ERROR STOP 'L2 thermal source changed L1 energy'
+            IF (state%q(idx_engyEqn,2,j,k)<baseline_energy(2,j,k)) found_cooling=.TRUE.
+            IF (state%q(idx_engyEqn,2,j,k)>baseline_energy(2,j,k)) &
+                ERROR STOP 'L2 thermal cooling increased L2 energy'
+        END DO
+        IF (.NOT.found_cooling) ERROR STOP 'L2 thermal Lie source had no cooling effect'
+        ! The binary payload also verifies seeded L2 OU and both optional
+        ! conservative slots bitwise across 1 and 4 OpenMP threads.
+        OPEN(NEWUNIT=output_unit,FILE='optional_lie.bin',ACCESS='STREAM', &
+            FORM='UNFORMATTED',STATUS='REPLACE')
+        WRITE(output_unit) state%q,state%qp,noise(1)%Z,noise(2)%Z,noise(2)%effective_Z
+        CLOSE(output_unit)
+
+        CALL workspace%finalize
+        CALL noise(1)%finalize
+        CALL noise(2)%finalize
+        CALL operators(1)%finalize
+        CALL operators(2)%finalize
+        CALL paired%finalize
+        CALL physics(1)%finalize
+        CALL physics(2)%finalize
+        DEALLOCATE(state%q,state%qp,state%deposit,state%erosion,state%erodible)
+        DEALLOCATE(state%deposit_tot,state%erosion_tot)
+        stochastic_l1=old_stochastic_l1
+        stochastic_l2=old_stochastic_l2
+        rheology_l1=old_rheology_l1
+        rheology_l2=old_rheology_l2
+        pore_pressure_l1=old_pore_l1
+        pore_pressure_l2=old_pore_l2
+        thermal_l2=old_thermal_l2
+        n_layers=old_layers
+        WRITE(*,*) 'PASS: two-layer Lie with independent L1 Darcy and L2 stochastic transport'
+    END SUBROUTINE check_optional_layer_lie_timestep
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.
   !> \details Uses mixed-sign and near-zero component stencils with a

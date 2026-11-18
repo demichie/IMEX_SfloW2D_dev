@@ -35,7 +35,7 @@ MODULE simulation_2d
     USE domain_2d, ONLY : domain_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE time_integration_2d, ONLY : time_integration_workspace_type
-    USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1
+    USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1,stochastic_l2
 
     IMPLICIT NONE
 
@@ -77,7 +77,7 @@ MODULE simulation_2d
         TYPE(domain_type), ALLOCATABLE :: domains(:) !< Layer-local active cell and face worklists.
         TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
         TYPE(time_integration_workspace_type) :: time_integration
-        TYPE(stochastic_workspace_type) :: stochastic
+        TYPE(stochastic_workspace_type), ALLOCATABLE :: stochastic(:) !< Independent OU workspace for each layer.
 
     CONTAINS
 
@@ -151,7 +151,10 @@ CONTAINS
 
         CALL this%time_integration%initialize(this%source_registry)
 
-        CALL this%stochastic%initialize(stochastic_l1,rheology_l1)
+        ALLOCATE(this%stochastic(this%model_layout%n_layers))
+        CALL this%stochastic(1)%initialize(stochastic_l1,rheology_l1,layer=1)
+        IF (this%model_layout%n_layers==2) &
+            CALL this%stochastic(2)%initialize(stochastic_l2,rheology_l2,layer=2)
 
         WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
 
@@ -234,7 +237,12 @@ CONTAINS
         CALL this%source_registry%finalize()
         IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
         CALL this%model_layout%finalize
-        CALL this%stochastic%finalize
+        IF (ALLOCATED(this%stochastic)) THEN
+            DO layer=1,SIZE(this%stochastic)
+                CALL this%stochastic(layer)%finalize
+            END DO
+            DEALLOCATE(this%stochastic)
+        END IF
 
     END SUBROUTINE finalize_simulation
 

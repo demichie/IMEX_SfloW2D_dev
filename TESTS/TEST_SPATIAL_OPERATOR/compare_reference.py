@@ -352,6 +352,11 @@ def main():
                 raise AssertionError(f"{tag}: missing integrated two-layer Lie timestep payload")
             if integrated[0].read_bytes() != integrated[1].read_bytes():
                 raise AssertionError(f"{tag}: integrated two-layer Lie state differs between 1 and 4 threads")
+            optional = [Path(tag)/f"threads-{threads}"/"optional_lie.bin" for threads in (1, 4)]
+            if not optional[0].is_file() or not optional[1].is_file():
+                raise AssertionError(f"{tag}: missing optional-layer Lie timestep payload")
+            if optional[0].read_bytes() != optional[1].read_bytes():
+                raise AssertionError(f"{tag}: optional Darcy/OU/thermal Lie state differs between 1 and 4 threads")
             print(f"PASS: {args.profile} {tag}, complete residual/geometry/traces/directional CFL, actual 1/4 threads", flush=True)
             for record in results:
                 print("N7_SPATIAL_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)

@@ -18,7 +18,7 @@ MODULE time_integration_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE layer_physics_2d, ONLY : layer_physics_type
     USE source_registry_2d, ONLY : source_registry_type
-    USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l2
+    USE stochastic_module, ONLY : stochastic_workspace_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,initialize_lie_source_executor, &
@@ -53,6 +53,7 @@ MODULE time_integration_2d
 CONTAINS
     !> @brief Allocate integration workspaces from the configured domain sizes.
     !> @param[in,out] this Integration workspace to allocate.
+    !> @param[in] source_registry Validated Lie source groups for the executor.
     SUBROUTINE initialize_time_integration(this,source_registry)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
         TYPE(source_registry_type), INTENT(IN) :: source_registry
@@ -78,8 +79,9 @@ CONTAINS
     !> @param[in,out] state Fluid and substrate state, committed after acceptance.
     !> @param[in] t Start time of timestep [s].
     !> @param[in] dt Positive timestep duration [s].
-    !> @param[in] stochastic_values Per-cell stochastic input array.
-    !> @param[in] source_registry Ordered Lie source groups.
+    !> @param[in,out] stochastic Independent OU workspace for each active layer.
+    !> @param[in] pre_spatial_primitives_ready Reuse CFL-prepared primitive traces when true.
+    !> @param[in] stochastic_prepared_hook Optional observer after OU preparation.
     !> @param[in] domain Active and reconstruction cell worklists.
     !> @param[in,out] spatial_operators Per-layer HP-PCCU workspaces; both slots execute for L1/L2.
     !> @param[in] layer_physics Canonical per-layer physical descriptors.
@@ -89,7 +91,7 @@ CONTAINS
         CLASS(time_integration_workspace_type), TARGET, INTENT(INOUT) :: this
         CLASS(state_type), TARGET, INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: t,dt
-        CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
+        TYPE(stochastic_workspace_type), INTENT(INOUT) :: stochastic(:)
         PROCEDURE(stochastic_stage_observer), OPTIONAL :: stochastic_prepared_hook
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operators(:)
@@ -118,17 +120,15 @@ CONTAINS
             rheology(layer)=layer_physics(layer)%rheology_configuration()
             pore_pressure(layer)=layer_physics(layer)%pore_pressure_configuration()
             mass_config(layer)=layer_physics(layer)%mass_exchange_configuration()
-            transport_stochastic(layer)=.FALSE.
             pore_enabled(layer)=pore_pressure(layer)%pore_pressure_flag
             stochastic_enabled(layer)=rheology(layer)%stochastic_rheology_flag
         END DO
-        transport_stochastic(1)=stochastic%config%stochastic_transport_flag
-        ! The OU workspace is still L1-owned. Never reuse its effective field
-        ! for an independently configured L2 stochastic rheology.
-        IF (n_layers==2) THEN
-            IF (stochastic_enabled(2) .OR. stochastic_l2%stochastic_transport_flag) &
-                CALL fatal_error('TL07: L2 stochastic physics requires its own OU workspace')
-        END IF
+        IF (SIZE(stochastic)<n_layers) CALL fatal_error('Missing stochastic workspace for layer')
+        DO layer=1,n_layers
+            IF (.NOT.ASSOCIATED(stochastic(layer)%config)) &
+                CALL fatal_error('Uninitialized stochastic layer configuration')
+            transport_stochastic(layer)=stochastic(layer)%config%stochastic_transport_flag
+        END DO
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tick,tick_rate)
             this%profile_calls=this%profile_calls+1
@@ -258,20 +258,29 @@ CONTAINS
         ! are valid only on the solve worklist, so stochastic%prepare_timestep
         ! uses the published state for inactive cells. Keep both published
         ! fluid arrays untouched until the final Lie transaction commits.
-        IF (rheology(1)%stochastic_rheology_flag .OR. stochastic%config%stochastic_transport_flag) THEN
-            CALL stochastic%prepare_timestep(state,dt,stochastic%config%stochastic_transport_flag, &
-                this%q_trial(:,1,:,:),this%qp_trial(:,1,:,:),domain)
-        END IF
+        DO layer=1,n_layers
+            IF (.NOT.stochastic_enabled(layer) .AND. .NOT.transport_stochastic(layer)) CYCLE
+            CALL stochastic(layer)%prepare_timestep(state,dt,transport_stochastic(layer), &
+                this%q_trial(:,layer,:,:),this%qp_trial(:,layer,:,:),domain)
+        END DO
         IF (PRESENT(stochastic_prepared_hook)) CALL stochastic_prepared_hook()
         ! Group 0 evaluates q^n but limits and applies to post-spatial q*.
         ! The geometry transaction supports deferred topography updates;
         ! it is not a recoverable timestep or retry mechanism.
         needs_geometry_update=this%lie_executor%has_bed_group
         IF (needs_geometry_update) CALL begin_geometry_transaction(sparse=.TRUE.)
-        CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
-            stochastic%effective_Z,t,state%q,qp_pre_all,source_step_failed,source_failure, &
-            thermal,rheology,pore_pressure,pore_caches,mass_config, &
-            transport_stochastic,pore_enabled,stochastic_enabled)
+        IF (n_layers==2) THEN
+            CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
+                stochastic(1)%effective_Z,t,state%q,qp_pre_all,source_step_failed,source_failure, &
+                thermal,rheology,pore_pressure,pore_caches,mass_config, &
+                transport_stochastic,pore_enabled,stochastic_enabled, &
+                stochastic_values_l2=stochastic(2)%effective_Z)
+        ELSE
+            CALL execute_lie_source_groups(this%lie_executor,state,this%q_trial,this%qp_trial,dt,domain, &
+                stochastic(1)%effective_Z,t,state%q,qp_pre_all,source_step_failed,source_failure, &
+                thermal,rheology,pore_pressure,pore_caches,mass_config, &
+                transport_stochastic,pore_enabled,stochastic_enabled)
+        END IF
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)

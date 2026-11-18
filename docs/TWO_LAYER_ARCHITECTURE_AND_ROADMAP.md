@@ -213,10 +213,10 @@ abilitazione in produzione.
 
 | Fase | Stato | Lavoro residuo / gate |
 |---|---|---|
-| **TL00–TL04 — Stato e fisica per layer** | Base predisposta | Verificare i percorsi integrati ancora scoperti: slot opzionali, IC/BC, input, output e regressioni L1/L2. |
+| **TL00–TL04 — Stato e fisica per layer** | Slot opzionali e workspace OU L1/L2 collegati, verifica CI pendente | L1/L2 condividono il layout opzionale ma mantengono configurazioni, campi OU e flussi casuali indipendenti. Restano IC/BC e I/O/restart completi nei blocchi successivi. |
 | **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
 | **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
-| **TL07 — Lie accoppiato** | Percorso integrato e regressioni estese; verifica CI finale pendente | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo con i quattro stati wet/dry. Restano il gate funzionale generale, le variabili opzionali e il workspace OU L2 (blocchi successivi). Verificare strict/optimized e OpenMP sul commit finale del blocco 1 prima di chiudere TL07. |
+| **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano validazione della transazione Lie effettiva, variabili opzionali per layer, stati termodinamici finali, drag e test two-layer end-to-end. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
@@ -225,10 +225,10 @@ abilitazione in produzione.
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
 post-spaziale in `time_integration_2d%advance` e' stato rimosso: lo stesso
 percorso sorgenti e commit viene ora attraversato da L1 e L2. Il layout
-continua a rifiutare `N_LAYERS=2` nei run produttivi. Per evitare l'uso
-incrociato del rumore L1, l'eventuale reologia/trasporto stochastic L2
-non e' ancora abilitata. Questo collegamento richiede test di passo
-accoppiato con invarianti fisici prima di essere considerato concluso.
+continua a rifiutare `N_LAYERS=2` nei run produttivi. Il blocco 2 sostituisce il precedente rifiuto del campo stochastic L2
+con un workspace e un flusso RNG indipendenti per layer. La funzione
+produttiva two-layer resta comunque bloccata dal gate di layout fino
+all'accettazione funzionale e scientifica.
 
 **TL07 - regressione integrata del timestep:** `TEST_SPATIAL_OPERATOR`
 esercita ora direttamente `time_integration_workspace_type%advance`
@@ -282,6 +282,30 @@ transazione. La copertura delle sorgenti di terreno e' ora inclusa nella regress
 integrata del timestep, ma necessita della verifica CI finale. Variabili
 opzionali, BC e restart restano nel perimetro dei blocchi successivi.
 Il gate produttivo `N_LAYERS=2` rimane chiuso.
+
+**Blocco 2 - variabili opzionali e OU per layer (18 novembre 2026):**
+`simulation_context_type` possiede un array di workspace OU, uno per
+layer, senza copie dei campi e senza riutilizzare il rumore di L1 per L2.
+L1 mantiene la successione RNG globale, inclusa quella ripristinata
+dal restart binario storico; L2 possiede una successione indipendente
+e ripristina il generatore globale dopo ogni prelievo. Ciascun workspace
+usa il layer assegnato per leggere massa, velocita' e componenti conservate. Il
+timestep prepara i campi dopo lo spaziale per ciascun layer attivo;
+l'esecutore Lie legge il corrispondente `effective_Z` per ogni gruppo.
+La legge termica e i coefficienti Darcy continuano a usare le
+configurazioni e le cache di layer gia' canoniche. Il parser accetta
+`STOCHASTIC_L2_PARAMETERS` per due layer e calcola `std_min` e la scala
+di velocita' con lo stesso kernel di validazione L1.
+
+`TEST_STOCHASTIC_EVOLUTION` verifica evoluzione, trasporto, seed e
+indipendenza del campo L2; `TEST_SPATIAL_OPERATOR` esercita il
+timestep integrato con Darcy passivo L1, OU L2 e una sorgente termica
+esplicita L2, verificando che non modifichi L1. Il payload
+`optional_lie.bin` confronta anche i campi OU L2 con rumore seminato e
+lo stato dei due layer bitwise tra 1 e 4 thread OpenMP. La compilazione e le
+regressioni sul commit del blocco 2 devono ancora essere osservate.
+Il restart two-layer, il NetCDF e l'attivazione produttiva rimangono
+nei blocchi successivi; nessuna ipotesi fisica e' stata modificata.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
