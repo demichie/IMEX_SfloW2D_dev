@@ -29,17 +29,6 @@ MODULE state_fields
     PRIVATE
     PUBLIC :: initialize_dry_physical_cell
     PUBLIC :: physical_cell_state_finite, finite_real_value
-    PUBLIC :: substrate_snapshot_type
-
-    !> Pre-step substrate inventory snapshot for transactional time integration.
-    !> @brief Snapshot of substrate inventories for transactional rollback.
-    TYPE :: substrate_snapshot_type
-        !> Per-solid deposited, eroded and erodible inventories in grid cells.
-        REAL(wp), ALLOCATABLE :: deposit(:,:,:),erosion(:,:,:),erodible(:,:,:)
-        !> Total deposited and eroded thickness fields for rollback.
-        REAL(wp), ALLOCATABLE :: deposit_tot(:,:),erosion_tot(:,:)
-    END TYPE substrate_snapshot_type
-
     !> \brief Owned cell states and diagnostics for one simulation.
     !> \details Fluid arrays use (component,layer,x-cell,y-cell); diagnostic maps use
     !>          (x-cell,y-cell). The model layout fixes component counts and indices.
@@ -79,8 +68,6 @@ MODULE state_fields
         PROCEDURE :: initialize => initialize_state
         PROCEDURE :: finalize => finalize_state
         PROCEDURE :: refresh_substrate_totals => refresh_substrate_totals
-        PROCEDURE :: snapshot_substrate => snapshot_substrate
-        PROCEDURE :: restore_substrate => restore_substrate
 
     END TYPE state_type
 
@@ -167,39 +154,6 @@ CONTAINS
         qp_cell = 0.0_wp
         qp_cell(idx_T) = T_ambient
     END SUBROUTINE initialize_dry_physical_cell
-
-    !> @brief Capture substrate fields into reusable rollback storage.
-    !> @details The destination is INTENT(INOUT) so its allocatable buffers can be reused.
-    !> @param[in] this Authoritative simulation state owning grid arrays and substrate inventories.
-    !> @param[inout] snapshot Independent, reusable substrate inventory snapshot for rollback.
-    SUBROUTINE snapshot_substrate(this,snapshot)
-        CLASS(state_type), INTENT(IN) :: this
-        ! Keep all substrate fields in the snapshot: exchange groups can update
-        ! inventories and their diagnostic totals before a later Lie group fails.
-        ! Partial snapshots need a separate write-set audit and rollback tests.
-        ! Reuse allocated rollback buffers across Lie steps. INTENT(OUT)
-        ! would deallocate allocatable snapshot components on every entry.
-        TYPE(substrate_snapshot_type), INTENT(INOUT) :: snapshot
-        snapshot%deposit=this%deposit
-        snapshot%erosion=this%erosion
-        snapshot%erodible=this%erodible
-        snapshot%deposit_tot=this%deposit_tot
-        snapshot%erosion_tot=this%erosion_tot
-    END SUBROUTINE snapshot_substrate
-
-    !> @brief Restore substrate fields from a previously captured snapshot.
-    !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
-    !> inventories.
-    !> @param[in] snapshot Independent, reusable substrate inventory snapshot for rollback.
-    SUBROUTINE restore_substrate(this,snapshot)
-        CLASS(state_type), INTENT(INOUT) :: this
-        TYPE(substrate_snapshot_type), INTENT(IN) :: snapshot
-        this%deposit=snapshot%deposit
-        this%erosion=snapshot%erosion
-        this%erodible=snapshot%erodible
-        this%deposit_tot=snapshot%deposit_tot
-        this%erosion_tot=snapshot%erosion_tot
-    END SUBROUTINE restore_substrate
 
     !> @brief Refresh substrate totals without replacing the authoritative lava deposit.
     !> @details For lava deposit_tot is accumulated immobilized thickness; for

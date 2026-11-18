@@ -9,7 +9,7 @@ PROGRAM test_projection_stress
   USE solid_transport_parameters_2d
   USE substrate_parameters_2d, ONLY : substrate, erodible_fract, coeff_porosity
   USE geometry_2d
-  USE state_fields, ONLY : state_type,substrate_snapshot_type
+  USE state_fields, ONLY : state_type
   USE state_composition, ONLY : conservative_mass_admissible
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
@@ -62,7 +62,7 @@ PROGRAM test_projection_stress
         CALL reset_state(.FALSE.)
         IF (level==0) THEN
            CALL check_lie_exchange_transaction
-           CALL check_lie_rejected_transaction
+           CALL check_lie_failure_status
         END IF
         DO k=1,ny
            DO j=1,nx
@@ -685,26 +685,21 @@ CONTAINS
     CALL reset_state(.FALSE.)
   END SUBROUTINE check_lie_exchange_transaction
 
-  !> A later-cell failure invalidates the whole Lie time-step.
-  !> The caller must restore substrate and geometry snapshots, while the
-  !> partially updated fluid trial is never published.
-  SUBROUTINE check_lie_rejected_transaction
+  !> A later-cell rejection must be reported to the fatal-only timestep.
+  !> This direct-executor regression checks failure propagation, not a
+  !> recoverable rollback of substrate inventories or published fluid fields.
+  SUBROUTINE check_lie_failure_status
     TYPE(source_registry_type) :: registry
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
-    TYPE(substrate_snapshot_type) :: substrate_before
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
-    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq,nx,ny)
     REAL(wp) :: q_work(nq,1,nx,ny),qp_work(nq,1,nx,ny)
     REAL(wp) :: qp_invalid(nq,nx,ny)
-    REAL(wp) :: bed_before(nx+1,ny+1)
-    REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
-    REAL(wp) :: erodible_before(ns,nx,ny),lava_before(nx,ny)
-    REAL(wp) :: centers_before(nx,ny),slope_before(nx,ny)
     REAL(wp) :: pressure
     INTEGER :: a,b,l
     LOGICAL :: failed,accepted
     CHARACTER(LEN=256) :: error,message
+
     CALL reset_state(.FALSE.)
     groups(1)%id=0
     groups(1)%method=SOURCE_METHOD_EXPLICIT
@@ -712,6 +707,7 @@ CONTAINS
     groups(1)%equation_ids=[(l,l=1,nq)]
     CALL registry%initialize(nq,0,groups,error)
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
+
     DO b=1,ny
        DO a=1,nx
           CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
@@ -719,45 +715,35 @@ CONTAINS
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
     END DO
-    q_before=q;qp_before=qp
-    bed_before=B_vertex
-    deposited_before=state%deposit;eroded_before=state%erosion
-    erodible_before=state%erodible;lava_before=state%deposit_tot
-    centers_before=B_cent;slope_before=B_prime_x_geom
-    q_trial=q_before;qp_trial=qp_before
-    q_work(:,1,:,:)=q_trial;qp_work(:,1,:,:)=qp_trial
-    ! Cell 2 is rejected after cell 1 has been considered for transfer.
-    ! An independent immutable pre-spatial input avoids aliasing an INTENT(INOUT)
-    ! candidate with the executor's INTENT(IN) GROUP-0 reference.
+
+    q_before=q
+    qp_before=qp
+    q_work(:,1,:,:)=q_before
+    qp_work(:,1,:,:)=qp_before
+
+    ! A rejected cell follows a valid one. The executor may have modified
+    ! its trial and shared substrate arrays when reporting the failure.
     qp_invalid=qp_before
     qp_invalid(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
-    CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
     CALL initialize_lie_source_executor(executor,registry)
     CALL execute_lie_source_groups(executor,state,q_work,qp_work,1.0_wp,domain, &
          q_original=RESHAPE(q_before,[nq,1,nx,ny]),qp_original=RESHAPE(qp_invalid,[nq,1,nx,ny]), &
          step_failed=failed,failure_message=message,thermal=[thermal_l1],rheology=[rheology_l1], &
-          pore_pressure=[pore_pressure_l1],pore_cache=[pore_pressure_cache_l1], &
-          mass_config=[mass_exchange_l1], &
-           transport_stochastic=[.FALSE.],pore_enabled=[pore_pressure_l1%pore_pressure_flag], &
-           stochastic_enabled=[rheology_l1%stochastic_rheology_flag])
+         pore_pressure=[pore_pressure_l1],pore_cache=[pore_pressure_cache_l1], &
+         mass_config=[mass_exchange_l1], &
+         transport_stochastic=[.FALSE.],pore_enabled=[pore_pressure_l1%pore_pressure_flag], &
+         stochastic_enabled=[rheology_l1%stochastic_rheology_flag])
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
-    CALL state%restore_substrate(substrate_before)
+
+    ! Dispose of this test's geometry transaction. Production treats the
+    ! rejected timestep as fatal and never promises substrate recovery.
     CALL rollback_geometry_transaction
-    ! Fluid workspaces are not published by the Lie driver on rejection.
-    q_trial=q_before;qp_trial=qp_before
-    IF (ANY(q_trial/=q_before) .OR. ANY(qp_trial/=qp_before)) &
-         ERROR STOP 'Rejected Lie fluid state changed'
-    IF (ANY(B_vertex/=bed_before) .OR. ANY(B_cent/=centers_before) .OR. &
-         ANY(B_prime_x_geom/=slope_before)) ERROR STOP 'Lie bed rollback mismatch'
-    IF (ANY(state%deposit/=deposited_before) .OR. ANY(state%erosion/=eroded_before) .OR. &
-         ANY(state%erodible/=erodible_before) .OR. ANY(state%deposit_tot/=lava_before)) &
-         ERROR STOP 'Lie inventory rollback mismatch'
     CALL finalize_lie_source_executor(executor)
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
-  END SUBROUTINE check_lie_rejected_transaction
+  END SUBROUTINE check_lie_failure_status
 
   !> \brief Generate reproducible rates with a portable nonoverflowing integer generator.
   !> \param[in] signed_rate Allow either deposition-like or erosion-like bed proposals.

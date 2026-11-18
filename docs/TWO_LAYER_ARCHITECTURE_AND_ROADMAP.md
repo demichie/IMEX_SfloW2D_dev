@@ -218,8 +218,8 @@ abilitazione in produzione.
 | **TL06 — Spaziale accoppiato** | Regresioni accoppiate validate nel blocco 3 | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
-| **TL12 — I/O e integrazione** | I/O two-layer implementato; CI blocco 5 pendente | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
-| **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
+| **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
+| **TL13a — Gate funzionale** | Audit e pulizia in corso; gate produttivo chiuso | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
@@ -438,3 +438,14 @@ duplicazioni, dipendenze coerenti, test realmente superati sul
 commit interessato e distinzione tra software funzionalmente
 integrato e modello scientificamente validato. `N_LAYERS=2`
 resta disabilitato fino al gate e alla relativa autorizzazione.
+
+
+**TL13a — rimozione di ripristino substrato non produttivo (18 novembre 2026):**
+L'API `substrate_snapshot_type`, `snapshot_substrate` e
+`restore_substrate` era usata soltanto da due fixture di test; il
+timestep produttivo usa un errore fatale senza retry e non dispone
+di un rollback recuperabile globale. La pulizia elimina tale
+interfaccia e allinea i test al contratto attuale, mantenendo la
+transazione della geometria e i controlli aggregati lava/granulare.
+Le Actions sul commit di pulizia devono essere verificate
+separatamente. Il gate `N_LAYERS=2` resta disabilitato.

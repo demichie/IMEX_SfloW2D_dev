@@ -12,7 +12,7 @@ PROGRAM test_workspace_lifecycle
        begin_geometry_transaction, rollback_geometry_transaction, &
        commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
-  USE state_fields, ONLY : state_type, substrate_snapshot_type
+  USE state_fields, ONLY : state_type
   USE substrate_parameters_2d, ONLY : substrate
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -21,7 +21,6 @@ PROGRAM test_workspace_lifecycle
   IMPLICIT NONE
 
   TYPE(state_type) :: state
-  TYPE(substrate_snapshot_type) :: substrate_before
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
     TYPE(spatial_operator_type), ALLOCATABLE :: spatial_slots(:) !< Independent slot-local workspaces.
@@ -61,8 +60,7 @@ PROGRAM test_workspace_lifecycle
        .NOT.ALLOCATED(sourceE_vect_x) .AND. .NOT.ALLOCATED(sourceW_vect_x) &
        .AND. .NOT.ALLOCATED(sourceS_vect_x) .AND. .NOT.ALLOCATED(sourceN_vect_x))
 
-  ! Verify that the authoritative physical inventories and their aggregate
-  ! maps are restored exactly after a simulated rejected transaction.
+  ! Initialize authoritative inventories for granular and lava aggregation checks.
   ALLOCATE(state%deposit(comp_cells_x,comp_cells_y,1))
   ALLOCATE(state%erosion(comp_cells_x,comp_cells_y,1))
   ALLOCATE(state%erodible(1,comp_cells_x,comp_cells_y))
@@ -73,18 +71,6 @@ PROGRAM test_workspace_lifecycle
   state%erodible=3.0_wp
   state%deposit_tot=5.0_wp
   state%erosion_tot=6.0_wp
-  CALL state%snapshot_substrate(substrate_before)
-  state%deposit=-11.0_wp
-  state%erosion=-12.0_wp
-  state%erodible=-13.0_wp
-  state%deposit_tot=-15.0_wp
-  state%erosion_tot=-16.0_wp
-  CALL state%restore_substrate(substrate_before)
-  CALL assert_true('rollback restores deposition', ALL(state%deposit==1.0_wp))
-  CALL assert_true('rollback restores erosion', ALL(state%erosion==2.0_wp))
-  CALL assert_true('rollback restores erodible inventory', ALL(state%erodible==3.0_wp))
-  CALL assert_true('rollback restores deposit totals', ALL(state%deposit_tot==5.0_wp))
-  CALL assert_true('rollback restores erosion totals', ALL(state%erosion_tot==6.0_wp))
 
   ! Canonical lava deposit must survive a refresh even with no solid classes,
   ! without consulting the (deliberately invalid) granular porosity.
@@ -95,23 +81,6 @@ PROGRAM test_workspace_lifecycle
   CALL state%refresh_substrate_totals()
   CALL assert_true('lava deposit survives n_solid=0 refresh', ALL(state%deposit_tot==2.5_wp))
   CALL assert_true('lava has no granular erosion total', ALL(state%erosion_tot==0.0_wp))
-  ! The canonical lava inventory must also be restored after a rejected
-  ! timestep, independently of the granular class inventory and its totals.
-  ! Reuse the same snapshot to check allocation-safe repeated transactions.
-  CALL state%snapshot_substrate(substrate_before)
-  state%deposit_tot(2,3)=9.75_wp
-  state%deposit(2,3,1)=17.0_wp
-  state%erosion_tot(2,3)=8.0_wp
-  CALL state%restore_substrate(substrate_before)
-  CALL assert_true('lava rollback restores canonical thickness', &
-       ALL(state%deposit_tot==2.5_wp))
-  CALL assert_true('lava rollback restores class inventory', &
-       ALL(state%deposit==1.0_wp))
-  CALL assert_true('lava rollback restores erosion total', &
-       ALL(state%erosion_tot==0.0_wp))
-  CALL state%refresh_substrate_totals()
-  CALL assert_true('lava rollback survives subsequent refresh', &
-       ALL(state%deposit_tot==2.5_wp))
   ! Switching back to a zero-class granular carrier must clear the
   ! aggregate instead of interpreting the lava thickness as sediment.
   lava_flag=.FALSE.
