@@ -11,7 +11,7 @@ fluid_viscosity=eval_lahar_fluid_viscosity(config,state%T,SUM(state%alphas))
 IF (REAL(state%h,wp)>depth_threshold) THEN
     inverse_depth=1.0_wp/state%h
     viscous_slope=config%Kappa*fluid_viscosity*state%mod_vel*0.125_wp &
-        *state%inv_rhom*inv_grav*inverse_depth**2
+        *state%inv_rho_m*inv_grav*inverse_depth**2
     turbulent_slope=(config%n_td**2)*state%mod_vel**2*inverse_depth**four_thirds
 ELSE
     viscous_slope=config%Kappa*fluid_viscosity*state%mod_vel &

@@ -187,7 +187,7 @@ PROGRAM test_analytic_velocity
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
-    cs%inv_rhom=CMPLX(1.0_wp/mixture_density,0.0_wp,wp)
+    cs%inv_rho_m=CMPLX(1.0_wp/mixture_density,0.0_wp,wp)
     cs%alphas=CMPLX(solid_fraction,0.0_wp,wp)
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2

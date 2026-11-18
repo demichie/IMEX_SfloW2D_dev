@@ -67,7 +67,7 @@ PROGRAM test_shared_implicit_kernels
     state%h=2.0_wp
     state%T=320.0_wp
     state%rho_m=1800.0_wp
-    state%inv_rhom=1.0_wp/state%rho_m
+    state%inv_rho_m=1.0_wp/state%rho_m
     state%red_grav=5.0_wp
     state%alphas=0.15_wp
     state%curvature_acceleration=0.0_wp

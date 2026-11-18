@@ -471,7 +471,7 @@ qp contiene h, u, v, T, frazioni massiche e variabili trasportate secondo il lay
 | Classe | Campi/semantica |
 | --- | --- |
 | Fondamentali | h, u, v, T; variabili trasportate Zs e pressione di poro in eccesso. |
-| Miscela e carrier | rho_m, inv_rhom, rho_c, inv_rho_c, cp_m, cp_c. |
+| Miscela e carrier | rho_m, inv_rho_m, rho_c, inv_rho_c, cp_m, cp_c. |
 | Composizione | xs, xg, alphas, alphag, incluse frazioni zero quando la fase è assente. |
 | Galleggiamento | red_grav e Ri (con soglia e saturazione originali). |
 | Cinematica / topografia | w, mod_vel_hor, mod_vel2, mod_vel, curvature_acceleration. |
@@ -509,7 +509,7 @@ La struttura logica è composta da quattro kernel principali, più helper matema
 1. Esaminare ammissibilità prima delle divisioni; trattare M ≤ soglia con la convenzione dry esistente.
 1. Calcolare inv_M una volta, e da esso xs, xg e scalari trasportati; applicare esattamente la chiusura con la semantica di accettazione/fallimento.
 1. Calcolare cp_m una volta; ricavare T = E/(M cp_m) rispettando fallback di temperatura e soglia eps_sing.
-1. Calcolare rho_m/inv_rhom tramite la formula canonica, ma non costruire alphas/alphag se l’implementazione specializzata può evitarlo senza duplicare la fisica.
+1. Calcolare rho_m/inv_rho_m tramite la formula canonica, ma non costruire alphas/alphag se l’implementazione specializzata può evitarlo senza duplicare la fisica.
 1. Calcolare h = M/rho_m e velocità usando la regolarizzazione corrente; produrre qp e l’eventuale p_dyn. Non costruire un physical_state.
 Le duplicazioni oggi presenti nella validazione di qc_to_qp e nella decodifica r_phys_var vanno eliminate, ma senza anticipare normalizzazioni che cambierebbero energia o massa. Le formule e l’ordine delle operazioni devono essere confrontati con l’oracolo attuale.
 

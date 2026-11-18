@@ -65,7 +65,7 @@ CONTAINS
     complex_state%h=CMPLX(2.0_wp,0.0_wp,wp)
     complex_state%T=CMPLX(300.0_wp,0.0_wp,wp)
     complex_state%rho_m=density
-    complex_state%inv_rhom=1.0_wp/density
+    complex_state%inv_rho_m=1.0_wp/density
     complex_state%u=v(1)
     complex_state%v=v(2)
     CALL update_physical_state_kinematics(complex_state,0.0_wp,0.0_wp, &

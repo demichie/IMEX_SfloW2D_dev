@@ -182,7 +182,7 @@ CONTAINS
             CALL assert_close('shared q->qp u',qp_check(idx_u),physical%u,tolerance)
             CALL assert_close('shared q->qp v',qp_check(idx_v),physical%v,tolerance)
             CALL assert_close('shared q->qp h',qp_check(idx_h),physical%h,tolerance)
-            gravity_value=evaluate_reduced_gravity(physical%rho_m,physical%inv_rhom)
+            gravity_value=evaluate_reduced_gravity(physical%rho_m,physical%inv_rho_m)
             CALL assert_close('shared reduced gravity',gravity_value,physical%red_grav,0.0_wp)
 
             cq_case=CMPLX(q_case,0.0_wp,wp)
@@ -216,7 +216,7 @@ CONTAINS
     !> inverse conversion must agree with the canonical mass-based EOS.
     SUBROUTINE check_inverse_volume_conversion
         REAL(wp) :: alphas(2),alphag(1),given_alphas(2),given_alphag(1)
-        REAL(wp) :: xs(2),xg(1),xc,rho_m,inv_rhom,rho_c,cp_m,cp_c
+        REAL(wp) :: xs(2),xg(1),xc,rho_m,inv_rho_m,rho_c,cp_m,cp_c
         REAL(wp) :: rho_ref,inv_rhom_ref,rho_c_ref,inv_rho_c_ref
         REAL(wp) :: cp_m_ref,cp_c_ref,alphas_ref(2),alphag_ref(1)
         REAL(wp) :: expected_density
@@ -243,11 +243,11 @@ CONTAINS
                 alphas=given_alphas
                 alphag=given_alphag
                 CALL evaluate_mixture_from_volume(350.0_wp,alphag,alphas, &
-                    rho_m,inv_rhom,rho_c,xs,xg,xc,cp_c,cp_m)
+                    rho_m,inv_rho_m,rho_c,xs,xg,xc,cp_c,cp_m)
                 CALL evaluate_mixture(350.0_wp,xs,xg,rho_ref,inv_rhom_ref, &
                     rho_c_ref,inv_rho_c_ref,cp_m_ref,cp_c_ref,alphas_ref,alphag_ref)
                 CALL assert_close('volume inverse mixture density',rho_m,rho_ref,0.0_wp)
-                CALL assert_close('volume inverse inverse density',inv_rhom,inv_rhom_ref,0.0_wp)
+                CALL assert_close('volume inverse inverse density',inv_rho_m,inv_rhom_ref,0.0_wp)
                 CALL assert_close('volume inverse carrier density',rho_c,rho_c_ref,0.0_wp)
                 CALL assert_close('volume inverse cp_m',cp_m,cp_m_ref,0.0_wp)
                 CALL assert_close('volume inverse cp_c',cp_c,cp_c_ref,0.0_wp)

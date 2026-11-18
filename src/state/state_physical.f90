@@ -107,7 +107,7 @@ CONTAINS
         state%h=mass*inv_rho_m
         INCLUDE 'inc/velocity_from_momentum.inc'
         state%u=u; state%v=v
-        state%xs=xs; state%xg=xg; state%rho_m=rho_m; state%inv_rhom=inv_rho_m
+        state%xs=xs; state%xg=xg; state%rho_m=rho_m; state%inv_rho_m=inv_rho_m
         state%rho_c=rho_c; state%inv_rho_c=inv_rho_c; state%cp_m=cp_m; state%cp_c=cp_c
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp
         IF (idx_stoch>0) state%Zs=q(idx_stoch)/mass
@@ -164,7 +164,7 @@ CONTAINS
             state%u=u; state%v=v
             state%T=T
             state%xs=xs; state%xg=xg; state%alphas=alphas; state%alphag=alphag
-            state%rho_m=rho_m; state%inv_rhom=inv_rho_m; state%rho_c=rho_c; state%inv_rho_c=inv_rho_c
+            state%rho_m=rho_m; state%inv_rho_m=inv_rho_m; state%rho_c=rho_c; state%inv_rho_c=inv_rho_c
             state%cp_m=cp_m; state%cp_c=cp_c; state%red_grav=evaluate_reduced_gravity(rho_m,inv_rho_m)
         ELSE
             state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp
@@ -215,10 +215,10 @@ CONTAINS
         ELSE
             IF (REAL(state%T,wp)<=0.0_wp) RETURN
             IF (.NOT.close_composition(state%xs,state%xg)) RETURN
-            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom,                                &
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rho_m,                                
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
-            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rho_m)
         END IF
 
         geometry=0.0_wp
@@ -268,10 +268,10 @@ CONTAINS
         ELSE
             IF (REAL(state%T,wp)<=0.0_wp) RETURN
             IF (.NOT.close_composition(state%xs,state%xg)) RETURN
-            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom,                                &
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rho_m,                                
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
-            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rho_m)
         END IF
 
         geometry=0.0_wp
@@ -308,10 +308,10 @@ CONTAINS
         ELSE
             IF (REAL(state%T,wp)<=0.0_wp) RETURN
             IF (.NOT.close_composition(state%xs,state%xg)) RETURN
-            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom,                                &
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rho_m,                                
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
-            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rho_m)
         END IF
 
         geometry=0.0_wp
@@ -348,10 +348,10 @@ CONTAINS
         ELSE
             IF (REAL(state%T,wp)<=0.0_wp) RETURN
             IF (.NOT.close_composition(state%xs,state%xg)) RETURN
-            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rhom,                                &
+            CALL evaluate_mixture(state%T,state%xs,state%xg,state%rho_m,state%inv_rho_m,                                
                 state%rho_c,state%inv_rho_c,state%cp_m,state%cp_c,state%alphas,state%alphag)
             IF (REAL(state%cp_m,wp)<=0.0_wp) RETURN
-            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rhom)
+            state%red_grav=evaluate_reduced_gravity(state%rho_m,state%inv_rho_m)
         END IF
 
         geometry=0.0_wp

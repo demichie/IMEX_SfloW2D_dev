@@ -88,8 +88,8 @@ CONTAINS
        CALL assert_close_scalar('shared state T', from_qp%T, from_complex%T, 2.0E-12_wp)
        CALL assert_close_scalar('shared state density', from_qp%rho_m, &
             from_complex%rho_m, 2.0E-12_wp)
-       CALL assert_close_scalar('shared state inverse density', from_qp%inv_rhom, &
-            from_complex%inv_rhom, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state inverse density', from_qp%inv_rho_m, &
+            from_complex%inv_rho_m, 2.0E-12_wp)
        CALL assert_close_scalar('shared state reduced gravity', from_qp%red_grav, &
             from_complex%red_grav, 2.0E-12_wp)
        CALL assert_close_scalar('shared state stochastic', from_qp%Zs, &
@@ -596,10 +596,10 @@ CONTAINS
 
     COMPLEX(wp), INTENT(IN) :: q(n_vars)
     COMPLEX(wp), INTENT(OUT) :: outputs(5)
-    COMPLEX(wp) :: h, u, v, T, rho_m, inv_rhom, Zs, pore
+    COMPLEX(wp) :: h, u, v, T, rho_m, inv_rho_m, Zs, pore
     COMPLEX(wp) :: alphas(n_solid), alphag(n_add_gas)
 
-    CALL c_phys_var(q, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs, pore)
+    CALL c_phys_var(q, h, u, v, T, rho_m, alphas, alphag, inv_rho_m, Zs, pore)
     outputs = [h, u, v, T, rho_m]
 
   END SUBROUTINE complex_conversion_outputs

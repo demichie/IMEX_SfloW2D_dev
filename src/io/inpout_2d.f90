@@ -1203,7 +1203,7 @@
         REAL(wp) :: pi_g
 
         REAL(wp) :: inv_rho_c
-        REAL(wp) :: inv_rhom
+        REAL(wp) :: inv_rho_m
         REAL(wp) :: xc_source
         ! parameter for elliptical source
         REAL(wp) :: h_ell
@@ -4679,7 +4679,7 @@
                     ! INOUT
                     alphas_source(1:n_solid),                                                                          &
                     ! OUT
-                    rho_m, inv_rhom, rho_c, xs_source(1:n_solid),                                                      &
+                    rho_m, inv_rho_m, rho_c, xs_source(1:n_solid),                                                      
                     xg_source(1:n_add_gas), xc_source, sp_heat_c,                                                      &
                     sp_heat_mix)
 
@@ -4747,7 +4747,7 @@
                     qp_source(idx_T) = T_source
 
                     CALL evaluate_mixture(T_source,xs_source(1:n_solid),xg_source(1:n_add_gas),                        &
-                        rho_m,inv_rhom,rho_c,inv_rho_c,sp_heat_mix,sp_heat_c,                                          &
+                        rho_m,inv_rho_m,rho_c,inv_rho_c,sp_heat_mix,sp_heat_c,                                          
                         alphas_source(1:n_solid),alphag_source(1:n_add_gas))
 
                     WRITE (*, *) 'Source solid volume fraction =', alphas_source(1:n_solid)
@@ -5365,7 +5365,7 @@
 
         REAL(wp) :: xl, xr, yl, yr
 
-        REAL(wp) :: rho_c, rho_m, inv_rhom, mass_fract(n_solid)
+        REAL(wp) :: rho_c, rho_m, inv_rho_m, mass_fract(n_solid)
         REAL(wp) :: alphag_init_local(n_add_gas)
         REAL(wp) :: xg_init(n_add_gas), xc_init
         REAL(wp) :: sp_heat_c, sp_heat_mix
@@ -5656,7 +5656,7 @@
             ! INOUT
             alphas_init,                                                                                               &
             ! OUT
-            rho_m, inv_rhom, rho_c,                                                                                    &
+            rho_m, inv_rho_m, rho_c,                                                                                    
             mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
 
             state%q(idx_totMassEqn,1, :, :) = thickness_init(:, :)*rho_m
