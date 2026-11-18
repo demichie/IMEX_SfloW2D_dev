@@ -3189,7 +3189,7 @@ CONTAINS
         WRITE(*,*) 'PASS: two-layer Lie with independent L1 Darcy and L2 stochastic transport'
     END SUBROUTINE check_optional_layer_lie_timestep
 
-  !> @brief Round-trip the real v8 checkpoint and the five-dimensional NetCDF schema.
+  !> @brief Round-trip the canonical checkpoint and the five-dimensional NetCDF schema.
   !> @details The structural two-layer fixture bypasses the production layout gate.
   !>          It tests the existing I/O implementations and shared substrate ownership.
   SUBROUTINE check_two_layer_io_roundtrip
@@ -3298,13 +3298,13 @@ CONTAINS
     clock%dt_old=0.006_wp
     clock%dt_old_old=0.007_wp
     clock%t_output=4.0_wp
-    CALL write_restart_file('two_layer_io_v8.bin',clock,noise,states,io_domain)
+    CALL write_restart_file('two_layer_io.bin',clock,noise,states,io_domain)
     states%q=0.0_wp
     B_vertex=0.0_wp
     noise(2)%Z=0.0_wp
     noise(2)%rng_state=0
     clock%t=0.0_wp
-    CALL read_restart_file('two_layer_io_v8.bin',clock,noise,states,io_domain)
+    CALL read_restart_file('two_layer_io.bin',clock,noise,states,io_domain)
     IF (ANY(states%q/=original_q)) ERROR STOP 'L1/L2 conservative restart round-trip mismatch'
     IF (ANY(B_vertex/=original_b)) ERROR STOP 'Shared bed checkpoint round-trip mismatch'
     IF (ANY(noise(2)%Z/=0.125_wp)) ERROR STOP 'L2 OU checkpoint mismatch'
@@ -3335,7 +3335,7 @@ CONTAINS
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot read total mass NetCDF diagnostic'
     IF (ANY(stored_total(:,:,1)/=states%q(idx_totMassEqn,1,:,:)+ &
         states%q(idx_totMassEqn,2,:,:))) ERROR STOP 'NetCDF total mass differs from layer sum'
-    ios=nf90_inq_varid(netcdf_id,'eta_L2',variable_id)
+    ios=nf90_inq_varid(netcdf_id,'eta_top',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing upper free-surface NetCDF field'
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot read upper free-surface NetCDF field'
@@ -3377,7 +3377,7 @@ CONTAINS
     dt_output=1.0_wp
     CALL output_solution(clock%t,states,clock)
     n_restart_files=2
-    restart_files(1)=snapshot_file_path(TRIM(run_name)//'_0000.q_2d')
+    restart_files(1)=snapshot_file_path(TRIM(run_name)//'_L1_0000.q_2d')
     restart_files(2)=snapshot_file_path(TRIM(run_name)//'_L2_0000.q_2d')
     INQUIRE(FILE=TRIM(restart_files(1)),EXIST=found_file)
     IF (.NOT.found_file) ERROR STOP 'Missing original L1 conservative snapshot'
@@ -3410,7 +3410,7 @@ CONTAINS
     stochastic_l2=saved_stochastic_l2
     pore_pressure_l1%pore_pressure_flag=saved_pore_l1
     n_layers=saved_layers
-    WRITE(*,*) 'PASS: two-layer binary v8 restart, OU RNG, NetCDF fields and budgets'
+    WRITE(*,*) 'PASS: canonical two-layer binary restart, OU RNG, NetCDF fields and budgets'
   END SUBROUTINE check_two_layer_io_roundtrip
 
   !> \brief Verify the vector generalized-minmod kernel against the scalar limiter.

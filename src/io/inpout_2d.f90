@@ -9,7 +9,7 @@
     !> Mattia de' Michieli Vitturi
     !
     !>
-    !> Owns input namelists, output schedules, NetCDF handles and versioned binary restart I/O. Several
+    !> Owns input namelists, output schedules, NetCDF handles and binary restart I/O. Several
     !> no-argument setup routines update shared parameter and geometry modules.
     !********************************************************************************
 
@@ -190,10 +190,7 @@
     INTEGER, PARAMETER :: output_unit_B = 28
 
     INTEGER, PARAMETER :: output_manifest_unit = 29
-    CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
-    ! Version 5 adds self-contained runout and steady-stop diagnostic history.
-    INTEGER, PARAMETER :: restart_format_version = 7
-    INTEGER, PARAMETER :: two_layer_restart_format_version = 8 !< Distinct L1/L2 checkpoint schema.
+    CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_LAYER_CKPT'
 
     !> Counter for the output files
     INTEGER :: output_idx
@@ -299,36 +296,16 @@
 
     REAL(wp) :: release_time(10)
 
-    ! NC: Variabili condivise per la gestione del file NetCDF
-    INTEGER             :: ncid              !< ID for NetCDF file
-    INTEGER             :: dimids(3)         !< ID for size of [x, y, time]
-    INTEGER             :: layer_dimids(5) !< Two-layer [component,layer,x,y,time].
-    INTEGER             :: layer_q_varid, layer_qp_varid !< Full two-layer conservative/primitive fields.
-    INTEGER             :: layer_eta_varid, layer_depth_varid !< Upper free surface and total thickness.
-    INTEGER             :: layer_mass_varid(3) !< L1, L2 and total mass-per-area maps.
-    INTEGER             :: x_varid, y_varid, t_varid !< ID for x,y
-    INTEGER             :: b_varid, eta_varid, w_varid !< IDs for bed, surface, vertical velocity
-    INTEGER             :: h_varid           !> ID for h
-    INTEGER             :: u_varid, v_varid  !> ID for u and v
-    INTEGER             :: Temp_varid        !> ID for T
-    INTEGER, ALLOCATABLE :: solid_varid(:)    !> ID for solid fractions
-    INTEGER, ALLOCATABLE :: gas_varid(:)      !> ID for gas fractions
-    INTEGER, ALLOCATABLE :: stoch_varid(:)    !> ID for stochastic variable
-    INTEGER, ALLOCATABLE :: pore_varid(:)     !> ID for pore pressure
-    INTEGER             :: hMax_varid        !> ID for max of thickness
-    INTEGER             :: pDynMax_varid     !> ID for max of dynamic pressure
-    INTEGER             :: modVelMax_varid   !> ID for max of velicity magnitude
-    INTEGER, ALLOCATABLE :: deposit_varid(:)  !> ID for solid deposit
-    INTEGER             :: deposit_tot_varid !> ID for cumulative deposit thickness
-    INTEGER, ALLOCATABLE :: erosion_varid(:)  !> ID for solid erosion
-    INTEGER             :: Ri2D_varid        !> ID for Richardson number
-    INTEGER             :: rho_m2D_varid     !> ID for flow density
-    INTEGER             :: red_grav2D_varid  !> ID for reduced gravity
-    INTEGER             :: muEff_varid       !> ID for effective mu
-    INTEGER             :: erodible_varid    !> ID for total erodible thickness
-    INTEGER             :: shearVel_varid    !> ID for shear velocity
-    INTEGER, ALLOCATABLE :: Rouse_varid(:)   !> ID for Rouse numbers
-    INTEGER             :: inertialNumber_varid !> ID for inertial number
+    ! Canonical NetCDF state arrays for any configured layer count.
+    INTEGER :: ncid
+    INTEGER :: dimids(3)           !< [x,y,time].
+    INTEGER :: layer_dimids(5)     !< [component,layer,x,y,time].
+    INTEGER :: layer_q_varid,layer_qp_varid
+    INTEGER :: eta_top_varid,total_depth_varid
+    INTEGER :: total_mass_varid
+    INTEGER :: shared_class_varid(3)
+    INTEGER :: x_varid,y_varid,t_varid,b_varid
+    INTEGER :: hMax_varid,pDynMax_varid,modVelMax_varid,deposit_tot_varid
 
     INTEGER             :: nc_time_idx       !< Counter for time
     CHARACTER(LEN=2048)  :: nc_filename      !< NetCDF file name
@@ -6099,7 +6076,11 @@
 
         IF (output_cons_flag) THEN
 
-            output_file_2d = snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.q_2d')
+            IF (n_layers==2) THEN
+                output_file_2d=snapshot_file_path(TRIM(run_name)//'_L1_'//idx_string//'.q_2d')
+            ELSE
+                output_file_2d=snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.q_2d')
+            END IF
 
             IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_file_2d)
 
@@ -7652,362 +7633,134 @@
     !******************************************************************************
 
     SUBROUTINE init_netcdf_output
-
         USE netcdf
         USE parameters_2d, ONLY : n_vars
-        USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, x_comp, y_comp
+        USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,x_comp,y_comp
         IMPLICIT NONE
+        INTEGER :: component_dim,layer_dim,class_dim,status
+        INTEGER :: time_dim_len,expected_time_index
+        LOGICAL :: exists
+        INTEGER :: shared_class_dims(4)
 
-        INTEGER :: i
-        CHARACTER(LEN=4) :: idx_string
-        LOGICAL :: file_exists
-        INTEGER :: layer_dim,component_dim
-        INTEGER :: time_dim_len, expected_time_index
-        INTEGER :: status
+        nc_filename=output_file_path('fields',TRIM(run_name)//'.nc')
+        INQUIRE(FILE=nc_filename,EXIST=exists)
 
-        ALLOCATE (solid_varid(n_solid))
-        ALLOCATE (gas_varid(n_add_gas))
-        ALLOCATE (stoch_varid(n_stoch_vars))
-        ALLOCATE (pore_varid(n_pore_vars))
-        ALLOCATE (deposit_varid(n_solid))
-        ALLOCATE (erosion_varid(n_solid))
-        ALLOCATE (Rouse_varid(n_solid))
-
-        ! Set the output filename
-        nc_filename = output_file_path('fields', TRIM(run_name)//'.nc')
-        INQUIRE(FILE=nc_filename, EXIST=file_exists)
-
-        ! On restart, reuse at most one uncommitted record left by an interrupted
-        ! append; the checkpoint's output index is the commit boundary.
-        IF (restart .AND. file_exists) THEN
-            IF (verbose_level >= 0) WRITE (*, *) 'Appending to existing NetCDF: ',                                     &
-                TRIM(nc_filename)
-            CALL check(nf90_open(nc_filename, NF90_WRITE, ncid))
-            CALL check(nf90_inq_dimid(ncid, 'x', dimids(1)))
-            CALL check(nf90_inq_dimid(ncid, 'y', dimids(2)))
-            CALL check(nf90_inq_dimid(ncid, 'time', dimids(3)))
-            CALL check(nf90_inquire_dimension(ncid, dimids(3), len=time_dim_len))
-            IF (output_idx < 0 .OR. output_idx == HUGE(output_idx))                                                    &
-                    CALL fatal_error('Binary restart has an invalid NetCDF output index')
-            expected_time_index = output_idx + 1
-            IF (time_dim_len < output_idx)                                                                             &
-                    CALL fatal_error('NetCDF history is shorter than the binary restart checkpoint')
-            IF (time_dim_len > expected_time_index)                                                                    &
-                    CALL fatal_error('NetCDF history has more than one uncommitted time record')
-            nc_time_idx = expected_time_index
-            CALL check(nf90_inq_varid(ncid, 'x', x_varid))
-            CALL check(nf90_inq_varid(ncid, 'y', y_varid))
-            CALL check(nf90_inq_varid(ncid, 'time', t_varid))
-            CALL check(nf90_inq_varid(ncid, 'b', b_varid))
-            CALL check(nf90_inq_varid(ncid, 'h', h_varid))
-            status = nf90_inq_varid(ncid, 'eta', eta_varid)
-
-            IF (status .EQ. nf90_enotvar) THEN
-                WRITE (*, *) 'ERROR: cannot append to a legacy NetCDF file.'
-                WRITE (*, *) 'Its variable w stores free-surface elevation; the current schema uses ' //               &
-                                'eta for elevation and w for vertical velocity.'
-                WRITE (*, *) 'Start a new NetCDF output file to continue with the current schema.'
-                STOP
-
-            END IF
-
-            CALL check(status)
-            CALL check(nf90_inq_varid(ncid, 'u', u_varid))
-            CALL check(nf90_inq_varid(ncid, 'v', v_varid))
-            CALL check(nf90_inq_varid(ncid, 'w', w_varid))
-            CALL check(nf90_inq_varid(ncid, 'T', Temp_varid))
-
-            DO i = 1, n_solid
-                WRITE (idx_string, '(I2.2)') i
-                CALL check(nf90_inq_varid(ncid, 'solid_frac_'//TRIM(idx_string), solid_varid(i)))
-                CALL check(nf90_inq_varid(ncid, 'deposit__'//TRIM(idx_string), deposit_varid(i)))
-                CALL check(nf90_inq_varid(ncid, 'erosion_'//TRIM(idx_string), erosion_varid(i)))
-
-            END DO
-
-            DO i = 1, n_add_gas
-                WRITE (idx_string, '(I2.2)') i
-                CALL check(nf90_inq_varid(ncid, 'add_gas_frac_'//TRIM(idx_string), gas_varid(i)))
-
-            END DO
-
-            DO i = 1, n_stoch_vars
-                WRITE (idx_string, '(I2.2)') i
-                CALL check(nf90_inq_varid(ncid, 'Zs_'//TRIM(idx_string), stoch_varid(i)))
-
-            END DO
-
-            DO i = 1, n_pore_vars
-                WRITE (idx_string, '(I2.2)') i
-                CALL check(nf90_inq_varid(ncid, 'PorePres_'//TRIM(idx_string), pore_varid(i)))
-
-            END DO
-
-            CALL check(nf90_inq_varid(ncid, 'hMax', hMax_varid))
-            CALL check(nf90_inq_varid(ncid, 'pDynMax', pDynMax_varid))
-            CALL check(nf90_inq_varid(ncid, 'modVelMax', modVelMax_varid))
-            CALL check(nf90_inq_varid(ncid, 'Ri', Ri2D_varid))
-            CALL check(nf90_inq_varid(ncid, 'rhomix', rho_m2D_varid))
-            CALL check(nf90_inq_varid(ncid, 'red grav', red_grav2D_varid))
-            CALL check(nf90_inq_varid(ncid, 'mu eff', muEff_varid))
-            CALL check(nf90_inq_varid(ncid, 'erodible', erodible_varid))
-            status = nf90_inq_varid(ncid, 'deposit_tot', deposit_tot_varid)
-            IF (status == nf90_enotvar) THEN
-                CALL fatal_error('Cannot append to legacy NetCDF without deposit_tot; use a new output file')
-            END IF
-            CALL check(status)
-            CALL check(nf90_inq_varid(ncid, 'shear_velocity', shearVel_varid))
-
-            DO i = 1, n_solid
-                WRITE (idx_string, '(I2.2)') i
-                CALL check(nf90_inq_varid(ncid, 'Rouse_'//TRIM(idx_string), Rouse_varid(i)))
-
-            END DO
-
-            CALL check(nf90_inq_varid(ncid, 'inertial_number', inertialNumber_varid))
-            IF (n_layers==2) THEN
-                CALL check(nf90_inq_dimid(ncid,'component',component_dim))
-                CALL check(nf90_inq_dimid(ncid,'layer',layer_dim))
-                layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
-                CALL check(nf90_inq_varid(ncid,'q_layers',layer_q_varid))
-                CALL check(nf90_inq_varid(ncid,'qp_layers',layer_qp_varid))
-                CALL check(nf90_inq_varid(ncid,'eta_L2',layer_eta_varid))
-                CALL check(nf90_inq_varid(ncid,'h_total',layer_depth_varid))
-                CALL check(nf90_inq_varid(ncid,'mass_L1',layer_mass_varid(1)))
-                CALL check(nf90_inq_varid(ncid,'mass_L2',layer_mass_varid(2)))
-                CALL check(nf90_inq_varid(ncid,'mass_total',layer_mass_varid(3)))
-            ELSE
-                status=nf90_inq_varid(ncid,'q_layers',layer_q_varid)
-                IF (status/=nf90_enotvar) &
-                    CALL fatal_error('Cannot append single-layer run to a two-layer NetCDF file')
+        IF (restart .AND. exists) THEN
+            CALL check(nf90_open(nc_filename,NF90_WRITE,ncid))
+            CALL check(nf90_inq_dimid(ncid,'x',dimids(1)))
+            CALL check(nf90_inq_dimid(ncid,'y',dimids(2)))
+            CALL check(nf90_inq_dimid(ncid,'time',dimids(3)))
+            CALL check(nf90_inq_dimid(ncid,'component',component_dim))
+            CALL check(nf90_inq_dimid(ncid,'layer',layer_dim))
+            CALL verify_netcdf_dimension(component_dim,n_vars)
+            CALL verify_netcdf_dimension(layer_dim,n_layers)
+            CALL verify_netcdf_dimension(dimids(1),comp_cells_x)
+            CALL verify_netcdf_dimension(dimids(2),comp_cells_y)
+            CALL check(nf90_inquire_dimension(ncid,dimids(3),len=time_dim_len))
+            IF (output_idx<0 .OR. output_idx==HUGE(output_idx)) &
+                CALL fatal_error('Invalid NetCDF continuation index')
+            expected_time_index=output_idx+1
+            IF (time_dim_len<output_idx) &
+                CALL fatal_error('NetCDF history is shorter than the binary checkpoint')
+            IF (time_dim_len>expected_time_index) &
+                CALL fatal_error('NetCDF history has more than one uncommitted time record')
+            nc_time_idx=expected_time_index
+            layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
+            CALL check(nf90_inq_varid(ncid,'x',x_varid))
+            CALL check(nf90_inq_varid(ncid,'y',y_varid))
+            CALL check(nf90_inq_varid(ncid,'time',t_varid))
+            CALL check(nf90_inq_varid(ncid,'q_layers',layer_q_varid))
+            CALL check(nf90_inq_varid(ncid,'qp_layers',layer_qp_varid))
+            CALL check(nf90_inq_varid(ncid,'b',b_varid))
+            CALL check(nf90_inq_varid(ncid,'h_total',total_depth_varid))
+            CALL check(nf90_inq_varid(ncid,'eta_top',eta_top_varid))
+            CALL check(nf90_inq_varid(ncid,'mass_total',total_mass_varid))
+            CALL check(nf90_inq_varid(ncid,'deposit_tot',deposit_tot_varid))
+            CALL check(nf90_inq_varid(ncid,'hMax',hMax_varid))
+            CALL check(nf90_inq_varid(ncid,'pDynMax',pDynMax_varid))
+            CALL check(nf90_inq_varid(ncid,'modVelMax',modVelMax_varid))
+            IF (n_solid>0) THEN
+                CALL check(nf90_inq_dimid(ncid,'solid_class',class_dim))
+                CALL verify_netcdf_dimension(class_dim,n_solid)
+                CALL check(nf90_inq_varid(ncid,'deposit',shared_class_varid(1)))
+                CALL check(nf90_inq_varid(ncid,'erosion',shared_class_varid(2)))
+                CALL check(nf90_inq_varid(ncid,'erodible',shared_class_varid(3)))
             END IF
             RETURN
-
         END IF
 
-        IF (verbose_level >= 0) WRITE (*, *) 'Initializing NetCDF output file: ',                                      &
-        TRIM(nc_filename)
+        CALL check(nf90_create(nc_filename,nf90_clobber+nf90_netcdf4,ncid))
+        CALL check(nf90_def_dim(ncid,'x',comp_cells_x,dimids(1)))
+        CALL check(nf90_def_dim(ncid,'y',comp_cells_y,dimids(2)))
+        CALL check(nf90_def_dim(ncid,'time',NF90_UNLIMITED,dimids(3)))
+        CALL check(nf90_def_dim(ncid,'component',n_vars,component_dim))
+        CALL check(nf90_def_dim(ncid,'layer',n_layers,layer_dim))
+        layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
 
-        ! Create the file, overwriting it if it already exists
-        CALL check(nf90_create(nc_filename, nf90_clobber + nf90_netcdf4, ncid))
-
-        ! --- Define Dimensions ---
-        ! The IDs are saved into the module-level 'dimids' array
-        CALL check(nf90_def_dim(ncid, 'x', comp_cells_x, dimids(1)))
-        CALL check(nf90_def_dim(ncid, 'y', comp_cells_y, dimids(2)))
-        CALL check(nf90_def_dim(ncid, 'time', NF90_UNLIMITED, dimids(3)))
-
-        ! --- Define Coordinate Variables ---
-        CALL check(nf90_def_var(ncid, 'x', nf90_double, [dimids(1)], x_varid))
-        CALL check(nf90_def_var(ncid, 'y', nf90_double, [dimids(2)], y_varid))
-        CALL check(nf90_def_var(ncid, 'time', nf90_double, [dimids(3)], t_varid))
-
-        ! Assign attributes to the coordinate variables
-        CALL check(nf90_put_att(ncid, x_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, y_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, t_varid, 'units', 'seconds'))
-
-        CALL check(nf90_put_att(ncid, x_varid, 'long_name', 'x-coordinate'))
-        CALL check(nf90_put_att(ncid, y_varid, 'long_name', 'y-coordinate'))
-        CALL check(nf90_put_att(ncid, t_varid, 'long_name', 'time'))
-
-        ! --- Define Data Variables: b, h, eta, and velocity components ---
-        ! We pass the full 'dimids' array (x, y, time) because these are 3D variables
-        CALL check(nf90_def_var(ncid, 'b', nf90_double, dimids, b_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, b_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, b_varid, 'long_name', 'bed elevation'))
-
-        CALL check(nf90_def_var(ncid, 'h', nf90_double, dimids, h_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, h_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, h_varid, 'long_name', 'flow thickness'))
-
-        CALL check(nf90_def_var(ncid, 'eta', nf90_double, dimids, eta_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, eta_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, eta_varid, 'long_name', 'free surface elevation'))
-
-        CALL check(nf90_def_var(ncid, 'u', nf90_double, dimids, u_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, u_varid, 'units', 'meters/seconds'))
-        CALL check(nf90_put_att(ncid, u_varid, 'long_name', 'velocity x-component'))
-
-        CALL check(nf90_def_var(ncid, 'v', nf90_double, dimids, v_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, v_varid, 'units', 'meters/seconds'))
-        CALL check(nf90_put_att(ncid, v_varid, 'long_name', 'velocity y-component'))
-
-        CALL check(nf90_def_var(ncid, 'w', nf90_double, dimids, w_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, w_varid, 'units', 'meters/seconds'))
-        CALL check(nf90_put_att(ncid, w_varid, 'long_name', 'velocity z-component'))
-
-        CALL check(nf90_def_var(ncid, 'T', nf90_double, dimids, Temp_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, Temp_varid, 'units', 'kelvin'))
-        CALL check(nf90_put_att(ncid, Temp_varid, 'long_name', 'flow temperature'))
-
-        DO i = 1, n_solid
-
-            WRITE (idx_string, '(I2.2)') i
-
-            CALL check(nf90_def_var(ncid, 'solid_frac_'//trim(idx_string),                                             &
-                                            nf90_double, dimids, solid_varid(i), deflate_level=5,                      &
-                                            shuffle=.true.))
-            CALL check(nf90_put_att(ncid, solid_varid(i), 'units', ''))
-            CALL check(nf90_put_att(ncid, solid_varid(i),                                                              &
-                'long_name', 'volume fraction of solid class '//TRIM(idx_string)))
-
-            CALL check(nf90_def_var(ncid, 'deposit__'//trim(idx_string),                                               &
-                                            nf90_double, dimids, deposit_varid(i), deflate_level=5,                    &
-                                            shuffle=.true.))
-            CALL check(nf90_put_att(ncid, deposit_varid(i), 'units', 'meters'))
-            CALL check(nf90_put_att(ncid, deposit_varid(i), 'long_name',                                               &
-                                            'deposit thickness of solid class '//TRIM(idx_string)))
-
-            CALL check(nf90_def_var(ncid, 'erosion_'//trim(idx_string),                                                &
-                                            nf90_double, dimids, erosion_varid(i), deflate_level=5,                    &
-                                            shuffle=.true.))
-            CALL check(nf90_put_att(ncid, erosion_varid(i), 'units', 'meters'))
-            CALL check(nf90_put_att(ncid, erosion_varid(i), 'long_name',                                               &
-                                            'eroded thickness of solid class '//TRIM(idx_string)))
-
-        END DO
-
-        DO i = 1, n_add_gas
-
-            WRITE (idx_string, '(I2.2)') i
-
-            CALL check(nf90_def_var(ncid, 'add_gas_frac_'//trim(idx_string),                                           &
-                                            nf90_double, dimids, gas_varid(i), deflate_level=5,                        &
-                                            shuffle=.true.))
-            CALL check(nf90_put_att(ncid, gas_varid(i), 'units', ''))
-            CALL check(nf90_put_att(ncid, gas_varid(i), 'long_name',                                                   &
-                                            'volume fraction of additiona gass class '//TRIM(idx_string)))
-
-        END DO
-
-
-        DO i = 1, n_stoch_vars
-
-            WRITE (idx_string, '(I2.2)') i
-
-            CALL check(nf90_def_var(ncid, 'Zs_'//trim(idx_string), nf90_double,                                        &
-                                            dimids, stoch_varid(i), deflate_level=5, shuffle=.true.))
-            CALL check(nf90_put_att(ncid, stoch_varid(i), 'units', ''))
-            CALL check(nf90_put_att(ncid, stoch_varid(i), 'long_name', 'stochastic variable '//TRIM(idx_string)))
-
-        END DO
-
-        DO i = 1, n_pore_vars
-
-            WRITE (idx_string, '(I2.2)') i
-
-            CALL check(nf90_def_var(ncid, 'PorePres_'//trim(idx_string),                                               &
-                                            nf90_double, dimids, pore_varid(i), deflate_level=5,                       &
-                                            shuffle=.true.))
-            CALL check(nf90_put_att(ncid, pore_varid(i), 'units', 'Pa'))
-            CALL check(nf90_put_att(ncid, pore_varid(i), 'long_name', 'pore pressure '//TRIM(idx_string)))
-
-        END DO
-
-        CALL check(nf90_def_var(ncid, 'hMax', nf90_double, dimids, hMax_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, hMax_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, hMax_varid, 'long_name', 'max flow thickness'))
-
-        CALL check(nf90_def_var(ncid, 'pDynMax', nf90_double, dimids, pDynMax_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, pDynMax_varid, 'units', 'Pa'))
-        CALL check(nf90_put_att(ncid, pDynMax_varid, 'long_name', 'max dynamic pressure'))
-
-        CALL check(nf90_def_var(ncid, 'modVelMax', nf90_double, dimids,                                                &
-                                        modVelMax_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, modVelMax_varid, 'units', 'm/s'))
-        CALL check(nf90_put_att(ncid, modVelMax_varid, 'long_name', 'max velocity magnitude'))
-
-        CALL check(nf90_def_var(ncid, 'Ri', nf90_double, dimids, Ri2D_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, Ri2D_varid, 'units', ''))
-        CALL check(nf90_put_att(ncid, Ri2D_varid, 'long_name', 'Richardson number'))
-
-        CALL check(nf90_def_var(ncid, 'rhomix', nf90_double, dimids, rho_m2D_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, rho_m2D_varid, 'units', 'kg/m3'))
-        CALL check(nf90_put_att(ncid, rho_m2D_varid, 'long_name', 'mixture density'))
-
-        CALL check(nf90_def_var(ncid, 'red grav', nf90_double, dimids,                                                 &
-                                        red_grav2D_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, red_grav2D_varid, 'long_name', 'reduced gravity'))
-
-        CALL check(nf90_put_att(ncid, red_grav2D_varid, 'units', 'm/s2'))
-
-        CALL check(nf90_def_var(ncid, 'mu eff', nf90_double, dimids, muEff_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, muEff_varid, 'units', ''))
-        CALL check(nf90_put_att(ncid, muEff_varid, 'long_name', 'effective friction coefficient'))
-
-        CALL check(nf90_def_var(ncid, 'deposit_tot', nf90_double, dimids, deposit_tot_varid,                           &
-            deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, deposit_tot_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, deposit_tot_varid, 'long_name', 'cumulative deposited thickness'))
-
-        CALL check(nf90_def_var(ncid, 'erodible', nf90_double, dimids, erodible_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, erodible_varid, 'units', 'meters'))
-        CALL check(nf90_put_att(ncid, erodible_varid, 'long_name', 'total available erodible thickness'))
-
-        CALL check(nf90_def_var(ncid, 'shear_velocity', nf90_double, dimids,                                           &
-                                        shearVel_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, shearVel_varid, 'units', 'm/s'))
-        CALL check(nf90_put_att(ncid, shearVel_varid, 'long_name', 'basal shear velocity'))
-
-        DO i = 1, n_solid
-            WRITE (idx_string, '(I2.2)') i
-            CALL check(nf90_def_var(ncid, 'Rouse_'//TRIM(idx_string), nf90_double,                                     &
-                                            dimids, Rouse_varid(i), deflate_level=5, shuffle=.true.))
-            CALL check(nf90_put_att(ncid, Rouse_varid(i), 'units', ''))
-            CALL check(nf90_put_att(ncid, Rouse_varid(i),                                                              &
-                'long_name', 'Rouse number for solid class '//TRIM(idx_string)))
-
-        END DO
-
-        CALL check(nf90_def_var(ncid, 'inertial_number', nf90_double, dimids,                                          &
-                                        inertialNumber_varid, deflate_level=5, shuffle=.true.))
-        CALL check(nf90_put_att(ncid, inertialNumber_varid, 'units', ''))
-        CALL check(nf90_put_att(ncid, inertialNumber_varid, 'long_name', 'granular inertial number'))
-
-        IF (n_layers==2) THEN
-            CALL check(nf90_def_dim(ncid,'component',n_vars,component_dim))
-            CALL check(nf90_def_dim(ncid,'layer',n_layers,layer_dim))
-            layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
-            CALL check(nf90_def_var(ncid,'q_layers',nf90_double,layer_dimids, &
-                layer_q_varid,deflate_level=5,shuffle=.TRUE.))
-            CALL check(nf90_put_att(ncid,layer_q_varid,'long_name', &
-                'conservative variables [component,layer,x,y,time]'))
-            CALL check(nf90_def_var(ncid,'qp_layers',nf90_double,layer_dimids, &
-                layer_qp_varid,deflate_level=5,shuffle=.TRUE.))
-            CALL check(nf90_put_att(ncid,layer_qp_varid,'long_name', &
-                'primitive variables [component,layer,x,y,time]'))
-            CALL check(nf90_def_var(ncid,'eta_L2',nf90_double,dimids,layer_eta_varid, &
-                deflate_level=5,shuffle=.TRUE.))
-            CALL check(nf90_put_att(ncid,layer_eta_varid,'units','meters'))
-            CALL check(nf90_put_att(ncid,layer_eta_varid,'long_name','upper free surface B+h1+h2'))
-            CALL check(nf90_def_var(ncid,'h_total',nf90_double,dimids,layer_depth_varid, &
-                deflate_level=5,shuffle=.TRUE.))
-            CALL check(nf90_put_att(ncid,layer_depth_varid,'units','meters'))
-            CALL check(nf90_def_var(ncid,'mass_L1',nf90_double,dimids,layer_mass_varid(1), &
-                deflate_level=5,shuffle=.TRUE.))
-            CALL check(nf90_def_var(ncid,'mass_L2',nf90_double,dimids,layer_mass_varid(2), &
-                deflate_level=5,shuffle=.TRUE.))
-            CALL check(nf90_def_var(ncid,'mass_total',nf90_double,dimids,layer_mass_varid(3), &
-                deflate_level=5,shuffle=.TRUE.))
-            DO i=1,3
-                CALL check(nf90_put_att(ncid,layer_mass_varid(i),'units','kg/m2'))
-            END DO
+        CALL check(nf90_def_var(ncid,'x',nf90_double,[dimids(1)],x_varid))
+        CALL check(nf90_def_var(ncid,'y',nf90_double,[dimids(2)],y_varid))
+        CALL check(nf90_def_var(ncid,'time',nf90_double,[dimids(3)],t_varid))
+        CALL check(nf90_put_att(ncid,x_varid,'long_name','x coordinate'))
+        CALL check(nf90_put_att(ncid,y_varid,'long_name','y coordinate'))
+        CALL check(nf90_put_att(ncid,t_varid,'long_name','time'))
+        CALL check(nf90_put_att(ncid,x_varid,'units','meters'))
+        CALL check(nf90_put_att(ncid,y_varid,'units','meters'))
+        CALL check(nf90_put_att(ncid,t_varid,'units','seconds'))
+        CALL check(nf90_def_var(ncid,'q_layers',nf90_double,layer_dimids, &
+            layer_q_varid,deflate_level=5,shuffle=.TRUE.))
+        CALL check(nf90_put_att(ncid,layer_q_varid,'long_name','canonical conservative components by layer'))
+        CALL check(nf90_put_att(ncid,layer_q_varid,'units','SI per component'))
+        CALL check(nf90_def_var(ncid,'qp_layers',nf90_double,layer_dimids, &
+            layer_qp_varid,deflate_level=5,shuffle=.TRUE.))
+        CALL check(nf90_put_att(ncid,layer_qp_varid,'long_name','canonical primitive components by layer'))
+        CALL check(nf90_put_att(ncid,layer_qp_varid,'units','SI per component'))
+        CALL define_shared_output('b','bed elevation','meters',b_varid)
+        CALL define_shared_output('h_total','total flow thickness','meters',total_depth_varid)
+        CALL define_shared_output('eta_top','upper free surface','meters',eta_top_varid)
+        CALL define_shared_output('mass_total','total flow mass per area','kg/m2',total_mass_varid)
+        CALL define_shared_output('deposit_tot','deposited thickness','meters',deposit_tot_varid)
+        CALL define_shared_output('hMax','maximum flow thickness','meters',hMax_varid)
+        CALL define_shared_output('pDynMax','maximum dynamic pressure','Pa',pDynMax_varid)
+        CALL define_shared_output('modVelMax','maximum flow velocity','meters/seconds',modVelMax_varid)
+        IF (n_solid>0) THEN
+            CALL check(nf90_def_dim(ncid,'solid_class',n_solid,class_dim))
+            shared_class_dims=[class_dim,dimids(1),dimids(2),dimids(3)]
+            CALL check(nf90_def_var(ncid,'deposit',nf90_double,shared_class_dims,shared_class_varid(1)))
+            CALL check(nf90_def_var(ncid,'erosion',nf90_double,shared_class_dims,shared_class_varid(2)))
+            CALL check(nf90_def_var(ncid,'erodible',nf90_double,shared_class_dims,shared_class_varid(3)))
+            CALL check(nf90_put_att(ncid,shared_class_varid(1),'long_name','deposition per solid class'))
+            CALL check(nf90_put_att(ncid,shared_class_varid(2),'long_name','erosion per solid class'))
+            CALL check(nf90_put_att(ncid,shared_class_varid(3),'long_name','erodible inventory per solid class'))
+            CALL check(nf90_put_att(ncid,shared_class_varid(1),'units','meters'))
+            CALL check(nf90_put_att(ncid,shared_class_varid(2),'units','meters'))
+            CALL check(nf90_put_att(ncid,shared_class_varid(3),'units','meters'))
         END IF
-
-        ! End define mode. This writes the header to the file.
         CALL check(nf90_enddef(ncid))
-
-        ! Write the static data (coordinate arrays)
-        CALL check(nf90_put_var(ncid, x_varid, x_comp))
-        CALL check(nf90_put_var(ncid, y_varid, y_comp))
-
-        ! Initialize the time record counter
-        nc_time_idx = 1
-
-        RETURN
-
+        CALL check(nf90_put_var(ncid,x_varid,x_comp))
+        CALL check(nf90_put_var(ncid,y_varid,y_comp))
+        nc_time_idx=1
     END SUBROUTINE init_netcdf_output
+
+    !> @brief Check one existing dimension before appending new time records.
+    SUBROUTINE verify_netcdf_dimension(dimid,expected)
+        USE netcdf
+        INTEGER, INTENT(IN) :: dimid,expected
+        INTEGER :: actual
+        CALL check(nf90_inquire_dimension(ncid,dimid,len=actual))
+        IF (actual/=expected) CALL fatal_error('NetCDF dimension does not match simulation layout')
+    END SUBROUTINE verify_netcdf_dimension
+
+    !> @brief Define a shared, layer-independent grid field.
+    SUBROUTINE define_shared_output(name,description,unit_name,varid)
+        USE netcdf
+        CHARACTER(*), INTENT(IN) :: name,description,unit_name
+        INTEGER, INTENT(OUT) :: varid
+        CALL check(nf90_def_var(ncid,name,nf90_double,dimids,varid, &
+            deflate_level=5,shuffle=.TRUE.))
+        CALL check(nf90_put_att(ncid,varid,'long_name',description))
+        CALL check(nf90_put_att(ncid,varid,'units',unit_name))
+    END SUBROUTINE define_shared_output
+
 
     !******************************************************************************
     !> @brief Write one two-layer conservative budget next to the run fields.
@@ -8060,356 +7813,73 @@
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !******************************************************************************
 
-    SUBROUTINE write_netcdf_timestep(time_in, state)
+    SUBROUTINE write_netcdf_timestep(time_in,state)
         USE netcdf
-        USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
-        USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
-        USE parameters_2d, ONLY: n_vars
-
-
-        IMPLICIT NONE
+        USE parameters_2d, ONLY : n_vars
+        USE geometry_2d, ONLY : B_cent,comp_cells_x,comp_cells_y
         REAL(wp), INTENT(IN) :: time_in
         CLASS(state_type), INTENT(IN) :: state
+        REAL(wp), ALLOCATABLE :: tensor(:,:,:,:,:),field(:,:),classes(:,:,:,:)
+        INTEGER :: five_start(5),five_count(5),three_start(3),three_count(3)
+        INTEGER :: four_start(4),four_count(4),i
 
-        INTEGER :: start(3), count(3)
+        IF (SIZE(state%q,2)/=n_layers .OR. SIZE(state%qp,2)/=n_layers) &
+            CALL fatal_error('NetCDF state layer extent does not match the model')
+        IF (SIZE(state%q,1)/=n_vars .OR. SIZE(state%qp,1)/=n_vars) &
+            CALL fatal_error('NetCDF component extent does not match the model')
+        five_start=[1,1,1,1,nc_time_idx]
+        five_count=[n_vars,n_layers,comp_cells_x,comp_cells_y,1]
+        three_start=[1,1,nc_time_idx]
+        three_count=[comp_cells_x,comp_cells_y,1]
+        CALL check(nf90_put_var(ncid,t_varid,[time_in],start=[nc_time_idx],count=[1]))
 
-        INTEGER :: i, j, k
-        INTEGER :: start1d(1), count1d(1)
+        ALLOCATE(tensor(n_vars,n_layers,comp_cells_x,comp_cells_y,1))
+        tensor(:,:,:,:,1)=state%q
+        CALL check(nf90_put_var(ncid,layer_q_varid,tensor,start=five_start,count=five_count))
+        tensor(:,:,:,:,1)=state%qp
+        CALL check(nf90_put_var(ncid,layer_qp_varid,tensor,start=five_start,count=five_count))
+        DEALLOCATE(tensor)
 
+        ALLOCATE(field(comp_cells_x,comp_cells_y))
+        CALL check(nf90_put_var(ncid,b_varid,B_cent,start=three_start,count=three_count))
+        field=SUM(state%qp(idx_h,:,:,:),DIM=1)
+        CALL check(nf90_put_var(ncid,total_depth_varid,field,start=three_start,count=three_count))
+        field=B_cent+field
+        CALL check(nf90_put_var(ncid,eta_top_varid,field,start=three_start,count=three_count))
+        field=SUM(state%q(idx_totMassEqn,:,:,:),DIM=1)
+        CALL check(nf90_put_var(ncid,total_mass_varid,field,start=three_start,count=three_count))
+        CALL check(nf90_put_var(ncid,deposit_tot_varid,state%deposit_tot, &
+            start=three_start,count=three_count))
+        CALL check(nf90_put_var(ncid,hMax_varid,state%hmax,start=three_start,count=three_count))
+        CALL check(nf90_put_var(ncid,pDynMax_varid,state%pdynmax,start=three_start,count=three_count))
+        CALL check(nf90_put_var(ncid,modVelMax_varid,state%mod_vel_max, &
+            start=three_start,count=three_count))
+        DEALLOCATE(field)
 
-        REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix
-        TYPE(physical_state_real) :: output_physical_state
-        LOGICAL :: output_state_ok
-        REAL(wp) :: r_h, r_u, r_v, mod_hor_vel
-        REAL(wp) :: grav_coeff, vert_stress_eff, eff_normal_stress
-        REAL(wp) :: diam_characteristic, rho_particle, shear_rate
-        REAL(wp) :: exc_pore_pres
-        REAL(wp) :: r_alphas(n_solid), r_alphag(n_add_gas)
-
-        REAL(wp), ALLOCATABLE :: temp_array(:, :)
-        REAL(wp), ALLOCATABLE :: vertical_velocity(:, :)
-        REAL(wp), ALLOCATABLE :: Ri2D(:, :), rho_m2D(:, :), red_grav2D(:, :)
-        REAL(wp), ALLOCATABLE :: muEff(:, :)
-        REAL(wp), ALLOCATABLE :: erodible2D(:, :), shearVel(:, :)
-        REAL(wp), ALLOCATABLE :: Rouse(:, :, :), inertialNumber(:, :)
-        REAL(wp), ALLOCATABLE :: alphas2D(:, :, :), alphag2D(:, :, :)
-
-        REAL(wp) :: denom
-        REAL(wp), ALLOCATABLE :: layer_tensor(:,:,:,:,:)
-        INTEGER :: layer_start(5),layer_count(5)
-
-        WRITE (*, *) 'Writing ', TRIM(nc_filename)
-
-
-        ALLOCATE (Ri2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (rho_m2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (red_grav2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (muEff(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (erodible2D(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (shearVel(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (Rouse(n_solid, SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (inertialNumber(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-        ALLOCATE (alphas2D(n_solid,SIZE(state%qp, 3),SIZE(state%qp, 4)))
-        ALLOCATE (alphag2D(n_add_gas,SIZE(state%qp, 3),SIZE(state%qp, 4)))
-        ALLOCATE (vertical_velocity(SIZE(state%qp, 3),SIZE(state%qp, 4)))
-
-        Ri2D = 0.0_wp
-        rho_m2D = 0.0_wp
-        red_grav2D = 0.0_wp
-        muEff = 0.0_wp
-        ! Granular porosity is not meaningful for the separate lava carrier.
-        IF (.NOT.lava_flag .AND. n_solid>0) THEN
-            erodible2D = SUM(state%erodible(1:n_solid, :, :), DIM=1) /                                                 &
-                            (1.0_wp - substrate%erodible_porosity)
-        ELSE
-            erodible2D = 0.0_wp
-        END IF
-        shearVel = 0.0_wp
-        Rouse = 0.0_wp
-        inertialNumber = 0.0_wp
-        alphas2D = 0.0_wp
-        alphag2D = 0.0_wp
-        vertical_velocity = 0.0_wp
-        CALL initialize_physical_state_real(output_physical_state)
-
-        DO j = 1, comp_cells_x
-
-            DO k = 1, comp_cells_y
-
-                IF (state%qp(idx_h,1, j, k) .GT. dry_thickness_tolerance) THEN
-
-                    CALL build_physical_state_from_qp(state%qp(1:n_vars,1,j,k),output_physical_state,                  &
-                        accepted=output_state_ok)
-                    IF (.NOT.output_state_ok) CALL fatal_error('Invalid output physical state')
-                    r_Ri=output_physical_state%Ri
-                    r_rho_m=output_physical_state%rho_m
-                    r_rho_c=output_physical_state%rho_c
-                    r_red_grav=output_physical_state%red_grav
-                    r_sp_heat_c=output_physical_state%cp_c
-                    r_sp_heat_mix=output_physical_state%cp_m
-
-                    denom = state%q(idx_uEqn,1,j,k)**2 + state%q(idx_vEqn,1,j,k)**2
-
-                    IF (denom .GT. EPSILON(1.0_wp)) THEN
-
-                        r_Ri = r_red_grav / r_rho_m * state%q(idx_totMassEqn,1,j,k)**3 / denom
-
-                    ELSE
-
-                        r_Ri = 0.0_wp
-
-                    END IF
-
-                ELSE
-
-                    r_Ri = 0.0_wp
-                    r_rho_m = 0.0_wp
-                    r_rho_c = 0.0_wp
-                    r_red_grav = 0.0_wp
-                    r_sp_heat_c = 0.0_wp
-                    r_sp_heat_mix = 0.0_wp
-
-                END IF
-
-                Ri2D(j, k) = r_Ri
-                rho_m2D(j, k) = r_rho_m
-                red_grav2D(j, k) = r_red_grav
-
-                IF (state%qp(idx_h,1, j, k) .LE. dry_thickness_tolerance) CYCLE
-
-                r_h = state%qp(idx_h,1, j, k)
-                r_u = state%qp(idx_u,1, j, k)
-                r_v = state%qp(idx_v,1, j, k)
-                vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                                                     &
-                                                + r_v*B_prime_y_geom(j, k)
-
-                CALL primitive_to_volume_fractions(state%qp(1:n_vars,1,j,k), r_alphas, r_alphag)
-                alphas2D(:,j,k) = r_alphas
-                alphag2D(:,j,k) = r_alphag
-
-                IF (slope_correction_flag) THEN
-                    grav_coeff = 1.0_wp/(1.0_wp + B_prime_x_geom(j, k)**2 +                                            &
-                                                B_prime_y_geom(j, k)**2)
-                ELSE
-                    grav_coeff = 1.0_wp
-
-                END IF
-
-                mod_hor_vel = SQRT(r_u**2 + r_v**2)
-
-                IF (rheology_flag .AND. TRIM(rheology_l1%rheology_model) .EQ. 'voellmy') THEN
-                    exc_pore_pres = 0.0_wp
-                    IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore,1, j, k)
-                    muEff(j, k) = rheology_l1%mu*MAX(0.0_wp, 1.0_wp - MAX(0.0_wp, exc_pore_pres) /                     &
-                                                (r_rho_m*r_h*r_red_grav))
-                ELSE IF (rheology_flag .AND.                                                                           &
-                            (TRIM(rheology_l1%rheology_model) .EQ. 'mui' .OR.                                          &
-                            TRIM(rheology_l1%rheology_model) .EQ. 'mui_voellmy')) THEN
-
-                    IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN
-                        muEff(j, k) = rheology_l1%mu_s
-                    ELSE
-                        exc_pore_pres = 0.0_wp
-                        IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore,1, j, k)
-                        vert_stress_eff = r_rho_m*r_red_grav*r_h - exc_pore_pres
-
-                        IF (n_solid .GT. 1) THEN
-                            diam_characteristic = sauter_diameter(r_alphas)
-                            rho_particle = average_density_solids(r_alphas)
-                        ELSE
-                            diam_characteristic = diam_s(1)
-                            rho_particle = rho_s(1)
-
-                        END IF
-
-                        shear_rate = 2.5_wp*mod_hor_vel/r_h
-                        eff_normal_stress = MAX(EPSILON(1.0_wp),                                                       &
-                                                        vert_stress_eff*SQRT(grav_coeff))
-                        inertialNumber(j, k) = diam_characteristic*shear_rate /                                        &
-                                                        SQRT(eff_normal_stress/rho_particle)
-                        muEff(j, k) = (rheology_l1%mu_s*rheology_l1%I_0 +                                              &
-                            rheology_l1%mu_2*inertialNumber(j, k) +                                                    &
-                            rheology_l1%muI_inf*inertialNumber(j, k)**2) /                                             &
-                                            (rheology_l1%I_0 + inertialNumber(j, k))
-
-                    END IF
-
-                END IF
-
+        IF (n_solid>0) THEN
+            four_start=[1,1,1,nc_time_idx]
+            four_count=[n_solid,comp_cells_x,comp_cells_y,1]
+            ALLOCATE(classes(n_solid,comp_cells_x,comp_cells_y,1))
+            DO i=1,n_solid
+                classes(i,:,:,1)=state%deposit(:,:,i)
             END DO
-
-        END DO
-
-        ALLOCATE (temp_array(SIZE(state%qp, 3), SIZE(state%qp, 4)))
-
-        temp_array = 0.0_wp   ! inizializza a zero
-
-        start1d = (/nc_time_idx/)
-        count1d = (/1/)
-
-        ! Write the time value for the current record (as a one-element array)
-        CALL check(nf90_put_var(ncid, t_varid, (/time_in/), start=start1d, count=count1d))
-
-        ! Set up the start and count arrays to write a 2D slice
-        start = (/1, 1, nc_time_idx/)
-        count = (/comp_cells_x, comp_cells_y, 1/)
-
-        ! Write the bed topography (b)
-        CALL check(nf90_put_var(ncid, b_varid, B_cent, start=start, count=count))
-
-        ! Write the flow thickness (h)
-        CALL check(nf90_put_var(ncid, h_varid, state%qp(idx_h,1, :, :), start=start, count=count))
-
-        temp_array(:, :) = state%qp(idx_h,1, :, :) + B_cent(:, :)
-
-        ! Calculate and write the free surface elevation (eta = h + b)
-        CALL check(nf90_put_var(ncid, eta_varid, temp_array, start=start, count=count))
-
-        ! Write vertical velocity from horizontal velocity and bed slope.
-        CALL check(nf90_put_var(ncid, w_varid, vertical_velocity, start=start, count=count))
-
-        ! Write velocity components.  A cell classified as numerically dry has no
-        ! meaningful physical velocity; mask residual q/rho-h ratios in the output.
-        temp_array = 0.0_wp
-        WHERE (state%qp(idx_h,1, :, :) .GT. dry_thickness_tolerance)
-            temp_array = state%qp(idx_u,1, :, :)
-
-        END WHERE
-
-        CALL check(nf90_put_var(ncid, u_varid, temp_array, start=start, count=count))
-
-        temp_array = 0.0_wp
-        WHERE (state%qp(idx_h,1, :, :) .GT. dry_thickness_tolerance)
-            temp_array = state%qp(idx_v,1, :, :)
-
-        END WHERE
-
-        CALL check(nf90_put_var(ncid, v_varid, temp_array, start=start, count=count))
-
-        ! Write the flow temperature (T)
-        CALL check(nf90_put_var(ncid, Temp_varid, state%qp(idx_T,1, :, :), start=start, count=count))
-
-        temp_array = 0.0_wp   ! initialize to zero
-
-        ! Write solid fractions
-        DO i = 1, n_solid
-
-            temp_array = alphas2D(i,:,:)
-
-            CALL check(nf90_put_var(ncid, solid_varid(i), temp_array, start=start, count=count))
-
-            CALL check(nf90_put_var(ncid, deposit_varid(i), state%deposit(:, :, i), start=start, count=count))
-
-            CALL check(nf90_put_var(ncid, erosion_varid(i), state%erosion(:, :, i), start=start, count=count))
-
-        END DO
-
-        temp_array = 0.0_wp   ! initialize to zero
-
-        ! Write additional gas fractions
-        DO i = 1, n_add_gas
-
-            temp_array = alphag2D(i,:,:)
-
-            CALL check(nf90_put_var(ncid, gas_varid(i), temp_array, start=start, count=count))
-
-        END DO
-
-        temp_array = 0.0_wp   ! initialize to zero
-
-
-        temp_array = 0.0_wp   ! initialize to zero
-
-        ! Write stochastic variable
-        DO i = 1, n_stoch_vars
-            CALL check(nf90_put_var(ncid, stoch_varid(i),                                                              &
-                state%qp(idx_stoch + i - 1,1, :, :), start=start, count=count))
-
-        END DO
-
-        ! Write pore pressure variable
-        DO i = 1, n_pore_vars
-            temp_array = pres
-            WHERE (state%qp(idx_h,1, :, :) .GE. dry_thickness_tolerance)
-                temp_array = state%qp(idx_pore + i - 1,1, :, :) + pres
-
-            END WHERE
-
-            CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start, count=count))
-
-        END DO
-
-        temp_array = 0.0_wp   ! reset to zero
-
-        ! Write the max thickness (hMax)
-        CALL check(nf90_put_var(ncid, hMax_varid, state%hmax, start=start, count=count))
-
-        ! Write the max dynamic pressure (pdynmax)
-        CALL check(nf90_put_var(ncid, PDynMax_varid, state%pdynmax, start=start, count=count))
-
-        ! Write the max velocity magnitude
-        CALL check(nf90_put_var(ncid, ModVelMax_varid, state%mod_vel_max, start=start, count=count))
-
-        ! Write the Richardson number
-        CALL check(nf90_put_var(ncid, Ri2D_varid, Ri2D, start=start, count=count))
-
-        ! Write the mixture density
-        CALL check(nf90_put_var(ncid, rho_m2D_varid, rho_m2D, start=start, count=count))
-
-        ! Write the reduced gravity
-        CALL check(nf90_put_var(ncid, red_grav2D_varid, red_grav2D, start=start, count=count))
-
-        CALL check(nf90_put_var(ncid, muEff_varid, muEff, start=start, count=count))
-        CALL check(nf90_put_var(ncid, erodible_varid, erodible2D, start=start, count=count))
-        CALL check(nf90_put_var(ncid, deposit_tot_varid, state%deposit_tot, start=start, count=count))
-        CALL check(nf90_put_var(ncid, shearVel_varid, shearVel, start=start, count=count))
-
-        DO i = 1, n_solid
-            CALL check(nf90_put_var(ncid, Rouse_varid(i), Rouse(i, :, :), start=start, count=count))
-
-        END DO
-
-        CALL check(nf90_put_var(ncid, inertialNumber_varid, inertialNumber, start=start, count=count))
-
-        IF (n_layers==2) THEN
-            IF (SIZE(state%q,2)/=2 .OR. SIZE(state%qp,2)/=2) &
-                CALL fatal_error('Two-layer NetCDF requires two authoritative layer slots')
-            layer_start=[1,1,1,1,nc_time_idx]
-            layer_count=[n_vars,2,comp_cells_x,comp_cells_y,1]
-            ALLOCATE(layer_tensor(n_vars,2,comp_cells_x,comp_cells_y,1))
-            layer_tensor(:,:,:,:,1)=state%q
-            CALL check(nf90_put_var(ncid,layer_q_varid,layer_tensor, &
-                start=layer_start,count=layer_count))
-            layer_tensor(:,:,:,:,1)=state%qp
-            CALL check(nf90_put_var(ncid,layer_qp_varid,layer_tensor, &
-                start=layer_start,count=layer_count))
-            DEALLOCATE(layer_tensor)
-            temp_array=B_cent+state%qp(idx_h,1,:,:)+state%qp(idx_h,2,:,:)
-            CALL check(nf90_put_var(ncid,layer_eta_varid,temp_array,start=start,count=count))
-            temp_array=state%qp(idx_h,1,:,:)+state%qp(idx_h,2,:,:)
-            CALL check(nf90_put_var(ncid,layer_depth_varid,temp_array,start=start,count=count))
-            CALL check(nf90_put_var(ncid,layer_mass_varid(1),state%q(idx_totMassEqn,1,:,:), &
-                start=start,count=count))
-            CALL check(nf90_put_var(ncid,layer_mass_varid(2),state%q(idx_totMassEqn,2,:,:), &
-                start=start,count=count))
-            temp_array=state%q(idx_totMassEqn,1,:,:)+state%q(idx_totMassEqn,2,:,:)
-            CALL check(nf90_put_var(ncid,layer_mass_varid(3),temp_array,start=start,count=count))
+            CALL check(nf90_put_var(ncid,shared_class_varid(1),classes, &
+                start=four_start,count=four_count))
+            DO i=1,n_solid
+                classes(i,:,:,1)=state%erosion(:,:,i)
+            END DO
+            CALL check(nf90_put_var(ncid,shared_class_varid(2),classes, &
+                start=four_start,count=four_count))
+            classes(:,:,:,1)=state%erodible
+            CALL check(nf90_put_var(ncid,shared_class_varid(3),classes, &
+                start=four_start,count=four_count))
+            DEALLOCATE(classes)
         END IF
 
-        ! Increment the time record counter for the next write operation
-        nc_time_idx = nc_time_idx + 1
-
+        nc_time_idx=nc_time_idx+1
         CALL check(nf90_sync(ncid))
-
-        DEALLOCATE (Ri2D, rho_m2D, red_grav2D, muEff, erodible2D)
-        DEALLOCATE (shearVel, Rouse, inertialNumber)
-        DEALLOCATE (alphas2D, alphag2D)
-        DEALLOCATE (vertical_velocity)
-        DEALLOCATE (temp_array)
-
-        RETURN
-
     END SUBROUTINE write_netcdf_timestep
+
 
     !******************************************************************************
     !> \brief Close the currently open NetCDF output file.
@@ -8443,7 +7913,7 @@
     END SUBROUTINE check
 
     !******************************************************************************
-    !> \brief Write a versioned checkpoint including conservative state, geometry and RNG history.
+    !> \brief Write the canonical checkpoint for one or two material layers.
     !
     !> This subroutine writes the current state of the simulation to a binary file
     !> to allow restarting the simulation later. It saves dimensions, time,
@@ -8489,24 +7959,11 @@
 
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_magic
         CALL check_restart_io(ierr, io_message, 'writing header to', filename)
-        IF (n_layers==2) THEN
-            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) two_layer_restart_format_version
-        ELSE
-            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_version
-        END IF
-        CALL check_restart_io(ierr, io_message, 'writing version to', filename)
-
         IF (SIZE(stochastic)/=n_layers .OR. SIZE(state%q,2)/=n_layers) &
             CALL fatal_error('Restart layer workspaces do not match the configured layout')
-        IF (n_layers==2) THEN
-            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x, &
-                comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars, &
-                n_pore_vars, n_thickness_levels, n_dyn_pres_levels, n_layers
-        ELSE
-            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x, &
-                comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars, &
-                n_pore_vars, n_thickness_levels, n_dyn_pres_levels
-        END IF
+        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x, &
+            comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars, &
+            n_pore_vars, n_thickness_levels, n_dyn_pres_levels, n_layers
         CALL check_restart_io(ierr, io_message, 'writing dimensions to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) &
             (rheology_l1%stochastic_rheology_flag .OR. stochastic_l1%stochastic_transport_flag), &
@@ -8520,11 +7977,7 @@
             runtime%t_output, runtime%t_runout, runtime%t_probes
         CALL check_restart_io(ierr, io_message, 'writing output state to', filename)
 
-        IF (n_layers==2) THEN
-            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
-        ELSE
-            WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q(:,1,:,:)
-        END IF
+        WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
         CALL check_restart_io(ierr, io_message, 'writing conservative state to', filename)
         WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
         CALL check_restart_io(ierr, io_message, 'writing nodal topography to', filename)
@@ -8566,8 +8019,7 @@
 
         END IF
 
-        ! Append-only extension: canonical physical payload record indices stay
-        ! unchanged. Diagnostic configuration must match for exact continuation.
+        ! Diagnostic configuration must match for exact continuation.
         WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) output_runout_flag,                                             &
             dt_runout, eps_stop, alphas_threshold, x0_runout, y0_runout,                                               &
             runtime%stop_requested, runtime%steady_deadline
@@ -8580,14 +8032,11 @@
             runtime%runout%last_distance, runtime%runout%maximum_distance,                                             &
             runtime%runout%runout_row, runtime%runout%mass_center_row
         CALL check_restart_io(ierr, io_message, 'writing runout history to', filename)
-        ! Preserve the v7 final record: lava thickness in a lava run, zeros otherwise.
-        IF (lava_flag) THEN
-            WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit_tot
-        ELSE
-            WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) 0.0_wp*state%deposit_tot
-        END IF
-        CALL check_restart_io(ierr, io_message, 'writing lava deposit to', filename)
+        WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit_tot
+        CALL check_restart_io(ierr, io_message, 'writing shared substrate totals to', filename)
 
+        ! L2 is present only when the configured model contains two layers.
+        ! No separate checkpoint schema or historical record interpretation.
         IF (n_layers==2) THEN
             WRITE(unit_rst,IOSTAT=ierr,IOMSG=io_message) stochastic(2)%Z
             CALL check_restart_io(ierr,io_message,'writing L2 OU field to',filename)
@@ -8607,7 +8056,7 @@
     END SUBROUTINE write_restart_file
 
     !******************************************************************************
-    !> \brief Validate and restore a versioned checkpoint into an initialized simulation.
+    !> \brief Validate and restore the canonical checkpoint into an initialized simulation.
     !
     !> This subroutine reads the state of the simulation from a binary file.
     !> It restores dimensions, time, conservative variables, grid variables,
@@ -8643,7 +8092,6 @@
         CLASS(state_type), INTENT(INOUT) :: state
         CLASS(domain_type), INTENT(INOUT) :: domain
         INTEGER :: unit_rst, ierr
-        INTEGER :: format_version
         INTEGER :: nx_check, ny_check, nvars_check, nsolid_check, naddgas_check
         INTEGER :: nstoch_check, npore_check, nthickness_check, ndynpres_check
         INTEGER :: seed_size, current_seed_size,layer_seed_size,layers_check
@@ -8664,35 +8112,20 @@
         CALL check_restart_io(ierr, io_message, 'reading header from', filename)
 
         IF (format_magic /= restart_format_magic) THEN
-            WRITE(*,*) 'ERROR: Unsupported or legacy binary restart file: ',                                           &
+            WRITE(*,*) 'ERROR: Invalid binary checkpoint header: ',                                                    &
                     TRIM(filename)
             ERROR STOP 1
 
         END IF
 
-        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) format_version
-        CALL check_restart_io(ierr, io_message, 'reading version from', filename)
-
-        IF ((n_layers==1 .AND. format_version/=restart_format_version) .OR. &
-            (n_layers==2 .AND. format_version/=two_layer_restart_format_version)) THEN
-            WRITE(*,*) 'ERROR: Restart format does not match configured layer count:', format_version,n_layers
-            ERROR STOP 1
-        END IF
         IF (SIZE(stochastic)/=n_layers .OR. SIZE(state%q,2)/=n_layers) &
             CALL fatal_error('Restart layer workspaces do not match configured layout')
 
         ! Reject incompatible grid/component layouts before reading array payloads.
         ! The checkpoint stores canonical conservative states, not a qp cache.
-        layers_check=1
-        IF (format_version==two_layer_restart_format_version) THEN
-            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check, &
-                nvars_check, nsolid_check, naddgas_check, nstoch_check, &
-                npore_check, nthickness_check, ndynpres_check, layers_check
-        ELSE
-            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check, &
-                nvars_check, nsolid_check, naddgas_check, nstoch_check, &
-                npore_check, nthickness_check, ndynpres_check
-        END IF
+        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check, &
+            nvars_check, nsolid_check, naddgas_check, nstoch_check, &
+            npore_check, nthickness_check, ndynpres_check, layers_check
         CALL check_restart_io(ierr, io_message, 'reading dimensions from', filename)
         IF (nx_check /= comp_cells_x .OR. ny_check /= comp_cells_y .OR.                                                &
             nvars_check /= n_vars .OR. nsolid_check /= n_solid .OR.                                                    &
@@ -8726,11 +8159,7 @@
             runtime%t_output, runtime%t_runout, runtime%t_probes
         CALL check_restart_io(ierr, io_message, 'reading output state from', filename)
 
-        IF (format_version==two_layer_restart_format_version) THEN
-            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
-        ELSE
-            READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q(:,1,:,:)
-        END IF
+        READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
         CALL check_restart_io(ierr, io_message, 'reading conservative state from', filename)
         ! Restore the authoritative nodal bed; shared face/centre elevations and
         ! derivative fields are regenerated later rather than checkpointed separately.
@@ -8812,14 +8241,13 @@
             runtime%runout%last_distance, runtime%runout%maximum_distance,                                             &
             runtime%runout%runout_row, runtime%runout%mass_center_row
         CALL check_restart_io(ierr, io_message, 'reading runout history from', filename)
-        ! Legacy v7 lava_deposit occupies this record; map to canonical deposit_tot.
         READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit_tot
-        CALL check_restart_io(ierr, io_message, 'reading lava deposit from', filename)
+        CALL check_restart_io(ierr, io_message, 'reading shared substrate totals from', filename)
         CALL state%refresh_substrate_totals()
         IF (output_runout_flag .AND. .NOT. runtime%runout%initialized)                                                 &
             CALL fatal_error('Restart is missing initialized runout diagnostic history.')
 
-        IF (format_version==two_layer_restart_format_version) THEN
+        IF (n_layers==2) THEN
             READ(unit_rst,IOSTAT=ierr,IOMSG=io_message) stochastic(2)%Z
             CALL check_restart_io(ierr,io_message,'reading L2 OU field from',filename)
             READ(unit_rst,IOSTAT=ierr,IOMSG=io_message) layer_seed_size

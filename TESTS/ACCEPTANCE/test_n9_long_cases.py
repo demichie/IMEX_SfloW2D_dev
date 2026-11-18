@@ -144,41 +144,44 @@ class N9Helpers(unittest.TestCase):
         with self.assertRaises(AssertionError):
             n9.changed_parameter(text, 'ABSENT_PARAMETER', '0')
 
-    def records(self, path, *, version=4, bad_tail=False):
-        q = np.zeros((4,2,3), dtype='<f8')
+    def records(self, path, *, bad_tail=False, layers=1):
+        q = np.zeros((4,layers,2,3), dtype='<f8')
         q[0] = 2
-        records = [b'IMEX_SFLOW2D_RST', struct.pack('<i',version),
-                   struct.pack('<9i',2,3,4,0,0,0,0,6,5), struct.pack('<2i',0,0),
+        records = [b'IMEX_LAYER_CKPT ',
+                   struct.pack('<10i',2,3,4,0,0,0,0,6,5,layers),
+                   struct.pack('<5i',0,0,0,0,0),
                    struct.pack('<4d',3600,.1,.1,.2), b'output schedule',
                    q.tobytes(order='F'), np.zeros((3,4),dtype='<f8').tobytes(order='F')]
-        if version == 5:
-            records.extend([b'v5 extension record']*13)
         with path.open('wb') as stream:
             for i, record in enumerate(records):
                 marker = struct.pack('<i',len(record))
-                stream.write(marker+record+(b'bad!' if bad_tail and i==7 else marker))
+                stream.write(marker+record+(b'bad!' if bad_tail and i==6 else marker))
         return q
 
     def test_checkpoint_header_layout_and_fortran_order(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'checkpoint.bin'
-            for version in (4, 5):
-                expected = self.records(path,version=version)
+            for layers in (1,2):
+                expected = self.records(path,layers=layers)
                 info, actual = n9.checkpoint(path)
-                self.assertEqual(info['magic'], 'IMEX_SFLOW2D_RST')
-                self.assertEqual(info['version'], version)
+                self.assertEqual(info['magic'], 'IMEX_LAYER_CKPT')
                 self.assertEqual(info['layout'][:3], [2,3,4])
+                self.assertEqual(info['layout'][-1], layers)
                 self.assertTrue(np.array_equal(actual,expected))
                 self.assertEqual(info['conservative_sha256'],
                                  hashlib.sha256(expected.tobytes(order='F')).hexdigest())
 
-    def test_bad_checkpoint_version_and_record_markers_fail(self):
+    def test_bad_checkpoint_magic_and_record_markers_fail(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'checkpoint.bin'
-            for options in ({'version':3},{'bad_tail':True}):
-                self.records(path,**options)
-                with self.assertRaises(AssertionError):
-                    n9.checkpoint(path)
+            self.records(path,bad_tail=True)
+            with self.assertRaises(AssertionError):
+                n9.checkpoint(path)
+            self.records(path)
+            payload = path.read_bytes().replace(b'IMEX_LAYER_CKPT ',b'INVALID_CHECKPT ',1)
+            path.write_bytes(payload)
+            with self.assertRaises(AssertionError):
+                n9.checkpoint(path)
 
     def test_headerless_csv_is_read_but_lost_history_and_values_fail(self):
         with tempfile.TemporaryDirectory() as temporary:

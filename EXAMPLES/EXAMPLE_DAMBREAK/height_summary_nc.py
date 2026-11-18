@@ -39,25 +39,13 @@ def nc_read_height(nc_path: Path, var_hint: str = None):
         from netCDF4 import Dataset
         ds = Dataset(nc_path.as_posix(), 'r')
 
-        candidates = []
-        if var_hint and var_hint in ds.variables:
-            candidates = [var_hint]
-        if not candidates:
-            for name in ds.variables:
-                low = name.lower()
-                if low in ('h', 'height', 'thickness', 'flow_height', 'hflow', 'sum_h'):
-                    candidates.append(name)
-        if not candidates:
-            for name, v in ds.variables.items():
-                dims = getattr(v, 'dimensions', ())
-                if len(dims) == 3 and any('time' in d.lower() for d in dims):
-                    candidates = [name]
-                    break
-        if not candidates:
-            raise RuntimeError('No suitable height variable found in NetCDF.')
-
-        v = ds.variables[candidates[0]]
-        H = np.array(v[:], dtype=float)
+        if var_hint and var_hint != 'qp_layers':
+            raise ValueError('Only canonical qp_layers is supported as a height source')
+        # Canonical Fortran shape (component,layer,x,y,time) appears in
+        # netCDF4 Python as (time,y,x,layer,component).
+        if 'qp_layers' not in ds.variables:
+            raise RuntimeError('Canonical qp_layers variable is missing')
+        H = np.asarray(ds.variables['qp_layers'][:,:,:,:,0], dtype=float)[:,:,:,0]
 
         x = y = t = None
         for ax in ('x', 'xc', 'lon', 'longitude'):
@@ -83,21 +71,10 @@ def nc_read_height(nc_path: Path, var_hint: str = None):
         import h5py
         f = h5py.File(nc_path.as_posix(), 'r')
 
-        def first_3d(h):
-            for k, v in h.items():
-                if isinstance(v, h5py.Dataset) and v.ndim == 3:
-                    return v
-                if isinstance(v, h5py.Group):
-                    g = first_3d(v)
-                    if g is not None:
-                        return g
-            return None
-
-        d = first_3d(f)
-        if d is None:
-            raise RuntimeError('No 3D dataset found (h5py).')
-
-        H = np.array(d[...], dtype=float)
+        if 'qp_layers' not in f:
+            raise RuntimeError('Canonical qp_layers dataset is missing')
+        # NetCDF/HDF5 and netCDF4 expose the same reversed dimension order.
+        H = np.asarray(f['qp_layers'][...], dtype=float)[:,:,:,0,0]
         t = f['time'][...] if 'time' in f.keys() else None
         x = f['x'][...] if 'x' in f.keys() else None
         y = f['y'][...] if 'y' in f.keys() else None

@@ -84,7 +84,7 @@ static int verify_partial_time_record(const char *path, double expected_time)
         goto done;
     }
 
-    status = nc_inq_varid(ncid, "h", &field_varid);
+    status = nc_inq_varid(ncid, "q_layers", &field_varid);
     if (report_netcdf_error(status, "find partial field variable")) goto done;
     status = nc_inq_var(ncid, field_varid, NULL, NULL, &field_rank,
                         field_dimids, NULL);
@@ -278,9 +278,24 @@ static int compare_outputs(const char *reference_path, const char *resumed_path)
         fprintf(stderr, "NetCDF dimensions exceed comparison capacity\n");
         goto done;
     }
-    field_count = x_length * y_length * time_length;
+    /* The canonical q tensor has 1 layer and n_vars components here. */
+    {
+        int component_dimid, layer_dimid;
+        size_t n_components, n_layers;
+        status = nc_inq_dimid(reference_ncid, "component", &component_dimid);
+        if (report_netcdf_error(status, "find component dimension")) goto done;
+        status = nc_inq_dimlen(reference_ncid, component_dimid, &n_components);
+        if (report_netcdf_error(status, "read component dimension")) goto done;
+        status = nc_inq_dimid(reference_ncid, "layer", &layer_dimid);
+        if (report_netcdf_error(status, "find layer dimension")) goto done;
+        status = nc_inq_dimlen(reference_ncid, layer_dimid, &n_layers);
+        if (report_netcdf_error(status, "read layer dimension")) goto done;
+        if (n_components > SIZE_MAX / (x_length * y_length * time_length) ||
+            n_layers > SIZE_MAX / (n_components * x_length * y_length * time_length)) goto done;
+        field_count = x_length * y_length * time_length * n_components * n_layers;
+    }
     if (compare_variable_data(reference_ncid, resumed_ncid, "time", time_length) ||
-        compare_variable_data(reference_ncid, resumed_ncid, "h", field_count)) {
+        compare_variable_data(reference_ncid, resumed_ncid, "q_layers", field_count)) {
         goto done;
     }
     result = 0;
