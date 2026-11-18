@@ -216,7 +216,7 @@ abilitazione in produzione.
 | **TL00–TL04 — Stato e fisica per layer** | Base predisposta | Verificare i percorsi integrati ancora scoperti: slot opzionali, IC/BC, input, output e regressioni L1/L2. |
 | **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
 | **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
-| **TL07 — Lie accoppiato** | Percorso spaziale-Lie-commit collegato, da verificare | Il trial L1/L2 entra nell'esecutore Lie condiviso e pubblica i due layer sul workset comune; il gate di layout resta attivo. Gruppo 0 da snapshot pre-spaziale, inventari post-spaziali e transazione interlayer sono implementati. Restano regressioni integrate del timestep, optional slots, OpenMP e gate L2. La fisica stochastic L2 e' esplicitamente rifiutata finche' manca il workspace OU L2. |
+| **TL07 — Lie accoppiato** | Percorso integrato e regressioni estese; verifica CI finale pendente | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo con i quattro stati wet/dry. Restano il gate funzionale generale, le variabili opzionali e il workspace OU L2 (blocchi successivi). Verificare strict/optimized e OpenMP sul commit finale del blocco 1 prima di chiudere TL07. |
 | **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano validazione della transazione Lie effettiva, variabili opzionali per layer, stati termodinamici finali, drag e test two-layer end-to-end. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
@@ -278,9 +278,10 @@ Il contratto attuale rimane di errore fatale senza retry: q/qp vengono
 pubblicati solo dopo la riuscita del Lie globale, ma il substrato puo'
 essere aggiornato per cella durante il sweep. Non dichiarare un rollback
 globale recuperabile del substrato senza una migrazione coerente della
-transazione. Restano aperte l'integrazione con sorgenti di terreno,
-variabili opzionali, BC e restart. Il gate produttivo `N_LAYERS=2`
-rimane chiuso.
+transazione. La copertura delle sorgenti di terreno e' ora inclusa nella regressione
+integrata del timestep, ma necessita della verifica CI finale. Variabili
+opzionali, BC e restart restano nel perimetro dei blocchi successivi.
+Il gate produttivo `N_LAYERS=2` rimane chiuso.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
