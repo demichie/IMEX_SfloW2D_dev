@@ -11,7 +11,7 @@ PROGRAM test_interlayer_mass_exchange
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE constitutive_parameters_2d, ONLY : grav,kin_visc_c,rho_a_amb,vonK
-    USE source_input_2d, ONLY : read_interlayer_exchange_parameters,write_interlayer_exchange_parameters
+    USE source_input_2d, ONLY : read_interlayer_parameters,write_interlayer_parameters
     USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange
     IMPLICIT NONE
     TYPE(interlayer_mass_exchange_config_type) :: config
@@ -91,16 +91,16 @@ PROGRAM test_interlayer_mass_exchange
 
     ! The physical input belongs to one pair; reject it for single-layer runs.
     OPEN(NEWUNIT=unit,STATUS='scratch',FORM='formatted')
-    WRITE(unit,'(A)') '&INTERLAYER_EXCHANGE_PARAMETERS'
-    WRITE(unit,'(A)') " interlayer_exchange%elutriation_flag = T,"
-    WRITE(unit,'(A)') " interlayer_exchange%elutriation_solid_volume_fraction = 0.15,"
-    WRITE(unit,'(A)') " interlayer_exchange%elutriation_carrier_mode = 'ALLOW_CONCENTRATED' "
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS'
+    WRITE(unit,'(A)') " interlayer_mass_exchange%elutriation_flag = T,"
+    WRITE(unit,'(A)') " interlayer_mass_exchange%elutriation_solid_volume_fraction = 0.15,"
+    WRITE(unit,'(A)') " interlayer_mass_exchange%elutriation_carrier_mode = 'ALLOW_CONCENTRATED' "
     WRITE(unit,'(A)') '/'
     n_layers=1
-    CALL read_interlayer_exchange_parameters(unit,error)
+    CALL read_interlayer_parameters(unit,error)
     CALL require(INDEX(error,'requires N_LAYERS=2')>0,'reject interlayer input in single-layer')
     n_layers=2
-    CALL read_interlayer_exchange_parameters(unit,error)
+    CALL read_interlayer_parameters(unit,error)
     CALL require(LEN_TRIM(error)==0,'read pair-wide interlayer input: '//TRIM(error))
     CALL close(interlayer_exchange%elutriation_solid_volume_fraction,0.15_wp,'read lifted solid fraction')
     CALL require(interlayer_exchange%elutriation_carrier_mode=='ALLOW_CONCENTRATED', &
@@ -118,7 +118,7 @@ PROGRAM test_interlayer_mass_exchange
     WRITE(unit,'(A)') " interlayer_momentum_exchange%method = 'analytic',"
     WRITE(unit,'(A)') ' interlayer_momentum_exchange%group = 5'
     WRITE(unit,'(A)') '/'
-    CALL read_interlayer_exchange_parameters(unit,error)
+    CALL read_interlayer_parameters(unit,error)
     CALL require(LEN_TRIM(error)==0,'canonical interlayer input: '//TRIM(error))
     CALL require(interlayer_exchange%settling_flag .AND. interlayer_exchange%group==4, &
         'canonical input modifies the only mass exchange object')
@@ -130,21 +130,22 @@ PROGRAM test_interlayer_mass_exchange
     ! The backup always emits the unified canonical group, not both spellings.
     CLOSE(unit)
     OPEN(NEWUNIT=unit,STATUS='scratch',FORM='formatted')
-    CALL write_interlayer_exchange_parameters(unit)
+    CALL write_interlayer_parameters(unit)
     REWIND(unit)
     READ(unit,'(A)',IOSTAT=unit_read_status) first_line
     CALL require(unit_read_status==0 .AND. INDEX(first_line,'&INTERLAYER_PARAMETERS')>0, &
         'canonical interlayer backup group')
     CLOSE(unit)
 
-    ! A historical group and the canonical group cannot both specify the pair.
+    ! Multiple occurrences of the one canonical pair-wide group are invalid.
     OPEN(NEWUNIT=unit,STATUS='scratch',FORM='formatted')
-    WRITE(unit,'(A)') '&INTERLAYER_EXCHANGE_PARAMETERS'
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS'
     WRITE(unit,'(A)') '/'
     WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS'
     WRITE(unit,'(A)') '/'
-    CALL read_interlayer_exchange_parameters(unit,error)
-    CALL require(INDEX(error,'mutually exclusive')>0,'reject mixed legacy and canonical groups')
+    CALL read_interlayer_parameters(unit,error)
+    CALL require(INDEX(error,'Duplicate INTERLAYER_PARAMETERS')>0, &
+        'reject duplicate canonical interlayer groups')
     CLOSE(unit)
     CALL test_density_asymmetry()
     CALL test_gross_carrier_exchange()
