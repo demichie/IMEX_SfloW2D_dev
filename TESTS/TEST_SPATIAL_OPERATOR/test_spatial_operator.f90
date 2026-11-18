@@ -2730,6 +2730,8 @@ CONTAINS
         REAL(wp) :: baseline_energy(2,nx,ny)
         INTEGER :: old_layers,j,k,l,eq,output_unit
         LOGICAL :: accepted,found_pore,found_ou,found_cooling
+        LOGICAL :: created_zone,created_source_fraction,created_fissure_fraction
+        LOGICAL :: created_arc_perim,created_arc_normals
         CHARACTER(LEN=256) :: error
 
         IF (nx<12 .OR. ny<12) RETURN
@@ -2804,6 +2806,25 @@ CONTAINS
         state%erodible=0.0_wp
         state%deposit_tot=0.0_wp
         state%erosion_tot=0.0_wp
+
+        ! Match the production Lie geometry contract. An earlier regression
+        ! releases its temporary B_zone and injection maps before this test.
+        created_zone=.NOT.ALLOCATED(B_zone)
+        IF (created_zone) ALLOCATE(B_zone(nx,ny))
+        B_zone=0
+        created_source_fraction=.NOT.ALLOCATED(cell_source_fractions)
+        IF (created_source_fraction) ALLOCATE(cell_source_fractions(nx,ny))
+        cell_source_fractions=0.0_wp
+        created_fissure_fraction=.NOT.ALLOCATED(cell_fissure_fractions)
+        IF (created_fissure_fraction) ALLOCATE(cell_fissure_fractions(nx,ny,n_fissures))
+        cell_fissure_fractions=0.0_wp
+        created_arc_perim=.NOT.ALLOCATED(cell_arc_perim)
+        IF (created_arc_perim) ALLOCATE(cell_arc_perim(nx,ny))
+        cell_arc_perim=0.0_wp
+        created_arc_normals=.NOT.ALLOCATED(cell_arc_n_x)
+        IF (created_arc_normals) ALLOCATE(cell_arc_n_x(nx,ny),cell_arc_n_y(nx,ny))
+        cell_arc_n_x=0.0_wp
+        cell_arc_n_y=0.0_wp
 
         CALL paired%initialize
         CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
@@ -2901,6 +2922,11 @@ CONTAINS
         CALL physics(2)%finalize
         DEALLOCATE(state%q,state%qp,state%deposit,state%erosion,state%erodible)
         DEALLOCATE(state%deposit_tot,state%erosion_tot)
+        IF (created_zone) DEALLOCATE(B_zone)
+        IF (created_source_fraction) DEALLOCATE(cell_source_fractions)
+        IF (created_fissure_fraction) DEALLOCATE(cell_fissure_fractions)
+        IF (created_arc_perim) DEALLOCATE(cell_arc_perim)
+        IF (created_arc_normals) DEALLOCATE(cell_arc_n_x,cell_arc_n_y)
         stochastic_l1=old_stochastic_l1
         stochastic_l2=old_stochastic_l2
         rheology_l1=old_rheology_l1
