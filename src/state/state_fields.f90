@@ -107,7 +107,7 @@ CONTAINS
         this%erosion_tot=0.0_wp
         this%q = 0.0_wp
         this%qp = 0.0_wp
-        this%qp(idx_T,1:model_layout%n_layers,1:comp_cells_x,1:comp_cells_y) = T_ambient
+        this%qp(model_layout%idx_T,1:model_layout%n_layers,1:comp_cells_x,1:comp_cells_y) = T_ambient
 
         ALLOCATE( this%hmax(comp_cells_x,comp_cells_y) )
         ALLOCATE( this%pdynmax(comp_cells_x,comp_cells_y) )

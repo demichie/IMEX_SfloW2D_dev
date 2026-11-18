@@ -37,6 +37,8 @@ MODULE model_layout_2d
         INTEGER :: idx_uEqn = 0
         INTEGER :: idx_vEqn = 0
         INTEGER :: idx_engyEqn = 0
+        !> Temperature component of the primitive state, not a conservative energy equation.
+        INTEGER :: idx_T = 0
         INTEGER :: idx_solid_first = 0
         INTEGER :: idx_solid_last = 0
         INTEGER :: idx_add_gas_first = 0
@@ -132,6 +134,7 @@ CONTAINS
         this%idx_uEqn = 2
         this%idx_vEqn = 3
         this%idx_engyEqn = 4
+        this%idx_T = 4
 
         this%idx_solid_first = 5
         this%idx_solid_last = 4 + n_solid
@@ -190,6 +193,7 @@ CONTAINS
         this%idx_uEqn = 0
         this%idx_vEqn = 0
         this%idx_engyEqn = 0
+        this%idx_T = 0
         this%idx_solid_first = 0
         this%idx_solid_last = 0
         this%idx_add_gas_first = 0
@@ -227,6 +231,7 @@ CONTAINS
             .AND. this%idx_totMassEqn == 1                                                                             &
             .AND. this%idx_uEqn == 2                                                                             &
             .AND. this%idx_vEqn == 3                                                                             &
+            .AND. this%idx_T == 4                                                                                     &
             .AND. this%idx_engyEqn == 4                                                                                &
             .AND. this%idx_solid_first == 5                                                                            &
             .AND. this%idx_solid_last == 4 + this%n_solid                                                              &

@@ -20,6 +20,7 @@ PROGRAM test_model_layout
        layout%idx_solid_last == 5)
   CALL assert_true('gas range', layout%idx_add_gas_first == 6        &
        .AND. layout%idx_add_gas_last == 6)
+  CALL assert_true('temperature and energy indices', layout%idx_T == 4 .AND. layout%idx_engyEqn == 4)
   CALL assert_true('physical velocity indices', layout%idx_u == 2 &
        .AND. layout%idx_v == 3)
 
