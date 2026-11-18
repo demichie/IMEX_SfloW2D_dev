@@ -219,7 +219,7 @@ abilitazione in produzione.
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
-| **TL13a — Gate funzionale** | Audit e pulizia in corso; gate produttivo chiuso | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
+| **TL13a — Gate funzionale** | Audit di chiusura e test di continuazione I/O pronti; validazione integrata pendente | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
@@ -449,3 +449,16 @@ interfaccia e allinea i test al contratto attuale, mantenendo la
 transazione della geometria e i controlli aggregati lava/granulare.
 Le Actions sul commit di pulizia devono essere verificate
 separatamente. Il gate `N_LAYERS=2` resta disabilitato.
+
+
+**TL13a — integrazione funzionale e continuazione (18 novembre 2026):**
+`TEST_SPATIAL_OPERATOR` controlla ora anche l'append NetCDF dopo
+il restart: due record temporali e stati L1/L2 conservati in entrambi.
+Il workflow `solver-validation.yml` include il test strutturale two-layer
+nelle build strict/debug e optimized, insieme ai test produttivi di
+restart e budget; il confronto OpenMP del driver single-layer
+(1/2/4 thread) e' abilitato per default.
+Questo non costituisce ancora un end-to-end produttivo a due layer:
+`supported_layer_count` e il parser mantengono intenzionalmente il
+gate chiuso. L'esecuzione delle Actions sulla revisione finale e
+l'approvazione di un test controllato two-layer sono ancora necessarie.

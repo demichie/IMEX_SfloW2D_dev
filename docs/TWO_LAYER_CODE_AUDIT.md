@@ -35,25 +35,45 @@ No retry and no recoverable whole-step substrate rollback are supported.
 transaction remains a separate mechanism for deferred bed-cache updates;
 its internal rollback fixture is still valid.
 
+## Canonical I/O continuation and end-to-end verification
+
+The existing structural `TEST_SPATIAL_OPERATOR` fixture now appends a second
+NetCDF frame using `restart=.TRUE.`, then checks that both canonical L1/L2
+state tensors are readable, unchanged and that the time dimension has exactly
+two records. This extends the round-trip from initial serialization to
+restart continuation without introducing a second I/O implementation.
+
+The existing `solver-validation.yml` is the production-driver acceptance
+route: optimized and strict/debug builds, `make check`, binary and stochastic
+restarts, source-mass and HP-PCCU tests, canonical two-layer structural
+regressions, and complete single-layer NetCDF/OpenMP comparison across
+1/2/4 threads. The OpenMP job is enabled by default for manual dispatch.
+This is intentionally a *single-layer production driver* test plus a
+*structural two-layer* test; it is not a claim of two-layer production execution.
+
 ## Evidence and remaining functional gates
 
-- The optimized/debug build on baseline `5f00eec55` succeeded.
-- On the later `7f8189a76` regression run
-  [#44343739896](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/44343739896),
-  the spatial and state jobs were observed successful. Other jobs must be
-  checked for their final status before declaring that run fully green.
-- No build or regression evidence exists yet for the cleanup commit that
-  updates this document. Previous CI runs do **not** validate new code.
+- On baseline `4bc2dce0`, optimized/debug build
+  [#44345533346](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/44345533346)
+  and numerical regressions
+  [#44345568177](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/44345568177)
+  both concluded **success**.
+- No workflow outcome exists yet for the subsequent TL13a integration
+  extensions. The new SHA must pass the full solver-validation workflow
+  before functional acceptance claims can be strengthened.
 - The production `N_LAYERS=2` gate remains closed. Structural two-layer
   fixtures are not equivalent to a complete production run.
-- A production end-to-end scenario must exercise parsing, initial conditions,
-  all four boundary sides, spatial/Lie evolution, substrate budgets, output,
-  continuation and OpenMP determinism through the actual driver.
+- A **two-layer** production end-to-end scenario still requires an approved,
+  controlled layout activation and must exercise parsing, initial conditions,
+  boundaries, spatial/Lie evolution, substrate budgets, output, continuation
+  and OpenMP determinism through the actual driver.
 - On the final cleanup SHA, run optimized and strict/debug builds, all
   numerical/source/state regressions, single-layer examples and the
   representative lava/dry variants. Compare scientific budgets, not only exit codes.
 - TL13b must separately validate coupled hyperbolicity/shear, density
   contrasts, pressure and closure limits before any production release.
 
-**TL13a gate is open:** this cleanup removes an obsolete interface, but
-does not by itself authorize two-layer production or establish scientific validity.
+**TL13a gate remains open:** structural two-layer integration and real
+single-layer end-to-end validation are distinct. A production two-layer
+integration run is unavailable while the intentional layout gate is closed;
+scientific approval and TL13b remain separate.

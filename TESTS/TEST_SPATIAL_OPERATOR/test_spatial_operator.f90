@@ -3208,7 +3208,7 @@ CONTAINS
     INTEGER :: unit_budget
     REAL(wp) :: budget(11)
     CHARACTER(LEN=256) :: header
-    INTEGER :: saved_layers,ios,netcdf_id,variable_id,seed_size
+    INTEGER :: saved_layers,ios,netcdf_id,variable_id,seed_size,time_dim,time_length
     INTEGER, ALLOCATABLE :: old_rng(:)
     LOGICAL :: accepted,found_file,saved_pore_l1,created_erodible,created_erodible_fract
     CHARACTER(LEN=256) :: message
@@ -3320,20 +3320,44 @@ CONTAINS
     WRITE(error_unit,'(A)') 'CHECK: writing canonical NetCDF output'
     CALL write_netcdf_timestep(clock%t,states)
     CALL close_netcdf()
+
+    ! Append a second output record through the actual restart-continuation
+    ! path. The previous conservative and primitive layer records must remain
+    ! intact; appending must never silently replace the original history.
+    restart=.TRUE.
+    output_idx=1
+    WRITE(error_unit,'(A)') 'CHECK: appending canonical NetCDF restart record'
+    CALL init_netcdf_output()
+    CALL write_netcdf_timestep(clock%t+clock%dt,states)
+    CALL close_netcdf()
+    restart=.FALSE.
     WRITE(error_unit,'(A)') 'CHECK: reopening canonical NetCDF output'
     ios=nf90_open(output_file_path('fields',TRIM(run_name)//'.nc'),NF90_NOWRITE,netcdf_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot open two-layer NetCDF'
+    ios=nf90_inq_dimid(netcdf_id,'time',time_dim)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF time dimension'
+    ios=nf90_inquire_dimension(netcdf_id,time_dim,len=time_length)
+    IF (ios/=nf90_noerr .OR. time_length/=2) &
+        ERROR STOP 'Two-layer NetCDF restart did not append one time record'
     ALLOCATE(stored_q(n_vars,2,nx,ny,1),stored_qp(n_vars,2,nx,ny,1))
     ios=nf90_inq_varid(netcdf_id,'q_layers',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF conservative layer tensor'
     ios=nf90_get_var(netcdf_id,variable_id,stored_q)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot read canonical NetCDF conservative tensor'
     IF (ANY(stored_q(:,:,:,:,1)/=original_q)) ERROR STOP 'NetCDF q_layers values mismatch'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_q, &
+        start=[1,1,1,1,2],count=[n_vars,2,nx,ny,1])
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended NetCDF conservative layer record'
+    IF (ANY(stored_q(:,:,:,:,1)/=original_q)) ERROR STOP 'NetCDF appended q_layers values mismatch'
     ios=nf90_inq_varid(netcdf_id,'qp_layers',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF primitive layer tensor'
     ios=nf90_get_var(netcdf_id,variable_id,stored_qp)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot read canonical NetCDF primitive tensor'
     IF (ANY(stored_qp(:,:,:,:,1)/=states%qp)) ERROR STOP 'NetCDF qp_layers values mismatch'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_qp, &
+        start=[1,1,1,1,2],count=[n_vars,2,nx,ny,1])
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended NetCDF primitive layer record'
+    IF (ANY(stored_qp(:,:,:,:,1)/=states%qp)) ERROR STOP 'NetCDF appended qp_layers values mismatch'
     ALLOCATE(stored_total(nx,ny,1))
     ios=nf90_inq_varid(netcdf_id,'mass_total',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing total mass NetCDF diagnostic'
@@ -3355,6 +3379,7 @@ CONTAINS
         ERROR STOP 'NetCDF total depth is not h1+h2'
     ios=nf90_close(netcdf_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Closing two-layer NetCDF failed'
+    WRITE(error_unit,'(A)') 'PASS: canonical NetCDF L1/L2 continuation preserves both records'
 
     CALL write_two_layer_budget(clock%t,states,'0000')
     INQUIRE(FILE=output_file_path('fields',TRIM(run_name)//'_budget_0000.csv'),EXIST=found_file)

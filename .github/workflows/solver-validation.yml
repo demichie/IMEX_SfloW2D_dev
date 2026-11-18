@@ -7,7 +7,7 @@ on:
         description: 'Also compare complete solver outputs with 1, 2 and 4 OpenMP threads'
         type: boolean
         required: false
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -57,6 +57,11 @@ jobs:
           set -euo pipefail
           sh TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
           sh TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
+      - name: Verify canonical two-layer structural integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh TESTS/TEST_SPATIAL_OPERATOR/run_test.sh
       - name: Verify source mass budgets and HP-PCCU Gate H
         shell: bash
         env:
