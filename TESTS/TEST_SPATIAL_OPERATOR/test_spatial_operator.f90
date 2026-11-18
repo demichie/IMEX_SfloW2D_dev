@@ -35,6 +35,7 @@ PROGRAM test_spatial_operator
   USE rheology_parameters_2d, ONLY : rheology_l2
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l2
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l2,pore_pressure_cache_l1,pore_pressure_cache_l2
+  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange,interlayer_mass_exchange_config_type
   USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
       interlayer_momentum_exchange_config_type
   USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1,stochastic_l2
@@ -401,22 +402,26 @@ CONTAINS
         TYPE(spatial_operator_type) :: operators(2)
         TYPE(time_integration_workspace_type) :: workspace
         TYPE(source_registry_type) :: registry
-        TYPE(source_group_type) :: groups(3)
+        TYPE(source_group_type) :: groups(4)
         TYPE(layer_physics_type) :: physics(2)
         TYPE(state_type) :: coupled_state
         TYPE(stochastic_workspace_type) :: stochastic
         TYPE(interlayer_momentum_exchange_config_type) :: old_drag
+        TYPE(interlayer_mass_exchange_config_type) :: old_mass
         REAL(wp) :: base_q(n_vars,2,nx,ny),before_q(n_vars,2,nx,ny)
         REAL(wp) :: before_qp(n_vars,2,nx,ny)
         REAL(wp) :: pt1(n_vars,nx,ny),pt2(n_vars,nx,ny)
         REAL(wp) :: bound1,bound2,dt_step,momentum_difference,drag_difference,scale
-        INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit
-        LOGICAL :: created_zone,created_arc
+        REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
+        INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer
+        LOGICAL :: created_zone,created_arc,created_diam,accepted
+        REAL(wp), ALLOCATABLE :: original_diam(:)
         CHARACTER(LEN=256) :: error
 
         original_layers=n_layers
         n_layers=2
         old_drag=interlayer_momentum_exchange
+        old_mass=interlayer_exchange
         ! Both layers are configured from the canonical physics objects.
         CALL physics(1)%initialize(.FALSE.,rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,error)
         IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L1 physics in integrated Lie fixture'
@@ -430,11 +435,16 @@ CONTAINS
         groups(1)%equation_ids=[(eq,eq=1,n_eqns)]
         groups(2)=groups(1)
         groups(2)%scope=SOURCE_SCOPE_L2
-        groups(3)%id=5
+        groups(3)%id=4
         groups(3)%scope=SOURCE_SCOPE_INTERLAYER
-        groups(3)%method=SOURCE_METHOD_ANALYTIC
-        groups(3)%source_names=[CHARACTER(LEN=64)::'interlayer_drag']
-        groups(3)%equation_ids=[INTEGER::]
+        groups(3)%method=SOURCE_METHOD_EXPLICIT
+        groups(3)%source_names=[CHARACTER(LEN=64)::'interlayer_mass_exchange']
+        groups(3)%equation_ids=[(eq,eq=1,n_eqns)]
+        groups(4)%id=5
+        groups(4)%scope=SOURCE_SCOPE_INTERLAYER
+        groups(4)%method=SOURCE_METHOD_ANALYTIC
+        groups(4)%source_names=[CHARACTER(LEN=64)::'interlayer_drag']
+        groups(4)%equation_ids=[INTEGER::]
         CALL registry%initialize(n_eqns,0,groups,error)
         IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid integrated Lie group registry'
 
@@ -469,6 +479,9 @@ CONTAINS
         CALL operators(1)%prepare_hp_workset(paired)
         CALL operators(2)%prepare_hp_workset(paired)
         CALL workspace%initialize(registry)
+        ! The drag-only reference must remain a no-op for mass transfer.
+        interlayer_exchange%settling_flag=.FALSE.
+        interlayer_exchange%elutriation_flag=.FALSE.
         interlayer_momentum_exchange%model='CHEZY'
         interlayer_momentum_exchange%method='ANALYTIC'
         interlayer_momentum_exchange%group=5
@@ -545,6 +558,121 @@ CONTAINS
             ! Compare the complete accepted timestep payload across 1/4 threads.
             WRITE(integrated_unit) coupled_state%q,coupled_state%qp
         END DO
+
+        ! Exercise the exact production Lie mass source on the same compact
+        ! two-layer workset. Keep external erosion and deposition inactive:
+        ! differences from the reference are purely interlayer transfers.
+        created_diam=.NOT.ALLOCATED(diam_s)
+        IF (created_diam) THEN
+            ALLOCATE(diam_s(n_solid))
+        ELSE
+            original_diam=diam_s
+        END IF
+        diam_s=2.0E-5_wp
+        kin_before=kin_visc_c
+        vonK_before=vonK
+        kin_visc_c=1.0E-6_wp
+        vonK=0.41_wp
+        interlayer_exchange%method='EXPLICIT'
+        interlayer_exchange%group=4
+        interlayer_exchange%elutriation_solid_volume_fraction=0.20_wp
+        interlayer_exchange%elutriation_carrier_mode='LIMIT_SOLIDS'
+        interlayer_exchange%elutriation_law='LINEAR_USTAR'
+        interlayer_exchange%rouse_critical=100.0_wp
+        interlayer_exchange%elutriation_efficiency=0.1_wp
+        interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
+
+        DO scenario=1,4
+            before_q=0.0_wp
+            before_qp=0.0_wp
+            before_qp(idx_T,:,:,:)=T_ambient
+            DO k=5,ny-4
+                DO j=5,nx-4
+                    DO layer=1,2
+                        IF (scenario==4) CYCLE
+                        IF (scenario==2 .AND. layer==2) CYCLE
+                        IF (scenario==3 .AND. layer==1) CYCLE
+                        primitive=0.0_wp
+                        primitive(idx_T)=T_ambient
+                        primitive(idx_h)=0.3_wp
+                        primitive(idx_u)=2.0_wp
+                        IF (layer==1) THEN
+                            primitive(idx_h)=0.5_wp
+                            primitive(idx_u)=20.0_wp
+                        END IF
+                        primitive(idx_solid_first)=0.10_wp
+                        CALL primitive_to_conservative(primitive,before_q(:,layer,j,k),accepted=accepted)
+                        IF (.NOT.accepted) ERROR STOP 'Invalid solid-bearing interlayer cold-start fixture'
+                        before_qp(:,layer,j,k)=primitive
+                    END DO
+                END DO
+            END DO
+
+            pt1=before_qp(:,1,:,:)
+            pt2=before_qp(:,2,:,:)
+            CALL operators(1)%compute_timestep(before_q(:,1,:,:),pt1,0.0_wp,bound1,paired)
+            CALL operators(2)%compute_timestep(before_q(:,2,:,:),pt2,0.0_wp,bound2,paired, &
+                lower_operator=operators(1),h_lower=pt1(idx_h,:,:))
+            dt_step=MIN(1.0E-5_wp,0.01_wp*MIN(dt_bound,bound1,bound2))
+            IF (dt_step<=0.0_wp) ERROR STOP 'Invalid mass-transfer integrated timestep'
+            before_qp(:,1,:,:)=pt1
+            before_qp(:,2,:,:)=pt2
+
+            interlayer_exchange%settling_flag=.FALSE.
+            interlayer_exchange%elutriation_flag=.FALSE.
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            base_q=coupled_state%q
+
+            interlayer_exchange%settling_flag=.TRUE.
+            interlayer_exchange%elutriation_flag=.TRUE.
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+
+            mass_difference=0.0_wp
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                DO eq=1,n_eqns
+                    component_difference=SUM(coupled_state%q(eq,:,j,k)-base_q(eq,:,j,k))
+                    scale=MAX(1.0_wp,SUM(ABS(base_q(eq,:,j,k))))
+                    IF (ABS(component_difference)>1.0E-10_wp*scale) &
+                        ERROR STOP 'Integrated interlayer mass exchange violates paired conservative budget'
+                END DO
+                DO layer=1,2
+                    IF (.NOT.conservative_mass_admissible(coupled_state%q(:,layer,j,k))) &
+                        ERROR STOP 'Integrated interlayer mass exchange produced inadmissible state'
+                    IF (.NOT.ALL(ieee_is_finite(coupled_state%qp(:,layer,j,k)))) &
+                        ERROR STOP 'Integrated mass exchange produced non-finite primitives'
+                END DO
+                mass_difference=mass_difference+SUM(ABS(coupled_state%q(idx_solidEqn_first,:,j,k) &
+                    -base_q(idx_solidEqn_first,:,j,k)))
+            END DO
+            IF (scenario/=4 .AND. mass_difference<=0.0_wp) &
+                ERROR STOP 'Integrated interlayer settling or elutriation did not transfer solids'
+            IF (scenario==4 .AND. mass_difference/=0.0_wp) &
+                ERROR STOP 'Dry column generated interlayer mass exchange'
+            IF (scenario==2 .AND. .NOT.ANY(coupled_state%q(idx_totMassEqn,2,:,:)> &
+                base_q(idx_totMassEqn,2,:,:))) &
+                ERROR STOP 'Integrated elutriation failed to cold-start L2'
+            IF (scenario==3 .AND. .NOT.ANY(coupled_state%q(idx_totMassEqn,1,:,:)> &
+                base_q(idx_totMassEqn,1,:,:))) &
+                ERROR STOP 'Integrated settling failed to cold-start L1'
+            WRITE(integrated_unit) coupled_state%q,coupled_state%qp
+        END DO
+        IF (created_diam) THEN
+            DEALLOCATE(diam_s)
+        ELSE
+            diam_s=original_diam
+        END IF
+        kin_visc_c=kin_before
+        vonK=vonK_before
         CLOSE(integrated_unit)
 
         CALL workspace%finalize()
@@ -556,8 +684,9 @@ CONTAINS
         IF (created_zone) DEALLOCATE(B_zone)
         IF (created_arc) DEALLOCATE(cell_arc_perim)
         interlayer_momentum_exchange=old_drag
+        interlayer_exchange=old_mass
         n_layers=original_layers
-        WRITE(*,*) 'PASS: coupled spatial-Lie-commit, four wet/dry cases, conservative interlayer drag'
+        WRITE(*,*) 'PASS: coupled spatial-Lie-commit, drag and mass exchange in four wet/dry cases'
     END SUBROUTINE check_integrated_coupled_lie_timestep
 
     !> @brief Check exact global conservative budgets for compact-support layers.

@@ -230,10 +230,13 @@ passo con coefficiente Chézy nullo e positivo, controllando il bilancio
 locale del momento tra i layer e l'invarianza di massa, solidi ed
 energia termica per effetto del solo drag. I profili strict/optimized
 usano lo script esistente, che confronta ora anche i payload del passo
-accoppiato tra OpenMP 1 e 4 thread. Questa prova non abilita
-`N_LAYERS=2` e non sostituisce le future regressioni di cold-start
-con mass exchange, gruppi 0 interlayer, sorgenti di terreno,
-variabili opzionali e restart.
+accoppiato tra OpenMP 1 e 4 thread. La regressione include ora anche
+settling ed elutriazione sul timestep effettivo: il confronto con le
+sorgenti disattivate verifica il bilancio di tutte le equazioni
+conservative e il cold-start di L1 e L2, senza duplicare l'integratore.
+La prova non abilita `N_LAYERS=2` e resta da verificare in CI.
+Restano aperti i test completi del gruppo 0 interlayer, sorgenti di
+terreno, variabili opzionali e restart.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
