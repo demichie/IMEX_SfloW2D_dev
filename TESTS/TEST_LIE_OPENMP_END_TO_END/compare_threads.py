@@ -75,8 +75,14 @@ def prepare(repo, root, name, cells=32, horizon='2.0E-2'):
                            exchange + "&GAS_TRANSPORT_PARAMETERS")
     if name == "EXAMPLE_2D_NEWTON":
         # Force the actual production backward-Euler Newton group.
-        text = replace_one(text, r"^\s*RHEOLOGY_MODEL\s*=.*$",
-                           " RHEOLOGY_MODEL='quadratic',\n RHEOLOGY_METHOD='NEWTON',\n RHEOLOGY_GROUP=2,")
+        # The canonical single-layer NAMELIST owns one rheology object.
+        # Change its existing settings rather than adding obsolete scalars.
+        text = replace_one(text, r"^\s*RHEOLOGY%RHEOLOGY_MODEL\s*=.*$",
+                           " RHEOLOGY%RHEOLOGY_MODEL='quadratic',")
+        text = replace_one(text, r"^\s*RHEOLOGY%RHEOLOGY_METHOD\s*=.*$",
+                           " RHEOLOGY%RHEOLOGY_METHOD='NEWTON',")
+        text = replace_one(text, r"^\s*RHEOLOGY%RHEOLOGY_GROUP\s*=.*$",
+                           " RHEOLOGY%RHEOLOGY_GROUP=2,")
     if name == "EXAMPLE_2D_TOPO":
         text = replace_one(text, r"^\s*SUBSTRATE%TOPO_CHANGE_FLAG\s*=.*$",
                            " SUBSTRATE%TOPO_CHANGE_FLAG=T,")
@@ -86,8 +92,8 @@ def prepare(repo, root, name, cells=32, horizon='2.0E-2'):
         # process. The ordinary EXAMPLE_2D regression remains unchanged.
         text = replace_one(text, r"^\s*DIAM_S\s*=.*$",
                            " DIAM_S=2.0E-3,")
-        text = replace_one(text, r"^\s*ENTRAINMENT_FLAG\s*=.*$",
-                           " ENTRAINMENT_FLAG=F,")
+        text = replace_one(text, r"^\s*MASS_EXCHANGE%ENTRAINMENT%FLAG\s*=.*$",
+                           " MASS_EXCHANGE%ENTRAINMENT%FLAG=F,")
     input_path.write_text(text)
     return fixture
 
