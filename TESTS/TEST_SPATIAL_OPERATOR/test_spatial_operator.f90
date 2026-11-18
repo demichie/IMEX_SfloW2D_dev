@@ -361,6 +361,7 @@ PROGRAM test_spatial_operator
   ! Keep this state-mutating BC fixture separate from the reference payload.
   ! It runs after serialization so it cannot perturb the measured spatial fields.
   CALL check_layer_local_dirichlet_inlet
+  CALL check_coupled_boundary_wetdry
   WRITE(*,*) 'Production worksets:',domain%solve_cells,domain%reconstruction_cells
   CALL spatial%finalize
   CALL hyperbolic%finalize
@@ -2503,6 +2504,248 @@ CONTAINS
     CALL reconstruction%initialize
     WRITE(*,*) 'PASS: layer-local Dirichlet inlet and independent HP traces'
   END SUBROUTINE check_layer_local_dirichlet_inlet
+
+  !> @brief Exercise independent four-side BC and wet/dry coupled spatial updates.
+  !> @details Runs the real L1/L2 HP and CFL operators on a shared workset.
+  !>          The production layer-count gate remains unchanged.
+  SUBROUTINE check_coupled_boundary_wetdry
+    TYPE(domain_type) :: paired
+    TYPE(spatial_operator_type) :: lower_operator,upper_operator
+    TYPE(reconstruction_workspace_type) :: lower_recon,upper_recon
+    TYPE(bc), ALLOCATABLE :: saved_w(:,:),saved_e(:,:),saved_s(:,:),saved_n(:,:)
+    REAL(wp), ALLOCATABLE :: q1(:,:,:),q2(:,:,:),qp1(:,:,:),qp2(:,:,:)
+    REAL(wp), ALLOCATABLE :: term1(:,:,:),term2(:,:,:)
+    REAL(wp) :: primitive(n_vars),dt1,dt2,coupled_step,budget1,budget2
+    REAL(wp) :: face_values(6,4,4),spatial_values(3,4)
+    REAL(wp) :: depth1,depth2,normal1,normal2,eta1,eta2,base2
+    REAL(wp) :: tolerance,flux_scale
+    CHARACTER(LEN=32) :: saved_mode
+    CHARACTER(LEN=16), PARAMETER :: modes(4)=[CHARACTER(LEN=16):: &
+        'h_x','eta_x','minmod','froude_blend']
+    INTEGER :: mode,side,scenario,j,k,l,ix,iy,out_unit
+    LOGICAL :: accepted
+
+    IF (nx<12 .OR. ny<12) RETURN
+    saved_w=bcW
+    saved_e=bcE
+    saved_s=bcS
+    saved_n=bcN
+    saved_mode=kt_trace_reconstruction
+    tolerance=512.0_wp*EPSILON(1.0_wp)
+
+    ALLOCATE(q1(n_vars,nx,ny),q2(n_vars,nx,ny),qp1(n_vars,nx,ny),qp2(n_vars,nx,ny))
+    ALLOCATE(term1(n_eqns,nx,ny),term2(n_eqns,nx,ny))
+    q1=0.0_wp
+    q2=0.0_wp
+    qp1=0.0_wp
+    qp2=0.0_wp
+    qp1(idx_T,:,:)=T_ambient
+    qp2(idx_T,:,:)=T_ambient
+
+    CALL paired%initialize
+    CALL paired%check_solve(q1,0.0_wp,.TRUE.,q_other=q2)
+    CALL lower_recon%initialize(1)
+    CALL upper_recon%initialize(2)
+    CALL lower_recon%prepare_hp_workset(paired%hp_eta_cells,paired%hp_eta_j,paired%hp_eta_k)
+    CALL upper_recon%prepare_hp_workset(paired%hp_eta_cells,paired%hp_eta_j,paired%hp_eta_k)
+
+    ! All external faces can receive distinct L1 and L2 data even when the
+    ! interior is entirely dry. Exercise each HP trace-selection mode.
+    DO mode=1,SIZE(modes)
+        kt_trace_reconstruction=TRIM(modes(mode))
+        DO side=1,4
+            bcW%flag=1
+            bcE%flag=1
+            bcS%flag=1
+            bcN%flag=1
+            bcW%value=0.0_wp
+            bcE%value=0.0_wp
+            bcS%value=0.0_wp
+            bcN%value=0.0_wp
+            ix=nx/2
+            iy=ny/2
+            SELECT CASE(side)
+            CASE(1)
+                ix=1
+                bcW(idx_h,1)%flag=0
+                bcW(idx_h,2)%flag=0
+                bcW(idx_h,1)%value=1.25_wp
+                bcW(idx_h,2)%value=2.5_wp
+                bcW(idx_u,1)%flag=0
+                bcW(idx_u,2)%flag=0
+                bcW(idx_u,1)%value=2.5_wp
+                bcW(idx_u,2)%value=7.5_wp
+            CASE(2)
+                ix=nx
+                bcE(idx_h,1)%flag=0
+                bcE(idx_h,2)%flag=0
+                bcE(idx_h,1)%value=1.25_wp
+                bcE(idx_h,2)%value=2.5_wp
+                bcE(idx_u,1)%flag=0
+                bcE(idx_u,2)%flag=0
+                bcE(idx_u,1)%value=2.5_wp
+                bcE(idx_u,2)%value=7.5_wp
+            CASE(3)
+                iy=1
+                bcS(idx_h,1)%flag=0
+                bcS(idx_h,2)%flag=0
+                bcS(idx_h,1)%value=1.25_wp
+                bcS(idx_h,2)%value=2.5_wp
+                bcS(idx_v,1)%flag=0
+                bcS(idx_v,2)%flag=0
+                bcS(idx_v,1)%value=2.5_wp
+                bcS(idx_v,2)%value=7.5_wp
+            CASE(4)
+                iy=ny
+                bcN(idx_h,1)%flag=0
+                bcN(idx_h,2)%flag=0
+                bcN(idx_h,1)%value=1.25_wp
+                bcN(idx_h,2)%value=2.5_wp
+                bcN(idx_v,1)%flag=0
+                bcN(idx_v,2)%flag=0
+                bcN(idx_v,1)%value=2.5_wp
+                bcN(idx_v,2)%value=7.5_wp
+            END SELECT
+
+            CALL lower_recon%reconstruct(qp1,0.0_wp,paired%solve_cells, &
+                paired%j_cent,paired%k_cent,.TRUE.)
+            CALL lower_recon%reconstruct_kt_eta(qp1)
+            CALL upper_recon%reconstruct(qp2,0.0_wp,paired%solve_cells, &
+                paired%j_cent,paired%k_cent,.TRUE.,lower_recon=lower_recon,h_lower=qp1(idx_h,:,:))
+            CALL upper_recon%reconstruct_kt_eta(qp2,lower_recon=lower_recon)
+
+            SELECT CASE(side)
+            CASE(1)
+                depth1=lower_recon%h_selected_interfaceR(ix,iy)
+                depth2=upper_recon%h_selected_interfaceR(ix,iy)
+                normal1=lower_recon%qp_adv_interfaceR(idx_u,ix,iy)
+                normal2=upper_recon%qp_adv_interfaceR(idx_u,ix,iy)
+                eta1=lower_recon%eta_interfaceR(ix,iy)
+                eta2=upper_recon%eta_interfaceR(ix,iy)
+                base2=lower_recon%eta_cellW(ix,iy)
+            CASE(2)
+                depth1=lower_recon%h_selected_interfaceL(ix+1,iy)
+                depth2=upper_recon%h_selected_interfaceL(ix+1,iy)
+                normal1=lower_recon%qp_adv_interfaceL(idx_u,ix+1,iy)
+                normal2=upper_recon%qp_adv_interfaceL(idx_u,ix+1,iy)
+                eta1=lower_recon%eta_interfaceL(ix+1,iy)
+                eta2=upper_recon%eta_interfaceL(ix+1,iy)
+                base2=lower_recon%eta_cellE(ix,iy)
+            CASE(3)
+                depth1=lower_recon%h_selected_interfaceT(ix,iy)
+                depth2=upper_recon%h_selected_interfaceT(ix,iy)
+                normal1=lower_recon%qp_adv_interfaceT(idx_v,ix,iy)
+                normal2=upper_recon%qp_adv_interfaceT(idx_v,ix,iy)
+                eta1=lower_recon%eta_interfaceT(ix,iy)
+                eta2=upper_recon%eta_interfaceT(ix,iy)
+                base2=lower_recon%eta_cellS(ix,iy)
+            CASE(4)
+                depth1=lower_recon%h_selected_interfaceB(ix,iy+1)
+                depth2=upper_recon%h_selected_interfaceB(ix,iy+1)
+                normal1=lower_recon%qp_adv_interfaceB(idx_v,ix,iy+1)
+                normal2=upper_recon%qp_adv_interfaceB(idx_v,ix,iy+1)
+                eta1=lower_recon%eta_interfaceB(ix,iy+1)
+                eta2=upper_recon%eta_interfaceB(ix,iy+1)
+                base2=lower_recon%eta_cellN(ix,iy)
+            END SELECT
+            IF (ABS(depth1-1.25_wp)>tolerance .OR. ABS(depth2-2.5_wp)>tolerance) &
+                ERROR STOP 'Four-side independent L1/L2 prescribed depth lost'
+            IF (ABS(normal1-2.0_wp)>tolerance .OR. ABS(normal2-3.0_wp)>tolerance) &
+                ERROR STOP 'Four-side independent L1/L2 prescribed discharge lost'
+            ! L2 is measured above the completed L1 cell-side interface,
+            ! not above a duplicated or newly differentiated terrain.
+            IF (ABS(eta2-base2-2.5_wp)>tolerance*MAX(1.0_wp,ABS(base2))) &
+                ERROR STOP 'Four-side L2 HP base disagrees with L1 surface'
+            face_values(:,side,mode)=[depth1,depth2,normal1,normal2,eta1,eta2]
+        END DO
+    END DO
+
+    CALL lower_recon%finalize
+    CALL upper_recon%finalize
+    bcW=saved_w
+    bcE=saved_e
+    bcS=saved_s
+    bcN=saved_n
+    kt_trace_reconstruction=saved_mode
+
+    ! A shared OR workset, including its dry halo, must handle all four
+    ! possible occupancies without creating matter in an absent layer.
+    CALL lower_operator%initialize(1)
+    CALL upper_operator%initialize(2)
+    spatial_values=0.0_wp
+    DO scenario=1,4
+        q1=0.0_wp
+        q2=0.0_wp
+        DO k=5,ny-4
+            DO j=5,nx-4
+                DO l=1,2
+                    IF (scenario==4) CYCLE
+                    IF (scenario==2 .AND. l==2) CYCLE
+                    IF (scenario==3 .AND. l==1) CYCLE
+                    primitive=0.0_wp
+                    primitive(idx_T)=T_ambient
+                    primitive(idx_h)=0.2_wp+0.1_wp*REAL(l,wp)
+                    primitive(idx_u)=0.03_wp*REAL(l,wp)
+                    primitive(idx_v)=-0.02_wp*REAL(l,wp)
+                    IF (l==1) THEN
+                        CALL primitive_to_conservative(primitive,q1(:,j,k),accepted=accepted)
+                    ELSE
+                        CALL primitive_to_conservative(primitive,q2(:,j,k),accepted=accepted)
+                    END IF
+                    IF (.NOT.accepted) ERROR STOP 'Invalid wet/dry coupled spatial fixture'
+                END DO
+            END DO
+        END DO
+
+        CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+        CALL lower_operator%prepare_hp_workset(paired)
+        CALL upper_operator%prepare_hp_workset(paired)
+        qp1=0.0_wp
+        qp2=0.0_wp
+        qp1(idx_T,:,:)=T_ambient
+        qp2(idx_T,:,:)=T_ambient
+        CALL lower_operator%compute_timestep(q1,qp1,0.0_wp,dt1,paired)
+        CALL upper_operator%compute_timestep(q2,qp2,0.0_wp,dt2,paired, &
+            lower_operator=lower_operator,h_lower=qp1(idx_h,:,:))
+        CALL lower_operator%evaluate_coupled(upper_operator,qp1,qp2,term1,term2, &
+            0.0_wp,paired,coupled_step)
+        IF (.NOT.ieee_is_finite(coupled_step) .OR. coupled_step<=0.0_wp .OR. coupled_step>max_dt) &
+            ERROR STOP 'Invalid shared wet/dry two-layer CFL'
+        budget1=0.0_wp
+        budget2=0.0_wp
+        flux_scale=1.0_wp
+        DO l=1,paired%solve_cells
+            j=paired%j_cent(l)
+            k=paired%k_cent(l)
+            IF (.NOT.ALL(ieee_is_finite(term1(:,j,k))) .OR. .NOT.ALL(ieee_is_finite(term2(:,j,k)))) &
+                ERROR STOP 'Nonfinite coupled wet/dry residual'
+            budget1=budget1+term1(idx_totMassEqn,j,k)
+            budget2=budget2+term2(idx_totMassEqn,j,k)
+            flux_scale=MAX(flux_scale,ABS(term1(idx_totMassEqn,j,k)),ABS(term2(idx_totMassEqn,j,k)))
+            IF (scenario==2 .OR. scenario==4) THEN
+                IF (ANY(ABS(term2(:,j,k))>1.0E-9_wp)) &
+                    ERROR STOP 'Dry L2 developed coupled spatial residual'
+            END IF
+            IF (scenario==3 .OR. scenario==4) THEN
+                IF (ANY(ABS(term1(:,j,k))>1.0E-9_wp)) &
+                    ERROR STOP 'Dry L1 developed coupled spatial residual'
+            END IF
+        END DO
+        IF (ABS(budget1)>1.0E-9_wp*flux_scale .OR. ABS(budget2)>1.0E-9_wp*flux_scale) &
+            ERROR STOP 'Coupled compact wet/dry mass residual is not conservative'
+        spatial_values(:,scenario)=[coupled_step,budget1,budget2]
+    END DO
+    CALL lower_operator%finalize
+    CALL upper_operator%finalize
+    CALL paired%finalize
+    DEALLOCATE(q1,q2,qp1,qp2,term1,term2)
+
+    OPEN(NEWUNIT=out_unit,FILE='coupled_bc_wetdry.bin',ACCESS='STREAM', &
+        FORM='UNFORMATTED',STATUS='REPLACE')
+    WRITE(out_unit) face_values,spatial_values
+    CLOSE(out_unit)
+    WRITE(*,*) 'PASS: four-sided layer BC, shared wet/dry workset and coupled CFL'
+  END SUBROUTINE check_coupled_boundary_wetdry
 
   !> Verify disabled optional slots in the complete reconstructed HP-PCCU operator.
   !> Each isolated layer uses the same seven-component layout: L1 has only pore

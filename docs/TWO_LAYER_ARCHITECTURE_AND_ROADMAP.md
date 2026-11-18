@@ -214,8 +214,8 @@ abilitazione in produzione.
 | Fase | Stato | Lavoro residuo / gate |
 |---|---|---|
 | **TL00–TL04 — Stato e fisica per layer** | Slot opzionali e workspace OU L1/L2 collegati, verifica CI pendente | L1/L2 condividono il layout opzionale ma mantengono configurazioni, campi OU e flussi casuali indipendenti. Restano IC/BC e I/O/restart completi nei blocchi successivi. |
-| **TL05 — Operatori L2** | Test isolati presenti | Integrare copertura dry, BC, sorgenti e variabili opzionali senza duplicare operatori. |
-| **TL06 — Spaziale accoppiato** | Kernel e test parziali | Collegare completamente i path, i trial e i controlli al passo Lie two-layer; verificare bilanci, CFL comune, dry/BC e terreno curvo. |
+| **TL05 — Operatori L2** | Percorso spaziale condiviso e test estesi; CI blocco 3 pendente | Ricostruzione HP e BC per layer, selezione di velocita' L1/L2 e componenti inattive riusano gli operatori canonici; regressioni estese a tutti i lati e alle quattro occupazioni wet/dry. |
+| **TL06 — Spaziale accoppiato** | Accoppiamento e regressioni di blocco 3 predisposti; CI pendente | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano validazione della transazione Lie effettiva, variabili opzionali per layer, stati termodinamici finali, drag e test two-layer end-to-end. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
@@ -306,6 +306,28 @@ lo stato dei due layer bitwise tra 1 e 4 thread OpenMP. La compilazione e le
 regressioni sul commit del blocco 2 devono ancora essere osservate.
 Il restart two-layer, il NetCDF e l'attivazione produttiva rimangono
 nei blocchi successivi; nessuna ipotesi fisica e' stata modificata.
+
+**Blocco 3 - operatori spaziali, wet/dry e BC L1/L2 (18 novembre 2026):**
+`spatial_operator_2d%evaluate_coupled` propaga ora verso L2 gli stessi
+limiti di velocita' totale soltanto sulle facce del workset OR realmente
+attive; coefficienti di pressione e ricostruzioni restano propri di
+ciascun layer. La vista `qp(idx_h,:,:)` del layer inferiore viene
+accettata dalla preparazione geometrica L2 con shape assunto, senza
+copia temporanea del dominio e senza cambiare `B`, `G` o le
+formule idrostatiche e interlayer.
+
+`TEST_SPATIAL_OPERATOR` verifica ora in modo integrato i quattro lati
+W/E/S/N con dati Dirichlet distinti per L1/L2 e quattro selettori di
+traccia HP, anche a dominio asciutto. Verifica inoltre tutte le
+occupazioni wet/wet, solo L1, solo L2, dry/dry usando il workset OR,
+il CFL comune e la conservazione della massa con il solver spaziale
+di produzione, su topografie piane e Q1 curve esistenti. Il payload
+`coupled_bc_wetdry.bin` viene confrontato bitwise tra OpenMP 1 e 4
+thread in strict e optimized. Le regressioni del gruppo 0 per la
+curvatura e dell'equilibrio stratificato rimangono attive.
+Questo blocco non modifica la chiusura degli autovalori accoppiati;
+la verifica scientifica di shear/iperbolicita' resta TL13b. Il gate
+produttivo `N_LAYERS=2` rimane chiuso fino all'accettazione prevista.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.

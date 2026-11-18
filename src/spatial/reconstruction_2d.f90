@@ -102,7 +102,9 @@ CONTAINS
     !> @param[out] bed_w,bed_e,bed_s,bed_n Cell-owned effective face bases [m].
     SUBROUTINE prepare_upper_layer_bed(this,h_lower,bed_center,bed_w,bed_e,bed_s,bed_n)
         CLASS(reconstruction_workspace_type), INTENT(IN) :: this
-        REAL(wp), INTENT(IN) :: h_lower(comp_cells_x,comp_cells_y)
+        ! Assumed shape accepts the noncontiguous qp(idx_h,:,:) view without
+        ! a full-domain array temporary or a change in numerical evaluation.
+        REAL(wp), INTENT(IN) :: h_lower(:,:)
         REAL(wp), INTENT(OUT) :: bed_center(comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(OUT) :: bed_w(comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(OUT) :: bed_e(comp_cells_x,comp_cells_y)
@@ -111,6 +113,8 @@ CONTAINS
         INTEGER :: l,j,k
 
         IF (this%layer/=1) ERROR STOP 'Upper-layer base requires the L1 reconstruction'
+        IF (SIZE(h_lower,1)/=comp_cells_x .OR. SIZE(h_lower,2)/=comp_cells_y) &
+            ERROR STOP 'Invalid lower-layer thickness shape in upper-layer geometry'
         IF (ANY(h_lower<0.0_wp)) ERROR STOP 'Negative lower-layer thickness in upper-layer geometry'
 
         bed_center=B_cent+h_lower

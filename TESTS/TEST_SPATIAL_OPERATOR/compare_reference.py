@@ -357,6 +357,11 @@ def main():
                 raise AssertionError(f"{tag}: missing optional-layer Lie timestep payload")
             if optional[0].read_bytes() != optional[1].read_bytes():
                 raise AssertionError(f"{tag}: optional Darcy/OU/thermal Lie state differs between 1 and 4 threads")
+            spatial_bc = [Path(tag)/f"threads-{threads}"/"coupled_bc_wetdry.bin" for threads in (1, 4)]
+            if not spatial_bc[0].is_file() or not spatial_bc[1].is_file():
+                raise AssertionError(f"{tag}: missing coupled four-side BC and wet/dry payload")
+            if spatial_bc[0].read_bytes() != spatial_bc[1].read_bytes():
+                raise AssertionError(f"{tag}: coupled BC/wet/dry/CFL differs between 1 and 4 threads")
             print(f"PASS: {args.profile} {tag}, complete residual/geometry/traces/directional CFL, actual 1/4 threads", flush=True)
             for record in results:
                 print("N7_SPATIAL_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)

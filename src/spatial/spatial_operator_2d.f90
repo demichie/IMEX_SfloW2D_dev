@@ -163,6 +163,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: time
         CLASS(domain_type), INTENT(IN) :: domain
         REAL(wp), INTENT(OUT) :: dt
+        INTEGER :: l,j,k
 
         IF (this%reconstruction%layer/=1 .OR. upper%reconstruction%layer/=2) &
             ERROR STOP 'Coupled spatial operator requires ordered L1/L2'
@@ -173,12 +174,21 @@ CONTAINS
             domain%solve_interfaces_x,domain%j_stag_x,domain%k_stag_x, &
             domain%solve_interfaces_y,domain%j_stag_y,domain%k_stag_y)
 
-        ! Each layer backend reads its own face arrays. Copy only the active
-        ! face bounds; keep the hydrostatic coefficients layer-specific.
-        upper%hp_pccu%a_interface_xNeg=this%hp_pccu%a_interface_xNeg
-        upper%hp_pccu%a_interface_xPos=this%hp_pccu%a_interface_xPos
-        upper%hp_pccu%a_interface_yNeg=this%hp_pccu%a_interface_yNeg
-        upper%hp_pccu%a_interface_yPos=this%hp_pccu%a_interface_yPos
+        ! Both backends use the same coupled speeds only on active faces.
+        ! Do not copy unrelated inactive grid entries at every timestep.
+        ! Keep hydrostatic Gamma and reconstructed geometry layer-local.
+        DO l=1,domain%solve_interfaces_x
+            j=domain%j_stag_x(l)
+            k=domain%k_stag_x(l)
+            upper%hp_pccu%a_interface_xNeg(j,k)=this%hp_pccu%a_interface_xNeg(j,k)
+            upper%hp_pccu%a_interface_xPos(j,k)=this%hp_pccu%a_interface_xPos(j,k)
+        END DO
+        DO l=1,domain%solve_interfaces_y
+            j=domain%j_stag_y(l)
+            k=domain%k_stag_y(l)
+            upper%hp_pccu%a_interface_yNeg(j,k)=this%hp_pccu%a_interface_yNeg(j,k)
+            upper%hp_pccu%a_interface_yPos(j,k)=this%hp_pccu%a_interface_yPos(j,k)
+        END DO
 
         CALL this%compute_coupled_timestep(domain, &
             this%hp_pccu%a_interface_xNeg,this%hp_pccu%a_interface_xPos, &
