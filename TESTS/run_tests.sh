@@ -64,10 +64,12 @@ run_case() {
         sh ./cleanFolder.sh
         case "$fixture" in
             cf)
-                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_CF/topo.zip"
+                mkdir -p DEM
+                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_CF/DEM/topo.zip" -d DEM
                 ;;
             taal)
-                cp "$repo_dir/EXAMPLES/EXAMPLE_TAAL/topography_dem.asc" .
+                mkdir -p DEM
+                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_TAAL/DEM/topography_dem.zip" -d DEM
                 ;;
         esac
         solver_log=solver.log
