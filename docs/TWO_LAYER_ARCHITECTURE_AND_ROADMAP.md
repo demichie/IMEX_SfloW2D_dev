@@ -251,6 +251,16 @@ del gruppo 0 e drag analitico nel gruppo successivo, verificandone
 l'ordine e la conservazione. I payload di questi passi rientrano nel
 confronto bitwise OpenMP 1/4 thread. La prova resta da verificare in CI.
 
+**TL07 - copertura aggiuntiva del gruppo zero:** la regressione integrata
+esercita anche sorgenti di curvatura indipendenti per L1 e L2 nello
+stesso timestep. Per ogni cella confronta i contributi espliciti
+valutati sullo stato pre-spaziale con il candidato post-spaziale,
+senza introdurre un secondo integratore. Il caso e' limitato alle
+fixture con curvatura attiva ed e' incluso nel payload OpenMP
+strict/optimized. La verifica CI sul commit che aggiunge il caso
+resta necessaria; non sostituisce i test integrati delle sorgenti
+di erosione/deposizione dal substrato.
+
 Il contratto attuale rimane di errore fatale senza retry: q/qp vengono
 pubblicati solo dopo la riuscita del Lie globale, ma il substrato puo'
 essere aggiornato per cella durante il sweep. Non dichiarare un rollback

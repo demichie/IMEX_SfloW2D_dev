@@ -418,6 +418,7 @@ CONTAINS
         REAL(wp) :: pt1(n_vars,nx,ny),pt2(n_vars,nx,ny)
         REAL(wp) :: bound1,bound2,dt_step,momentum_difference,drag_difference,scale
         REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
+        REAL(wp) :: curvature_rate(n_eqns),curvature_effect
         INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status
         LOGICAL :: created_zone,created_arc,created_diam,accepted
         REAL(wp), ALLOCATABLE :: original_diam(:)
@@ -566,6 +567,82 @@ CONTAINS
             ! Compare the complete accepted timestep payload across 1/4 threads.
             WRITE(integrated_unit) coupled_state%q,coupled_state%qp
         END DO
+
+        ! Test simultaneous L1/L2 group-zero geometry sources on the same
+        ! two-layer timestep. The no-source step is the post-spatial recipient;
+        ! each curvature rate is evaluated on the pre-spatial primitive state.
+        IF (curvature_term_flag) THEN
+            before_q(:,1,:,:)=q1
+            before_q(:,2,:,:)=q2
+            pt1=p1
+            pt2=p2
+            CALL operators(1)%compute_timestep(before_q(:,1,:,:),pt1,0.0_wp,bound1,paired)
+            CALL operators(2)%compute_timestep(before_q(:,2,:,:),pt2,0.0_wp,bound2,paired, &
+                lower_operator=operators(1),h_lower=pt1(idx_h,:,:))
+            dt_step=MIN(1.0E-5_wp,0.01_wp*MIN(dt_bound,bound1,bound2))
+            IF (dt_step<=0.0_wp) ERROR STOP 'Invalid two-layer curvature timestep'
+            before_qp(:,1,:,:)=pt1
+            before_qp(:,2,:,:)=pt2
+            interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
+            interlayer_exchange%settling_flag=.FALSE.
+            interlayer_exchange%elutriation_flag=.FALSE.
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            base_q=coupled_state%q
+
+            CALL workspace%finalize()
+            CALL registry%finalize()
+            groups(1)%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
+            groups(2)%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
+            groups(1)%source_mask=IBSET(0,SOURCE_ID_GEOMETRY_CURVATURE-1)
+            groups(2)%source_mask=groups(1)%source_mask
+            CALL registry%initialize(n_eqns,0,groups,error)
+            IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid paired curvature Lie registry'
+            CALL workspace%initialize(registry)
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+
+            curvature_effect=0.0_wp
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                expected_q=base_q(:,:,j,k)
+                DO layer=1,2
+                    CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                        B_second_xx_geom(j,k),B_second_xy_geom(j,k),B_second_yy_geom(j,k), &
+                        grav_coeff(j,k),before_qp(:,layer,j,k),curvature_rate,0.0_wp,0.0_wp, &
+                        no_fissures,0.0_wp,0.0_wp,0.0_wp,dx*dy,groups(layer),0.0_wp, &
+                        materials=materials,thermal=physics(layer)%thermal_configuration(), &
+                        rheology=physics(layer)%rheology_configuration(),pore_enabled=.FALSE., &
+                        stochastic_enabled=.FALSE.)
+                    expected_q(1:n_eqns,layer)=expected_q(1:n_eqns,layer)+dt_step*curvature_rate
+                END DO
+                scale=MAX(1.0_wp,MAXVAL(ABS(expected_q)))
+                IF (MAXVAL(ABS(expected_q-coupled_state%q(:,:,j,k)))>1.0E-10_wp*scale) &
+                    ERROR STOP 'Paired group-zero curvature did not use pre-spatial rates and post-spatial recipients'
+                curvature_effect=curvature_effect+SUM(ABS(coupled_state%q(:,:,j,k)-base_q(:,:,j,k)))
+                IF (.NOT.ALL(ieee_is_finite(coupled_state%qp(:,:,j,k)))) &
+                    ERROR STOP 'Nonfinite paired curvature primitive state'
+            END DO
+            IF (.NOT.ieee_is_finite(curvature_effect)) ERROR STOP 'Invalid paired curvature effect'
+            WRITE(integrated_unit) coupled_state%q,coupled_state%qp
+
+            CALL workspace%finalize()
+            CALL registry%finalize()
+            groups(1)%source_names=[CHARACTER(LEN=64)::]
+            groups(2)%source_names=[CHARACTER(LEN=64)::]
+            groups(1)%source_mask=0
+            groups(2)%source_mask=0
+            CALL registry%initialize(n_eqns,0,groups,error)
+            IF (LEN_TRIM(error)>0) ERROR STOP 'Could not restore paired Lie registry'
+            CALL workspace%initialize(registry)
+        END IF
 
         ! Exercise the exact production Lie mass source on the same compact
         ! two-layer workset. Keep external erosion and deposition inactive:
