@@ -2,7 +2,7 @@
 PROGRAM test_interlayer_lie_transaction
     USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns,n_stoch_vars,n_pore_vars
     USE parameters_2d, ONLY : gas_flag,sutherland_flag,configure_canonical_state_indices,idx_h,idx_T,idx_u,idx_v
-    USE parameters_2d, ONLY : idx_solid_first,idx_solid_last
+    USE parameters_2d, ONLY : idx_solid_first,idx_solid_last,idx_stoch,idx_pore
     USE constitutive_parameters_2d, ONLY : sp_heat_a,sp_gas_const_a,sp_heat_g,sp_gas_const_g
     USE constitutive_parameters_2d, ONLY : pres,inv_pres,T_ambient,grav,kin_visc_c,rho_a_amb,vonK
     USE solid_transport_parameters_2d, ONLY : rho_s,inv_rho_s,sp_heat_s,diam_s,maximum_solid_packing
@@ -10,6 +10,8 @@ PROGRAM test_interlayer_lie_transaction
     USE state_physical, ONLY : build_physical_state_from_qp
     USE state_conversions, ONLY : primitive_to_conservative
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
+    USE interlayer_momentum_exchange_2d, ONLY : apply_interlayer_momentum_exchange_analytic, &
+        interlayer_momentum_exchange_config_type
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE rheology_parameters_2d, ONLY : rheology_config_type
@@ -19,8 +21,10 @@ PROGRAM test_interlayer_lie_transaction
     TYPE(interlayer_mass_exchange_config_type) :: config
     TYPE(mass_exchange_config_type) :: mass_l2
     TYPE(rheology_config_type) :: rheology_l2
+    TYPE(interlayer_momentum_exchange_config_type) :: drag
     REAL(wp) :: q(6,2),qp(6,2),before(6,2),primitives(6,2),snapshot(6,2)
     REAL(wp) :: after_group0(6,2),after_later(6,2)
+    REAL(wp) :: after_transfer(6,2),slip_before,slip_after
     REAL(wp) :: dt
     LOGICAL :: ok
     INTEGER :: i,status
@@ -121,6 +125,88 @@ PROGRAM test_interlayer_lie_transaction
     CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.TRUE.,dt,q,qp,scratch,status)
     CALL require(status==20,'negative candidate species mass rejects the entire pair')
     CALL require(ALL(q==before) .AND. ALL(qp==primitives),'paired failure does not commit either layer')
+
+    ! Sequence the actual paired physical source and analytic Chezy drag on
+    ! the same accepted candidates. Mass exchange may change both inertias;
+    ! the following drag must read those updated masses and velocities.
+    config%settling_flag=.TRUE.
+    config%elutriation_flag=.TRUE.
+    config%rouse_critical=100.0_wp
+    CALL make_column(1.0_wp,1.0_wp,20.0_wp,2.0_wp,q,qp)
+    qp(idx_T,1)=420.0_wp
+    qp(idx_T,2)=275.0_wp
+    DO i=1,2
+        CALL primitive_to_conservative(qp(:,i),q(:,i),accepted=ok)
+        CALL require(ok,'thermally distinct donor candidate conversion')
+    END DO
+    before=q
+    snapshot=qp
+    CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
+    CALL require(status==0,'two-way physical mass group accepted before drag')
+    CALL check_conservation(before,q,'two-way thermal mass exchange')
+    CALL check_admissibility(qp)
+    after_transfer=q
+    slip_before=ABS(qp(idx_u,2)-qp(idx_u,1))
+    drag%model='CHEZY'
+    drag%chezy_drag_coeff=0.03_wp
+    CALL apply_interlayer_momentum_exchange_analytic(drag,dt,q,qp,ok)
+    CALL require(ok,'drag after mass group accepts updated layer inertia')
+    CALL check_conservation(before,q,'two-way mass and subsequent analytic drag')
+    CALL require(ALL(q(1,:)==after_transfer(1,:)), &
+        'drag leaves post-transfer layer masses unchanged')
+    CALL require(ALL(q(4:6,:)==after_transfer(4:6,:)), &
+        'drag leaves thermal energy and solid-species inventories unchanged')
+    slip_after=ABS(qp(idx_u,2)-qp(idx_u,1))
+    CALL require(slip_after<=slip_before,'drag relaxes relative velocity after mass transfer')
+    CALL check_admissibility(qp)
+
+    ! Optional transported scalars belong to their configured layer even
+    ! when the interlayer transaction changes mass and recomputes primitives.
+    ! No stochastic/Darcy state is silently transferred with solid or carrier.
+    BLOCK
+        TYPE(physical_state_real) :: optional_physical(4)
+        REAL(wp) :: optional_q(8,2),optional_qp(8,2),optional_before(8,2),optional_snapshot(8,2)
+        INTEGER :: layer
+
+        n_stoch_vars=1
+        n_pore_vars=1
+        n_vars=8
+        n_eqns=8
+        CALL configure_canonical_state_indices()
+        optional_q=0.0_wp
+        optional_qp=0.0_wp
+        DO layer=1,2
+            optional_qp(idx_h,layer)=1.0_wp
+            optional_qp(idx_T,layer)=300.0_wp
+            optional_qp(idx_u,layer)=REAL(10*layer,wp)
+            optional_qp(idx_solid_first:idx_solid_last,layer)=[0.6_wp,0.2_wp]
+        END DO
+        optional_qp(idx_pore,1)=0.15_wp
+        optional_qp(idx_stoch,2)=0.35_wp
+        DO layer=1,2
+            CALL primitive_to_conservative(optional_qp(:,layer),optional_q(:,layer),accepted=ok)
+            CALL require(ok,'optional layer candidate conversion')
+        END DO
+        optional_before=optional_q
+        optional_snapshot=optional_qp
+        DO layer=1,4
+            CALL initialize_physical_state_real(optional_physical(layer))
+        END DO
+        CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,optional_snapshot,.FALSE.,dt, &
+            optional_q,optional_qp,optional_physical,status)
+        CALL require(status==0,'paired transfer with independent optional layers accepted')
+        CALL require(ALL(optional_q(idx_stoch,:)==optional_before(idx_stoch,:)), &
+            'interlayer transfer does not invent or move stochastic conservative scalar')
+        CALL require(ALL(optional_q(idx_pore,:)==optional_before(idx_pore,:)), &
+            'interlayer transfer does not invent or move Darcy conservative scalar')
+        CALL require(optional_q(idx_pore,2)==0.0_wp .AND. optional_q(idx_stoch,1)==0.0_wp, &
+            'inactive optional layer components remain exactly zero')
+        DO layer=1,8
+            CALL require(ABS(SUM(optional_q(layer,:))-SUM(optional_before(layer,:)))<= &
+                1.0E-10_wp*MAX(1.0_wp,ABS(SUM(optional_before(layer,:)))), &
+                'optional pair preserves every conservative component')
+        END DO
+    END BLOCK
 
     PRINT *, 'PASS paired Lie transaction four wet/dry cases, group-zero snapshot, conservation, atomic rejection'
 

@@ -147,6 +147,9 @@ PROGRAM test_interlayer_mass_exchange
     CALL require(INDEX(error,'mutually exclusive')>0,'reject mixed legacy and canonical groups')
     CLOSE(unit)
     CALL test_density_asymmetry()
+    CALL test_gross_carrier_exchange()
+    CALL test_independent_process_limits()
+    CALL test_concentrated_carrier_limit()
     CALL test_physical_sources()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
@@ -173,6 +176,196 @@ CONTAINS
             (carrier2+dt*(2.0_wp*cu-cd)),2.0_wp*carrier1+carrier2, &
             'unequal density carrier mass conservation')
     END SUBROUTINE test_density_asymmetry
+
+    !> @brief Verify both gross carrier streams with unequal donor and recipient densities.
+    !> @details Donor caps apply to withdrawals before the opposite stream arrives.
+    !>          Recipient packing uses transferred MASS divided by recipient density,
+    !>          not a fictitious shared carrier volume or a net gross flux.
+    SUBROUTINE test_gross_carrier_exchange()
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        REAL(wp) :: solids1(2),solids2(2),rates_down(2),rates_up(2)
+        REAL(wp) :: accepted_down(2),accepted_up(2),flow_down,flow_up
+        REAL(wp) :: carriers1,carriers2,dt_local,packing_local,alpha
+        REAL(wp) :: donor_rho1,donor_rho2,receiver_rho1,receiver_rho2
+        REAL(wp) :: new_solids1(2),new_solids2(2),new_carrier1,new_carrier2
+        REAL(wp) :: transferred_carrier_mass
+        REAL(wp) :: strict_solid,concentrated_solid
+        LOGICAL :: valid
+        INTEGER :: mode
+
+        pair%settling_flag=.TRUE.
+        pair%elutriation_flag=.TRUE.
+        dt_local=1.0_wp
+        packing_local=0.6_wp
+        alpha=0.1_wp
+        pair%elutriation_solid_volume_fraction=alpha
+        solids1=[0.06_wp,0.03_wp]
+        solids2=[0.04_wp,0.02_wp]
+        carriers1=0.12_wp
+        carriers2=0.16_wp
+        rates_down=[0.010_wp,0.005_wp]
+        rates_up=[0.018_wp,0.008_wp]
+        donor_rho1=1.7_wp
+        donor_rho2=1.2_wp
+        receiver_rho1=1.5_wp
+        receiver_rho2=1.4_wp
+
+        DO mode=1,2
+            IF (mode==1) THEN
+                pair%elutriation_carrier_mode='LIMIT_SOLIDS'
+            ELSE
+                pair%elutriation_carrier_mode='ALLOW_CONCENTRATED'
+            END IF
+
+            CALL limit_interlayer_mass_transfer(solids1,solids2,carriers1,carriers2, &
+                rates_down,rates_up,dt_local,packing_local,pair,accepted_down,accepted_up, &
+                flow_down,flow_up,valid, &
+                rho_carrier_l1=donor_rho1,rho_carrier_l2=donor_rho2, &
+                candidate_rho_l1=receiver_rho1,candidate_rho_l2=receiver_rho2)
+            CALL require(valid,'two gross carrier streams with distinct densities accepted')
+            CALL require(ALL(accepted_down>=0.0_wp) .AND. ALL(accepted_up>=0.0_wp), &
+                'nonnegative per-species gross solid rates')
+            CALL require(flow_down>=0.0_wp .AND. flow_up>=0.0_wp, &
+                'nonnegative independent gross carrier streams')
+            CALL require(ALL(dt_local*accepted_down<=solids2+1.0E-12_wp), &
+                'settling cannot spend simultaneous elutriation receipts')
+            CALL require(ALL(dt_local*accepted_up<=solids1+1.0E-12_wp), &
+                'elutriation cannot spend simultaneous settling receipts')
+            CALL require(dt_local*flow_up<=carriers1+1.0E-12_wp .AND. &
+                dt_local*flow_down<=carriers2+1.0E-12_wp, &
+                'donor carrier gross withdrawals do not spend simultaneous receipts')
+
+            new_solids1=solids1+dt_local*(accepted_down-accepted_up)
+            new_solids2=solids2-dt_local*(accepted_down-accepted_up)
+            new_carrier1=carriers1+dt_local* &
+                (donor_rho2*flow_down-donor_rho1*flow_up)/receiver_rho1
+            new_carrier2=carriers2+dt_local* &
+                (donor_rho1*flow_up-donor_rho2*flow_down)/receiver_rho2
+            transferred_carrier_mass=dt_local*(donor_rho2*flow_down-donor_rho1*flow_up)
+
+            CALL require(ALL(new_solids1>=-1.0E-12_wp) .AND. ALL(new_solids2>=-1.0E-12_wp), &
+                'species remain admissible with two gross streams')
+            CALL require(new_carrier1>=-1.0E-12_wp .AND. new_carrier2>=-1.0E-12_wp, &
+                'recipient carrier inventories remain nonnegative')
+            CALL require(SUM(new_solids1)<=packing_local*(SUM(new_solids1)+new_carrier1)+1.0E-12_wp, &
+                'L1 packing with recipient carrier density')
+            CALL require(SUM(new_solids2)<=packing_local*(SUM(new_solids2)+new_carrier2)+1.0E-12_wp, &
+                'L2 packing with recipient carrier density')
+            CALL close(SUM(new_solids1+new_solids2),SUM(solids1+solids2), &
+                'pair conservation of species volume under dissimilar carrier densities')
+            CALL close(receiver_rho1*(new_carrier1-carriers1),transferred_carrier_mass, &
+                'L1 receives actual gross carrier mass')
+            CALL close(receiver_rho2*(new_carrier2-carriers2),-transferred_carrier_mass, &
+                'L2 receives exactly the opposite carrier mass')
+            CALL close(receiver_rho1*(new_carrier1-carriers1)+ &
+                receiver_rho2*(new_carrier2-carriers2),0.0_wp, &
+                'carrier mass exchange is antisymmetric')
+
+            IF (mode==1) THEN
+                strict_solid=SUM(accepted_up)
+                CALL close(flow_up,(1.0_wp-alpha)/alpha*strict_solid, &
+                    'LIMIT_SOLIDS preserves upward parcel composition')
+            ELSE
+                concentrated_solid=SUM(accepted_up)
+                CALL require(concentrated_solid>=strict_solid-1.0E-12_wp, &
+                    'ALLOW_CONCENTRATED does not forbid otherwise admissible solid lifting')
+                CALL require(flow_up<=(1.0_wp-alpha)/alpha*concentrated_solid+1.0E-12_wp, &
+                    'concentrated carrier lift does not exceed prescribed composition')
+            END IF
+        END DO
+
+    END SUBROUTINE test_gross_carrier_exchange
+
+    !> @brief Require independent settling and elutriation reductions at a packing boundary.
+    !> @details The L2 packing inequality limits the upward rate, while
+    !>          full downward settling remains admissible. A common reduction
+    !>          factor would unnecessarily suppress the descending flux.
+    SUBROUTINE test_independent_process_limits()
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        REAL(wp) :: solids1(2),solids2(2),settling_rate(2),elutriation_rate(2)
+        REAL(wp) :: accepted_down(2),accepted_up(2),flow_down,flow_up
+        REAL(wp) :: new_l1(2),new_l2(2),carrier_l1,carrier_l2
+        REAL(wp) :: down_factor,up_factor
+        LOGICAL :: valid
+
+        pair%settling_flag=.TRUE.
+        pair%elutriation_flag=.TRUE.
+        pair%elutriation_solid_volume_fraction=1.0_wp
+        pair%elutriation_carrier_mode='LIMIT_SOLIDS'
+        solids1=[0.12_wp,0.08_wp]
+        solids2=[0.05_wp,0.03_wp]
+        carrier_l1=0.4_wp
+        carrier_l2=0.12_wp
+        settling_rate=[0.006_wp,0.004_wp]
+        elutriation_rate=[0.072_wp,0.048_wp]
+
+        CALL limit_interlayer_mass_transfer(solids1,solids2,carrier_l1,carrier_l2, &
+            settling_rate,elutriation_rate,1.0_wp,0.6_wp,pair, &
+            accepted_down,accepted_up,flow_down,flow_up,valid)
+        CALL require(valid,'packing-limited unequal reductions accepted')
+        down_factor=SUM(accepted_down)/SUM(settling_rate)
+        up_factor=SUM(accepted_up)/SUM(elutriation_rate)
+        CALL require(down_factor>up_factor+1.0E-4_wp, &
+            'settling and elutriation must not share a needless common limiter factor')
+        CALL close(down_factor,1.0_wp,'admissible settling remains at its proposed physical rate')
+        CALL require(up_factor<1.0_wp .AND. up_factor>0.0_wp, &
+            'L2 packing reduces only the competing upward solid stream')
+        CALL close(flow_up,0.0_wp,'pure-solid lift requires no upward carrier')
+        CALL close(flow_down,0.0_wp,'L1 has adequate carrier for accepted settling')
+
+        new_l1=solids1+accepted_down-accepted_up
+        new_l2=solids2+accepted_up-accepted_down
+        CALL require(ALL(new_l1>=0.0_wp) .AND. ALL(new_l2>=0.0_wp), &
+            'independently limited solid inventories are nonnegative')
+        CALL require(SUM(new_l1)<=0.6_wp*(SUM(new_l1)+carrier_l1)+1.0E-12_wp, &
+            'L1 final packing with separately limited streams')
+        CALL require(SUM(new_l2)<=0.6_wp*(SUM(new_l2)+carrier_l2)+1.0E-12_wp, &
+            'L2 final packing with separately limited streams')
+        CALL close(SUM(new_l1+new_l2),SUM(solids1+solids2), &
+            'independently limited gross solid exchange is conservative')
+    END SUBROUTINE test_independent_process_limits
+
+    !> @brief Keep both solid laws active while reducing only upward carrier.
+    !> @details In ALLOW_CONCENTRATED a packed donor can accept full gross
+    !>          solid transfer even if a full co-lift would exhaust the
+    !>          independent downward-carrier donor.
+    SUBROUTINE test_concentrated_carrier_limit()
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        REAL(wp) :: lower(2),upper(2),settle_rate(2),elut_rate(2)
+        REAL(wp) :: down_rate(2),up_rate(2),carrier_down,carrier_up
+        REAL(wp) :: lower_after,upper_after,lower_carrier,upper_carrier
+        LOGICAL :: valid
+
+        pair%settling_flag=.TRUE.
+        pair%elutriation_flag=.TRUE.
+        pair%elutriation_solid_volume_fraction=0.2_wp
+        pair%elutriation_carrier_mode='ALLOW_CONCENTRATED'
+        lower=[0.12_wp,0.08_wp]
+        upper=[0.05_wp,0.03_wp]
+        lower_carrier=0.14_wp
+        upper_carrier=0.12_wp
+        settle_rate=[0.05_wp,0.03_wp]
+        elut_rate=[0.03_wp,0.02_wp]
+
+        CALL limit_interlayer_mass_transfer(lower,upper,lower_carrier,upper_carrier, &
+            settle_rate,elut_rate,1.0_wp,0.6_wp,pair, &
+            down_rate,up_rate,carrier_down,carrier_up,valid)
+        CALL require(valid,'independent concentrated carrier bound accepted')
+        CALL close(SUM(down_rate),SUM(settle_rate),'all descending solids accepted')
+        CALL close(SUM(up_rate),SUM(elut_rate),'all ascending solids accepted')
+        CALL require(carrier_up<lower_carrier-1.0E-4_wp .AND. carrier_up>0.0_wp, &
+            'upward carrier independently reduced without rejecting solids')
+        CALL require(carrier_up<4.0_wp*SUM(up_rate), &
+            'ALLOW_CONCENTRATED permits a more concentrated lifted parcel')
+        CALL require(carrier_down<=upper_carrier+1.0E-12_wp, &
+            'downward carrier cannot spend simultaneous upward receipts')
+        lower_after=SUM(lower)+SUM(down_rate)-SUM(up_rate)
+        upper_after=SUM(upper)-SUM(down_rate)+SUM(up_rate)
+        CALL require(lower_after<=0.6_wp*(lower_after+lower_carrier+carrier_down-carrier_up)+1.0E-12_wp, &
+            'L1 packing with separately limited upward carrier')
+        CALL require(upper_after<=0.6_wp*(upper_after+upper_carrier+carrier_up-carrier_down)+1.0E-12_wp, &
+            'L2 packing with separately limited upward carrier')
+    END SUBROUTINE test_concentrated_carrier_limit
 
     !> @brief Exercise physics and antisymmetric paired mass, momentum and energy.
     SUBROUTINE test_physical_sources()
@@ -256,6 +449,33 @@ CONTAINS
         CALL require(valid,'simultaneous source-rate assembly accepted')
         DO i=1,6
             CALL close(source1(i)+source2(i),0.0_wp,'simultaneous antisymmetric conservative rate')
+        END DO
+
+        ! Both donors can have different carrier densities, heat capacities,
+        ! temperatures and velocities. Rates remain paired per conservative
+        ! equation; an energy or momentum credit cannot use recipient values.
+        l1%rho_c=1.5_wp
+        l2%rho_c=0.8_wp
+        l1%rho_m=SUM(rho_s*l1%alphas)+l1%rho_c*(1.0_wp-SUM(l1%alphas))
+        l2%rho_m=SUM(rho_s*l2%alphas)+l2%rho_c*(1.0_wp-SUM(l2%alphas))
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l1%T=420.0_wp
+        l2%T=280.0_wp
+        l1%cp_c=1000.0_wp
+        l2%cp_c=1200.0_wp
+        l1%u=12.0_wp
+        l2%u=-3.0_wp
+        l1%v=2.0_wp
+        l2%v=-1.0_wp
+        CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt,source1,source2,valid)
+        CALL require(valid,'two-way exchange with unequal donor thermodynamics accepted')
+        CALL require(ABS(source1(1))>0.0_wp,'unequal carrier density induces nonzero paired mass exchange')
+        CALL require(ABS(source1(4))>0.0_wp,'unequal donor temperatures transfer sensible heat')
+        DO i=1,6
+            CALL close(source1(i)+source2(i),0.0_wp, &
+                'unequal donor density and temperature preserve each conservative pair')
         END DO
 
         ! The additional gas species follows the donor carrier composition.

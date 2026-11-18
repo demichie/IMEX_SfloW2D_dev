@@ -213,11 +213,11 @@ abilitazione in produzione.
 
 | Fase | Stato | Lavoro residuo / gate |
 |---|---|---|
-| **TL00–TL04 — Stato e fisica per layer** | Slot opzionali e workspace OU L1/L2 collegati, verifica CI pendente | L1/L2 condividono il layout opzionale ma mantengono configurazioni, campi OU e flussi casuali indipendenti. Restano IC/BC e I/O/restart completi nei blocchi successivi. |
-| **TL05 — Operatori L2** | Percorso spaziale condiviso e test estesi; CI blocco 3 pendente | Ricostruzione HP e BC per layer, selezione di velocita' L1/L2 e componenti inattive riusano gli operatori canonici; regressioni estese a tutti i lati e alle quattro occupazioni wet/dry. |
-| **TL06 — Spaziale accoppiato** | Accoppiamento e regressioni di blocco 3 predisposti; CI pendente | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
+| **TL00–TL04 — Stato e fisica per layer** | Slot opzionali e OU L1/L2 validati nei blocchi 1-3 | L1/L2 condividono il layout opzionale ma mantengono configurazioni, campi OU e flussi casuali indipendenti. Restano IC/BC e I/O/restart completi nei blocchi successivi. |
+| **TL05 — Operatori L2** | Percorso spaziale e BC L1/L2 validati nel blocco 3 | Ricostruzione HP e BC per layer, selezione di velocita' L1/L2 e componenti inattive riusano gli operatori canonici; regressioni estese a tutti i lati e alle quattro occupazioni wet/dry. |
+| **TL06 — Spaziale accoppiato** | Regresioni accoppiate validate nel blocco 3 | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
-| **TL08–TL11 — Chiusure e scambi** | Kernel e assemblatore cell-local predisposti | Rate di settling/elutriazione, co-lift in due modalita', limitatore congiunto, trasformazione dei volumi con densita' di carrier distinte e sorgenti accoppiate di massa/specie/momento/energia termica con regressioni isolate. Restano validazione della transazione Lie effettiva, variabili opzionali per layer, stati termodinamici finali, drag e test two-layer end-to-end. |
+| **TL08–TL11 — Chiusure e scambi** | Limitatore a fattori indipendenti e validazione integrata predisposti; CI blocco 4 pendente | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Parziale | Input L1/L2, NetCDF, restart/round-trip, diagnostiche e EXAMPLES; preservare input e output single-layer. |
 | **TL13a — Gate funzionale** | Non superato | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
@@ -328,6 +328,39 @@ curvatura e dell'equilibrio stratificato rimangono attive.
 Questo blocco non modifica la chiusura degli autovalori accoppiati;
 la verifica scientifica di shear/iperbolicita' resta TL13b. Il gate
 produttivo `N_LAYERS=2` rimane chiuso fino all'accettazione prevista.
+
+**Blocco 4 - scambi conservativi L1/L2 (18 novembre 2026):**
+Il coordinatore fisico esistente `interlayer_mass_exchange_2d`
+continua a usare i rate prodotti dalle leggi cell-local `interlayer_settling`
+ed `interlayer_elutriation`, senza spostare formule o introdurre un
+secondo integratore. Il limitatore impone la disponibilita' di ogni
+donatore sulle masse e sui volumi lordi pre-trasferimento, preserva
+le proporzioni tra le classi di ogni processo e verifica il packing
+finale in entrambi i layer. Quando il packing limita un processo,
+non riduce inutilmente anche l'altro: ricerca scale separate di
+settling ed elutriazione a partire da un candidato congiuntamente
+ammissibile. In `ALLOW_CONCENTRATED` verifica anche se l'intero
+trasferimento solido diventa ammissibile riducendo soltanto il
+carrier ascendente; `LIMIT_SOLIDS` mantiene invece la composizione
+della corrente imposta dall'input.
+
+I trasferimenti conservativi usano le densita' e capacita'
+termiche dei donatori e la conversione di volume ai destinatari.
+`TEST_SOURCE_REGISTRY` aggiunge casi vincolati con fattori
+solidi diversi, carrier limitato indipendentemente, densita'
+donatore/destinatario diseguali, due classi solide e temperature
+differenti. `test_interlayer_lie_transaction` esercita inoltre
+la sequenza scambio di massa e drag Chézy sui candidati aggiornati,
+e controlla che i componenti conservativi opzionali Darcy/OU
+restino nei rispettivi layer. Il controllo finale azzera i rate
+provvisori se una transazione non e' ammissibile.
+
+La modifica riguarda il limite dei rate interlayer effettivamente
+vincolati; le formule di settling, elutriazione, drag e il
+comportamento single-layer non cambiano. Compilazione optimized,
+strict/debug, regressioni e OpenMP sono ancora da verificare sul
+commit finale del blocco. Il gate produttivo `N_LAYERS=2` resta
+chiuso, insieme alle verifiche scientifiche TL13b.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.

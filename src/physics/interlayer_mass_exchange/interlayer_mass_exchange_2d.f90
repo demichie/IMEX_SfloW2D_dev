@@ -35,8 +35,10 @@ CONTAINS
     !> @brief Limit gross two-way solid and carrier fluxes against both layer inventories.
     !> @details All volumes are phase volumes per horizontal area [m]; proposed
     !>          and accepted fluxes are [m/s]. The solid rates for all classes in
-    !>          each direction share a donor scale. Gross withdrawals never spend
-    !>          same-substep receipts, whereas final packing uses both processes.
+    !>          each direction share a donor scale, but the two process scales
+    !>          are independent when constrained by packing or carrier supply.
+    !>          Gross withdrawals never spend same-substep receipts; final
+    !>          packing accounts for both gross processes and carrier streams.
     !>          LIMIT_SOLIDS preserves the parcel solid fraction; ALLOW_CONCENTRATED
     !>          may reduce co-lift independently. Downward carrier is the minimum
     !>          required to keep L1 admissible after both solid fluxes and co-lift.
@@ -72,6 +74,7 @@ CONTAINS
         REAL(wp) :: donor_rho1,donor_rho2,receiver_rho1,receiver_rho2
         REAL(wp) :: up_to_l1,down_to_l1,up_to_l2,down_to_l2,available_up,available_down
         REAL(wp) :: f_settle,f_elut,co_lift,requested,alpha_lift,beta,lo,hi,mid,scale
+        REAL(wp) :: initial_scale,down_candidate,f_carrier
         REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2
         INTEGER :: i,k,n
 
@@ -162,56 +165,132 @@ CONTAINS
             END IF
         END IF
 
-        ! Final packing uses the combined changes, but no gross donor withdrawal
-        ! can use a simultaneous credit. The feasible shared scale interval
-        ! contains zero; bisection is entered only for a binding packing bound.
-        IF (.NOT.feasible(1.0_wp)) THEN
+        ! Start with a jointly feasible scale. The old common-scale
+        ! solution remains a conservative admissible point; it is not the
+        ! final physical limit when the two gross transfers can differ.
+        ! Packing and carrier caps define a convex feasible region in
+        ! the solid-process and carrier scales. The searches start from
+        ! an admissible point and cannot spend donor receipts.
+        ! In ALLOW_CONCENTRATED, reduce upward carrier independently
+        ! before sacrificing either solid flux. This never applies to
+        ! LIMIT_SOLIDS, whose lifted parcel composition is prescribed.
+        IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED' .AND. &
+            .NOT.feasible(1.0_wp,1.0_wp,1.0_wp) .AND. feasible(1.0_wp,1.0_wp,0.0_wp)) THEN
+            f_settle=1.0_wp
+            f_elut=1.0_wp
             lo=0.0_wp
             hi=1.0_wp
             DO k=1,56
                 mid=0.5_wp*(lo+hi)
-                IF (feasible(mid)) THEN
+                IF (feasible(1.0_wp,1.0_wp,mid)) THEN
                     lo=mid
                 ELSE
                     hi=mid
                 END IF
             END DO
-            scale=lo*(1.0_wp-128.0_wp*EPSILON(1.0_wp))
+            f_carrier=lo*(1.0_wp-128.0_wp*EPSILON(1.0_wp))
         ELSE
-            scale=1.0_wp
+            IF (.NOT.feasible(1.0_wp,1.0_wp,1.0_wp)) THEN
+                lo=0.0_wp
+                hi=1.0_wp
+                DO k=1,56
+                    mid=0.5_wp*(lo+hi)
+                    IF (feasible(mid,mid,mid)) THEN
+                        lo=mid
+                    ELSE
+                        hi=mid
+                    END IF
+                END DO
+                scale=lo*(1.0_wp-128.0_wp*EPSILON(1.0_wp))
+            ELSE
+                scale=1.0_wp
+            END IF
+
+            initial_scale=scale
+            f_settle=scale
+            f_elut=scale
+            IF (scale<1.0_wp) THEN
+                ! Relax the descending process first, then ascending co-lift.
+                ! Each search starts from the accepted candidate and changes
+                ! only its own physical rate; no new limiter representation.
+                IF (feasible(1.0_wp,f_elut,f_elut)) THEN
+                    f_settle=1.0_wp
+                ELSE
+                    lo=f_settle
+                    hi=1.0_wp
+                    DO k=1,56
+                        mid=0.5_wp*(lo+hi)
+                        IF (feasible(mid,f_elut,f_elut)) THEN
+                            lo=mid
+                        ELSE
+                            hi=mid
+                        END IF
+                    END DO
+                    f_settle=MAX(initial_scale,lo*(1.0_wp-128.0_wp*EPSILON(1.0_wp)))
+                END IF
+                IF (feasible(f_settle,1.0_wp,1.0_wp)) THEN
+                    f_elut=1.0_wp
+                ELSE
+                    lo=f_elut
+                    hi=1.0_wp
+                    DO k=1,56
+                        mid=0.5_wp*(lo+hi)
+                        IF (feasible(f_settle,mid,mid)) THEN
+                            lo=mid
+                        ELSE
+                            hi=mid
+                        END IF
+                    END DO
+                    f_elut=MAX(initial_scale,lo*(1.0_wp-128.0_wp*EPSILON(1.0_wp)))
+                END IF
+            END IF
+
+            f_carrier=f_elut
         END IF
 
-        accepted_settling=scale*accepted_settling
-        accepted_elutriation=scale*accepted_elutriation
-        carrier_up=scale*co_lift
-        carrier_down=MAX(0.0_wp,(beta*(s1+dt* &
-            (SUM(accepted_settling)-SUM(accepted_elutriation)))-c1+dt*up_to_l1*carrier_up)/(dt*down_to_l1))
-        IF (.NOT.ieee_is_finite(carrier_down)) RETURN
-        IF (carrier_down>available_down+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,available_down)) RETURN
-        valid=.TRUE.
+        accepted_settling=f_settle*accepted_settling
+        accepted_elutriation=f_elut*accepted_elutriation
+        CALL candidate_flux(f_settle,f_elut,f_carrier,down_candidate,carrier_up)
+        carrier_down=down_candidate
+        ! Recheck the final independently scaled candidate before exposing
+        ! any accepted rate. Failure must never leak partially accepted fluxes.
+        IF (ieee_is_finite(carrier_down)) THEN
+            IF (carrier_down<=available_down+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,available_down)) &
+                valid=feasible(f_settle,f_elut,f_carrier)
+        END IF
+        IF (.NOT.valid) THEN
+            accepted_settling=0.0_wp
+            accepted_elutriation=0.0_wp
+            carrier_down=0.0_wp
+            carrier_up=0.0_wp
+        END IF
 
     CONTAINS
 
-        !> @brief Evaluate simultaneous upward/downward carrier rates at common scaling.
-        !> @param[in] f Common physical transfer scale in [0,1].
+        !> @brief Evaluate simultaneous upward/downward carrier rates at independent process scales.
+        !> @param[in] fs Settling reduction factor in [0,1].
+        !> @param[in] fe Elutriation factor in [0,1].
+        !> @param[in] fc Upward carrier factor in [0,fe]; equal to fe in LIMIT_SOLIDS.
         !> @param[out] down Required downward carrier rate [m/s].
         !> @param[out] up Prescribed upward carrier rate [m/s].
-        PURE SUBROUTINE candidate_flux(f,down,up)
-            REAL(wp), INTENT(IN) :: f
+        PURE SUBROUTINE candidate_flux(fs,fe,fc,down,up)
+            REAL(wp), INTENT(IN) :: fs,fe,fc
             REAL(wp), INTENT(OUT) :: down,up
-            up=f*co_lift
-            down=MAX(0.0_wp,(beta*(s1+dt*f*(settle_total-elut_total))-c1+dt*up_to_l1*up)/ &
+            up=fc*co_lift
+            down=MAX(0.0_wp,(beta*(s1+dt*(fs*settle_total-fe*elut_total))-c1+dt*up_to_l1*up)/ &
                 (dt*down_to_l1))
         END SUBROUTINE candidate_flux
 
-        !> @brief Check L2 carrier inventory and packing at the proposed common scale.
-        !> @param[in] f Common physical transfer scale in [0,1].
+        !> @brief Check L2 carrier inventory and packing at the proposed process scales.
+        !> @param[in] fs Settling reduction factor in [0,1].
+        !> @param[in] fe Elutriation factor in [0,1].
+        !> @param[in] fc Upward carrier factor in [0,fe]; equal to fe in LIMIT_SOLIDS.
         !> @return Whether the candidate carrier exchange is admissible in L2.
-        PURE LOGICAL FUNCTION feasible(f) RESULT(ok)
-            REAL(wp), INTENT(IN) :: f
+        PURE LOGICAL FUNCTION feasible(fs,fe,fc) RESULT(ok)
+            REAL(wp), INTENT(IN) :: fs,fe,fc
             REAL(wp) :: down,up,solid2_after,carrier2_after,tol
-            CALL candidate_flux(f,down,up)
-            solid2_after=s2+dt*f*(elut_total-settle_total)
+            CALL candidate_flux(fs,fe,fc,down,up)
+            solid2_after=s2+dt*(fe*elut_total-fs*settle_total)
             carrier2_after=c2+dt*(up_to_l2*up-down_to_l2*down)
             tol=128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)
             ok=ieee_is_finite(down) .AND. ieee_is_finite(carrier2_after)

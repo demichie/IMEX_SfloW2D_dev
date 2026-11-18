@@ -251,7 +251,9 @@ CONTAINS
             error='Invalid ELUTRIATION_CARRIER_MODE'
             RETURN
         END SELECT
-        IF (config%settling_velocity_weight<0.0_wp .OR. config%settling_velocity_weight>1.0_wp .OR. &
+        IF (.NOT.ieee_is_finite(config%settling_velocity_weight) .OR. &
+            .NOT.ieee_is_finite(config%settling_plug_thickness) .OR. &
+            config%settling_velocity_weight<0.0_wp .OR. config%settling_velocity_weight>1.0_wp .OR. &
             config%settling_plug_thickness<=0.0_wp) THEN
             error='Invalid interlayer settling transfer velocity parameters'
             RETURN
