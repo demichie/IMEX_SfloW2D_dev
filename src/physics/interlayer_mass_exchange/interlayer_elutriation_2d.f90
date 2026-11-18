@@ -6,13 +6,19 @@ MODULE interlayer_elutriation_2d
     USE parameters_2d, ONLY : wp,n_solid
     USE constitutive_parameters_2d, ONLY : grav,kin_visc_c,rho_a_amb,vonK
     USE solid_transport_parameters_2d, ONLY : rho_s,diam_s,maximum_solid_packing
-    USE state_types, ONLY : physical_state_real
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_types, ONLY : physical_state_real,physical_state_complex
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE mass_exchange_deposition_2d, ONLY : settling_velocity
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_interlayer_elutriation_explicit
+    ! Four physical treatment entry points; unsupported methods fail explicitly.
+    PUBLIC :: eval_interlayer_elutriation_semi_implicit
+    PUBLIC :: eval_interlayer_elutriation_implicit
+    PUBLIC :: solve_interlayer_elutriation_analytic
+
 CONTAINS
     !> @brief Return per-class solid volume fluxes upward, without carrier or state updates.
     !> @param[in] config Pair-wide elutriation closure and its input coefficients.
@@ -86,4 +92,43 @@ CONTAINS
                 config%elutriation_donor_cap*state_l1%h*state_l1%alphas(i)/dt)
         END DO
     END SUBROUTINE eval_interlayer_elutriation_explicit
+    !> @brief Reject unsupported semi-implicit treatment for interlayer elutriation.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE eval_interlayer_elutriation_semi_implicit(config,mass_l2,state_l1,state_l2,dt,elutriation)
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_real), INTENT(IN) :: state_l1,state_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: elutriation(n_solid)
+
+        elutriation=0.0_wp
+        CALL fatal_error('interlayer_elutriation: unsupported semi-implicit physical treatment')
+    END SUBROUTINE eval_interlayer_elutriation_semi_implicit
+
+    !> @brief Reject unsupported implicit treatment for interlayer elutriation.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE eval_interlayer_elutriation_implicit(config,mass_l2,state_l1,state_l2,dt,elutriation)
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_complex), INTENT(IN) :: state_l1,state_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: elutriation(n_solid)
+
+        elutriation=0.0_wp
+        CALL fatal_error('interlayer_elutriation: unsupported implicit physical treatment')
+    END SUBROUTINE eval_interlayer_elutriation_implicit
+
+    !> @brief Reject unsupported analytic treatment for interlayer elutriation.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE solve_interlayer_elutriation_analytic(config,mass_l2,state_l1,state_l2,dt,elutriation)
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_real), INTENT(IN) :: state_l1,state_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: elutriation(n_solid)
+
+        elutriation=0.0_wp
+        CALL fatal_error('interlayer_elutriation: unsupported analytic physical treatment')
+    END SUBROUTINE solve_interlayer_elutriation_analytic
+
 END MODULE interlayer_elutriation_2d

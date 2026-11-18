@@ -76,7 +76,15 @@ un layer verso terreno e atmosfera. Gli scambi interni L1/L2 appartengono a
 Il drag e' fisicamente distinto e appartiene a
 `src/physics/interlayer_momentum_exchange/`, con il coordinatore
 `interlayer_momentum_exchange_2d.f90` e la legge
-`interlayer_drag_chezy_2d.f90`. Il NAMELIST canonico
+`interlayer_drag_chezy_2d.f90`. Tutte le cinque unita' operative
+(`interlayer_settling`, `interlayer_elutriation`, coordinatore
+`interlayer_mass_exchange`, legge `interlayer_drag_chezy` e coordinatore
+`interlayer_momentum_exchange`) espongono le quattro interfacce fisiche
+`EXPLICIT`, `SEMI_IMPLICIT`, `IMPLICIT`, `ANALYTIC`: soltanto le
+formulazioni effettivamente implementate vengono eseguite. Le altre
+sollevano un errore fatale esplicito, come nei moduli storici di
+`physics/mass_exchange`. `TEST_SOURCE_REGISTRY` verifica tutti i quindici
+rifiuti in entrambe le build strict e optimized. Il NAMELIST canonico
 `INTERLAYER_PARAMETERS` include i due oggetti indipendenti
 `interlayer_mass_exchange` e `interlayer_momentum_exchange`, con metodi e
 gruppi Lie separati; `INTERLAYER_EXCHANGE_PARAMETERS` rimane un alias storico

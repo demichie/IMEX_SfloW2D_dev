@@ -7,7 +7,8 @@ MODULE interlayer_mass_exchange_2d
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
     USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
-    USE state_types, ONLY : physical_state_real
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_types, ONLY : physical_state_real,physical_state_complex
     USE state_physical, ONLY : build_physical_state_from_qp
     USE state_conversions, ONLY : conservative_to_primitive
     USE state_composition, ONLY : conservative_mass_admissible
@@ -23,6 +24,11 @@ MODULE interlayer_mass_exchange_2d
     PRIVATE
     PUBLIC :: limit_interlayer_mass_transfer, eval_interlayer_mass_exchange_explicit
     PUBLIC :: apply_interlayer_lie_group
+
+    ! Four physical treatment entry points; unsupported methods fail explicitly.
+    PUBLIC :: eval_interlayer_mass_exchange_semi_implicit
+    PUBLIC :: eval_interlayer_mass_exchange_implicit
+    PUBLIC :: solve_interlayer_mass_exchange_analytic
 
 CONTAINS
 
@@ -431,4 +437,59 @@ CONTAINS
         qp=candidate_qp
         status=0
     END SUBROUTINE apply_interlayer_lie_group
+    !> @brief Reject unsupported semi-implicit treatment for interlayer mass exchange.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE eval_interlayer_mass_exchange_semi_implicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
+        limit_l1,limit_l2,dt,source_l1,source_l2,valid)
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_real), INTENT(IN) :: eval_l1,eval_l2,limit_l1,limit_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
+        LOGICAL, INTENT(OUT) :: valid
+
+        source_l1=0.0_wp
+        source_l2=0.0_wp
+        valid=.FALSE.
+        CALL fatal_error('interlayer_mass_exchange: unsupported semi-implicit physical treatment')
+    END SUBROUTINE eval_interlayer_mass_exchange_semi_implicit
+
+    !> @brief Reject unsupported implicit treatment for interlayer mass exchange.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE eval_interlayer_mass_exchange_implicit(config,rheology_l2,mass_l2,eval_l1,eval_l2,limit_l1,limit_l2,dt, &
+        source_l1,source_l2,valid)
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_complex), INTENT(IN) :: eval_l1,eval_l2,limit_l1,limit_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
+        LOGICAL, INTENT(OUT) :: valid
+
+        source_l1=0.0_wp
+        source_l2=0.0_wp
+        valid=.FALSE.
+        CALL fatal_error('interlayer_mass_exchange: unsupported implicit physical treatment')
+    END SUBROUTINE eval_interlayer_mass_exchange_implicit
+
+    !> @brief Reject unsupported analytic treatment for interlayer mass exchange.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE solve_interlayer_mass_exchange_analytic(config,rheology_l2,mass_l2,eval_l1,eval_l2,limit_l1, &
+            limit_l2,dt, &
+        source_l1,source_l2,valid)
+        TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
+        TYPE(physical_state_real), INTENT(IN) :: eval_l1,eval_l2,limit_l1,limit_l2
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
+        LOGICAL, INTENT(OUT) :: valid
+
+        source_l1=0.0_wp
+        source_l2=0.0_wp
+        valid=.FALSE.
+        CALL fatal_error('interlayer_mass_exchange: unsupported analytic physical treatment')
+    END SUBROUTINE solve_interlayer_mass_exchange_analytic
+
 END MODULE interlayer_mass_exchange_2d

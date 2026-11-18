@@ -72,5 +72,43 @@ for profile in strict optimized; do
       $netcdf_flibs $netcdf_clibs -o test_interlayer_momentum_exchange
     ./test_interlayer_momentum_exchange > interlayer-momentum-results.log
     cat interlayer-momentum-results.log
+    # Each unused physical method must terminate with the expected fatal
+    # diagnostic; merely returning an error status is not sufficient.
+    "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $netcdf_fflags -c "$test_dir/test_interlayer_unsupported_treatments.f90"
+    "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $production_objects test_interlayer_unsupported_treatments.o -llapack \
+      $netcdf_flibs $netcdf_clibs -o test_interlayer_unsupported_treatments
+    set -- \
+      'interlayer_settling: unsupported semi-implicit physical treatment' \
+      'interlayer_settling: unsupported implicit physical treatment' \
+      'interlayer_settling: unsupported analytic physical treatment' \
+      'interlayer_elutriation: unsupported semi-implicit physical treatment' \
+      'interlayer_elutriation: unsupported implicit physical treatment' \
+      'interlayer_elutriation: unsupported analytic physical treatment' \
+      'interlayer_mass_exchange: unsupported semi-implicit physical treatment' \
+      'interlayer_mass_exchange: unsupported implicit physical treatment' \
+      'interlayer_mass_exchange: unsupported analytic physical treatment' \
+      'interlayer_drag_chezy: unsupported explicit physical treatment' \
+      'interlayer_drag_chezy: unsupported semi-implicit physical treatment' \
+      'interlayer_drag_chezy: unsupported implicit physical treatment' \
+      'interlayer_momentum_exchange: unsupported explicit physical treatment' \
+      'interlayer_momentum_exchange: unsupported semi-implicit physical treatment' \
+      'interlayer_momentum_exchange: unsupported implicit physical treatment'
+    case_index=0
+    for expected in "$@"; do
+      case_index=$((case_index+1))
+      if ./test_interlayer_unsupported_treatments "$case_index" > unsupported.log 2>&1; then
+        echo "FAIL: unsupported treatment $case_index returned successfully" >&2
+        exit 1
+      fi
+      if ! grep -F "FATAL ERROR:" unsupported.log > /dev/null || \
+         ! grep -F "$expected" unsupported.log > /dev/null; then
+        cat unsupported.log >&2
+        echo "FAIL: unsupported treatment $case_index emitted the wrong diagnostic" >&2
+        exit 1
+      fi
+    done
+    printf 'PASS: 15 unsupported interlayer treatments fail with fatal diagnostics (%s)\n' "$profile"
 done
 printf 'D17 evidence directory: %s\n' "$work_dir"

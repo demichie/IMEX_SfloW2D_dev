@@ -3,6 +3,7 @@
 !>          No cell indices, grid storage, or alternative time integrator are introduced.
 MODULE interlayer_momentum_exchange_2d
     USE parameters_2d, ONLY : wp,n_vars,idx_h,idx_u,idx_v,idx_totMassEqn,idx_uEqn,idx_vEqn
+    USE diagnostics_2d, ONLY : fatal_error
     USE interlayer_drag_chezy_2d, ONLY : evaluate_interlayer_drag_chezy_analytic
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
@@ -19,6 +20,11 @@ MODULE interlayer_momentum_exchange_2d
     END TYPE interlayer_momentum_exchange_config_type
 
     TYPE(interlayer_momentum_exchange_config_type) :: interlayer_momentum_exchange
+
+    ! Four physical treatment entry points; unsupported methods fail explicitly.
+    PUBLIC :: apply_interlayer_momentum_exchange_explicit
+    PUBLIC :: apply_interlayer_momentum_exchange_semi_implicit
+    PUBLIC :: apply_interlayer_momentum_exchange_implicit
 
 CONTAINS
 
@@ -81,4 +87,40 @@ CONTAINS
         qp(idx_v,2)=updated_velocity2(2)
         accepted=.TRUE.
     END SUBROUTINE apply_interlayer_momentum_exchange_analytic
+    !> @brief Reject unsupported explicit treatment for interlayer momentum exchange.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE apply_interlayer_momentum_exchange_explicit(config,dt,q,qp,accepted)
+        TYPE(interlayer_momentum_exchange_config_type), INTENT(IN) :: config
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(INOUT) :: q(n_vars,2),qp(n_vars,2)
+        LOGICAL, INTENT(OUT) :: accepted
+
+        accepted=.FALSE.
+        CALL fatal_error('interlayer_momentum_exchange: unsupported explicit physical treatment')
+    END SUBROUTINE apply_interlayer_momentum_exchange_explicit
+
+    !> @brief Reject unsupported semi-implicit treatment for interlayer momentum exchange.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE apply_interlayer_momentum_exchange_semi_implicit(config,dt,q,qp,accepted)
+        TYPE(interlayer_momentum_exchange_config_type), INTENT(IN) :: config
+        REAL(wp), INTENT(IN) :: dt
+        REAL(wp), INTENT(INOUT) :: q(n_vars,2),qp(n_vars,2)
+        LOGICAL, INTENT(OUT) :: accepted
+
+        accepted=.FALSE.
+        CALL fatal_error('interlayer_momentum_exchange: unsupported semi-implicit physical treatment')
+    END SUBROUTINE apply_interlayer_momentum_exchange_semi_implicit
+
+    !> @brief Reject unsupported implicit treatment for interlayer momentum exchange.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE apply_interlayer_momentum_exchange_implicit(config,dt,q,qp,accepted)
+        TYPE(interlayer_momentum_exchange_config_type), INTENT(IN) :: config
+        REAL(wp), INTENT(IN) :: dt
+        COMPLEX(wp), INTENT(INOUT) :: q(n_vars,2),qp(n_vars,2)
+        LOGICAL, INTENT(OUT) :: accepted
+
+        accepted=.FALSE.
+        CALL fatal_error('interlayer_momentum_exchange: unsupported implicit physical treatment')
+    END SUBROUTINE apply_interlayer_momentum_exchange_implicit
+
 END MODULE interlayer_momentum_exchange_2d

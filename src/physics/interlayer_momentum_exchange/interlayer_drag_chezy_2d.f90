@@ -4,10 +4,16 @@
 !>          The returned impulse is added to L1 and subtracted from L2.
 MODULE interlayer_drag_chezy_2d
     USE parameters_2d, ONLY : wp
+    USE diagnostics_2d, ONLY : fatal_error
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: evaluate_interlayer_drag_chezy_analytic
+
+    ! Four physical treatment entry points; unsupported methods fail explicitly.
+    PUBLIC :: evaluate_interlayer_drag_chezy_explicit
+    PUBLIC :: evaluate_interlayer_drag_chezy_semi_implicit
+    PUBLIC :: evaluate_interlayer_drag_chezy_implicit
 
 CONTAINS
 
@@ -55,4 +61,46 @@ CONTAINS
         accepted=ALL(ieee_is_finite(impulse))
         IF (.NOT.accepted) impulse=0.0_wp
     END SUBROUTINE evaluate_interlayer_drag_chezy_analytic
+    !> @brief Reject unsupported explicit treatment for interlayer drag chezy.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE evaluate_interlayer_drag_chezy_explicit(mass_l1,mass_l2,rho_l2,velocity_l1,velocity_l2, &
+        coefficient,dt,impulse,accepted)
+        REAL(wp), INTENT(IN) :: mass_l1,mass_l2,rho_l2,coefficient,dt
+        REAL(wp), INTENT(IN) :: velocity_l1(2),velocity_l2(2)
+        REAL(wp), INTENT(OUT) :: impulse(2)
+        LOGICAL, INTENT(OUT) :: accepted
+
+        impulse=0.0_wp
+        accepted=.FALSE.
+        CALL fatal_error('interlayer_drag_chezy: unsupported explicit physical treatment')
+    END SUBROUTINE evaluate_interlayer_drag_chezy_explicit
+
+    !> @brief Reject unsupported semi-implicit treatment for interlayer drag chezy.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE evaluate_interlayer_drag_chezy_semi_implicit(mass_l1,mass_l2,rho_l2,velocity_l1,velocity_l2, &
+        coefficient,dt,impulse,accepted)
+        REAL(wp), INTENT(IN) :: mass_l1,mass_l2,rho_l2,coefficient,dt
+        REAL(wp), INTENT(IN) :: velocity_l1(2),velocity_l2(2)
+        REAL(wp), INTENT(OUT) :: impulse(2)
+        LOGICAL, INTENT(OUT) :: accepted
+
+        impulse=0.0_wp
+        accepted=.FALSE.
+        CALL fatal_error('interlayer_drag_chezy: unsupported semi-implicit physical treatment')
+    END SUBROUTINE evaluate_interlayer_drag_chezy_semi_implicit
+
+    !> @brief Reject unsupported implicit treatment for interlayer drag chezy.
+    !> @details No candidate state is committed; report the unsupported method.
+    SUBROUTINE evaluate_interlayer_drag_chezy_implicit(mass_l1,mass_l2,rho_l2,velocity_l1,velocity_l2, &
+        coefficient,dt,impulse,accepted)
+        REAL(wp), INTENT(IN) :: mass_l1,mass_l2,rho_l2,coefficient,dt
+        COMPLEX(wp), INTENT(IN) :: velocity_l1(2),velocity_l2(2)
+        COMPLEX(wp), INTENT(OUT) :: impulse(2)
+        LOGICAL, INTENT(OUT) :: accepted
+
+        impulse=0.0_wp
+        accepted=.FALSE.
+        CALL fatal_error('interlayer_drag_chezy: unsupported implicit physical treatment')
+    END SUBROUTINE evaluate_interlayer_drag_chezy_implicit
+
 END MODULE interlayer_drag_chezy_2d
