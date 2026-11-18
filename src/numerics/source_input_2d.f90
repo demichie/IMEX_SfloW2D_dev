@@ -24,12 +24,11 @@ MODULE source_input_2d
     NAMELIST /mass_exchange_parameters/ mass_exchange
     NAMELIST /mass_exchange_l1_parameters/ mass_exchange_l1
     NAMELIST /mass_exchange_l2_parameters/ mass_exchange_l2
-    ! Both NAMELIST spellings address one canonical mass-exchange object.
+    ! The pair-wide NAMELIST references the authoritative interlayer objects.
     TYPE(interlayer_mass_exchange_config_type), POINTER :: interlayer_mass_exchange => interlayer_exchange
-    NAMELIST /interlayer_exchange_parameters/ interlayer_exchange
     NAMELIST /interlayer_parameters/ interlayer_mass_exchange,interlayer_momentum_exchange
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
-    PUBLIC :: read_interlayer_exchange_parameters, write_interlayer_exchange_parameters
+    PUBLIC :: read_interlayer_parameters, write_interlayer_parameters
     PUBLIC :: uppercase_source_text
 
 CONTAINS
@@ -168,19 +167,20 @@ CONTAINS
     !> @brief Read canonical pair-wide mass exchange settings from one optional NAMELIST.
     !> @details Single-layer input must not contain interlayer settings. A single
     !>          pair owns these settings; neither L1 nor L2 is a surrogate owner.
-    SUBROUTINE read_interlayer_exchange_parameters(input_unit,error)
+    SUBROUTINE read_interlayer_parameters(input_unit,error)
         INTEGER, INTENT(IN) :: input_unit
         CHARACTER(*), INTENT(OUT) :: error
         CHARACTER(LEN=2048) :: line
-        INTEGER :: ios,legacy_count,canonical_count
+        INTEGER :: ios,count
+
         error=''
-        legacy_count=0
-        canonical_count=0
+        count=0
         REWIND(input_unit,IOSTAT=ios)
         IF (ios/=0) THEN
             error='Unable to scan INTERLAYER_PARAMETERS'
             RETURN
         END IF
+
         DO
             READ(input_unit,'(A)',IOSTAT=ios) line
             IF (ios<0) EXIT
@@ -189,35 +189,19 @@ CONTAINS
                 RETURN
             END IF
             line=uppercase_source_text(ADJUSTL(line))
-            IF (INDEX(line,'&INTERLAYER_EXCHANGE_PARAMETERS')==1 .OR. &
-                INDEX(line,'$INTERLAYER_EXCHANGE_PARAMETERS')==1) legacy_count=legacy_count+1
             IF (INDEX(line,'&INTERLAYER_PARAMETERS')==1 .OR. &
-                INDEX(line,'$INTERLAYER_PARAMETERS')==1) canonical_count=canonical_count+1
+                INDEX(line,'$INTERLAYER_PARAMETERS')==1) count=count+1
         END DO
-        IF (legacy_count>1 .OR. canonical_count>1) THEN
-            error='Duplicate interlayer NAMELIST'
+
+        IF (count>1) THEN
+            error='Duplicate INTERLAYER_PARAMETERS NAMELIST'
             RETURN
         END IF
-        IF (legacy_count+canonical_count>1) THEN
-            error='INTERLAYER_PARAMETERS and INTERLAYER_EXCHANGE_PARAMETERS are mutually exclusive'
+        IF (n_layers/=2 .AND. count/=0) THEN
+            error='INTERLAYER_PARAMETERS requires N_LAYERS=2'
             RETURN
         END IF
-        IF (n_layers/=2 .AND. legacy_count+canonical_count/=0) THEN
-            IF (legacy_count==1) THEN
-                error='INTERLAYER_EXCHANGE_PARAMETERS requires N_LAYERS=2'
-            ELSE
-                error='INTERLAYER_PARAMETERS requires N_LAYERS=2'
-            END IF
-            RETURN
-        END IF
-        IF (legacy_count==1) THEN
-            REWIND(input_unit)
-            READ(input_unit,NML=interlayer_exchange_parameters,IOSTAT=ios)
-            IF (ios/=0) THEN
-                error='Invalid INTERLAYER_EXCHANGE_PARAMETERS NAMELIST'
-                RETURN
-            END IF
-        ELSEIF (canonical_count==1) THEN
+        IF (count==1) THEN
             REWIND(input_unit)
             READ(input_unit,NML=interlayer_parameters,IOSTAT=ios)
             IF (ios/=0) THEN
@@ -225,13 +209,14 @@ CONTAINS
                 RETURN
             END IF
         END IF
+
         CALL validate_interlayer_exchange_configuration(interlayer_exchange,error)
         IF (LEN_TRIM(error)>0) RETURN
         CALL validate_interlayer_momentum_exchange_configuration(interlayer_momentum_exchange,error)
         IF (LEN_TRIM(error)>0) RETURN
         REWIND(input_unit,IOSTAT=ios)
         IF (ios/=0) error='Unable to rewind after interlayer NAMELIST'
-    END SUBROUTINE read_interlayer_exchange_parameters
+    END SUBROUTINE read_interlayer_parameters
 
     !> @brief Validate pair-wide co-lift parameters without enabling an unimplemented source.
     SUBROUTINE validate_interlayer_exchange_configuration(config,error)
@@ -343,10 +328,10 @@ CONTAINS
     END SUBROUTINE validate_interlayer_momentum_exchange_configuration
 
     !> @brief Write the unique canonical interlayer configuration for two-layer restarts.
-    SUBROUTINE write_interlayer_exchange_parameters(output_unit)
+    SUBROUTINE write_interlayer_parameters(output_unit)
         INTEGER, INTENT(IN) :: output_unit
         IF (n_layers==2) WRITE(output_unit,NML=interlayer_parameters)
-    END SUBROUTINE write_interlayer_exchange_parameters
+    END SUBROUTINE write_interlayer_parameters
 
     !> @brief Convert ASCII lowercase source-input text to uppercase.
     !> @param[in] text Input characters.

@@ -87,9 +87,9 @@ sollevano un errore fatale esplicito, come nei moduli storici di
 rifiuti in entrambe le build strict e optimized. Il NAMELIST canonico
 `INTERLAYER_PARAMETERS` include i due oggetti indipendenti
 `interlayer_mass_exchange` e `interlayer_momentum_exchange`, con metodi e
-gruppi Lie separati; `INTERLAYER_EXCHANGE_PARAMETERS` rimane un alias storico
-per il solo mass exchange e le due sintassi sono mutuamente esclusive.
-Il backup produce soltanto la forma canonica. Aggiungere nuove leggi soltanto quando
+gruppi Lie separati. `INTERLAYER_PARAMETERS` e' l'unica NAMELIST
+pair-wide: il parser e il backup usano esclusivamente questa forma.
+Non esiste un secondo input per il solo scambio di massa. Aggiungere nuove leggi soltanto quando
 servono, senza interfacce transitorie. Condividere i kernel fisici gia' esistenti se equivalenti,
 senza assimilare la deposizione nel substrato al trasferimento interlayer.
 

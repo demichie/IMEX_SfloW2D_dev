@@ -16,7 +16,7 @@ This document is the current audit, not a historical compatibility matrix.
 | Coupled physics | `interlayer_mass_exchange_2d` and `interlayer_momentum_exchange_2d` | Conserved gross transfers are limited jointly; drag remains a separate analytic process. |
 | Binary checkpoint and NetCDF | `inpout_2d` | One canonical binary format with a layer-count header; `q_layers` and `qp_layers` are the only NetCDF layer-state tensors. |
 
-The single-layer NAMELIST names without `_L1` are **intentional input design**, not obsolete interfaces. No compatibility with previously generated binary checkpoint or NetCDF schemas is required.
+The single-layer NAMELIST names without `_L1` are **intentional input design**, not obsolete interfaces. No compatibility with previously generated binary checkpoint or NetCDF schemas is required. `INTERLAYER_PARAMETERS` is the only pair-wide NAMELIST, covering mass exchange and momentum drag; the redundant input spelling and its parser branch have been removed.
 
 ## TL13a cleanup in this change
 
@@ -77,3 +77,14 @@ This is intentionally a *single-layer production driver* test plus a
 single-layer end-to-end validation are distinct. A production two-layer
 integration run is unavailable while the intentional layout gate is closed;
 scientific approval and TL13b remain separate.
+
+
+## Definitive interlayer input interface
+
+The canonical `source_input_2d::read_interlayer_parameters` and
+`write_interlayer_parameters` handle one pair-wide
+`INTERLAYER_PARAMETERS` NAMELIST that refers directly to the
+existing authoritative mass- and momentum-exchange configuration
+objects. The additional exchange-only NAMELIST and its conditional
+reader were removed; no shadow configuration or compatibility
+parser remains. Single-layer short NAMELISTs are intentionally retained.
