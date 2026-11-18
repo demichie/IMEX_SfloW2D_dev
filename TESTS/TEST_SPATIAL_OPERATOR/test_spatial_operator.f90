@@ -825,6 +825,10 @@ CONTAINS
         CALL registry%initialize(n_eqns,0,external_groups,error)
         IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid paired external/interlayer Lie registry'
         CALL workspace%initialize(registry)
+        ! External source groups refresh aggregate bed thickness even with
+        ! topographic evolution disabled. Use a physically valid fixture bed.
+        substrate%erodible_porosity=0.25_wp
+        substrate%T_ground=T_ambient
         mass_exchange_l1%deposition%settling_flag=.TRUE.
         mass_exchange_l2%deposition%settling_flag=.TRUE.
         CALL physics(1)%finalize()
