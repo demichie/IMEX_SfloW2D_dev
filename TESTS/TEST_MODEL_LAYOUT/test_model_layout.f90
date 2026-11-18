@@ -14,7 +14,7 @@ PROGRAM test_model_layout
 
   CALL assert_true('basic layout initialized', layout%is_initialized())
   CALL assert_true('basic counts', layout%n_layers == 1 .AND.               &
-       layout%n_vars == 6 .AND. layout%n_physical_variables == 6      &
+       layout%n_vars == 6      &
        .AND. layout%n_eqns == 6)
   CALL assert_true('solid range', layout%idx_solid_first == 5 .AND.         &
        layout%idx_solid_last == 5)

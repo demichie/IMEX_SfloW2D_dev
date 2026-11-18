@@ -45,7 +45,7 @@ PROGRAM test_state_initialization
   ! appended auxiliary velocities. In this four-variable fixture, h/u/v
   ! begin at zero and temperature alone starts at the ambient value.
   CALL assert_true('primitive state size', &
-       SIZE(state%qp(:,1,:,:),1) == model_layout%n_physical_variables)
+       SIZE(state%qp(:,1,:,:),1) == model_layout%n_vars)
   CALL assert_true('physical state', &
        ALL(state%qp(1:3,1,:,:) .EQ. 0.0_wp) .AND. &
        ALL(state%qp(model_layout%idx_T,1,:,:) .EQ. T_ambient))

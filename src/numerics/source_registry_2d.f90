@@ -32,8 +32,8 @@ MODULE source_registry_2d
     !> \brief Validated metadata owned and finalized by one simulation context.
     TYPE :: source_registry_type
     PRIVATE
-        INTEGER :: n_equations=0 !< Conservative layout size.
-        INTEGER :: pore_equation=0 !< Pore index, zero when absent.
+        INTEGER :: n_eqns=0 !< Conservative layout size.
+        INTEGER :: idx_poreEqn=0 !< Pore index, zero when absent.
         LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
         LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
         TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
@@ -52,13 +52,13 @@ CONTAINS
     !> @details Rejects inconsistent methods, duplicated identities and invalid
     !>          equation footprints; updates registry ownership on successful validation.
     !> @param[in,out] this Registry receiving validated group metadata.
-    !> @param[in] n_equations Number of conservative equations.
-    !> @param[in] pore_equation Pressure-of-pore equation index, zero when absent.
+    !> @param[in] n_eqns Number of conservative equations.
+    !> @param[in] idx_poreEqn Pressure-of-pore equation index, zero when absent.
     !> @param[in] groups Ordered source group candidates from input configuration.
     !> @param[out] error Validation diagnostic; empty on success.
-    SUBROUTINE initialize_lie_registry(this,n_equations,pore_equation,groups,error)
+    SUBROUTINE initialize_lie_registry(this,n_eqns,idx_poreEqn,groups,error)
         CLASS(source_registry_type), INTENT(INOUT) :: this
-        INTEGER, INTENT(IN) :: n_equations,pore_equation
+        INTEGER, INTENT(IN) :: n_eqns,idx_poreEqn
         TYPE(source_group_type), INTENT(IN) :: groups(:)
         CHARACTER(*), INTENT(OUT) :: error
         TYPE(source_term_type) :: term
@@ -71,10 +71,10 @@ CONTAINS
         rheology_count=0
         ALLOCATE(seen(0),seen_scope(0))
         error='D19: invalid Lie group configuration'
-        IF (n_equations<4 .OR. SIZE(groups)==0) RETURN
+        IF (n_eqns<4 .OR. SIZE(groups)==0) RETURN
 
-        IF (pore_equation/=0) THEN
-            IF (pore_equation<5 .OR. pore_equation>n_equations) RETURN
+        IF (idx_poreEqn/=0) THEN
+            IF (idx_poreEqn<5 .OR. idx_poreEqn>n_eqns) RETURN
 
         END IF
 
@@ -95,11 +95,11 @@ CONTAINS
             IF (.NOT.ALLOCATED(groups(i)%source_names)) RETURN
             IF (groups(i)%id/=0 .AND. SIZE(groups(i)%source_names)==0) RETURN
             IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
-            IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
+            IF (.NOT.valid_equations(groups(i)%equation_ids,n_eqns)) RETURN
 
             SELECT CASE(groups(i)%method)
             CASE(SOURCE_METHOD_EXPLICIT)
-                IF (SIZE(groups(i)%equation_ids)/=n_equations) RETURN
+                IF (SIZE(groups(i)%equation_ids)/=n_eqns) RETURN
             CASE(SOURCE_METHOD_NEWTON)
                 IF (SIZE(groups(i)%equation_ids)==0) RETURN
             CASE(SOURCE_METHOD_ANALYTIC)
@@ -194,8 +194,8 @@ CONTAINS
             IF (ANY((seen=='mass_exchange_vaporization') .AND. (seen_scope==layer)) .AND. &
                 .NOT.ANY((seen=='mass_exchange_deposition') .AND. (seen_scope==layer))) RETURN
         END DO
-        this%n_equations=n_equations
-        this%pore_equation=pore_equation
+        this%n_eqns=n_eqns
+        this%idx_poreEqn=idx_poreEqn
         this%lie_entries=groups
         ! Resolve source identities and capabilities once, outside all cell loops.
         DO i=1,SIZE(this%lie_entries)
@@ -274,7 +274,7 @@ CONTAINS
     SUBROUTINE finalize_registry(this)
         CLASS(source_registry_type), INTENT(INOUT) :: this
         IF (ALLOCATED(this%lie_entries)) DEALLOCATE(this%lie_entries)
-        this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
+        this%n_eqns=0; this%idx_poreEqn=0; this%initialized=.FALSE.
         this%implicit_sources_flag=.FALSE.
     END SUBROUTINE finalize_registry
 

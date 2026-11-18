@@ -24,8 +24,6 @@ MODULE model_layout_2d
         INTEGER :: n_layers = 0
         !> Number of conservative state components per cell.
         INTEGER :: n_vars = 0
-        !> Primitive state size including appended horizontal velocities.
-        INTEGER :: n_physical_variables = 0
         !> Number of conservative balance equations.
         INTEGER :: n_eqns = 0
 
@@ -124,7 +122,6 @@ CONTAINS
 
         this%n_layers = n_layers
         this%n_vars = n_vars
-        this%n_physical_variables = n_vars
         this%n_eqns = n_eqns
         this%n_solid = n_solid
         this%n_add_gas = n_add_gas
@@ -183,7 +180,6 @@ CONTAINS
 
         this%n_layers = 0
         this%n_vars = 0
-        this%n_physical_variables = 0
         this%n_eqns = 0
         this%n_solid = 0
         this%n_add_gas = 0
@@ -226,7 +222,6 @@ CONTAINS
             .AND. this%n_vars == 4 + this%n_solid                                                                 &
                     + this%n_add_gas + this%n_stoch_vars                                                        &
                     + this%n_pore_vars                                                                             &
-            .AND. this%n_physical_variables == this%n_vars                                                    &
             .AND. this%n_eqns == this%n_vars                                                                 &
             .AND. this%idx_totMassEqn == 1                                                                             &
             .AND. this%idx_uEqn == 2                                                                             &

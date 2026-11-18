@@ -92,7 +92,7 @@ CONTAINS
         ALLOCATE( this%hpos(comp_cells_x,comp_cells_y),                                                                &
             this%hpos_old(comp_cells_x,comp_cells_y) )
 
-        ALLOCATE( this%qp(model_layout%n_physical_variables,model_layout%n_layers,comp_cells_x,                     &
+        ALLOCATE( this%qp(model_layout%n_vars,model_layout%n_layers,comp_cells_x,                     &
             comp_cells_y) )
 
         ALLOCATE(this%deposit(comp_cells_x,comp_cells_y,n_solid))

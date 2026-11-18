@@ -99,3 +99,43 @@ and rejects interlayer input when only one layer is configured. The test
 uses temporary Fortran scratch units and restores both configuration
 objects, so it does not create a parallel configuration or modify other
 test inputs.
+
+
+## Canonical scientific naming audit (18 November 2026)
+
+The nomenclature migration is deliberately **semantic**, not a general
+case/style conversion. It updates the production Fortran owners, their
+REAL/COMPLEX consumers, shared `.inc` kernels and directly dependent tests.
+
+| Quantity | Sole current name | Ownership and distinction |
+| --- | --- | --- |
+| Reciprocal bulk mixture density | `inv_rho_m` | REAL/COMPLEX `physical_state` and mixture kernels; distinct from `inv_rho_c`. |
+| Pair-wide mass-exchange configuration | `interlayer_mass_exchange` | Owned by `interlayer_mass_exchange_parameters_2d`; directly referenced by `INTERLAYER_PARAMETERS`. No pointer alias is retained. |
+| Rheology configuration pointer | `layer_physics_type%rheology` | Non-owning reference to per-layer canonical rheology, parallel to the thermal/pore/mass references. |
+| Equation and transported-variable counts | `n_eqns`, `n_vars` | Shared by global index conventions, model layout and source registry. One `n_vars` sizes both `q` and `qp`; the redundant `n_physical_variables` was removed. |
+| Optional component counts | `n_add_gas`, `n_stoch_vars`, `n_pore_vars` | Layout metadata; no second spelling for those counts. |
+| Primitive temperature index | `model_layout%idx_T` | Explicitly initialized in the layout, independent of global-index initialization. |
+| Conservative energy equation index | `model_layout%idx_engyEqn` | Semantically distinct from primitive temperature even when both index values are four. |
+| Kernel flow depth and total solid fraction | `flow_depth`, `total_solid_fraction` | Erosion and deposition interfaces use names shared with their downstream mathematical kernels. |
+| Settling drag inputs | `particle_diameter`, `solid_density`, `carrier_density` | Identical physical meanings throughout the terminal-velocity kernel. |
+
+Further intentional distinctions:
+
+- `q` (conservative), `qp` (primitive) and their `trial`/`original`
+  stages are not interchangeable.
+- `idx_totMassEqn`, `idx_uEqn`, `idx_vEqn`, `idx_engyEqn`
+  describe conservative equations; `idx_h`, `idx_u`, `idx_v`,
+  `idx_T` describe primitive components. Equal integer values are not
+  synonymous physical quantities.
+- Horizontal speed, total speed and squared speed remain distinct.
+  The local letter `T` in cell-level physics represents temperature.
+- `r_h`, `rho_c`, `rhoc` and `config` outside the audited kernel
+  interfaces are not all proven synonyms. Further broad renaming would
+  require checking each procedure's units, scope, formulation and
+  keyword-argument callers; a superficial global replacement is unsafe.
+
+Verification for this nomenclature migration must be performed against
+its final branch SHA. Previously green CI and currently running workflows
+on preceding commits do **not** validate these edits. The scientific
+formulations, source ordering, input NAMELIST group names and production
+`N_LAYERS=2` gate are unchanged.
