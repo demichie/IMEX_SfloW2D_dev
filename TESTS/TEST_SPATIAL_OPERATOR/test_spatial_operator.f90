@@ -4,7 +4,7 @@ PROGRAM test_spatial_operator
   USE rheology_parameters_2d, ONLY : rheology_l1
   USE parameters_2d
   USE substrate_parameters_2d, ONLY : substrate
-  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_config_type
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
   USE constitutive_parameters_2d
   USE solid_transport_parameters_2d
@@ -24,7 +24,8 @@ PROGRAM test_spatial_operator
   USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient, eval_local_speeds_direction
   USE state_composition, ONLY : conservative_mass_admissible
   USE mass_injection_coefficients_2d, ONLY : injection_material_set_type, prepare_injection_materials
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_ID_GEOMETRY_CURVATURE, &
+      SOURCE_ID_EXCHANGE_DEPOSITION
   USE source_registry_2d, ONLY : source_group_type
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE source_registry_2d, ONLY : source_registry_type, &
@@ -404,12 +405,13 @@ CONTAINS
         TYPE(spatial_operator_type) :: operators(2)
         TYPE(time_integration_workspace_type) :: workspace
         TYPE(source_registry_type) :: registry
-        TYPE(source_group_type) :: groups(4)
+        TYPE(source_group_type) :: groups(4),external_groups(6)
         TYPE(layer_physics_type) :: physics(2)
         TYPE(state_type) :: coupled_state
         TYPE(stochastic_workspace_type) :: stochastic
         TYPE(interlayer_momentum_exchange_config_type) :: old_drag
         TYPE(interlayer_mass_exchange_config_type) :: old_mass
+        TYPE(mass_exchange_config_type) :: old_external_l1,old_external_l2
         TYPE(physical_state_real) :: reference_physical(4)
         REAL(wp) :: base_q(n_vars,2,nx,ny),base_qp(n_vars,2,nx,ny)
         REAL(wp) :: expected_q(n_vars,2),expected_qp(n_vars,2)
@@ -418,7 +420,7 @@ CONTAINS
         REAL(wp) :: pt1(n_vars,nx,ny),pt2(n_vars,nx,ny)
         REAL(wp) :: bound1,bound2,dt_step,momentum_difference,drag_difference,scale
         REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
-        REAL(wp) :: curvature_rate(n_eqns),curvature_effect
+        REAL(wp) :: curvature_rate(n_eqns),curvature_effect,solid_budget,expected_deposition
         INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status
         LOGICAL :: created_zone,created_arc,created_diam,accepted
         REAL(wp), ALLOCATABLE :: original_diam(:)
@@ -428,6 +430,8 @@ CONTAINS
         n_layers=2
         old_drag=interlayer_momentum_exchange
         old_mass=interlayer_exchange
+        old_external_l1=mass_exchange_l1
+        old_external_l2=mass_exchange_l2
         DO l=1,4
             CALL initialize_physical_state_real(reference_physical(l))
         END DO
@@ -785,6 +789,127 @@ CONTAINS
                 WRITE(integrated_unit) coupled_state%q,coupled_state%qp
             END DO
         END DO
+        ! Integrate external deposition and internal exchange in the same
+        ! cell-outer timestep. The shared terrain inventory receives deposits
+        ! only from the exposed layer; the paired transfer conserves solids.
+        CALL workspace%finalize()
+        CALL registry%finalize()
+        groups(3)%id=4
+        interlayer_exchange%group=4
+        external_groups(1:2)=groups(1:2)
+        external_groups(3)=groups(1)
+        external_groups(3)%id=4
+        external_groups(3)%source_names=[CHARACTER(LEN=64)::'mass_exchange_deposition']
+        external_groups(3)%source_mask=IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1)
+        external_groups(4)=external_groups(3)
+        external_groups(4)%scope=SOURCE_SCOPE_L2
+        external_groups(5)=groups(3)
+        external_groups(6)=groups(4)
+        CALL registry%initialize(n_eqns,0,external_groups,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid paired external/interlayer Lie registry'
+        CALL workspace%initialize(registry)
+        mass_exchange_l1%deposition%settling_flag=.TRUE.
+        mass_exchange_l2%deposition%settling_flag=.TRUE.
+        CALL physics(1)%finalize()
+        CALL physics(2)%finalize()
+        CALL physics(1)%initialize(.FALSE.,rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L1 deposition Lie physics'
+        CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
+        IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L2 deposition Lie physics'
+        interlayer_exchange%settling_flag=.TRUE.
+        interlayer_exchange%elutriation_flag=.TRUE.
+        interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
+
+        DO scenario=1,4
+            before_q=0.0_wp
+            before_qp=0.0_wp
+            before_qp(idx_T,:,:,:)=T_ambient
+            DO k=5,ny-4
+                DO j=5,nx-4
+                    DO layer=1,2
+                        IF (scenario==4) CYCLE
+                        IF (scenario==2 .AND. layer==2) CYCLE
+                        IF (scenario==3 .AND. layer==1) CYCLE
+                        primitive=0.0_wp
+                        primitive(idx_T)=T_ambient
+                        primitive(idx_h)=0.5_wp
+                        primitive(idx_u)=2.0_wp
+                        primitive(idx_solid_first)=0.10_wp
+                        CALL primitive_to_conservative(primitive,before_q(:,layer,j,k),accepted=accepted)
+                        IF (.NOT.accepted) ERROR STOP 'Invalid external exchange fixture state'
+                        before_qp(:,layer,j,k)=primitive
+                    END DO
+                END DO
+            END DO
+            pt1=before_qp(:,1,:,:)
+            pt2=before_qp(:,2,:,:)
+            CALL operators(1)%compute_timestep(before_q(:,1,:,:),pt1,0.0_wp,bound1,paired)
+            CALL operators(2)%compute_timestep(before_q(:,2,:,:),pt2,0.0_wp,bound2,paired, &
+                lower_operator=operators(1),h_lower=pt1(idx_h,:,:))
+            dt_step=MIN(1.0E-5_wp,0.01_wp*MIN(dt_bound,bound1,bound2))
+            IF (dt_step<=0.0_wp) ERROR STOP 'Invalid external exchange timestep'
+            before_qp(:,1,:,:)=pt1
+            before_qp(:,2,:,:)=pt2
+
+            ! Rebuild the same cell workset and source schedule with the
+            ! deposition closures temporarily disabled, as a paired reference.
+            mass_exchange_l1%deposition%settling_flag=.FALSE.
+            mass_exchange_l2%deposition%settling_flag=.FALSE.
+            CALL physics(1)%finalize()
+            CALL physics(2)%finalize()
+            CALL physics(1)%initialize(.FALSE.,rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,error)
+            IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L1 reference exchange physics'
+            CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
+            IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L2 reference exchange physics'
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            coupled_state%deposit=0.0_wp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            base_q=coupled_state%q
+
+            mass_exchange_l1%deposition%settling_flag=.TRUE.
+            mass_exchange_l2%deposition%settling_flag=.TRUE.
+            CALL physics(1)%finalize()
+            CALL physics(2)%finalize()
+            CALL physics(1)%initialize(.FALSE.,rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1,error)
+            IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid active L1 exchange physics'
+            CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
+            IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid active L2 exchange physics'
+            coupled_state%q=before_q
+            coupled_state%qp=before_qp
+            coupled_state%deposit=0.0_wp
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+
+            expected_deposition=SUM(coupled_state%deposit(:,:,1))
+            IF (scenario==4) THEN
+                IF (expected_deposition/=0.0_wp) &
+                    ERROR STOP 'Dry paired column deposited solids'
+            ELSE
+                IF (expected_deposition<=0.0_wp) &
+                    ERROR STOP 'Exposed layer did not deposit into shared substrate'
+            END IF
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                solid_budget=SUM(coupled_state%q(idx_solidEqn_first,:,j,k) &
+                    -base_q(idx_solidEqn_first,:,j,k)) &
+                    +rho_s(1)*coupled_state%deposit(j,k,1)
+                scale=MAX(1.0_wp,SUM(ABS(base_q(idx_solidEqn_first,:,j,k))))
+                IF (ABS(solid_budget)>1.0E-9_wp*scale) &
+                    ERROR STOP 'External deposition and interlayer exchange do not conserve paired solids'
+                DO layer=1,2
+                    IF (.NOT.conservative_mass_admissible(coupled_state%q(:,layer,j,k))) &
+                        ERROR STOP 'Paired external exchange produced inadmissible state'
+                END DO
+            END DO
+            WRITE(integrated_unit) coupled_state%q,coupled_state%qp,coupled_state%deposit
+        END DO
+        mass_exchange_l1=old_external_l1
+        mass_exchange_l2=old_external_l2
         IF (created_diam) THEN
             DEALLOCATE(diam_s)
         ELSE
