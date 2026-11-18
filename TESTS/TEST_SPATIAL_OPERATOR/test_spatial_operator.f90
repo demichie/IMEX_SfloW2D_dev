@@ -3305,16 +3305,21 @@ CONTAINS
     noise(2)%rng_state=0
     clock%t=0.0_wp
     CALL read_restart_file('two_layer_io.bin',clock,noise,states,io_domain)
+    WRITE(*,'(A)') 'CHECK: verifying binary checkpoint payload'
     IF (ANY(states%q/=original_q)) ERROR STOP 'L1/L2 conservative restart round-trip mismatch'
     IF (ANY(B_vertex/=original_b)) ERROR STOP 'Shared bed checkpoint round-trip mismatch'
     IF (ANY(noise(2)%Z/=0.125_wp)) ERROR STOP 'L2 OU checkpoint mismatch'
     IF (ANY(noise(2)%rng_state/=old_rng)) ERROR STOP 'Independent L2 RNG checkpoint mismatch'
     IF (clock%t/=3.25_wp .OR. clock%dt_old_old/=0.007_wp) &
         ERROR STOP 'Two-layer timestep history checkpoint mismatch'
+    WRITE(*,'(A)') 'PASS: binary L1/L2 state, bed, OU RNG and timestep history'
 
+    WRITE(*,'(A)') 'CHECK: initializing canonical NetCDF output'
     CALL init_netcdf_output()
+    WRITE(*,'(A)') 'CHECK: writing canonical NetCDF output'
     CALL write_netcdf_timestep(clock%t,states)
     CALL close_netcdf()
+    WRITE(*,'(A)') 'CHECK: reopening canonical NetCDF output'
     ios=nf90_open(output_file_path('fields',TRIM(run_name)//'.nc'),NF90_NOWRITE,netcdf_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot open two-layer NetCDF'
     ALLOCATE(stored_q(n_vars,2,nx,ny,1),stored_qp(n_vars,2,nx,ny,1))
