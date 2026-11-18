@@ -42,6 +42,7 @@ gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
     "$repo_dir/src/core/parameters_2d.f90" \
     "$repo_dir/src/physics/mass_exchange/mass_exchange_parameters_2d.f90" \
     "$repo_dir/src/physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.f90" \
+    "$repo_dir/src/core/diagnostics_2d.f90" \
     "$repo_dir/src/physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.f90" \
     "$repo_dir/src/physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.f90" \
     "$repo_dir/src/numerics/source_input_2d.f90" \

@@ -679,3 +679,10 @@ physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT): core/pa
 physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT): \
     core/parameters_2d.$(OBJEXT) \
     physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT)
+
+# Interlayer unsupported-method interfaces call diagnostics_2d%fatal_error.
+physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
