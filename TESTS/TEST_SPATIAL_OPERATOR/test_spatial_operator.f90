@@ -424,6 +424,7 @@ CONTAINS
         REAL(wp) :: curvature_rate(n_eqns),curvature_effect,solid_budget,expected_deposition
         INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status
         LOGICAL :: created_zone,created_arc,created_diam,created_erodible_fraction,accepted
+        LOGICAL :: created_source_fraction,created_fissure_fraction,created_arc_normals
         REAL(wp), ALLOCATABLE :: original_diam(:),original_erodible_fraction(:)
         CHARACTER(LEN=256) :: error
 
@@ -479,6 +480,20 @@ CONTAINS
         created_arc=.NOT.ALLOCATED(cell_arc_perim)
         IF (created_arc) ALLOCATE(cell_arc_perim(nx,ny))
         cell_arc_perim=0.0_wp
+        ! The full source executor consumes these geometry inputs even when
+        ! the configured external process has no injection or fissure source.
+        created_source_fraction=.NOT.ALLOCATED(cell_source_fractions)
+        IF (created_source_fraction) ALLOCATE(cell_source_fractions(nx,ny))
+        cell_source_fractions=0.0_wp
+        created_fissure_fraction=.NOT.ALLOCATED(cell_fissure_fractions)
+        IF (created_fissure_fraction) ALLOCATE(cell_fissure_fractions(nx,ny,n_fissures))
+        cell_fissure_fractions=0.0_wp
+        created_arc_normals=.NOT.ALLOCATED(cell_arc_n_x)
+        IF (created_arc_normals) THEN
+            ALLOCATE(cell_arc_n_x(nx,ny),cell_arc_n_y(nx,ny))
+        END IF
+        cell_arc_n_x=0.0_wp
+        cell_arc_n_y=0.0_wp
 
         ! The existing single-layer OU field is merely a zero-valued input;
         ! no stochastic source is active in either layer in this fixture.
@@ -1054,6 +1069,9 @@ CONTAINS
         CALL physics(2)%finalize()
         IF (created_zone) DEALLOCATE(B_zone)
         IF (created_arc) DEALLOCATE(cell_arc_perim)
+        IF (created_source_fraction) DEALLOCATE(cell_source_fractions)
+        IF (created_fissure_fraction) DEALLOCATE(cell_fissure_fractions)
+        IF (created_arc_normals) DEALLOCATE(cell_arc_n_x,cell_arc_n_y)
         interlayer_momentum_exchange=old_drag
         interlayer_exchange=old_mass
         n_layers=original_layers
