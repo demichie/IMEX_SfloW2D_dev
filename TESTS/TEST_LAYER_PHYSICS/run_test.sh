@@ -37,8 +37,9 @@ gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
     "$test_dir/test_solid_transport_namelist.f90" -o test_solid_transport_namelist
 ./test_solid_transport_namelist
 
-# The short and explicit L1 forms write the same canonical mass-exchange object.
-gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+# The interlayer modules use diagnostics_2d, whose fatal_error needs the OpenMP runtime.
+# Link the isolated NAMELIST fixture with the same OpenMP support as production.
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace -fopenmp \
     "$repo_dir/src/core/parameters_2d.f90" \
     "$repo_dir/src/physics/mass_exchange/mass_exchange_parameters_2d.f90" \
     "$repo_dir/src/physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.f90" \
