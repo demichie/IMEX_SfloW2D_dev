@@ -242,9 +242,22 @@ accoppiato tra OpenMP 1 e 4 thread. La regressione include ora anche
 settling ed elutriazione sul timestep effettivo: il confronto con le
 sorgenti disattivate verifica il bilancio di tutte le equazioni
 conservative e il cold-start di L1 e L2, senza duplicare l'integratore.
-La prova non abilita `N_LAYERS=2` e resta da verificare in CI.
-Restano aperti i test completi del gruppo 0 interlayer, sorgenti di
-terreno, variabili opzionali e restart.
+La regressione copre ora anche le due schedulazioni dello scambio
+interlayer, nel gruppo 0 e in un gruppo successivo. Per ogni scenario
+wet/dry confronta il candidato accettato dal timestep con la
+transazione fisica cell-local, applicata a q* e valutata su q^n
+soltanto per il gruppo 0. Un caso wet/wet combina poi mass exchange
+del gruppo 0 e drag analitico nel gruppo successivo, verificandone
+l'ordine e la conservazione. I payload di questi passi rientrano nel
+confronto bitwise OpenMP 1/4 thread. La prova resta da verificare in CI.
+
+Il contratto attuale rimane di errore fatale senza retry: q/qp vengono
+pubblicati solo dopo la riuscita del Lie globale, ma il substrato puo'
+essere aggiornato per cella durante il sweep. Non dichiarare un rollback
+globale recuperabile del substrato senza una migrazione coerente della
+transazione. Restano aperte l'integrazione con sorgenti di terreno,
+variabili opzionali, BC e restart. Il gate produttivo `N_LAYERS=2`
+rimane chiuso.
 
 **Sequenza:** completare TL06/TL07 e la fisica TL08–TL11,
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
