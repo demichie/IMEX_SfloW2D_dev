@@ -88,7 +88,6 @@ CONTAINS
     SUBROUTINE initialize_lie_source_executor(executor,source_registry)
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON
         USE substrate_parameters_2d, ONLY : substrate
-        USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         TYPE(source_registry_type), INTENT(IN) :: source_registry
         INTEGER :: group_index,env_status,parse_status,ncells,source_id
@@ -118,13 +117,6 @@ CONTAINS
             CASE DEFAULT
                 CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
             END SELECT
-            IF (ANY(executor%groups(group_index)%source_names=='pore_pressure_dissipation')                            &
-                .OR. ANY(executor%groups(group_index)%source_names=='pore_pressure_darcy')) THEN
-                IF (TRIM(ADJUSTL(pore_pressure_l1%f_inhibit_mode))=='STATIC' .OR. &
-                    TRIM(ADJUSTL(pore_pressure_l1%f_inhibit_mode))=='DYNAMIC') THEN
-                    IF (pore_pressure_l1%N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
-                END IF
-            END IF
             ! Resolved catalogue IDs 18:23 are all mass-exchange processes.
             executor%exchange_group(group_index)=                                                                      &
                 IAND(executor%groups(group_index)%source_mask,                                                        &
@@ -345,6 +337,25 @@ CONTAINS
         source_time=0.0_wp
         IF (PRESENT(step_start_time)) source_time=step_start_time
         IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
+        ! Validate Darcy inhibition against the configuration of the group's
+        ! actual layer; no global L1 physics may be used for an L2 group.
+        DO group_index=1,SIZE(executor%groups)
+            IF (.NOT.ANY(executor%groups(group_index)%source_names=='pore_pressure_dissipation') .AND. &
+                .NOT.ANY(executor%groups(group_index)%source_names=='pore_pressure_darcy')) CYCLE
+            SELECT CASE(executor%groups(group_index)%scope)
+            CASE(SOURCE_SCOPE_L1)
+                layer=1
+            CASE(SOURCE_SCOPE_L2)
+                layer=2
+            CASE DEFAULT
+                CALL fatal_error('Darcy source requires a layer-specific Lie scope')
+            END SELECT
+            IF (layer>SIZE(pore_pressure)) CALL fatal_error('Missing Darcy configuration for Lie layer')
+            IF (TRIM(ADJUSTL(pore_pressure(layer)%f_inhibit_mode))=='STATIC' .OR. &
+                TRIM(ADJUSTL(pore_pressure(layer)%f_inhibit_mode))=='DYNAMIC') THEN
+                IF (pore_pressure(layer)%N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
+            END IF
+        END DO
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tick,clock_rate)
             DO group_index=1,SIZE(executor%groups)
