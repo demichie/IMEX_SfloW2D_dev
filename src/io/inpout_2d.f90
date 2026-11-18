@@ -1194,7 +1194,7 @@
         LOGICAL :: composition_by_volume
         REAL(wp) :: alphas_given(100), alphag_given(100)
         REAL(wp) :: alphas_fissure(100)
-        REAL(wp) :: rho_m_fissure, inv_rhom_fissure, rho_c_fissure, xc_fissure
+        REAL(wp) :: rho_m_fissure, inv_rho_m_fissure, rho_c_fissure, xc_fissure
         REAL(wp) :: sp_heat_c_fissure, sp_heat_mix_fissure
         REAL(wp) :: Ri
         REAL(wp) :: sp_heat_c, sp_heat_mix
@@ -4710,7 +4710,7 @@
                             ! INOUT
                             alphas_fissure(1:n_solid),                                                                 &
                             ! OUT
-                            rho_m_fissure, inv_rhom_fissure, rho_c_fissure,                                            &
+                            rho_m_fissure, inv_rho_m_fissure, rho_c_fissure,                                           &
                             xs_fissures(:, i), xg_fissures(:, i),                                                      &
                             xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
 

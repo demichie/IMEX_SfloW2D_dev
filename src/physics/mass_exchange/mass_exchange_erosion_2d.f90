@@ -107,11 +107,11 @@ CONTAINS
             CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_erosion_analytic
 
-        !> @brief Compute erosion volumes under the finite erodible_inventory-bed inventory constraint.
+        !> @brief Compute erosion volumes under the finite erodible-bed inventory constraint.
         !> @param[in] flow_depth Mobile flow thickness [m].
         !> @param[in] speed Slope-corrected flow speed [m/s].
         !> @param[in] total_solid_fraction Total solid volume fraction.
-        !> @param[in] erodible_inventory Available erodible_inventory solid inventory by species [m].
+        !> @param[in] erodible_inventory Available erodible solid inventory by species [m].
         !> @param[in] time_step Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
         !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].

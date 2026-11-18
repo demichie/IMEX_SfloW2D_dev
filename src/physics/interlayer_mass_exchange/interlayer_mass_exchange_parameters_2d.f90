@@ -4,7 +4,7 @@ MODULE interlayer_mass_exchange_parameters_2d
     USE parameters_2d, ONLY : wp
     IMPLICIT NONE
     PRIVATE
-    PUBLIC :: interlayer_mass_exchange_config_type, interlayer_exchange
+    PUBLIC :: interlayer_mass_exchange_config_type, interlayer_mass_exchange
 
     TYPE :: interlayer_mass_exchange_config_type
         LOGICAL :: settling_flag=.FALSE.                 !< Transfer solids from L2 to L1.
@@ -30,5 +30,5 @@ MODULE interlayer_mass_exchange_parameters_2d
         INTEGER :: group=4                              !< Paired mass-transfer Lie group.
     END TYPE interlayer_mass_exchange_config_type
 
-    TYPE(interlayer_mass_exchange_config_type), TARGET :: interlayer_exchange
+    TYPE(interlayer_mass_exchange_config_type), TARGET :: interlayer_mass_exchange
 END MODULE interlayer_mass_exchange_parameters_2d

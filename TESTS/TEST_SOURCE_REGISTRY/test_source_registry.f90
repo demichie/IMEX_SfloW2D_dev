@@ -10,7 +10,7 @@ PROGRAM test_source_registry
   USE source_input_2d
   USE parameters_2d
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
-  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange,interlayer_mass_exchange_config_type
+  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange,interlayer_mass_exchange_config_type
   USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
        interlayer_momentum_exchange_config_type
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
@@ -263,9 +263,9 @@ PROGRAM test_source_registry
   CALL require(ANY(groups%scope==SOURCE_SCOPE_L2 .AND. groups%id==3), &
        'L2 Darcy source configured at its own group')
   CALL registry%finalize()
-  interlayer_exchange%elutriation_flag=.TRUE.
-  interlayer_exchange%method='EXPLICIT'
-  interlayer_exchange%group=4
+  interlayer_mass_exchange%elutriation_flag=.TRUE.
+  interlayer_mass_exchange%method='EXPLICIT'
+  interlayer_mass_exchange%group=4
   CALL initialize_configured_sources(registry,error, &
        rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
        rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
@@ -300,7 +300,7 @@ PROGRAM test_source_registry
   CALL require(.NOT.registry%is_initialized(),'conflicting groups leave no registry')
   interlayer_momentum_exchange%group=5
   interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
-  interlayer_exchange%elutriation_flag=.FALSE.
+  interlayer_mass_exchange%elutriation_flag=.FALSE.
   CALL initialize_configured_sources(registry,error, &
        rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
        rheology_l2=rheology_l2)
@@ -318,10 +318,10 @@ CONTAINS
     CHARACTER(LEN=256) :: line
 
     saved_layers=n_layers
-    saved_mass=interlayer_exchange
+    saved_mass=interlayer_mass_exchange
     saved_drag=interlayer_momentum_exchange
     n_layers=2
-    interlayer_exchange=interlayer_mass_exchange_config_type()
+    interlayer_mass_exchange=interlayer_mass_exchange_config_type()
     interlayer_momentum_exchange=interlayer_momentum_exchange_config_type()
 
     OPEN(NEWUNIT=unit,STATUS='SCRATCH',FORM='FORMATTED')
@@ -333,7 +333,7 @@ CONTAINS
     REWIND(unit)
     CALL read_interlayer_parameters(unit,input_error)
     CALL require(LEN_TRIM(input_error)==0,'canonical interlayer input: '//TRIM(input_error))
-    CALL require(interlayer_exchange%group==3,'interlayer mass group read from canonical pair')
+    CALL require(interlayer_mass_exchange%group==3,'interlayer mass group read from canonical pair')
     CALL require(interlayer_momentum_exchange%group==7,'interlayer drag group read independently')
     CALL require(interlayer_momentum_exchange%chezy_drag_coeff==0.125_wp, &
          'interlayer Chezy coefficient read from canonical pair')
@@ -366,7 +366,7 @@ CONTAINS
     CLOSE(unit)
 
     n_layers=saved_layers
-    interlayer_exchange=saved_mass
+    interlayer_mass_exchange=saved_mass
     interlayer_momentum_exchange=saved_drag
   END SUBROUTINE check_interlayer_input
 

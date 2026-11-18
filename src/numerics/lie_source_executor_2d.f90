@@ -11,7 +11,7 @@ MODULE lie_source_executor_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
     USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
         apply_interlayer_momentum_exchange_analytic
@@ -527,7 +527,7 @@ CONTAINS
                             cell_error=17
                             EXIT group_loop
                         END IF
-                        CALL apply_interlayer_lie_group(interlayer_exchange,rheology(2),mass_config(2), &
+                        CALL apply_interlayer_lie_group(interlayer_mass_exchange,rheology(2),mass_config(2), &
                             qp_original(:,1:2,j,k),executor%groups(group_index)%id==0,time_step, &
                             q_layers(:,1:2),qp_layers(:,1:2), &
                             executor%interlayer_physical_scratch(:,tid),cell_error)

@@ -36,7 +36,7 @@ PROGRAM test_spatial_operator
   USE rheology_parameters_2d, ONLY : rheology_l2
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l2
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l2,pore_pressure_cache_l1,pore_pressure_cache_l2
-  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange,interlayer_mass_exchange_config_type
+  USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange,interlayer_mass_exchange_config_type
   USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
   USE state_types, ONLY : physical_state_real,initialize_physical_state_real
   USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
@@ -441,7 +441,7 @@ CONTAINS
         original_layers=n_layers
         n_layers=2
         old_drag=interlayer_momentum_exchange
-        old_mass=interlayer_exchange
+        old_mass=interlayer_mass_exchange
         old_external_l1=mass_exchange_l1
         old_external_l2=mass_exchange_l2
         old_substrate=substrate
@@ -523,8 +523,8 @@ CONTAINS
         CALL operators(2)%prepare_hp_workset(paired)
         CALL workspace%initialize(registry)
         ! The drag-only reference must remain a no-op for mass transfer.
-        interlayer_exchange%settling_flag=.FALSE.
-        interlayer_exchange%elutriation_flag=.FALSE.
+        interlayer_mass_exchange%settling_flag=.FALSE.
+        interlayer_mass_exchange%elutriation_flag=.FALSE.
         interlayer_momentum_exchange%model='CHEZY'
         interlayer_momentum_exchange%method='ANALYTIC'
         interlayer_momentum_exchange%group=5
@@ -618,8 +618,8 @@ CONTAINS
             before_qp(:,1,:,:)=pt1
             before_qp(:,2,:,:)=pt2
             interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
-            interlayer_exchange%settling_flag=.FALSE.
-            interlayer_exchange%elutriation_flag=.FALSE.
+            interlayer_mass_exchange%settling_flag=.FALSE.
+            interlayer_mass_exchange%elutriation_flag=.FALSE.
             coupled_state%q=before_q
             coupled_state%qp=before_qp
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
@@ -692,13 +692,13 @@ CONTAINS
         vonK_before=vonK
         kin_visc_c=1.0E-6_wp
         vonK=0.41_wp
-        interlayer_exchange%method='EXPLICIT'
-        interlayer_exchange%group=4
-        interlayer_exchange%elutriation_solid_volume_fraction=0.20_wp
-        interlayer_exchange%elutriation_carrier_mode='LIMIT_SOLIDS'
-        interlayer_exchange%elutriation_law='LINEAR_USTAR'
-        interlayer_exchange%rouse_critical=100.0_wp
-        interlayer_exchange%elutriation_efficiency=0.1_wp
+        interlayer_mass_exchange%method='EXPLICIT'
+        interlayer_mass_exchange%group=4
+        interlayer_mass_exchange%elutriation_solid_volume_fraction=0.20_wp
+        interlayer_mass_exchange%elutriation_carrier_mode='LIMIT_SOLIDS'
+        interlayer_mass_exchange%elutriation_law='LINEAR_USTAR'
+        interlayer_mass_exchange%rouse_critical=100.0_wp
+        interlayer_mass_exchange%elutriation_efficiency=0.1_wp
         interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
 
         ! First run a later Lie mass group, then the same physical fixture
@@ -709,7 +709,7 @@ CONTAINS
                 CALL workspace%finalize()
                 CALL registry%finalize()
                 groups(3)%id=0
-                interlayer_exchange%group=0
+                interlayer_mass_exchange%group=0
                 CALL registry%initialize(n_eqns,0,groups,error)
                 IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid interlayer group-zero registry'
                 CALL workspace%initialize(registry)
@@ -750,8 +750,8 @@ CONTAINS
                 before_qp(:,1,:,:)=pt1
                 before_qp(:,2,:,:)=pt2
 
-                interlayer_exchange%settling_flag=.FALSE.
-                interlayer_exchange%elutriation_flag=.FALSE.
+                interlayer_mass_exchange%settling_flag=.FALSE.
+                interlayer_mass_exchange%elutriation_flag=.FALSE.
                 interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
                 coupled_state%q=before_q
                 coupled_state%qp=before_qp
@@ -761,8 +761,8 @@ CONTAINS
                 base_q=coupled_state%q
                 base_qp=coupled_state%qp
 
-                interlayer_exchange%settling_flag=.TRUE.
-                interlayer_exchange%elutriation_flag=.TRUE.
+                interlayer_mass_exchange%settling_flag=.TRUE.
+                interlayer_mass_exchange%elutriation_flag=.TRUE.
                 ! In group-zero mode, the wet/wet scenario also verifies that
                 ! analytic drag follows the paired mass transfer in Lie order.
                 interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
@@ -779,7 +779,7 @@ CONTAINS
                     k=paired%k_cent(l)
                     expected_q=base_q(:,:,j,k)
                     expected_qp=base_qp(:,:,j,k)
-                    CALL apply_interlayer_lie_group(interlayer_exchange,rheology_l2,mass_exchange_l2, &
+                    CALL apply_interlayer_lie_group(interlayer_mass_exchange,rheology_l2,mass_exchange_l2, &
                         before_qp(:,:,j,k),group_mode==2,dt_step,expected_q,expected_qp, &
                         reference_physical,source_status)
                     IF (source_status/=0) ERROR STOP 'Rejected reference interlayer Lie transaction'
@@ -825,7 +825,7 @@ CONTAINS
         CALL workspace%finalize()
         CALL registry%finalize()
         groups(3)%id=4
-        interlayer_exchange%group=4
+        interlayer_mass_exchange%group=4
         external_groups(1:2)=groups(1:2)
         external_groups(3)=groups(1)
         external_groups(3)%id=4
@@ -850,8 +850,8 @@ CONTAINS
         IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L1 deposition Lie physics'
         CALL physics(2)%initialize(.FALSE.,rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2,error)
         IF (LEN_TRIM(error)>0) ERROR STOP 'Invalid L2 deposition Lie physics'
-        interlayer_exchange%settling_flag=.TRUE.
-        interlayer_exchange%elutriation_flag=.TRUE.
+        interlayer_mass_exchange%settling_flag=.TRUE.
+        interlayer_mass_exchange%elutriation_flag=.TRUE.
         interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
 
         DO scenario=1,4
@@ -1090,7 +1090,7 @@ CONTAINS
         IF (created_fissure_fraction) DEALLOCATE(cell_fissure_fractions)
         IF (created_arc_normals) DEALLOCATE(cell_arc_n_x,cell_arc_n_y)
         interlayer_momentum_exchange=old_drag
-        interlayer_exchange=old_mass
+        interlayer_mass_exchange=old_mass
         n_layers=original_layers
         WRITE(*,*) 'PASS: coupled spatial-Lie-commit, interlayer group 0/later, ordered drag, wet/dry'
     END SUBROUTINE check_integrated_coupled_lie_timestep

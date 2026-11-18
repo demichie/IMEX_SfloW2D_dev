@@ -4,7 +4,7 @@
 MODULE source_input_2d
     USE parameters_2d, ONLY : wp, n_layers
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type, mass_exchange_l1, mass_exchange_l2
-    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_exchange
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_mass_exchange
     USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange_config_type, &
         interlayer_momentum_exchange
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -25,7 +25,6 @@ MODULE source_input_2d
     NAMELIST /mass_exchange_l1_parameters/ mass_exchange_l1
     NAMELIST /mass_exchange_l2_parameters/ mass_exchange_l2
     ! The pair-wide NAMELIST references the authoritative interlayer objects.
-    TYPE(interlayer_mass_exchange_config_type), POINTER :: interlayer_mass_exchange => interlayer_exchange
     NAMELIST /interlayer_parameters/ interlayer_mass_exchange,interlayer_momentum_exchange
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
     PUBLIC :: read_interlayer_parameters, write_interlayer_parameters
@@ -210,7 +209,7 @@ CONTAINS
             END IF
         END IF
 
-        CALL validate_interlayer_exchange_configuration(interlayer_exchange,error)
+        CALL validate_interlayer_exchange_configuration(interlayer_mass_exchange,error)
         IF (LEN_TRIM(error)>0) RETURN
         CALL validate_interlayer_momentum_exchange_configuration(interlayer_momentum_exchange,error)
         IF (LEN_TRIM(error)>0) RETURN
@@ -320,8 +319,8 @@ CONTAINS
             RETURN
         END IF
         IF (config%chezy_drag_coeff>0.0_wp .AND. &
-            config%group==interlayer_exchange%group .AND. &
-            (interlayer_exchange%settling_flag .OR. interlayer_exchange%elutriation_flag)) THEN
+            config%group==interlayer_mass_exchange%group .AND. &
+            (interlayer_mass_exchange%settling_flag .OR. interlayer_mass_exchange%elutriation_flag)) THEN
             error='Interlayer mass and momentum exchange require different Lie groups'
             RETURN
         END IF

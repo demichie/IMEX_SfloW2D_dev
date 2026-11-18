@@ -18,7 +18,7 @@ MODULE source_configuration_2d
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
-    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_exchange
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange
     USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange
     IMPLICIT NONE
     PRIVATE
@@ -325,13 +325,13 @@ CONTAINS
         END DO
         ! One shared mass-transfer group owns both directions and their carrier
         ! budget; distinct physical laws never become separate Lie transactions.
-        IF (last_layer==2 .AND. (interlayer_exchange%settling_flag .OR. &
-            interlayer_exchange%elutriation_flag)) THEN
-            IF (interlayer_exchange%method/='EXPLICIT' .OR. interlayer_exchange%group<0) THEN
+        IF (last_layer==2 .AND. (interlayer_mass_exchange%settling_flag .OR. &
+            interlayer_mass_exchange%elutriation_flag)) THEN
+            IF (interlayer_mass_exchange%method/='EXPLICIT' .OR. interlayer_mass_exchange%group<0) THEN
                 error='TL07: interlayer mass exchange requires an EXPLICIT Lie group'
                 RETURN
             END IF
-            g%id=interlayer_exchange%group
+            g%id=interlayer_mass_exchange%group
             g%scope=SOURCE_SCOPE_INTERLAYER
             g%method=SOURCE_METHOD_EXPLICIT
             g%source_names=[CHARACTER(LEN=64)::'interlayer_mass_exchange']
@@ -348,8 +348,8 @@ CONTAINS
                 error='TL09: interlayer Chezy drag requires a positive ANALYTIC group'
                 RETURN
             END IF
-            IF ((interlayer_exchange%settling_flag .OR. interlayer_exchange%elutriation_flag) .AND. &
-                interlayer_momentum_exchange%group==interlayer_exchange%group) THEN
+            IF ((interlayer_mass_exchange%settling_flag .OR. interlayer_mass_exchange%elutriation_flag) .AND. &
+                interlayer_momentum_exchange%group==interlayer_mass_exchange%group) THEN
                 error='TL09: mass exchange and drag require distinct Lie groups'
                 RETURN
             END IF

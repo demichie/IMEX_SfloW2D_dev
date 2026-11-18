@@ -3,7 +3,7 @@ PROGRAM test_interlayer_mass_exchange
     USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : n_stoch_vars,n_pore_vars,gas_flag,sutherland_flag
     USE parameters_2d, ONLY : configure_canonical_state_indices,idx_solidEqn_first
-    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_exchange
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_mass_exchange
     USE interlayer_mass_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_mass_exchange_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
     USE state_types, ONLY : physical_state_real,initialize_physical_state_real
@@ -102,8 +102,8 @@ PROGRAM test_interlayer_mass_exchange
     n_layers=2
     CALL read_interlayer_parameters(unit,error)
     CALL require(LEN_TRIM(error)==0,'read pair-wide interlayer input: '//TRIM(error))
-    CALL close(interlayer_exchange%elutriation_solid_volume_fraction,0.15_wp,'read lifted solid fraction')
-    CALL require(interlayer_exchange%elutriation_carrier_mode=='ALLOW_CONCENTRATED', &
+    CALL close(interlayer_mass_exchange%elutriation_solid_volume_fraction,0.15_wp,'read lifted solid fraction')
+    CALL require(interlayer_mass_exchange%elutriation_carrier_mode=='ALLOW_CONCENTRATED', &
         'read and normalize carrier mode')
     CLOSE(unit)
 
@@ -120,7 +120,7 @@ PROGRAM test_interlayer_mass_exchange
     WRITE(unit,'(A)') '/'
     CALL read_interlayer_parameters(unit,error)
     CALL require(LEN_TRIM(error)==0,'canonical interlayer input: '//TRIM(error))
-    CALL require(interlayer_exchange%settling_flag .AND. interlayer_exchange%group==4, &
+    CALL require(interlayer_mass_exchange%settling_flag .AND. interlayer_mass_exchange%group==4, &
         'canonical input modifies the only mass exchange object')
     CALL require(interlayer_momentum_exchange%group==5 .AND. &
         interlayer_momentum_exchange%method=='ANALYTIC' .AND. &
