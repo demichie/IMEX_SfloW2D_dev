@@ -10,6 +10,7 @@ MODULE lie_source_executor_2d
     USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE rheology_2d, ONLY : limit_rheology_momentum_reversal
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange
@@ -648,21 +649,15 @@ CONTAINS
                     q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
 
-                    ! Isolated mu(I) friction must only slow the existing momentum.
-                    ! Record an overshooting explicit Euler step, without altering it.
-                    IF (executor%diagnostics_enabled .AND. &
+                    ! Apply the existing friction-only projection only when the
+                    ! explicit group contains mu(I) and no other source.
+                    ! Group zero evaluates rates at the pre-spatial state, so
+                    ! projecting its post-spatial recipient would also affect transport.
+                    IF (executor%groups(group_index)%id>0 .AND. &
                         executor%groups(group_index)%rheology_name=='rheology_mui' .AND. &
                         SIZE(executor%groups(group_index)%source_names)==1) THEN
-                        IF (DOT_PRODUCT(q_local(idx_uEqn:idx_vEqn), &
-                            q_candidate(idx_uEqn:idx_vEqn))<0.0_wp) THEN
-                            WRITE(error_unit,'(A,4(A,I0),2(A,ES24.16))') 'MUI_EXPLICIT_REVERSAL', &
-                                ' j=',j,' k=',k,' layer=',layer,' group=',executor%groups(group_index)%id, &
-                                ' t=',source_time,' dt=',time_step
-                            WRITE(error_unit,'(A,4(ES24.16,1X))') 'MUI_EXPLICIT_MOMENTUM=', &
-                                q_local(idx_uEqn),q_local(idx_vEqn), &
-                                q_candidate(idx_uEqn),q_candidate(idx_vEqn)
-                            FLUSH(error_unit)
-                        END IF
+                        CALL limit_rheology_momentum_reversal(q_local(idx_uEqn:idx_vEqn), &
+                            q_candidate(idx_uEqn:idx_vEqn))
                     END IF
 
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN

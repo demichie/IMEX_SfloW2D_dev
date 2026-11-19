@@ -34,7 +34,7 @@ PROGRAM test_analytic_velocity
   USE rheology_mui_2d, ONLY : eval_rheology_mui_semi_implicit, eval_rheology_mui_analytic
   USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_semi_implicit,        &
        eval_rheology_mui_voellmy_implicit, eval_rheology_mui_voellmy_analytic
-  USE rheology_2d, ONLY : eval_rheology_analytic
+  USE rheology_2d, ONLY : eval_rheology_analytic, limit_rheology_momentum_reversal
 
   IMPLICIT NONE
 
@@ -685,6 +685,18 @@ CALL eval_rheology_mui_voellmy_implicit(quadratic_config,cs, &
   CALL assert_flow_semigroup(EXACT_FLOW_MUI,                               &
        [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp], 0.5_wp,             &
        'mu(I) drag')
+  ! Overshooting explicit mu(I) Euler friction must stop instead of
+  ! reversing momentum; a dissipative stage must remain unchanged.
+  BLOCK
+    REAL(wp) :: before(2), candidate(2)
+    before=[0.5_wp,0.0_wp]
+    candidate=before+1.0_wp*[-2.0_wp,0.0_wp]
+    CALL limit_rheology_momentum_reversal(before,candidate)
+    IF (ANY(candidate/=0.0_wp)) ERROR STOP 'mu(I) explicit stopping projection failed'
+    candidate=[0.25_wp,0.0_wp]
+    CALL limit_rheology_momentum_reversal(before,candidate)
+    IF (ANY(candidate/=[0.25_wp,0.0_wp])) ERROR STOP 'mu(I) dissipative update was modified'
+  END BLOCK
   ! Regression from the granular dam-break wet/dry front: the original
   ! adaptive Simpson integration exhausted its recursion depth near u=0.
   CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
