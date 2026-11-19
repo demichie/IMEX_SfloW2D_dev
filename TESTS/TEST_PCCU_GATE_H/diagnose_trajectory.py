@@ -1,11 +1,33 @@
 #!/usr/bin/env python3
-"""Find the first full-precision conservative state divergence in Gate-H."""
+"""Enforce all-step same-input KT checks and retain independent trajectory drift."""
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import numpy as np
 from compare_fields import CONTRACT, common_input, accepted_times, kt
+
+
+
+def check_same_input_step(previous, observed, vertices, dx, dt, params, scales, epsilon):
+    """Check every conservative component after one update from the same state."""
+    if previous.ndim != 3 or previous.shape[-1] != 4 or observed.shape != previous.shape[:2]+(3,):
+        raise AssertionError("invalid same-input conservative field shapes")
+    if not np.all(np.isfinite(previous)) or not np.all(np.isfinite(observed)):
+        raise AssertionError("nonfinite same-input conservative field")
+    predicted, _ = kt.advance(previous, vertices, dx, dx, [dt], params)
+    difference = observed-predicted[..., :3]
+    scaled = np.max(np.abs(difference), axis=(0, 1))/scales
+    if not np.all(np.isfinite(scaled)):
+        raise AssertionError("nonfinite same-input error")
+    component = int(np.argmax(scaled))
+    j, i = np.unravel_index(np.argmax(np.abs(difference[..., component])), difference.shape[:2])
+    result = {"max_scaled_error": scaled.tolist(),
+              "worst_component": component, "worst_cell_ij": [int(i), int(j)],
+              "fortran_q": observed[j, i].tolist(),
+              "python_one_step_q": predicted[j, i, :3].tolist(),
+              "signed_error": difference[j, i].tolist()}
+    return result, bool(np.all(scaled <= epsilon))
 
 
 def diagnose(case_dir, mode):
@@ -38,7 +60,21 @@ def diagnose(case_dir, mode):
     reference=initial.copy()
     first=None
     max_errors=np.zeros(3)
+    max_same_input=np.zeros(3)
+    first_operator_failure=None
+    worst_operator_step=None
     for index, step_dt in enumerate(dt):
+        previous=initial.copy() if index==0 else np.zeros_like(initial)
+        if index:
+            previous[...,:3]=states[index-1]
+        direct, passed=check_same_input_step(previous,states[index],vertices,dx,
+                                             step_dt,params,scales,eps)
+        max_same_input=np.maximum(max_same_input,np.asarray(direct["max_scaled_error"]))
+        if worst_operator_step is None or max(direct["max_scaled_error"]) > max(worst_operator_step["detail"]["max_scaled_error"]):
+            worst_operator_step={"step":index+1,"detail":direct}
+        if not passed and first_operator_failure is None:
+            first_operator_failure={"step":index+1,"start_time":float(np.sum(dt[:index])),
+                                    "dt":float(step_dt),"detail":direct,"limit":float(eps)}
         reference,_,_=kt.advance(reference,vertices,dx,dx,[step_dt],params,
                                  return_diagnostics=True)
         difference=states[index]-reference[...,:3]
@@ -56,48 +92,27 @@ def diagnose(case_dir, mode):
                 "python_q":reference[ij][:3].tolist(),
                 "signed_difference":difference[ij].tolist()
             }
-    # Re-evaluate the first discrepant step from the *same* Fortran
-    # pre-step state. This removes pre-existing trajectory drift and
-    # exposes a genuinely different spatial update at that step.
-    if first is not None:
-        step=first["step_number"]
-        previous=initial.copy() if step==1 else np.zeros_like(initial)
-        if step>1:
-            previous[...,:3]=states[step-2]
-            previous[...,3]=0.0  # Gate-H has no solid species.
-        predicted,_,_=kt.advance(previous,vertices,dx,dx,[dt[step-1]],params,
-                                  return_diagnostics=True)
-        local_error=states[step-1]-predicted[...,:3]
-        local_scaled=np.max(np.abs(local_error),axis=(0,1))/scales
-        component=int(np.argmax(local_scaled))
-        j,i=np.unravel_index(np.argmax(np.abs(local_error[...,component])),shape)
-        jj=slice(max(0,j-1),min(shape[0],j+2))
-        ii=slice(max(0,i-1),min(shape[1],i+2))
-        first["same_input_one_step"]={
-            "max_scaled_error":local_scaled.tolist(),
-            "component_index":component,
-            "worst_cell_ij":[int(i),int(j)],
-            "fortran_previous_q":previous[j,i,:3].tolist(),
-            "fortran_accepted_q":states[step-1,j,i,:].tolist(),
-            "python_update_from_fortran_q":predicted[j,i,:3].tolist(),
-            "fortran_applied_rate":((states[step-1,j,i,:]-previous[j,i,:3])/dt[step-1]).tolist(),
-            "python_rate":((predicted[j,i,:3]-previous[j,i,:3])/dt[step-1]).tolist(),
-            "mass_error_patch":local_error[jj,ii,0].tolist(),
-            "momentum_x_error_patch":local_error[jj,ii,1].tolist(),
-            "momentum_y_error_patch":local_error[jj,ii,2].tolist(),
-            "previous_mass_patch":previous[jj,ii,0].tolist(),
-        }
-        print(f"TRAJECTORY SAME-INPUT {mode} dx={dx:g} "
-              f"step={step} worst={(i,j)} scaled={local_scaled.tolist()}",flush=True)
-        print(f"TRAJECTORY SAME-INPUT local={first['same_input_one_step']}",flush=True)
     report={"mode":mode,"dx":dx,"steps":len(dt),
             "first_out_of_contract_step":first,
             "max_scaled_errors_over_trajectory":max_errors.tolist(),
+            "same_input_all_steps": {
+                "status": "passed" if first_operator_failure is None else "failed",
+                "steps_checked":len(dt),
+                "scaled_limit_per_step":float(eps),
+                "maximum_scaled_errors":max_same_input.tolist(),
+                "worst_step":worst_operator_step,
+                "first_failure":first_operator_failure,
+            },
             "accepted_states_sha256":evidence["accepted_states_sha256"],
             "note":"All comparisons use Fortran binary64 states, not formatted ASCII output."}
     (case_dir/"trajectory_evidence.json").write_text(json.dumps(report,indent=2,allow_nan=False)+"\n")
     print(f"TRAJECTORY {mode} dx={dx:g} first out-of-contract={first}",flush=True)
     print(f"TRAJECTORY largest scaled errors={max_errors.tolist()}",flush=True)
+    print(f"SAME-INPUT ALL-STEPS {mode} dx={dx:g} "
+          f"status={report['same_input_all_steps']['status']} "
+          f"maximum_scaled_errors={max_same_input.tolist()} limit={eps:.17g}",flush=True)
+    if first_operator_failure is not None:
+        raise AssertionError(f"Gate-H same-input operator mismatch: {first_operator_failure}")
 
 
 if __name__=="__main__":

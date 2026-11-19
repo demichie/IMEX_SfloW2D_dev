@@ -59,6 +59,37 @@ class FieldCheckerTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             c.compare(h[:, :-1], h, h, h, 10)
 
+    def test_diagnostic_drift_does_not_relax_strict_comparator(self):
+        h = np.ones((4, 5))
+        changed = h.copy()
+        changed[1, 2] += 1e-6
+        with self.assertRaises(AssertionError):
+            c.compare(changed, h, h, h, 10)
+        evidence = c.compare(changed, h, h, h, 10, enforce=False)
+        self.assertFalse(evidence["within_original_roundoff_limit"])
+        self.assertGreater(evidence["h_Linf_m"], evidence["limit_m"])
+
+    def test_same_input_step_rejects_corrupted_conservative_cell(self):
+        from diagnose_trajectory import check_same_input_step
+        q = np.zeros((4, 5, 4))
+        q[..., 0] = 1000.0
+        bed = np.zeros((5, 6))
+        params = c.kt.Parameters()
+        accepted, _ = c.kt.advance(q, bed, 0.2, 0.2, [0.0001], params)
+        scales = np.array([1000.0, 1000.0, 1000.0])
+        epsilon = c.CONTRACT["current_IMEX"]["roundoff_epsilon_multiplier"]*np.finfo(float).eps
+        result, passed = check_same_input_step(q, accepted[..., :3], bed, 0.2,
+                                               0.0001, params, scales, epsilon)
+        self.assertTrue(passed)
+        np.testing.assert_array_equal(result["max_scaled_error"], np.zeros(3))
+        corrupted = accepted[..., :3].copy()
+        corrupted[1, 3, 1] += 0.01
+        result, passed = check_same_input_step(q, corrupted, bed, 0.2,
+                                               0.0001, params, scales, epsilon)
+        self.assertFalse(passed)
+        self.assertEqual(result["worst_cell_ij"], [3, 1])
+        self.assertEqual(result["worst_component"], 1)
+
     def test_historical_limits_are_separate(self):
         h = np.ones((8, 10)); bed = 5*np.ones_like(h)
         c.historical_comparison(h+1e-4, h, bed)

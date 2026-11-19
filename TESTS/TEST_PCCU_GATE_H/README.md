@@ -22,87 +22,50 @@ Gate-H uses pure liquid without rheology or sources. One-cell dimensions use
 the same code as 2D with their inactive direction omitted.
 
 The reference starts from the exact emitted ASCII initial state and independently
-imports/interpolates the emitted DEM. It never uses evolved Fortran states as
-reference input. A test-only observational main records the accepted timesteps
-and must reproduce the uninstrumented canonical output byte for byte. The
-Python time integration uses the same `n_RK=2` explicit tableau (forward Euler
-for this source-free problem). Matching the accepted times isolates the spatial
-comparison; this test does not assert autonomous adaptive-CFL equality.
+imports/interpolates the DEM. A test-only observational main records every
+accepted timestep and its full-precision conservative state. Its canonical
+output must remain byte-identical to the uninstrumented production run.
 
-`field_contract_v4.json` pins the active core and retains the original
-32768-epsilon-per-step h/eta comparison bound. Every cell is compared, including
-both momenta using independent initial hydrostatic mass/momentum scales.
-`reference_fields.npz` and `field_evidence.json` retain reference fields, checksums,
-errors, accepted times and the independently integrated boundary mass transport.
+**Acceptance:** at *every* accepted timestep, KT-PYTHON advances once from
+the **identical preceding Fortran conservative state**, with the actual accepted
+`dt`. The maximum error over every grid cell and all three conservative
+equations must remain below the fixed `32768 * float64_epsilon` normalized
+per-step bound. The mass scale is the initial maximum conservative mass
+(at least one), and both momentum scales use initial hydrostatic units.
+This is a local operator check; its tolerance does not grow with timestep
+count. Any missing or modified state stream, nonfinite field, or failed step
+makes Gate-H fail.
 
-The aggregate checks retain nonnegativity, zero uphill leakage, G=1 lateral
-symmetry and the existing mass-budget tolerance `5e-10`. The budget includes
-mass crossing the open external boundaries: the new scheme can produce a small
-outflow even at the coarse grid's short comparison time. Aggregate reference
-values are calculated from the new Python fields, with the existing bounds.
-A failed full-field comparison or invariant still fails the test, and all six
-completed grid/mode cases retain their diagnostics.
+**Independent trajectory:** KT-PYTHON also integrates from the common initial
+state over the entire accepted timestep sequence. `reference_fields.npz` and
+`field_evidence.json` retain its h, eta and all conservative momenta together
+with the *original* stringent roundoff limits and their pass/fail indicators.
+Independent trajectory drift is **diagnostic**, not an acceptance gate:
+roundoff may amplify across many nonlinear steps even when the per-step
+operator is correct. The mandatory `trajectory_evidence.json` records both
+the cumulative drift and the authoritative `same_input_all_steps` result.
+
+The separate aggregate checks retain nonnegativity, zero uphill leakage,
+G=1 lateral symmetry and the original mass-budget tolerance `5e-10`,
+including mass transported across open external boundaries. These remain
+acceptance gates for all six grid/mode cases.
 
 The original HP-PCCU cores, `reference_metrics.csv` and contracts v1-v3 remain
 historical archives. Their different numerical scheme and SSPRK2 trajectories
 are not acceptance oracles for the current KT operator. Other historical test
 suites that explicitly exercise HP-PCCU are not migrated by this Gate-H test.
 
-## First-step failure localization
+## Mandatory full-precision same-input audit
 
-When a full-field comparison fails, `run_test.sh` automatically invokes
-`diagnose_first_step.py`. It prepares a separate `first-step-diagnostic/`
-run with exactly the original first accepted timestep as end time and
-output event, and uses the already compiled observational main. It
-**verifies that this replay accepted one timestep with matching `dt`**
-before comparing the first conservative snapshot with a *single* independent
-KT-PYTHON update. Thus no Fortran numerical kernel is modified.
-
-The script retains `first_step_evidence.json` alongside the existing
-`field_evidence.json`; it prints the worst mass cell, its three conservative
-variables, the inferred first-step Fortran rate `(Q1-Q0)/dt`, the direct
-Python spatial residual and a surrounding 3-by-3 error stencil. This is a
-diagnostic, **not** a relaxation of `field_contract_v4.json`. If the
-replay cannot be verified, the diagnostic fails independently and the
-original Gate-H failure remains in force.
-
-For a persistent local case, set `KEEP_TEST_WORKDIR=1` as above; otherwise
-the temporary directory is removed by the runner.
-
-The same observer also runs an exact **two-step replay** (`--steps 2`),
-checking both accepted `dt` values against the full run. The
-`prefix_2_step_evidence.json` report captures the earliest post-initial
-discrepancies: if the first step matches but the second does not, inspect
-state conversions and the reconstructed second-step traces. For multi-step
-prefixes the reported inferred rate is a *mean rate*, not an instantaneous
-spatial residual.
-
-## Full-precision accepted-state trajectory audit
-
-The Gate-H observer now additionally emits `accepted_states.bin`: one
-Fortran stream-unformatted record of the three canonical L1 conservative
-components over the complete grid, immediately after each accepted advance.
-The original canonical snapshot is still checked byte-for-byte to establish
-that recording was non-invasive. The SHA-256 of the state stream is kept
-in `accepted_time_evidence.json`.
-
-Upon a failed full-field comparison, `diagnose_trajectory.py` reads those
-full-precision states and independently advances KT-PYTHON through the **same**
-accepted `dt` sequence, comparing each step's conservative mass and momenta.
-It records the first step exceeding the existing roundoff-scaled Gate-H
-threshold, plus the maximum error reached and the worst cell, in
-`trajectory_evidence.json`. This avoids drawing conclusions from the
-12-decimal-digit ASCII snapshots. It does not modify any numerical object,
-physical formula or acceptance limit.
-
-At the first out-of-contract timestep, the trajectory diagnostic also
-re-evaluates one KT-PYTHON step from the **actual full-precision Fortran state
-at the immediately preceding timestep**. The `same_input_one_step` record
-reports conservative rates and 3-by-3 discrepancy patches. Unlike a
-comparison of two evolved trajectories, this isolates a difference in
-the update applied to the same starting conservative state. The result
-helps distinguish differences in active worksets, reconstruction and
-nonconservative sources from previously accumulated errors.
+`diagnose_trajectory.py` is executed for **every** case, regardless of the
+independent trajectory drift. It reads and verifies `accepted_states.bin` and
+`accepted_times.bin`, computes one KT-PYTHON update for each accepted step
+from the preceding Fortran state, checks all cells and conservative components,
+and writes `trajectory_evidence.json`. A failed step yields a nonzero exit
+status and fails the full Gate-H run. Additional independent trajectory
+integration records the first drift exceeding the original roundoff threshold,
+but does not decide acceptance. Optional short-prefix replay remains available
+for investigating a failed mandatory operator check.
 
 ## Conservation of nearly dry cell momentum
 

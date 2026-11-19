@@ -55,18 +55,11 @@ do
         python3 "$test_dir/capture_times.py" "$observer" "$case_dir"
         if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_fields.py" "$case_dir" "$mode"; then
             failed=1
-            if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_trajectory.py" \
-                "$case_dir" "$mode"; then
-                echo "WARNING: full-precision trajectory diagnostic could not be completed" >&2
-            fi
-            if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_first_step.py" \
-                "$observer" "$case_dir" "$mode"; then
-                echo "WARNING: first-step Gate-H diagnostic could not be completed" >&2
-            fi
-            if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_first_step.py" \
-                "$observer" "$case_dir" "$mode" --steps 2; then
-                echo "WARNING: two-step Gate-H diagnostic could not be completed" >&2
-            fi
+        fi
+        # Every accepted step is required to agree from the same Fortran state.
+        if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_trajectory.py" \
+            "$case_dir" "$mode"; then
+            failed=1
         fi
         if ! python3 "$test_dir/analyze_case.py" "$case_dir" "$mode" "$reference"; then
             failed=1
@@ -75,9 +68,9 @@ do
 done
 
 if [ "$failed" -ne 0 ]; then
-    echo "FAIL: Gate-H full-field evidence retained for every completed grid/mode" >&2
+    echo "FAIL: Gate-H same-input operator or physical invariants" >&2
     exit "$failed"
 fi
 
 echo "PASS: Gate-H G=1 and slope-plus-curvature excavation refinements"
-echo "      match the current KT-PYTHON reference fields and mass budget"
+echo "      match KT-PYTHON per-step operators and physical mass budget"

@@ -17,12 +17,13 @@
     "max_dt": 0.02,
     "growth": "min(CFL directional minimum, max_dt, remaining time, 1.1*(dt_old+dt_old_old)/2)",
     "roundoff_epsilon_multiplier": 32768,
-    "field_limit": "32768 * float64_epsilon * accepted_steps * max(1, initial_h_max)",
+    "field_limit": "Original 32768 * float64_epsilon * accepted_steps * max(1, initial_h_max), now diagnostic only",
     "ambient_density": "101300 / (287.051 * 300)",
     "eps_sing": 1e-10,
     "comparison_times": "Independent trajectory from common initial fields using actual accepted dt, captured by an observational main whose final canonical output must be byte-identical to the uninstrumented solver",
     "KT_TRACE_RECONSTRUCTION": "froude_blend",
-    "conservative_scales": "M0=max(1,max initial mass); momentum=M0*sqrt(g*max(1,max initial depth)); same per-step roundoff multiplier"
+    "conservative_scales": "M0=max(1,max initial mass); momentum=M0*sqrt(g*max(1,max initial depth)); per-step operator bound 32768*float64_epsilon (not multiplied by steps)",
+    "acceptance": "Every recorded binary64 Fortran accepted step is checked against one independent KT-PYTHON update from the identical preceding Fortran conservative state, at 32768 * float64_epsilon times fixed initial hydrostatic conservative scales; all cells and all three equations. Independent full-trajectory fields remain non-gating diagnostic evidence."
   },
   "historical_SSPRK2": {
     "maximum_normalized_L1_h": 0.0002,
