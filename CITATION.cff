@@ -1,14 +1,11 @@
-cff-version: 1.1.0
-title: IMEX_SfloW2D_v2
-message: "If you use this software, please cite it as below."
+cff-version: 1.2.0
+message: "If you use IMEX-SfloW2D, please cite the software and the relevant scientific publications."
+title: "IMEX-SfloW2D"
+type: software
 authors:
   - given-names: Mattia
-    family-names: de' Michieli Vitturi
-    name-particle: Mattia
-    email: mattia.demichielivitturi@ingv.it
+    family-names: "de' Michieli Vitturi"
     affiliation: Istituto Nazionale di Geofisica e Vulcanologia
-    orcid: 'https://orcid.org/0000-0002-6750-9245'
-title: demichie/IMEX_SfloW2D_v2
-version: 1.0.1
-date-released: 2023-03-25
-license: GPL-3.0
+    orcid: "https://orcid.org/0000-0002-6750-9245"
+repository-code: "https://github.com/demichie/IMEX_SfloW2D_dev"
+license: GPL-3.0-only

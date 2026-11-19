@@ -17,8 +17,8 @@ IMEX_SfloW2D combines physical flow models with high-resolution spatial discreti
 - **[Doxygen](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/)** — generated Fortran source-code documentation.
 - **[References](references/index.md)** — publication and repository links.
 
-!!! info "Automatically published releases"
-    The documentation is built on demand or when a tag or release is published. Example pages are regenerated from the README.md files in `EXAMPLES/` at the selected revision.
+!!! info "Manually published documentation"
+    Documentation publication is started manually from GitHub Actions. Example pages are regenerated from the README.md files in `EXAMPLES/` at the selected revision.
 
 !!! warning "GitHub-generated source snapshots"
     GitHub's automatic **Source code (zip/tar.gz)** downloads are snapshots of

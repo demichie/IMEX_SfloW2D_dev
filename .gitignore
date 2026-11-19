@@ -1,5 +1,7 @@
-doc/html/
-plume_mom.doxy
+# Generated documentation and local build trees.
+/doc/html/
+/build/
+/plume_mom.doxy
 
 # Regenerate Autotools outputs in a checkout with `autoreconf -fi`.
 /aclocal.m4

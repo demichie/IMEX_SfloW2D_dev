@@ -1,90 +1,57 @@
-# Depth-averaged gas-particles model
+# IMEX-SfloW2D
 
-Shallow water model for multiphase flow (gas+particles) with density of gas
-temperature-dependent.
+IMEX-SfloW2D is a Fortran finite-volume, depth-averaged model for geophysical
+and volcanic flows, using high-resolution spatial discretization and
+implicit-explicit (IMEX) time integration. Supported single-layer carrier
+configurations include gas, liquid and lava, with model-specific physics.
 
-To compile the code you need a Fortran compiler and the NetCDF library for Fortran. You can install both with anaconda, by creating an anaconda environment and activating it:
+**Development status:** the `feature/two-layer` branch is preparing a
+two-layer architecture. The production `N_LAYERS=2` gate remains disabled
+until its validation is complete; the existing single-layer solver is the
+supported execution path. See the
+[two-layer architecture and roadmap](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
+for design decisions and remaining validation.
 
-> conda create -n fortran_env conda-forge::gfortran_linux-64  sysroot_linux-64  make  conda-forge::netcdf-fortran  conda-forge::liblapack  conda-forge::libblas
-> 
-> conda activate fortran_env
+## Build
 
-or, on a osx computer:
+Requirements: a Fortran compiler, Autoconf/Automake, NetCDF-Fortran,
+LAPACK/BLAS and Make. On Ubuntu, equivalent packages include `gfortran`,
+`autoconf`, `automake`, `libnetcdff-dev`, `liblapack-dev` and
+`libblas-dev`. Use libraries built for your selected Fortran compiler.
 
-> conda create -n fortran_env conda-forge::gfortran make conda-forge::netcdf-fortran conda-forge::liblapack conda-forge::libblas
-> 
-> conda activate fortran_env
+```sh
+autoreconf -fi
+./configure --with-netcdf=/usr FC=gfortran
+make -j2
+make check
+```
 
+For a strict/debug build, configure with `--enable-strict-debug`.
+The default build is optimized. Configure-time overrides include `FCFLAGS`,
+`OPENMP_FCFLAGS`, `NETCDF_LIBS` and `LAPACK_LIBS`. For Conda or another
+custom NetCDF-Fortran prefix, set `--with-netcdf=/path/to/prefix`.
+Generated Autotools files are not tracked in Git.
 
-The current physical configuration selects a single carrier phase (gas, liquid,
-or lava). The unsupported dispersed-liquid conservative component and its
-`xl_source` input have been removed. Mass exchange is assembled in
-`src/physics/mass_exchange/mass_exchange_2d.f90`. Binary restart uses one
-current development schema; older development checkpoints are not supported
-and must not be treated as separate supported formats. The production
-two-layer gate remains closed while its validation continues.
-See [the current documentation index](docs/README.md) and
-[the two-layer architecture roadmap](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
+`make install` installs the compiled executable. Focused numerical, physics,
+restart and OpenMP checks are available under `TESTS/`; see
+[contributing](CONTRIBUTING.md) and the [manual CI workflows](.github/README.md).
+GitHub Actions in this repository run only on manual dispatch.
 
-To compile:
+## Documentation and examples
 
-Generated Autotools files such as `configure` and `Makefile.in` are not tracked
-in Git. Regenerate them from a checkout with:
+- [Developer documentation](docs/README.md)
+- [Documentation website](https://demichie.github.io/IMEX_SfloW2D_dev/)
+- [Example configurations](EXAMPLES/) (each runnable example has its own README)
+- [Model architecture and implementation status](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
+- [NetCDF fields and binary restart](docs/NETCDF_OUTPUT.md)
+- [Citation metadata](CITATION.cff) and [GPLv3 license](COPYING)
 
-> autoreconf -fi
+## Releases
 
-The build uses the Fortran compiler selected by `FC` and the NetCDF Fortran
-library. For a Conda environment, pass its prefix as `--with-netcdf`:
-
-> ./configure --with-netcdf=/path/to/fortran_env
-
-The historical optimized profile is the default. To enable runtime checks and
-floating-point traps:
-
-> ./configure --with-netcdf=/path/to/fortran_env --enable-strict-debug
-
-`FCFLAGS` supplied by the environment is respected. Non-GNU toolchains can
-override `OPENMP_FCFLAGS`; `NETCDF_LIBS` and `LAPACK_LIBS` can likewise be
-provided when their library names or link dependencies differ from the
-defaults.
-
-> make
-
-> make check
-
-> make install
-
-The executable is copied in the bin folder.
-
-`make check` runs the legacy example integration cases in temporary
-directories, leaving the source fixtures untouched. The manually launched **Solver integration** Action also runs
-binary/stochastic restart and HP-PCCU Gate-H checks in optimized and
-strict-debug builds. The **Build only** Action compiles the manually selected `optimized` or `debug` profile
-without running tests.
-
-The legacy test runner can optionally run the focused `TEST_DYNAMIC_FINH`
-fixture with `TESTS/run_tests.sh /path/to/IMEX_SfloW2D TEST_DYNAMIC_FINH`.
-This focused diagnostic is available from the local test runner; the
-historical Intel ifx diagnostic Action has been retired.
-
-The current manually triggered Actions and their purposes are documented
-in [the Actions guide](.github/README.md).
-
-Several examples can be found in the EXAMPLES folder.
-
-The [Etna lava example](EXAMPLES/EXAMPLE_ETNA_LAVA/README.md) uses two bottom
-fissures and the original Etna DEM before avalanche preprocessing. Together
-with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it is part of the representative source and long-run validation cases.
-
-## Release downloads
-
-GitHub automatically provides **Source code (zip)** and **Source code
-(tar.gz)** snapshots for tags. These are Git snapshots, not the prepared
-Autotools source distribution; they may not contain generated files such as
-`configure`. When available, use the explicitly named
-`IMEX_SfloW2D-<version>.tar.gz` and
-`IMEX_SfloW2D-<version>-examples.tar.gz` assets attached to a validated
-[release](https://github.com/demichie/IMEX_SfloW2D_dev/releases).
+GitHub automatically supplies source snapshots for tags; these are not
+Autotools-generated distribution archives and may omit `configure`. When
+available, download the separately prepared source and examples archives from
+the [releases page](https://github.com/demichie/IMEX_SfloW2D_dev/releases).
 
 ## Per-run output directories
 
@@ -171,7 +138,7 @@ their diagnostic context.
 
 ## Vertical closure status
 
-The legacy velocity/concentration vertical-profile implementation has been
+The former velocity/concentration vertical-profile implementation has been
 removed. The current solver uses the standard depth-averaged equations, and
 the input options `VERTICAL_PROFILES_FLAG` and
 `VERTICAL_PROFILES_PARAMETERS` are no longer accepted.

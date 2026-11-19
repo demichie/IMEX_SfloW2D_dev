@@ -1,8 +1,5 @@
-# this is example-file: Makefile.am
-
-# the subdirectories of the project to go into
-SUBDIRS =   \
-            src
+# Build the solver in its source subdirectory.
+SUBDIRS = src
 
 # Test fixtures keep one lowercase input file; test copies use the solver's
 # required uppercase filename to avoid case-only aliases in Git.
