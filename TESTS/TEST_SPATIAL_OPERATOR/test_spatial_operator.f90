@@ -3456,7 +3456,7 @@ CONTAINS
     DEALLOCATE(states%q,states%qp,states%erodible,states%deposit,states%erosion)
     DEALLOCATE(states%deposit_tot,states%erosion_tot,states%hpos,states%hpos_old)
     DEALLOCATE(states%hmax,states%pdynmax,states%mod_vel_max,states%vuln_table)
-    DEALLOCATE(original_q,original_b,old_rng,stored_q,stored_qp,stored_total)
+    DEALLOCATE(original_q,original_b,old_rng,stored_total)
     stochastic_l2=saved_stochastic_l2
     pore_pressure_l1%pore_pressure_flag=saved_pore_l1
     n_layers=saved_layers
