@@ -77,7 +77,7 @@ commit alone. Its numerical sources differ from the previous `752b47fe`
 baseline only in `src/physics/equation_terms_2d.f90`. The candidate file SHA-256 is
 `f5d4cd0512fe00db79c8774b785c493a474d951da4766a2627dfc9fcf1ff7625`.
 
-[`results_froude_fix_2026_10_09.json`](results_froude_fix_2026_10_09.json)
+[[results_froude_fix_2026_10_09.json](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_froude_fix_2026_10_09.json)](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_froude_fix_2026_10_09.json)
 retains candidate source/test/tool hashes, compiler flags, input/output
 fingerprints, actual thread counts and the old/new comparison. Full build and
 invocation logs remain in

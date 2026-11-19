@@ -6,7 +6,7 @@ At this package's completion, N8 remained open for N8-B and D-N8-AREA.
 The subsequent [projection package](N8_B_PROJECTION_2026_10_10.md) closes those
 requirements and N8. N7 and N9 remain open.
 
-The [execution evidence](results_n8_a_2026_10_10.json) records the candidate
+The [execution evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n8_a_2026_10_10.json) records the candidate
 base revision, compiler, flags, source/fixture hashes, diagnostic values and
 payload fingerprints. The [closure checklist](N7_N8_CLOSURE_2026_10_10.md)
 retains the original requirements and moves N8-A to completed actions.
@@ -68,7 +68,7 @@ checkpoint files, gas snapshots and flat-evaluation payloads agree bitwise
 between teams.
 
 All eight historical snapshot/checkpoint fingerprints from the original 12
-transactions still match [the previous N8 evidence](results_n8_mass_exchange_2026_10_09.json).
+transactions still match [the previous N8 evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n8_mass_exchange_2026_10_09.json).
 The diagnostic checker rejects five deliberately invalid logs: a missing flat
 assertion, a missing gas case, a wrong actual team, a corrupted volume
 diagnostic and a nonfinite reference. Existing Fortran and diagnostic

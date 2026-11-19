@@ -1,47 +1,46 @@
 # Repository documentation
 
-## Purpose and role in IMEX-SfloW2D
+This directory contains **current developer contracts** and a separately
+identified **historical acceptance record**. The repository's source code
+and CI for the exact active commit remain the source of truth.
 
-This index distinguishes **current implementation instructions** from
-**historical acceptance and migration records**. Dated evidence is kept for
-reproducibility; it is not a second implementation roadmap or a source of
-obsolete compatibility requirements.
+## Current documentation
 
-## Current engineering guides
+- [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md): current TL13 priorities.
+- [Two-layer architecture](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md):
+  authoritative design, physical assumptions and remaining gates.
+- [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): technical snapshot;
+  historical status claims must be checked against current code.
+- [State architecture](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md): ownership,
+  conversion and regression contract.
+- [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md):
+  accepted-step publication and fatal rejection policy.
+- [Fortran style](FORTRAN_STYLE.md): mandatory formatting and Doxygen rules.
+- [Adding a rheology model](ADDING_A_RHEOLOGY_MODEL.md): extension guide
+  with illustrative, **not registered**, physics.
+- [NetCDF output](NETCDF_OUTPUT.md): named physical visualization fields;
+  binary checkpoints hold the full restart state.
 
-- [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md): consolidated priorities and development history.
-- [Two-layer architecture and roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md): authoritative current two-layer design and outstanding gate.
-- [Two-layer code audit](TWO_LAYER_CODE_AUDIT.md): architecture and validation findings at its stated baseline.
-- [State architecture](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md): state ownership and scientific invariants; dated baseline, check current source before acting.
-- [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md): current step-acceptance and failure contract.
-- [Fortran style and Codee](FORTRAN_STYLE.md): mandatory code and Doxygen conventions.
-- [Adding a rheology model](ADDING_A_RHEOLOGY_MODEL.md): extension procedure and tests.
-- [NetCDF output](NETCDF_OUTPUT.md): physical-field output schema and binary restart relationship.
-- [Lie geometry plan](LIE_CELL_OUTER_GEOMETRY_FREEZE_PLAN.md): rationale and implementation record; status statements have their own date/baseline.
+## Other authoritative sources
 
-## Source and example documentation
+- [Physics/source documentation](../src/physics/README.md) and
+  [state documentation](../src/state/README.md) describe owners and APIs.
+- Each example's `EXAMPLES/*/README.md` is the canonical run guide.
+- [Website sources](website/) are built by the MkDocs publishing workflow.
+- [Dated acceptance reports](acceptance/README.md) and their pinned JSON
+  fixtures are historical evidence; some are still **required by the
+  executable acceptance tests** in `TESTS/ACCEPTANCE/`.
 
-- [Source directory map](../src/physics/README.md) and the individual
-  `src/*/README.md` guides document every source directory, including the
-  constitutive equations of physical-law families.
-- [Examples](../EXAMPLES/) use `README.md` as the single run guide in
-  each example. The
-  [README migration audit](../EXAMPLES/README_SECOND_PASS_AUDIT.md)
-  retains the comparison evidence for the removed plain-text READMEs.
-- [Examples input audit](EXAMPLES_INPUT_COMPATIBILITY_AUDIT.md) records
-  a dated input-validation step; re-run its checker before relying on its
-  historical conclusions.
+## Retired documentation and reproducibility
 
-## Historical evidence (retained intentionally)
+Superseded roadmap archives, one-off cleanup plans and the obsolete
+large state-inventory manifest are no longer maintained in the active
+tree. They remain accessible through the immutable
+[pre-cleanup Git snapshot](https://github.com/demichie/IMEX_SfloW2D_dev/tree/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs).
+Test-consumed acceptance JSON fixtures remain local; links in dated
+reports also point to their original pinned revision for reproducibility.
+Old binary/restart/NetCDF versions in historical reports do **not**
+imply ongoing compatibility requirements.
 
-- [Acceptance records](acceptance/) contain dated test results, manifests,
-  reference inputs and supporting logs. These are **not** current
-  compatibility formats or prescribed scientific configurations.
-- [Archived roadmaps](archive/roadmaps/) record completed or superseded
-  proposals. Do not implement them instead of the current roadmap.
-- [Debug warning cleanup](DEBUG_WARNING_CLEANUP_2026_11_06.md) is a
-  snapshot of a particular compiler-warning baseline, not a perpetual
-  warning count.
-
-For any new change, inspect the current branch, declarations, tests and
-GitHub Actions results before trusting a dated document's status.
+Do not use a dated migration plan to reinstate obsolete interfaces.
+Check the current branch, source, tests and CI results for the exact SHA.

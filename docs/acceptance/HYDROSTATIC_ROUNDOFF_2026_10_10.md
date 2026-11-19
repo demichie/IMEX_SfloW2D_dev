@@ -11,7 +11,7 @@ state changes, component/carrier budget errors and force-scaled momentum
 residuals. N7-B remains open for its moving-contact test. CFL policy, physical
 laws, reconstruction and the clean reference kernels are unchanged.
 
-The [machine-readable evidence](results_hydrostatic_roundoff_2026_10_10.json)
+The [machine-readable evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_hydrostatic_roundoff_2026_10_10.json)
 pins the source and numerical fixtures, contracts, focused results and full
 audit. The base revision is `e4333a5cf0575d23287a32a082fe18fbd939bcbe`.
 Only `src/spatial/hyperbolic_2d.f90` changes in production.

@@ -4,7 +4,7 @@
 > continuation failures observed before checkpoint v5. The defects were
 > subsequently corrected and revalidated; see
 > [the v5 restart report](N9_RESTART_V5_2026_10_11.md) and
-> [v5 evidence](results_n9_restart_v5_2026_10_11.json). Do not interpret the
+> [v5 evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n9_restart_v5_2026_10_11.json). Do not interpret the
 > failures below as the current v5 result.
 
 ## Historical v4 results (superseded for restart diagnostics)
@@ -134,7 +134,7 @@ the command returns nonzero for them. The helper tests verify unique input
 overrides, restart record ordering/version/markers and positive/negative CSV
 history controls. Commands are documented in the acceptance README.
 
-The committed `results_n9_long_cases_2026_10_11.json` pins source, fixture,
+The committed [results_n9_long_cases_2026_10_11.json](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n9_long_cases_2026_10_11.json) pins source, fixture,
 reference and executable checksums, metadata, decoded-field fingerprints,
 budget observations and separate physical/diagnostic outcomes. Full runtime
 evidence is under `/tmp/imex-n9-long-20261011-v4`; full/split payloads are under

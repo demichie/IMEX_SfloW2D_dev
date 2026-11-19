@@ -1,3 +1,7 @@
+> Historical source links: retired paths below now lead to their Git history,
+> not to a current production module. Line numbers from the original audit
+> must not be interpreted as current source positions.
+
 # IMEX stage admissibility and temporal order audit
 
 ## Current stage-count contract
@@ -28,7 +32,7 @@ itself occurs outside parallel loops; numerical fixtures check actual teams.
 Six observer-off pairs per profile remain byte-identical.
 
 Follow-up evidence is archived in
-[`results_stage_count_contract_2026_10_10.json`](results_stage_count_contract_2026_10_10.json).
+[[results_stage_count_contract_2026_10_10.json](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_stage_count_contract_2026_10_10.json)](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_stage_count_contract_2026_10_10.json).
 Raw full-audit logs are in `/tmp/imex-stage-count-acceptance-20261010-final`;
 these temporary paths are not a permanent raw-output archive. Reproduction uses
 the unchanged test commands below, without the removed design-order switch.
@@ -63,7 +67,7 @@ comment now correctly identifies a stage count rather than an order.
 
 ## Stage comparisons and admissibility
 
-[`TEST_IMEX_STAGES`](../../TESTS/TEST_IMEX_STAGES/run_test.sh) compiles actual
+[`TEST_IMEX_STAGES`](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/TESTS/TEST_IMEX_STAGES/run_test.sh) compiles actual
 production modules in strict/debug and optimized profiles, with floating-point
 traps and OpenMP in both. Its assertion driver remains strictly compiled.
 Eight observer-off comparisons per profile cover resting and dynamic states
@@ -166,7 +170,7 @@ instead of applying the evaluated explicit residual.
 The dynamic and thermal tests reproduce the no-op with both compiler profiles
 and both thread counts. The intended forward-Euler result is retained alongside
 the observed result in
-[`results_imex_stages_2026_10_10.json`](results_imex_stages_2026_10_10.json).
+[[results_imex_stages_2026_10_10.json](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_imex_stages_2026_10_10.json)](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_imex_stages_2026_10_10.json).
 The default suite checks this known behavior as characterization; it does not
 declare `N_RK=1` scientifically valid. The separate
 `--require-design-order` gate fails with an assertion naming the defect.

@@ -6,7 +6,7 @@ Date: 21 October 2026. Audited revision:
 Status: **static inventory complete**. This report describes the implementation,
 not an endorsement of its physical formulas or a numerical acceptance of D02.
 No source, input, RK tableau or numerical tolerance is changed by D01.
-The companion [JSON inventory](results_d01_inventory_2026_10_21.json) records
+The companion [JSON inventory](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_d01_inventory_2026_10_21.json) records
 source hashes, routine spans, dispatch coverage, parameters and the D02 backlog.
 
 ## Scope and evidence

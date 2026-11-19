@@ -5,7 +5,7 @@ remains in progress. Baseline: `2faaa714` (committed D17-A inventory/contracts).
 This implementation adds metadata beside the existing numerical path; it does
 not yet route stage, boundary or mass-exchange evaluation through the registry.
 
-Evidence: [machine-readable results](results_d17_b_source_registry_2026_10_23.json).
+Evidence: [machine-readable results](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_d17_b_source_registry_2026_10_23.json).
 Reproduction: [standalone test README](../../TESTS/TEST_SOURCE_REGISTRY/README.md).
 The [phase-A contract](D17_SOURCE_CONTRACT_2026_10_23.md) and its manifest retain
 their original baseline evidence; their proposed IDs are now defined by the

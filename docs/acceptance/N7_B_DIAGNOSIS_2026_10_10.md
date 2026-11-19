@@ -11,7 +11,7 @@ equilibrium regressions are recorded in the
 [correction report](HYDROSTATIC_ROUNDOFF_2026_10_10.md); the contact reference
 remains open. The CFL and clean reference kernels are unchanged.
 
-The [evidence index](results_n7_b_diagnosis_2026_10_10.json) records the unchanged
+The [evidence index](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n7_b_diagnosis_2026_10_10.json) records the unchanged
 production revision, frozen contract, executed test hashes, case findings,
 binary fingerprints and retained raw directories. The
 [test README](../../TESTS/TEST_N7_COMPOSITION/README.md) gives reproduction

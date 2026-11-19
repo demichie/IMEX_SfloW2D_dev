@@ -5,9 +5,9 @@ N8 is now satisfied within the supported uniform Cartesian production contract.
 The user accepted the separate unequal-area algebra test on October 10, 2026;
 this does not enable nonuniform production meshes. N7 and N9 remain open.
 
-The [projection evidence](results_n8_b_projection_2026_10_10.json) records fixed
+The [projection evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n8_b_projection_2026_10_10.json) records fixed
 fixtures, refinement metrics, stress envelopes, source hashes and all-team
-payload fingerprints. The [full regression](results_n8_b_acceptance_2026_10_10.json)
+payload fingerprints. The [full regression](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n8_b_acceptance_2026_10_10.json)
 passes 36/36 runs and six cross-thread Gate-H/restart pairs. All 16 full-solver
 cases retain the preceding canonical output/checkpoint fingerprints, and all
 16 N8-A payload fingerprints remain unchanged.

@@ -1,6 +1,6 @@
 # Two-layer closure audit — TL13a
 
-**Branch:** `feature/two-layer`. **Audit baseline:** `7f8189a76e`, 18 November 2026.
+**Branch:** `feature/two-layer`. **Audit baseline:** `7f8189a76e`, 18 November 2026; output-schema wording verified against `src/io/inpout_2d.f90` on 19 November 2026.
 **Scope:** architectural closure and functional gate; scientific model validation remains TL13b.
 This document is the current audit, not a historical compatibility matrix.
 
@@ -14,7 +14,7 @@ This document is the current audit, not a historical compatibility matrix.
 | Source scheduling | `source_registry_2d` | L1, L2 and INTERLAYER scopes are validated in one registry. |
 | Spatial and Lie integration | `spatial_operator_2d`, `time_integration_2d`, `lie_source_executor_2d` | Shared OR workset, per-layer operators, one cell-local Lie transaction and one accepted fluid publication. |
 | Coupled physics | `interlayer_mass_exchange_2d` and `interlayer_momentum_exchange_2d` | Conserved gross transfers are limited jointly; drag remains a separate analytic process. |
-| Binary checkpoint and NetCDF | `inpout_2d` | One canonical binary format with a layer-count header; `q_layers` and `qp_layers` are the only NetCDF layer-state tensors. |
+| Binary checkpoint and NetCDF | `inpout_2d` | One canonical binary checkpoint with a layer-count header stores full conservative/primitive state; visualization NetCDF writes named scalar physical fields per layer, without `q_layers` or `qp_layers` tensors. |
 
 The single-layer NAMELIST names without `_L1` are **intentional input design**, not obsolete interfaces. No compatibility with previously generated binary checkpoint or NetCDF schemas is required. `INTERLAYER_PARAMETERS` is the only pair-wide NAMELIST, covering mass exchange and momentum drag; the redundant input spelling and its parser branch have been removed.
 
@@ -38,8 +38,8 @@ its internal rollback fixture is still valid.
 ## Canonical I/O continuation and end-to-end verification
 
 The existing structural `TEST_SPATIAL_OPERATOR` fixture now appends a second
-NetCDF frame using `restart=.TRUE.`, then checks that both canonical L1/L2
-state tensors are readable, unchanged and that the time dimension has exactly
+NetCDF frame using `restart=.TRUE.`, then checks that the canonical named L1/L2
+physical fields are readable, unchanged and that the time dimension has exactly
 two records. This extends the round-trip from initial serialization to
 restart continuation without introducing a second I/O implementation.
 

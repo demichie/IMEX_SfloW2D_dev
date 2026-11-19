@@ -11,7 +11,7 @@ Optimized dynamic outputs consequently change; this is not an output-neutral
 cleanup. N7 as a whole and N9 scientific baseline approval remain open. N8 stays
 satisfied. The next bounded package is N7-B, not layer storage or new physics.
 
-The [machine-readable evidence](results_n7_a_2026_10_10.json) pins production and
+The [machine-readable evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n7_a_2026_10_10.json) pins production and
 numerical fixture hashes, the frozen contract, case inventory, execution
 fingerprints, raw-evidence hashes, all audit results and baseline comparisons.
 The [test README](../../TESTS/TEST_N7_EQUILIBRIUM/README.md) explains execution and
