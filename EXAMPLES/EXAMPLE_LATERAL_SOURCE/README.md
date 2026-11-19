@@ -71,9 +71,9 @@ The former 900 K invocation with `XS_SOURCE=0.01` is a different, mass-basis mix
 
 The legacy README says the example uses a simple friction model "as in [1]", but no corresponding bibliography entry is supplied. Do not infer a specific reference until it has been checked.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record, including its historical description of the concentration as a mass fraction. The active guide corrects the composition to 1% by volume and records the distinction between `ALPHAS_SOURCE` and `XS_SOURCE`; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are retained here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Documentation verification note
 

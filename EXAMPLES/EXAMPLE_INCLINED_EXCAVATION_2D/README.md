@@ -93,9 +93,9 @@ The Q1 shared-face bed and positivity-limited `η−B` reconstruction produce ze
 
 The original README proposes the following integral measures: `M_uphill` for `x<10 m`; `M_downhill` for `x≥20 m`; `M_south` for `y<−5 m` and `10≤x<20`; `M_north` for `y≥5 m` and `10≤x<20`. Before physically driven overtopping, uphill and lateral masses should remain zero up to roundoff, while downhill mass grows only after eastern overtopping.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are retained here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Topography files
 

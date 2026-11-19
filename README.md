@@ -16,13 +16,15 @@ or, on a osx computer:
 > conda activate fortran_env
 
 
-Current source architecture uses exactly one physical phase flag (gas, liquid, or
-lava). The old dispersed-liquid conservative component and its `xl_source`
-input are no longer supported. Mass exchange is assembled by
-`src/physics/mass_exchange/mass_exchange_2d.f90`; the binary checkpoint
-format is v7 and is not compatible with older versions. For the active
-implementation and validation scope see
-[the D18.MX consolidation status](docs/IMEX_SfloW2D_Development_Roadmap.md).
+The current physical configuration selects a single carrier phase (gas, liquid,
+or lava). The unsupported dispersed-liquid conservative component and its
+`xl_source` input have been removed. Mass exchange is assembled in
+`src/physics/mass_exchange/mass_exchange_2d.f90`. Binary restart uses one
+current development schema; older development checkpoints are not supported
+and must not be treated as separate supported formats. The production
+two-layer gate remains closed while its validation continues.
+See [the current documentation index](docs/README.md) and
+[the two-layer architecture roadmap](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
 
 To compile:
 
@@ -72,8 +74,7 @@ Several examples can be found in the EXAMPLES folder.
 
 The [Etna lava example](EXAMPLES/EXAMPLE_ETNA_LAVA/README.md) uses two bottom
 fissures and the original Etna DEM before avalanche preprocessing. Together
-with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it replaces
-`EXAMPLE_LAVA_IMO` in that selection without removing the existing IMO example.
+with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it is part of the representative source and long-run validation cases.
 
 ## Release downloads
 
@@ -133,36 +134,24 @@ for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected po
 
 ## Runout and binary continuation
 
-The binary checkpoint format is now **v5**. It preserves the original runout
-origin and initial extents, previous barycentre, diagnostic sampling history,
-maximum runout and steady-stop state together with the physical state.
-Earlier binary formats, including v4, are rejected: they cannot provide an
-exact diagnostic continuation. ASCII initial conditions remain supported and
-are not treated as a binary continuation merely because `RESTART=T`.
+Binary restart is a **single development-only checkpoint schema**. It stores
+the canonical conservative and auxiliary state together with the runtime and
+runout sampling history required for continuation. Checkpoints written by
+superseded development implementations are not accepted; regenerate them
+instead of maintaining a versioned reader.
 
-Runout is written only to `RUN_NAME_runout.csv`; the accompanying barycentre
-and directional extents remain in `RUN_NAME_mass_center.csv`. Their existing
-five-column schemas and formatting are unchanged. `runout.txt` is neither read
-nor written. Existing legacy files are not automatically deleted.
+Runout diagnostics are written to `RUN_NAME_runout.csv` and
+`RUN_NAME_mass_center.csv`. On continuation, their existing headers and
+sampling history must be consistent with the restored checkpoint; incompatible
+histories are rejected without truncation. A missing CSV begins a new output
+segment and cannot reconstruct earlier diagnostic rows.
 
-For a binary continuation, both existing CSVs are checked before either is
-opened for append. Headers, finite ordered records and the exact last row must
-match the restored diagnostic history. The last sample need not occur at the
-checkpoint time. No header or checkpoint-time row is duplicated. A missing
-CSV starts a new segment with a header; its earlier rows cannot be recovered
-from a checkpoint.
-
-Incompatible, incomplete or later CSV histories cause an error without
-truncation or overwriting. Use matching histories or a new execution directory
-to start a segment. Keep the runout origin configuration, `DT_RUNOUT`,
-`ALPHAS_THRESHOLD`, `EPS_STOP` and `OUTPUT_RUNOUT_FLAG` unchanged for an exact
-continuation. Changes to the simulation end time are allowed; an already
-requested steady stop retains its original deadline.
-
-This policy applies to the runout and mass-centre CSVs. Probe CSV handling is
-unchanged by this package. See the
-[restart verification](docs/acceptance/N9_RESTART_V5_2026_10_11.md) for the
-verified cases and remaining acceptance scope.
+Keep the runout origin and relevant diagnostic scheduling parameters unchanged
+for a continuous restart. The dated
+[restart acceptance report](docs/acceptance/N9_RESTART_V5_2026_10_11.md)
+records historical validation evidence, **not** an additional supported
+checkpoint format. Consult [the current output guide](docs/NETCDF_OUTPUT.md)
+for physical-field and restart-file responsibilities.
 
 ## Runtime diagnostics
 

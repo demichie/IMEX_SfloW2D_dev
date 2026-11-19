@@ -60,9 +60,9 @@ The test has a supercritical inlet, no friction, no sedimentation or entrainment
 
 Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in ParaView.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are retained here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Topography files
 

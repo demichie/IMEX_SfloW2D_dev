@@ -62,9 +62,9 @@ Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in 
 1. Wang, Y., Hutter, K., and Pudasaini, S. P. (2004). The Savage-Hutter theory: A system of partial differential equations for avalanche flows of snow, debris, and mud. *ZAMM*, 84(8), 507–527. DOI: 10.1002/zamm.200310123.
 2. Gueugneau, V., Kelfoun, K., Roche, O., and Chupin, L. (2017). Effects of pore pressure in pyroclastic flows: numerical simulation and experimental validation. *Geophysical Research Letters*, 44(5), 2194–2202.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Differences in historical commands or parameters are documented here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Topography files
 

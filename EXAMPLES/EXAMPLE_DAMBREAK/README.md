@@ -183,9 +183,9 @@ The original README attributes the compaction/permeability formulation to Claudi
 
 Barker and Gray (2017), cited in the original README for regularized μ(I). Complete bibliographic details require verification.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are recorded here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Documentation verification note
 
