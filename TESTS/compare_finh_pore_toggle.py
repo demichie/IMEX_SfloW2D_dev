@@ -30,7 +30,12 @@ def without_pore_pressure(text):
 
 def run_pair(solver, evidence, timeout):
     evidence.mkdir(parents=True, exist_ok=True)
-    original = (FIXTURE / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
+    # Local fixture edits must not change the committed reference experiment.
+    reference = "HEAD:TESTS/TEST_DAMBREAK/TEST_OFF_FINH/IMEX_SfloW2D.inp"
+    original = subprocess.run(
+        ["git", "-C", str(ROOT), "show", reference],
+        check=True, capture_output=True, text=True,
+    ).stdout
     variants = (("original", original), ("no_pore_pressure", without_pore_pressure(original)))
     results = []
     with tempfile.TemporaryDirectory(prefix="imex-finh-pore-") as directory:
