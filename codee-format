@@ -1,0 +1,41 @@
+# IMEX-SfloW2D official Codee Formatter configuration.
+# Canonical conventions: docs/FORTRAN_STYLE.md.
+BasedOnStyle: Preserve
+
+IndentSize: 4
+ContinuationIndentSize: 4
+IndentExceptions:
+  Contains: IndentBeforeAndAfter
+  Comments: IndentIfAlreadyIndented
+
+ColumnLimit: 120
+AlignAmpersandToColumnLimit: true
+AlignAssignmentOperators: false
+AlignUseItems:
+  Kind: Regular
+  FirstLineFit: FitIfPossible
+
+Casing:
+  Identifiers: Preserve
+  Keywords: Uppercase
+  LogicalConstants: Uppercase
+  LogicalOperators: Uppercase
+  RelationalOperators: Uppercase
+  UserDefinedOperators: Preserve
+
+ConsecutiveEmptyLines:
+  MaxToKeep: 1
+  BetweenProcedures: 1
+  RemoveAtStartOfFile: true
+  RemoveAtEndOfFile: true
+
+DoubleColonSeparator: Preserve
+EndOfLineNormalization: Preserve
+EndStatementFormat: Preserve
+KindKeywordPrefix: Preserve
+RelationalOperators: Preserve
+RemoveConsecutiveWhitespace: false
+RemoveSemicolons: false
+RemoveTrailingWhitespace: true
+SeparateMultipleInlineStatements: false
+EnsureNewlineAtEOF: true
