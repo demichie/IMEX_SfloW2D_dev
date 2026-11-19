@@ -18,10 +18,14 @@ def instrument(source, include_spatial=False):
     The CFL proposal is already saved in cfl_dt immediately after
     compute_timestep; do not duplicate or modify the numerical evaluation.
     """
-    marker = re.compile(r"(?m)^(?P<indent> *)CALL simulation%advance_timestep\(")
+    call = re.compile(r"\bCALL\s+simulation%advance_timestep\s*\(", re.IGNORECASE)
+    if len(call.findall(source)) != 1:
+        raise AssertionError("unexpected main signature: exactly one advance hook required")
+
+    marker = re.compile(r"(?m)^(?P<indent> *)CALL simulation%advance_timestep\(", re.IGNORECASE)
     matches = list(marker.finditer(source))
     if len(matches) != 1:
-        raise AssertionError("unexpected main signature: exactly one advance hook required")
+        raise AssertionError("advance hook must start on its own source line")
 
     indent = matches[0].group("indent")
     record = "simulation%runtime%t, simulation%runtime%dt"

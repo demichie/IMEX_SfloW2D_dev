@@ -20,7 +20,7 @@ class FieldCheckerTests(unittest.TestCase):
         observed = instrument(marker)
         self.assertEqual(observed.count(marker), 1)
         self.assertIn("WRITE(accepted_time_unit)", observed)
-        for bad in ("", marker+marker):
+        for bad in ("", marker+marker, marker+"\n"+marker):
             with self.assertRaises(AssertionError):
                 instrument(bad)
 
