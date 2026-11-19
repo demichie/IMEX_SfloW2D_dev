@@ -13,31 +13,34 @@ import subprocess
 
 
 def instrument(source, include_spatial=False):
-    """Insert I/O immediately before the single production IMEX advance call."""
-    marker = "      CALL simulation%advance_timestep()"
-    if source.count(marker) != 1:
+    """Record accepted times before the unique production advance call.
+
+    The CFL proposal is already saved in cfl_dt immediately after
+    compute_timestep; do not duplicate or modify the numerical evaluation.
+    """
+    marker = re.compile(r"(?m)^(?P<indent> *)CALL simulation%advance_timestep\\(")
+    matches = list(marker.finditer(source))
+    if len(matches) != 1:
         raise AssertionError("unexpected main signature: exactly one advance hook required")
-    hook = """      BLOCK
-         INTEGER :: accepted_time_unit
-         OPEN(NEWUNIT=accepted_time_unit,FILE='accepted_times.bin', &
-              ACCESS='STREAM',FORM='UNFORMATTED',STATUS='UNKNOWN',POSITION='APPEND')
-         WRITE(accepted_time_unit) simulation%runtime%t, simulation%runtime%dt
-         CLOSE(accepted_time_unit)
-      END BLOCK
-"""
+
+    indent = matches[0].group("indent")
+    record = "simulation%runtime%t, simulation%runtime%dt"
     if include_spatial:
-        declaration = "   IMPLICIT NONE"
-        if source.count(declaration) != 1:
-            raise AssertionError("unexpected main declaration")
-        source = source.replace(declaration, declaration + "\n  REAL(wp) :: observed_spatial_dt", 1)
-        proposal = ("                simulation%runtime%dt, simulation%domains(1), &\n"
-                    "                boundary_source_enabled=boundary_source_enabled)")
+        proposal = "        cfl_dt=simulation%runtime%dt"
         if source.count(proposal) != 1:
-            raise AssertionError("unexpected spatial proposal hook")
-        source = source.replace(proposal, proposal + "\n      observed_spatial_dt = simulation%runtime%dt", 1)
-        hook = hook.replace("simulation%runtime%t, simulation%runtime%dt",
-                            "simulation%runtime%t, simulation%runtime%dt, observed_spatial_dt")
-    return source.replace(marker, hook + marker)
+            raise AssertionError("unexpected spatial timestep proposal hook")
+        record += ", cfl_dt"
+
+    hook = (
+        f"{indent}BLOCK\\n"
+        f"{indent}    INTEGER :: accepted_time_unit\\n"
+        f"{indent}    OPEN(NEWUNIT=accepted_time_unit,FILE='accepted_times.bin', &\\n"
+        f"{indent}        ACCESS='STREAM',FORM='UNFORMATTED',STATUS='UNKNOWN',POSITION='APPEND')\\n"
+        f"{indent}    WRITE(accepted_time_unit) {record}\\n"
+        f"{indent}    CLOSE(accepted_time_unit)\\n"
+        f"{indent}END BLOCK\\n"
+    )
+    return source[:matches[0].start()] + hook + source[matches[0].start():]
 
 
 def configured_flags(directory):
