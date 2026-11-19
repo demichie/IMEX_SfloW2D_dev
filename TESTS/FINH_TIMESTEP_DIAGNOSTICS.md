@@ -56,6 +56,27 @@ speeds. The diagnostic uses the CFL work already computed during the
 normal evolution. When diagnostics are disabled, neither this output
 nor a second CFL evaluation occurs.
 
+For sampled steps where `max_a_x > 100 m/s`, the solver additionally
+prints `CFL_X_FACE` records. The first active x-face attaining the exact
+global maximum is selected deterministically, after the OpenMP reduction.
+The records include its `j,k` face indices, signed characteristic bounds,
+the two full physical face states actually passed to the speed-bound kernel
+(including selected depths and the dry-state velocity zeroing), cached
+hydrostatic coefficients, and the neighboring conservative/primitive cell
+states. The left cell is `j-1,k` and the right cell is `j,k`, when
+within grid bounds. Printing is restricted to the first 20 steps and every
+100th step thereafter, and only when `IMEX_TIMESTEP_DIAGNOSTICS=1`.
+This diagnostic does not recompute waves or alter reconstruction, CFL,
+or source integration.
+
+For the observed OFF/STEP failure, inspect steps 5 through 9: the first
+abnormal x characteristic bound occurs at step 6 (`t≈6.22e-5 s`).
+Compare `CFL_X_FACE left_speed_input` and `right_speed_input` with the
+neighboring cell states to determine whether the huge bound originates
+from a reconstructed velocity, selected depth, or another local wave-speed
+input. Do not interpret the records as proof of a specific cause until the
+actual limiting face has been inspected.
+
 The driver also rejects any selected nonfinite, nonpositive or
 non-advancing timestep (`t + dt <= t`) with `INVALID_TIMESTEP`.
 This is an explicit failure, not a silent lower-bound substitution.

@@ -8,7 +8,7 @@
 !********************************************************************************
 
 MODULE spatial_operator_2d
-    USE parameters_2d, ONLY : idx_totMassEqn, idx_T
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_T, idx_u, idx_v, dry_thickness_tolerance
 
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
     USE diagnostics_2d, ONLY : fatal_error
@@ -221,6 +221,7 @@ CONTAINS
     !> evaluation.
     !> @param[out] max_speed_x Optional maximum x-face characteristic speed for diagnostics [m/s].
     !> @param[out] max_speed_y Optional maximum y-face characteristic speed for diagnostics [m/s].
+    !> @param[in] diagnose_max_x_face Print the CFL-limiting x-face and its input states when requested.
     !> @param[in] lower_operator Optional prepared L1 spatial operator; L2 reconstruction only.
     !> @param[in] h_lower Optional lower-layer thickness, paired with lower_operator.
     !> @note The returned CFL still uses isolated-layer characteristic bounds;
@@ -228,7 +229,7 @@ CONTAINS
     !******************************************************************************
 
     SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled, &
-        lower_operator, h_lower, max_speed_x, max_speed_y )
+        lower_operator, h_lower, max_speed_x, max_speed_y, diagnose_max_x_face )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -240,8 +241,11 @@ CONTAINS
         CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower_operator
         REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
         REAL(wp), INTENT(OUT), OPTIONAL :: max_speed_x,max_speed_y
+        LOGICAL, INTENT(IN), OPTIONAL :: diagnose_max_x_face
 
-        INTEGER :: j, k, l
+        INTEGER :: j, k, l, face_j, face_k
+        REAL(wp) :: face_speed
+        REAL(wp) :: qp_face_l(n_vars),qp_face_r(n_vars)
         REAL(wp) :: max_a_x, max_a_y
         REAL(wp) :: dynamic_pressure
         INTEGER :: tick,tock,tick_rate
@@ -331,6 +335,54 @@ CONTAINS
         CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
         IF (PRESENT(max_speed_x)) max_speed_x=max_a_x
         IF (PRESENT(max_speed_y)) max_speed_y=max_a_y
+        ! Run this serial diagnostic only after all OpenMP speed reductions
+        ! have completed. Reuse the exact selected traces and cached bounds.
+        IF (PRESENT(diagnose_max_x_face)) THEN
+            IF (diagnose_max_x_face .AND. max_a_x>100.0_wp) THEN
+                face_j=0
+                face_k=0
+                DO l=1,domain%solve_interfaces_x
+                    j=domain%j_stag_x(l)
+                    k=domain%k_stag_x(l)
+                    face_speed=MAX(this%hp_pccu%a_interface_xPos(j,k), &
+                        -this%hp_pccu%a_interface_xNeg(j,k))
+                    IF (face_speed==max_a_x) THEN
+                        face_j=j
+                        face_k=k
+                        EXIT
+                    END IF
+                END DO
+                IF (face_j>0) THEN
+                    j=face_j
+                    k=face_k
+                    qp_face_l=this%reconstruction%qp_adv_interfaceL(:,j,k)
+                    qp_face_r=this%reconstruction%qp_adv_interfaceR(:,j,k)
+                    qp_face_l(1)=this%reconstruction%h_selected_interfaceL(j,k)
+                    qp_face_r(1)=this%reconstruction%h_selected_interfaceR(j,k)
+                    IF (qp_face_l(1)<=dry_thickness_tolerance) qp_face_l(idx_u:idx_v)=0.0_wp
+                    IF (qp_face_r(1)<=dry_thickness_tolerance) qp_face_r(idx_u:idx_v)=0.0_wp
+                    WRITE(*,'(A,2(A,I0),3(A,ES24.16))') 'CFL_X_FACE', &
+                        ' j=',j,' k=',k, &
+                        ' a_neg=',this%hp_pccu%a_interface_xNeg(j,k), &
+                        ' a_pos=',this%hp_pccu%a_interface_xPos(j,k), &
+                        ' max_a_x=',max_a_x
+                    WRITE(*,'(A,*(ES24.16,1X))') 'CFL_X_FACE left_speed_input=',qp_face_l
+                    WRITE(*,'(A,*(ES24.16,1X))') 'CFL_X_FACE right_speed_input=',qp_face_r
+                    WRITE(*,'(A,4(A,ES24.16))') 'CFL_X_FACE geometry', &
+                        ' selected_h_l=',qp_face_l(1),' selected_h_r=',qp_face_r(1), &
+                        ' gamma_l=',this%hp_pccu%gamma_interface_xL(j,k), &
+                        ' gamma_r=',this%hp_pccu%gamma_interface_xR(j,k)
+                    IF (j>1) THEN
+                        WRITE(*,'(A,*(ES24.16,1X))') 'CFL_X_FACE left_center_q=',q(:,j-1,k)
+                        WRITE(*,'(A,*(ES24.16,1X))') 'CFL_X_FACE left_center_qp=',qp(:,j-1,k)
+                    END IF
+                    IF (j<=comp_cells_x) THEN
+                        WRITE(*,'(A,*(ES24.16,1X))') 'CFL_X_FACE right_center_q=',q(:,j,k)
+                        WRITE(*,'(A,*(ES24.16,1X))') 'CFL_X_FACE right_center_qp=',qp(:,j,k)
+                    END IF
+                END IF
+            END IF
+        END IF
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)

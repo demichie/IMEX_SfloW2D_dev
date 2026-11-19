@@ -472,7 +472,9 @@ PROGRAM IMEX_SfloW2D
                 simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
                 simulation%runtime%dt, simulation%domains(1), &
                 boundary_source_enabled=boundary_source_enabled, &
-                max_speed_x=cfl_max_a_x,max_speed_y=cfl_max_a_y)
+                max_speed_x=cfl_max_a_x,max_speed_y=cfl_max_a_y, &
+                diagnose_max_x_face=timestep_diagnostics_enabled .AND. &
+                    (timestep_count<20 .OR. MOD(timestep_count+1,100)==0))
         cfl_dt=simulation%runtime%dt
 
         IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                                                         &
