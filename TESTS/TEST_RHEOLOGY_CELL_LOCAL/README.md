@@ -165,3 +165,17 @@ This suite remains a standalone check, distributed with the project. Scientific
 formula changes, ownership migration, model-8 removal and broader compiler or
 platform acceptance belong to separately validated follow-ups. No test tolerance
 has been increased to close the initial findings.
+
+## Optional explicit mu(I) momentum-reversal witness
+
+For a single-thread run with the isolated explicit mu(I) Lie group, set
+`IMEX_LIE_DIAGNOSTICS=1 OMP_NUM_THREADS=1`. The solver prints
+`MUI_EXPLICIT_REVERSAL` and `MUI_EXPLICIT_MOMENTUM` records whenever the
+Euler friction substep reverses the conservative horizontal momentum.
+The records include cell indices, layer, group, start time, source timestep
+and both momentum vectors. This is observational only: the source rate,
+rollback logic, physical laws, and timestep remain unchanged. No reversal
+is attributed to mu(I) when its Lie group contains additional processes.
+The earlier `limit_rheology_momentum_reversal` procedure exists but is not
+invoked automatically in this path; numerical treatment changes require
+separate review and tests.

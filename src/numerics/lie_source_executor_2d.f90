@@ -283,6 +283,8 @@ CONTAINS
         USE state_fields, ONLY : initialize_dry_physical_cell,physical_cell_state_finite,finite_real_value
         USE state_composition, ONLY : conservative_mass_admissible
         USE parameters_2d, ONLY : sea_mass_removal_flag,idx_h
+        USE parameters_2d, ONLY : idx_uEqn,idx_vEqn
+        USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
         USE substrate_parameters_2d, ONLY : substrate
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
@@ -645,6 +647,23 @@ CONTAINS
                     ! Stage the entire local fluid/substrate transfer before committing it.
                     q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
+
+                    ! Isolated mu(I) friction must only slow the existing momentum.
+                    ! Record an overshooting explicit Euler step, without altering it.
+                    IF (executor%diagnostics_enabled .AND. &
+                        executor%groups(group_index)%rheology_name=='rheology_mui' .AND. &
+                        SIZE(executor%groups(group_index)%source_names)==1) THEN
+                        IF (DOT_PRODUCT(q_local(idx_uEqn:idx_vEqn), &
+                            q_candidate(idx_uEqn:idx_vEqn))<0.0_wp) THEN
+                            WRITE(error_unit,'(A,4(A,I0),2(A,ES24.16))') 'MUI_EXPLICIT_REVERSAL', &
+                                ' j=',j,' k=',k,' layer=',layer,' group=',executor%groups(group_index)%id, &
+                                ' t=',source_time,' dt=',time_step
+                            WRITE(error_unit,'(A,4(ES24.16,1X))') 'MUI_EXPLICIT_MOMENTUM=', &
+                                q_local(idx_uEqn),q_local(idx_vEqn), &
+                                q_candidate(idx_uEqn),q_candidate(idx_vEqn)
+                            FLUSH(error_unit)
+                        END IF
+                    END IF
 
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                         cell_error=6
