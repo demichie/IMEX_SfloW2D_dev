@@ -217,7 +217,7 @@ CONTAINS
     !> @param[out] xc Total carrier mass fraction, including additional gases.
     !> @param[out] cp_c Carrier heat capacity (J/kg/K).
     !> @param[out] cp_m Mass-specific mixture heat capacity (J/kg/K).
-    SUBROUTINE evaluate_mixture_from_volume(T,alphag,alphas,rho_m,inv_rho_m,                                            
+    SUBROUTINE evaluate_mixture_from_volume(T,alphag,alphas,rho_m,inv_rho_m,                                           &
             rho_c,xs,xg,xc,cp_c,cp_m)
         REAL(wp), INTENT(IN) :: T,alphag(n_add_gas)
         REAL(wp), INTENT(INOUT) :: alphas(n_solid)
@@ -251,7 +251,7 @@ CONTAINS
         xs=alphas*rho_s/rho_from_volume
         xg=alphag*rho_g/rho_from_volume
 
-        CALL evaluate_mixture(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,                                                  
+        CALL evaluate_mixture(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,                                                 &
             cp_m,cp_c,phase_alphas,phase_alphag)
         xc=1.0_wp-SUM(xs)
     END SUBROUTINE evaluate_mixture_from_volume
@@ -273,7 +273,7 @@ CONTAINS
         xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (.NOT.normalize_face_composition(xs,xg))                                                                    &
             ERROR STOP 'Invalid primitive composition in volume conversion'
-        CALL evaluate_mixture_phase_properties(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,                         
+        CALL evaluate_mixture_phase_properties(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,                        &
             alphas,alphag)
     END SUBROUTINE primitive_to_volume_fractions
 

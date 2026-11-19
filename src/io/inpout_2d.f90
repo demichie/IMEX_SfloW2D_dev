@@ -4679,7 +4679,7 @@
                     ! INOUT
                     alphas_source(1:n_solid),                                                                          &
                     ! OUT
-                    rho_m, inv_rho_m, rho_c, xs_source(1:n_solid),                                                      
+                    rho_m, inv_rho_m, rho_c, xs_source(1:n_solid),                                                     &
                     xg_source(1:n_add_gas), xc_source, sp_heat_c,                                                      &
                     sp_heat_mix)
 
@@ -4747,7 +4747,7 @@
                     qp_source(idx_T) = T_source
 
                     CALL evaluate_mixture(T_source,xs_source(1:n_solid),xg_source(1:n_add_gas),                        &
-                        rho_m,inv_rho_m,rho_c,inv_rho_c,sp_heat_mix,sp_heat_c,                                          
+                        rho_m,inv_rho_m,rho_c,inv_rho_c,sp_heat_mix,sp_heat_c,                                         &
                         alphas_source(1:n_solid),alphag_source(1:n_add_gas))
 
                     WRITE (*, *) 'Source solid volume fraction =', alphas_source(1:n_solid)
@@ -5656,7 +5656,7 @@
             ! INOUT
             alphas_init,                                                                                               &
             ! OUT
-            rho_m, inv_rho_m, rho_c,                                                                                    
+            rho_m, inv_rho_m, rho_c,                                                                                   &
             mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
 
             state%q(idx_totMassEqn,1, :, :) = thickness_init(:, :)*rho_m
