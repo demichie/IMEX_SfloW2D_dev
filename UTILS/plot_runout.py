@@ -1,62 +1,57 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import sys
-import os.path
+#!/usr/bin/env python3
+"""Plot solver runout and area history, reporting maximum-runout milestones."""
+import argparse
+import csv
 from pathlib import Path
 
-if len(sys.argv) == 2:
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 
-    runout_file = sys.argv[1]
 
-    os.path.isfile(runout_file)
+def analyze(path):
+    path = Path(path)
+    with path.open(newline="", encoding="utf-8") as stream:
+        reader = csv.reader(stream)
+        next(reader, None)
+        rows = [row for row in reader if any(part.strip() for part in row)]
+    if not rows:
+        raise ValueError(f"No runout samples in {path}")
+    data = np.atleast_2d(np.asarray([[float(v) for v in row] for row in rows]))
+    if data.shape[1] < 3 or not np.all(np.isfinite(data[:, :3])):
+        raise ValueError(f"Invalid runout CSV: {path}")
+    time, distance, area = data[:, 0], data[:, 1], data[:, 2]
+    if np.any(np.diff(time) <= 0):
+        raise ValueError("Runout times must be strictly increasing")
+    fig, ax = plt.subplots(figsize=(9, 5))
+    twin = ax.twinx()
+    ax.plot(time, distance, "C0-", label="Runout")
+    twin.plot(time, area, "C1-", label="Area")
+    ax.set(xlabel="Time (s)", ylabel="Runout (m)")
+    twin.set_ylabel("Area (m²)")
+    fig.tight_layout()
+    output = path.with_suffix(".png")
+    fig.savefig(output)
+    plt.close(fig)
+    maximum = float(np.max(distance))
+    milestones = {}
+    if maximum > 0:
+        for portion in (0.95, 0.99):
+            indices = np.flatnonzero(distance >= portion * maximum)
+            milestones[portion] = (float(time[indices[0]]), float(distance[indices[0]]))
+    return output, float(time[np.argmax(distance)]), maximum, milestones
 
-else:
 
-    print('Please provide file name (*_runout.csv)\n')
-    sys.exit()
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("runout_csv", type=Path)
+    args = parser.parse_args()
+    output, when, maximum, milestones = analyze(args.runout_csv)
+    print(f"{output}\nMaximum runout: {maximum:g} m at {when:g} s")
+    for fraction, (time, distance) in milestones.items():
+        print(f"First {fraction:.0%} of maximum: {distance:g} m at {time:g} s")
 
-data = np.genfromtxt(runout_file, delimiter=',', skip_header=1)
-print(data.shape)
 
-time = data[:, 0]
-runout = data[:, 1]
-area = data[:, 2]
-
-# read the content of the file opened
-file = open(runout_file)
-content = file.readlines()
-
-# read 10th line from the file
-# print("variable names line")
-
-fig, ax1 = plt.subplots()
-
-plt.xlim([np.amin(time), np.amax(time)])
-
-ax2 = ax1.twinx()
-ax1.plot(time, runout, 'g-')
-ax2.plot(time, area, 'b-')
-
-ax1.set_xlabel('time [s]')
-ax1.set_ylabel('runout [m]', color='g')
-ax2.set_ylabel('area [m2]', color='b')
-
-fig.savefig(Path(runout_file).with_suffix('.png'))
-
-idx = int(np.argmax(runout))
-print('time', time[idx])
-print('runout', runout[idx])
-
-max_runout = runout[idx]
-
-set0 = np.array(np.argwhere(runout > 0.99 * max_runout))
-idx = set0[0]
-print('99% runout', runout[idx])
-print('time for 99% max runout', time[idx])
-
-set0 = np.array(np.argwhere(runout > 0.95 * max_runout))
-idx = set0[0]
-print('95% runout', runout[idx])
-print('time for 95% max runout', time[idx])
-
-# plt.show()
+if __name__ == "__main__":
+    main()

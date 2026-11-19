@@ -93,17 +93,15 @@ must be removed.
 ./cleanFolder.sh
 ```
 
-For optional raster plotting, link the plotting utility:
+For optional raster plotting, use the shared utility directly with the
+run's actual output directory (adjust the run name if needed):
 
 ```bash
-ln -s ../../UTILS/plot_overlay.py .
+python ../../UTILS/plot_overlay.py OUTPUT/exampleEtna
 ```
 
-Then create the overlay images:
-
-```bash
-python plot_overlay.py
-```
+This requires `OUTPUT_ESRI_FLAG=T`. For NetCDF-only output, use
+[ParaView](../../UTILS/README_ParaView.md) instead.
 
 
 ## Expected output

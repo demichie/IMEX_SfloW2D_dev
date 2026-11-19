@@ -109,7 +109,7 @@ The original README specifies substitution tokens in the form `ENSEMBLE_xyz` and
 /
 ```
 
-`templatedir/run.sh` orchestrates the ellipsoidal-volume preprocessing and solver execution. Its optional per-run plotting command is commented out by default; enable it *before* copying the template folder to run the overlay postprocessor for each realization. The original documentation skips step 7 in its numbering and contains the misspellings `ENSAMBLE` and `create_ensamble.py`; these are documentation errors, not names to adopt as new conventions.
+`templatedir/run.sh` orchestrates the ellipsoidal-volume preprocessing and solver execution. Its optional per-run plotting command is commented out by default. After a realization finishes, invoke the shared `UTILS/plot_overlay.py` with that realization's `OUTPUT/<RUN_NAME>` directory. No copy of the postprocessor is retained in the template. The original documentation skips step 7 in its numbering and contains the misspellings `ENSAMBLE` and `create_ensamble.py`; these are documentation errors, not names to adopt as new conventions.
 
 ### 2. Generate ensemble members and run simulations
 

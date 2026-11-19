@@ -12,4 +12,4 @@ export OMP_NUM_THREADS=1
 ./IMEX_SfloW2D > run.log
 
 # Optional per-run plots; rasters are stored in OUTPUT/<RUN_NAME>/.
-#python plot_overlay.py > postprocessing1.log
+# From this realization directory, if ESRI output is enabled:\n# python ../../../../UTILS/plot_overlay.py OUTPUT/exampleEtna > postprocessing1.log
