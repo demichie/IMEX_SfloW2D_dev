@@ -33,7 +33,6 @@ jobs:
       OMP_DYNAMIC: 'FALSE'
       OPENBLAS_NUM_THREADS: '1'
       IMEX_TEST_CASE_TIMEOUT: ${{ matrix.case_timeout }}
-      IMEX_TEST_LOG_DIR: ${{ runner.temp }}/imex-integration-logs
     steps:
       - uses: actions/checkout@v4
       - name: Install compiler and test dependencies
@@ -55,6 +54,8 @@ jobs:
           test -x src/IMEX_SfloW2D
       - name: Run integration test suite
         shell: bash
+        env:
+          IMEX_TEST_LOG_DIR: ${{ runner.temp }}/imex-integration-logs
         run: |
           set -euo pipefail
           sh -n TESTS/run_tests.sh
