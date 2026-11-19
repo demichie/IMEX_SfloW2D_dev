@@ -1055,6 +1055,12 @@ CONTAINS
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
             END IF
+            ! Report the accepted bed increment only in diagnostic mode.
+            ! The same cell-local bed rates are used by apply_local_bed_rate.
+            IF (executor%diagnostics_enabled) THEN
+                WRITE(*,'(A,I0,A,ES24.16)') 'D20_BED_WITNESS group=',executor%bed_group_id, &
+                    ' max_abs_delta=',MAXVAL(ABS(executor%bed_rate_cell))*ABS(time_step)
+            END IF
         END IF
         ! Refresh derived inventories only after all cells have been accepted.
         IF (executor%has_exchange_group) CALL state%refresh_substrate_totals()
