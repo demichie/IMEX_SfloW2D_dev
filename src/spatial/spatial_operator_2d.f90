@@ -219,6 +219,8 @@ CONTAINS
     !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
     !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL
     !> evaluation.
+    !> @param[out] max_speed_x Optional maximum x-face characteristic speed for diagnostics [m/s].
+    !> @param[out] max_speed_y Optional maximum y-face characteristic speed for diagnostics [m/s].
     !> @param[in] lower_operator Optional prepared L1 spatial operator; L2 reconstruction only.
     !> @param[in] h_lower Optional lower-layer thickness, paired with lower_operator.
     !> @note The returned CFL still uses isolated-layer characteristic bounds;
@@ -226,7 +228,7 @@ CONTAINS
     !******************************************************************************
 
     SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled, &
-        lower_operator, h_lower )
+        lower_operator, h_lower, max_speed_x, max_speed_y )
 
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -237,6 +239,7 @@ CONTAINS
         LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
         CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower_operator
         REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
+        REAL(wp), INTENT(OUT), OPTIONAL :: max_speed_x,max_speed_y
 
         INTEGER :: j, k, l
         REAL(wp) :: max_a_x, max_a_y
@@ -249,6 +252,8 @@ CONTAINS
         END IF
 
         dt = max_dt
+        IF (PRESENT(max_speed_x)) max_speed_x=0.0_wp
+        IF (PRESENT(max_speed_y)) max_speed_y=0.0_wp
 
         ! The sentinel selects the prescribed max_dt without evaluating face speeds.
         IF ( cfl .EQ. -1.0_wp ) THEN
@@ -324,6 +329,8 @@ CONTAINS
         !$OMP END PARALLEL DO
 
         CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
+        IF (PRESENT(max_speed_x)) max_speed_x=max_a_x
+        IF (PRESENT(max_speed_y)) max_speed_y=max_a_y
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)

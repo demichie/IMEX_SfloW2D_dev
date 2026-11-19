@@ -79,6 +79,12 @@ run_case() {
                 ;;
         esac
         case_name=$(basename "$case_dir")
+        case "$case_name" in
+            TEST_*_FINH)
+                IMEX_TIMESTEP_DIAGNOSTICS=1
+                export IMEX_TIMESTEP_DIAGNOSTICS
+                ;;
+        esac
         solver_log=solver.log
         if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
             mkdir -p "$IMEX_TEST_LOG_DIR"
@@ -137,13 +143,19 @@ run_case() {
         run_finished_epoch=$(date +%s)
         elapsed_seconds=$((run_finished_epoch - run_started_epoch))
         last_progress=$(grep '^t =' "$solver_log" | tail -n 1 || true)
+        last_timestep=$(grep '^TIMESTEP_DIAG' "$solver_log" | tail -n 1 || true)
         printf 'END: %s status=%s elapsed=%ss last_step=%s\n' \
             "$case_name" "$solver_status" "$elapsed_seconds" "${last_progress:-not available}"
+        if [ -n "$last_timestep" ]; then
+            printf '%s LAST_TIMESTEP: %s\n' "$case_name" "$last_timestep"
+        fi
         if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
             printf 'started_utc=%s\nfinished_utc=%s\nelapsed_seconds=%s\nexit_code=%s\nlast_step=%s\n' \
                 "$run_started_utc" "$run_finished_utc" "$elapsed_seconds" \
                 "$solver_status" "${last_progress:-not available}" \
                 > "$IMEX_TEST_LOG_DIR/$case_name.timing.txt"
+            printf 'last_timestep=%s\n' "${last_timestep:-not available}" \
+                >> "$IMEX_TEST_LOG_DIR/$case_name.timing.txt"
         fi
         if [ "$solver_status" -ne 0 ]; then
             if [ "$solver_status" -eq 124 ] || [ "$solver_status" -eq 137 ]; then

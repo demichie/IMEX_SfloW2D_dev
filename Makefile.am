@@ -13,6 +13,9 @@ EXTRA_DIST = \
   README.md \
   TESTS/run_tests.sh \
   TESTS/INTEGRATION_CI.md \
+  TESTS/FINH_TIMESTEP_DIAGNOSTICS.md \
+  TESTS/compare_finh_timestep.py \
+  TESTS/test_compare_finh_timestep.py \
   TESTS/TEST_SOURCE_REGISTRY/README.md \
   TESTS/TEST_SOURCE_REGISTRY/run_test.sh \
   TESTS/TEST_SOURCE_REGISTRY/test_source_registry.f90 \
@@ -94,6 +97,7 @@ EXTRA_DIST = \
   TESTS/DIAGNOSTICS/ARCHIVE/kt_ritter_1d.f90
 
 check-local:
+	python3 -m unittest discover -s $(top_srcdir)/TESTS -p 'test_compare_finh_timestep.py'
 	python3 -m unittest discover -s $(top_srcdir)/EXAMPLES/EXAMPLE_ETNA_TWO_LAYER -p 'test_*.py'
 	$(SHELL) $(top_srcdir)/TESTS/TEST_OUTPUT_PATHS/run_test.sh \
 	  "$(FC)" "$(OPENMP_FCFLAGS)" "$(abs_top_builddir)/src"

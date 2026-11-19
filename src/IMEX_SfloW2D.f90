@@ -131,6 +131,10 @@ PROGRAM IMEX_SfloW2D
     CHARACTER(LEN=4) :: ext
     LOGICAL :: is_binary_restart
     LOGICAL :: runout_exists, mass_exists
+    LOGICAL :: timestep_diagnostics_enabled
+    INTEGER :: timestep_count
+    REAL(wp) :: cfl_dt,cfl_max_a_x,cfl_max_a_y
+    CHARACTER(LEN=8) :: timestep_diagnostics_setting
 
     WRITE(*,*) '---------------------'
     WRITE(*,*) 'IMEX_SfloW2D 2.0'
@@ -147,6 +151,10 @@ PROGRAM IMEX_SfloW2D
     CALL init_param
 
     CALL read_param
+    timestep_diagnostics_setting=''
+    CALL GET_ENVIRONMENT_VARIABLE('IMEX_TIMESTEP_DIAGNOSTICS',timestep_diagnostics_setting)
+    timestep_diagnostics_enabled=TRIM(timestep_diagnostics_setting)=='1'
+    timestep_count=0
 
     runout_exists = .FALSE.
     mass_exists = .FALSE.
@@ -463,7 +471,9 @@ PROGRAM IMEX_SfloW2D
         CALL simulation%spatial_operators(1)%compute_timestep( &
                 simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
                 simulation%runtime%dt, simulation%domains(1), &
-                boundary_source_enabled=boundary_source_enabled)
+                boundary_source_enabled=boundary_source_enabled, &
+                max_speed_x=cfl_max_a_x,max_speed_y=cfl_max_a_y)
+        cfl_dt=simulation%runtime%dt
 
         IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                                                         &
             simulation%runtime%t_output = t_end
@@ -497,6 +507,22 @@ PROGRAM IMEX_SfloW2D
         simulation%runtime%dt = MIN(simulation%runtime%dt,1.1_wp * 0.5_wp *                                            &
                 ( simulation%runtime%dt_old + simulation%runtime%dt_old_old ) )
 
+        timestep_count=timestep_count+1
+        IF (timestep_diagnostics_enabled .AND. &
+            (timestep_count<=20 .OR. MOD(timestep_count,100)==0)) THEN
+            WRITE(*,'(A,I0,5(A,ES24.16))') 'TIMESTEP_DIAG step=',timestep_count, &
+                ' t=',simulation%runtime%t,' cfl_dt=',cfl_dt, &
+                ' accepted_dt=',simulation%runtime%dt, &
+                ' max_a_x=',cfl_max_a_x,' max_a_y=',cfl_max_a_y
+        END IF
+        IF (.NOT.ieee_is_finite(simulation%runtime%dt) .OR. &
+            simulation%runtime%dt<=0.0_wp .OR. &
+            simulation%runtime%t+simulation%runtime%dt<=simulation%runtime%t) THEN
+            WRITE(*,'(A,3(A,ES24.16))') 'INVALID_TIMESTEP', &
+                ' t=',simulation%runtime%t,' cfl_dt=',cfl_dt, &
+                ' accepted_dt=',simulation%runtime%dt
+            CALL fatal_error('Selected timestep does not advance simulation time')
+        END IF
         simulation%runtime%dt_old_old = simulation%runtime%dt_old
         simulation%runtime%dt_old = simulation%runtime%dt
 
