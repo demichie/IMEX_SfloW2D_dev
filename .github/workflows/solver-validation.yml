@@ -23,13 +23,17 @@ jobs:
         include:
           - profile: optimized
             threads: '4'
+            case_timeout: '20m'
           - profile: strict-debug
             threads: '1'
+            case_timeout: '30m'
     env:
       FC: gfortran
       OMP_NUM_THREADS: ${{ matrix.threads }}
       OMP_DYNAMIC: 'FALSE'
       OPENBLAS_NUM_THREADS: '1'
+      IMEX_TEST_CASE_TIMEOUT: ${{ matrix.case_timeout }}
+      IMEX_TEST_LOG_DIR: ${{ runner.temp }}/imex-integration-logs
     steps:
       - uses: actions/checkout@v4
       - name: Install compiler and test dependencies
@@ -50,7 +54,19 @@ jobs:
           make -j4
           test -x src/IMEX_SfloW2D
       - name: Run integration test suite
-        run: make check
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n TESTS/run_tests.sh
+          make check
+      - name: Upload per-case solver logs and timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-${{ matrix.profile }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/imex-integration-logs/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify binary and stochastic restarts
         shell: bash
         run: |
