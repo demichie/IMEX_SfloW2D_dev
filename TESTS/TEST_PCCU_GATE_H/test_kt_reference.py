@@ -75,7 +75,7 @@ class KTReferenceTests(unittest.TestCase):
         q[..., 0] = 4.0e-8
         q[..., 1] = 7.0e-9
         q[..., 2] = -2.0e-9
-        final = kt.advance(q, np.zeros((5, 6)), 0.2, 0.2, [0.0001], p)
+        final, _ = kt.advance(q, np.zeros((5, 6)), 0.2, 0.2, [0.0001], p)
         np.testing.assert_array_equal(final[..., :3], q[..., :3])
 
     def test_reference_rejects_invalid_raw_states(self):
