@@ -67,7 +67,14 @@ class FieldCheckerTests(unittest.TestCase):
             c.compare(changed, h, h, h, 10)
         evidence = c.compare(changed, h, h, h, 10, enforce=False)
         self.assertFalse(evidence["within_original_roundoff_limit"])
+        self.assertIs(type(evidence["within_original_roundoff_limit"]), bool)
         self.assertGreater(evidence["h_Linf_m"], evidence["limit_m"])
+        # Both failure and success evidence must be JSON serializable.
+        import json
+        json.dumps(evidence, allow_nan=False)
+        passing = c.compare(h, h, h, h, 10, enforce=False)
+        self.assertIs(type(passing["within_original_roundoff_limit"]), bool)
+        json.dumps(passing, allow_nan=False)
 
     def test_same_input_step_rejects_corrupted_conservative_cell(self):
         from diagnose_trajectory import check_same_input_step

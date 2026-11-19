@@ -34,7 +34,7 @@ def compare(actual, expected, bed, initial_h, steps, enforce=True):
               "eta_Linf_m": float(np.max(np.abs(difference_eta))),
               "h_L1_m": float(np.mean(np.abs(difference_h))),
               "eta_L1_m": float(np.mean(np.abs(difference_eta)))}
-    result["within_original_roundoff_limit"] = max(result["h_Linf_m"], result["eta_Linf_m"]) <= limit
+    result["within_original_roundoff_limit"] = bool(max(result["h_Linf_m"], result["eta_Linf_m"]) <= limit)
     if enforce and not result["within_original_roundoff_limit"]:
         raise AssertionError(f"current IMEX full-field mismatch: {result}")
     return result
