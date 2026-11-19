@@ -693,10 +693,18 @@ CALL eval_rheology_mui_voellmy_implicit(quadratic_config,cs, &
        1.2402500000000004e-5_wp,0.5009884985665396_wp,speed_after)
   IF (speed_after<0.0_wp .OR. speed_after>0.5009884985665396_wp) &
        ERROR STOP 'mu(I) thin-front analytic update must dissipate speed'
-  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
-       [1.5041236872048884_wp,3.9208794320089733e6_wp, &
-        1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
-       0.5009884985665396_wp,'mu(I) thin-front semigroup')
+  BLOCK
+    REAL(wp) :: half_step, two_half_steps
+    CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
+         [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+          1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+         0.6201250000000002e-5_wp,0.5009884985665396_wp,half_step)
+    CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
+         [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+          1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+         0.6201250000000002e-5_wp,half_step,two_half_steps)
+    CALL assert_close(speed_after,two_half_steps,'mu(I) thin-front exact semigroup')
+  END BLOCK
   CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
        [1.0_wp,1.0_wp,1.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
        'mu(I) complex-root primitive')
