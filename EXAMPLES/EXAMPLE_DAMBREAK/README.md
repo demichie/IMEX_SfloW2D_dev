@@ -114,7 +114,10 @@ ln -s ../../bin/IMEX_SfloW2D .
 ```
 
 The simulation writes `OUTPUT/dambreak2D/fields/dambreak2D.nc`,
-viewable with ParaView, and snapshots under the run output directory.
+viewable with ParaView. The file exposes physical scalar fields `h`, `u`,
+`v`, `T`, `mass`, `rho_m`, `solid_fraction` and, with pore pressure
+enabled, `pore_pressure` (Pa). It does not contain `q_layers` or
+`qp_layers`. Snapshots are written under the run output directory.
 
 ### 4. Post-process the channel centerline
 

@@ -1,77 +1,49 @@
-# Canonical NetCDF output
+# NetCDF physical fields for visualization
 
-The solver writes one scientific schema for every configured layer count,
-without preserving historical field aliases or alternate layouts. Set
-`OUTPUT_NETCDF_FLAG=T` under `RUN_PARAMETERS` to write
+Set `OUTPUT_NETCDF_FLAG=T` under `RUN_PARAMETERS` to write
 `OUTPUT/<run_name>/fields/<run_name>.nc`.
 
-## Dimensions and variables
+The output is a single schema of scalar physical fields with Fortran dimensions
+`(x,y,time)`, readable as arrays in ParaView. The internal conservative `q`
+and primitive `qp` arrays are **not** copied as multidimensional NetCDF
+tensors. They remain authoritative in memory and in the binary checkpoint.
 
-`layer` has length `N_LAYERS`, either one or two. It is always present;
-`component` has the current canonical `n_vars` length. Both conservative
-and primitive components use the solver's shared component-index layout,
-including optional Darcy and stochastic variables when configured.
+For one layer the field names are unsuffixed. With `N_LAYERS=2`, layer-specific
+fields have suffix `_l1` or `_l2`; both layers share the same field convention.
 
-| Variable | Fortran dimensions | Meaning |
+| Variable (single layer) | Meaning | Units |
 | --- | --- | --- |
-| `x`, `y`, `time` | coordinate dimensions | Coordinates and snapshot times |
-| `q_layers` | `(component,layer,x,y,time)` | Authoritative conservative cell state |
-| `qp_layers` | `(component,layer,x,y,time)` | Physical primitive components |
-| `b` | `(x,y,time)` | Shared bed elevation |
-| `h_total` | `(x,y,time)` | Sum of all material layer depths |
-| `eta_top` | `(x,y,time)` | Shared bed plus total flow depth |
-| `mass_total` | `(x,y,time)` | Sum of all layer masses per unit area |
-| `deposit_tot` | `(x,y,time)` | Shared accumulated deposit thickness |
-| `hMax`, `pDynMax`, `modVelMax` | `(x,y,time)` | Existing hazard maxima |
-| `deposit`, `erosion`, `erodible` | `(solid_class,x,y,time)` | Shared inventories, when solid classes are present |
+| `h`, `u`, `v` | Depth and horizontal velocity components | m, m/s, m/s |
+| `T` | Temperature | K |
+| `mass` | Layer mass per unit area | kg/m² |
+| `rho_m` | Bulk density, computed as mass/depth in wet cells; zero in dry cells | kg/m³ |
+| `solid_fraction` | Total solid volume fraction (when solids are configured) | 1 |
+| `pore_pressure` | Excess pore pressure (only when its state component is configured) | Pa |
+| `stochastic` | Transported stochastic state (when configured) | 1 |
 
-There are no duplicated `h`, `T`, `u`, `v`, `eta_L2`, `mass_L1`,
-`mass_L2`, or L1-only density/solid-fraction variables. For example,
-`qp_layers(1,layer,:,:,:)` gives layer depth, and
-`q_layers(1,layer,:,:,:)` gives layer mass. Use the equations and
-canonical indices to derive other physical quantities. A field belonging
-to both layers is recorded only once.
+For multiple solid classes, `solid_fraction_class1`, `solid_fraction_class2`,
+etc. expose individual volume fractions. Extra gas classes use
+`gas_fraction_class1`, etc. Shared solid inventories are
+`deposit_class1`, `erosion_class1`, `erodible_class1`, etc.
+Each is a separate `(x,y,time)` field; no extra `component`, `layer`
+or `solid_class` dimensions occur in visualization variables.
 
-NetCDF Fortran exposes dimension order as shown above; Python's
-`netCDF4` or the C library reverses it (for example
-`[time,y,x,layer,component]`). A single-layer simulation still uses
-`layer=1`; it does not use a different I/O schema.
+The shared fields `b`, `h_total`, `eta_top`, `mass_total`,
+`deposit_tot`, `hMax`, `pDynMax`, `modVelMax` retain their
+previous meanings and units. Coordinates are `x`, `y`, and `time`.
 
-## Conservative snapshots and ESRI output
+The binary checkpoint remains the **only** restart state file. It preserves the
+complete authoritative conservative arrays and all restart metadata; NetCDF is
+for visualization and analysis only. Restart continuation appends records to
+an existing file that already uses the current visualization schema; there is
+no compatibility path for pre-migration NetCDF histories. Regenerate those
+outputs with the development solver.
 
-With `OUTPUT_CONS_FLAG=T`, single-layer runs write
-`<run_name>_<index>.q_2d`. Two-layer runs write **both**
-`<run_name>_L1_<index>.q_2d` and
-`<run_name>_L2_<index>.q_2d` using the same canonical components.
-Text initialization of two layers requires both files and their
-matching snapshot indices.
+The dam-break `height_summary_nc.py` reads the physical `h` variable.
 
-ESRI output preserves the single-layer raster naming for single-layer
-runs and explicitly names L2 and aggregate fields in two-layer runs.
-There is one shared DEM. Each two-layer output additionally writes
-`fields/<run_name>_budget_<index>.csv` with layer and total budgets.
+## Verification
 
-## Binary checkpoint
-
-The restart is **one unversioned format** for one or two layers. Its
-fixed magic header identifies a solver checkpoint, and the following
-record states the mesh, component counts, diagnostics dimensions and
-layer count. The canonical `q(component,layer,x,y)` is saved in full.
-The bed and substrate are shared and saved once. Run clock, output
-schedule, hazard/runout history and OU/RNG states required for
-deterministic continuation are also saved.
-
-The reader validates all dimensions and configured physics. It does
-not contain branch logic to recognize obsolete checkpoint versions.
-A checkpoint from a different layout must be regenerated by the
-current development solver rather than interpreted through an
-intermediate compatibility layer.
-
-## Validation
-
-The `TEST_SPATIAL_OPERATOR` integration fixture writes and reads a
-two-layer checkpoint, independently verifies L2 OU/RNG and the shared
-terrain, and reads back the canonical NetCDF tensors and aggregate
-fields. `TEST_BINARY_RESTART`, `TEST_STOCHASTIC_RESTART` and the
-acceptance decoder operate on the same format for single-layer
-simulations. Actual CI validation is required on the resulting commit.
+The structural two-layer `TEST_SPATIAL_OPERATOR` test checks scalar fields
+in both layers, absent obsolete tensors, solid inventories and appended time
+records. Run the relevant actions and a single-layer dam-break example to
+verify the full output chain in the current environment.

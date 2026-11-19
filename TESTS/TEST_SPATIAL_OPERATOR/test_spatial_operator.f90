@@ -3189,7 +3189,7 @@ CONTAINS
         WRITE(*,*) 'PASS: two-layer Lie with independent L1 Darcy and L2 stochastic transport'
     END SUBROUTINE check_optional_layer_lie_timestep
 
-  !> @brief Round-trip the canonical checkpoint and the five-dimensional NetCDF schema.
+  !> @brief Round-trip the canonical checkpoint and ParaView-readable NetCDF fields.
   !> @details The structural two-layer fixture bypasses the production layout gate.
   !>          It tests the existing I/O implementations and shared substrate ownership.
   SUBROUTINE check_two_layer_io_roundtrip
@@ -3202,7 +3202,6 @@ CONTAINS
     TYPE(stochastic_workspace_type) :: noise(2)
     TYPE(stochastic_config_type) :: saved_stochastic_l2
     REAL(wp), ALLOCATABLE :: original_q(:,:,:,:),original_b(:,:)
-    REAL(wp), ALLOCATABLE :: stored_q(:,:,:,:,:),stored_qp(:,:,:,:,:)
     REAL(wp), ALLOCATABLE :: stored_total(:,:,:)
     REAL(wp) :: primitive(n_vars),total_before
     INTEGER :: unit_budget
@@ -3339,26 +3338,46 @@ CONTAINS
     ios=nf90_inquire_dimension(netcdf_id,time_dim,len=time_length)
     IF (ios/=nf90_noerr .OR. time_length/=2) &
         ERROR STOP 'Two-layer NetCDF restart did not append one time record'
-    ALLOCATE(stored_q(n_vars,2,nx,ny,1),stored_qp(n_vars,2,nx,ny,1))
+    ! The five-dimensional canonical tensors are not part of the visualization schema.
     ios=nf90_inq_varid(netcdf_id,'q_layers',variable_id)
-    IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF conservative layer tensor'
-    ios=nf90_get_var(netcdf_id,variable_id,stored_q)
-    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read canonical NetCDF conservative tensor'
-    IF (ANY(stored_q(:,:,:,:,1)/=original_q)) ERROR STOP 'NetCDF q_layers values mismatch'
-    ios=nf90_get_var(netcdf_id,variable_id,stored_q, &
-        start=[1,1,1,1,2],count=[n_vars,2,nx,ny,1])
-    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended NetCDF conservative layer record'
-    IF (ANY(stored_q(:,:,:,:,1)/=original_q)) ERROR STOP 'NetCDF appended q_layers values mismatch'
+    IF (ios==nf90_noerr) ERROR STOP 'Obsolete q_layers tensor still present'
     ios=nf90_inq_varid(netcdf_id,'qp_layers',variable_id)
-    IF (ios/=nf90_noerr) ERROR STOP 'Missing canonical NetCDF primitive layer tensor'
-    ios=nf90_get_var(netcdf_id,variable_id,stored_qp)
-    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read canonical NetCDF primitive tensor'
-    IF (ANY(stored_qp(:,:,:,:,1)/=states%qp)) ERROR STOP 'NetCDF qp_layers values mismatch'
-    ios=nf90_get_var(netcdf_id,variable_id,stored_qp, &
-        start=[1,1,1,1,2],count=[n_vars,2,nx,ny,1])
-    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended NetCDF primitive layer record'
-    IF (ANY(stored_qp(:,:,:,:,1)/=states%qp)) ERROR STOP 'NetCDF appended qp_layers values mismatch'
+    IF (ios==nf90_noerr) ERROR STOP 'Obsolete qp_layers tensor still present'
     ALLOCATE(stored_total(nx,ny,1))
+    ios=nf90_inq_varid(netcdf_id,'h_l1',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing ParaView-compatible L1 depth'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 depth'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_h,1,:,:))) ERROR STOP 'NetCDF L1 depth mismatch'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total,start=[1,1,2],count=[nx,ny,1])
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended L1 depth'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_h,1,:,:))) ERROR STOP 'Appended L1 depth mismatch'
+    ios=nf90_inq_varid(netcdf_id,'h_l2',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing ParaView-compatible L2 depth'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L2 depth'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_h,2,:,:))) ERROR STOP 'NetCDF L2 depth mismatch'
+    ios=nf90_inq_varid(netcdf_id,'u_l2',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing ParaView-compatible L2 velocity'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L2 velocity'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_u,2,:,:))) ERROR STOP 'NetCDF L2 velocity mismatch'
+    ios=nf90_inq_varid(netcdf_id,'pore_pressure_l1',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing L1 pore pressure'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 pore pressure'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_pore,1,:,:))) ERROR STOP 'NetCDF L1 pore pressure mismatch'
+    ios=nf90_inq_varid(netcdf_id,'solid_fraction_l1',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing L1 solid fraction'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 solid fraction'
+    IF (ANY(stored_total(:,:,1)/=SUM(states%qp(idx_solid_first:idx_solid_last,1,:,:),DIM=1))) &
+        ERROR STOP 'NetCDF L1 solid fraction mismatch'
+    ios=nf90_inq_varid(netcdf_id,'deposit_class1',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing scalar deposit-class field'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read scalar deposit-class field'
+    IF (ANY(stored_total(:,:,1)/=states%deposit(:,:,1))) ERROR STOP 'Deposit-class field mismatch'
     ios=nf90_inq_varid(netcdf_id,'mass_total',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing total mass NetCDF diagnostic'
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)

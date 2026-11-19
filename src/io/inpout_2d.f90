@@ -296,14 +296,15 @@
 
     REAL(wp) :: release_time(10)
 
-    ! Canonical NetCDF state arrays for any configured layer count.
+    ! NetCDF exposes named, three-dimensional physical fields.
+    ! The authoritative q/qp arrays remain solely in the simulation state.
     INTEGER :: ncid
     INTEGER :: dimids(3)           !< [x,y,time].
-    INTEGER :: layer_dimids(5)     !< [component,layer,x,y,time].
-    INTEGER :: layer_q_varid,layer_qp_varid
+    INTEGER :: layer_field_varid(9,2) !< h,u,v,T,mass,rho_m,solid_fraction,pore_pressure,stochastic.
+    INTEGER, ALLOCATABLE :: solid_class_varid(:,:),gas_class_varid(:,:)
+    INTEGER, ALLOCATABLE :: shared_class_varid(:,:)
     INTEGER :: eta_top_varid,total_depth_varid
     INTEGER :: total_mass_varid
-    INTEGER :: shared_class_varid(3)
     INTEGER :: x_varid,y_varid,t_varid,b_varid
     INTEGER :: hMax_varid,pDynMax_varid,modVelMax_varid,deposit_tot_varid
 
@@ -7637,10 +7638,17 @@
         USE parameters_2d, ONLY : n_vars
         USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,x_comp,y_comp
         IMPLICIT NONE
-        INTEGER :: component_dim,layer_dim,class_dim,status
         INTEGER :: time_dim_len,expected_time_index
+        INTEGER :: layer,i,component
+        CHARACTER(LEN=24) :: suffix,number
         LOGICAL :: exists
-        INTEGER :: shared_class_dims(4)
+
+        IF (ALLOCATED(solid_class_varid)) DEALLOCATE(solid_class_varid)
+        IF (ALLOCATED(gas_class_varid)) DEALLOCATE(gas_class_varid)
+        IF (ALLOCATED(shared_class_varid)) DEALLOCATE(shared_class_varid)
+        ALLOCATE(solid_class_varid(n_solid,n_layers),gas_class_varid(n_add_gas,n_layers))
+        ALLOCATE(shared_class_varid(3,n_solid))
+        layer_field_varid=-1
 
         nc_filename=output_file_path('fields',TRIM(run_name)//'.nc')
         INQUIRE(FILE=nc_filename,EXIST=exists)
@@ -7650,10 +7658,6 @@
             CALL check(nf90_inq_dimid(ncid,'x',dimids(1)))
             CALL check(nf90_inq_dimid(ncid,'y',dimids(2)))
             CALL check(nf90_inq_dimid(ncid,'time',dimids(3)))
-            CALL check(nf90_inq_dimid(ncid,'component',component_dim))
-            CALL check(nf90_inq_dimid(ncid,'layer',layer_dim))
-            CALL verify_netcdf_dimension(component_dim,n_vars)
-            CALL verify_netcdf_dimension(layer_dim,n_layers)
             CALL verify_netcdf_dimension(dimids(1),comp_cells_x)
             CALL verify_netcdf_dimension(dimids(2),comp_cells_y)
             CALL check(nf90_inquire_dimension(ncid,dimids(3),len=time_dim_len))
@@ -7665,12 +7669,9 @@
             IF (time_dim_len>expected_time_index) &
                 CALL fatal_error('NetCDF history has more than one uncommitted time record')
             nc_time_idx=expected_time_index
-            layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
             CALL check(nf90_inq_varid(ncid,'x',x_varid))
             CALL check(nf90_inq_varid(ncid,'y',y_varid))
             CALL check(nf90_inq_varid(ncid,'time',t_varid))
-            CALL check(nf90_inq_varid(ncid,'q_layers',layer_q_varid))
-            CALL check(nf90_inq_varid(ncid,'qp_layers',layer_qp_varid))
             CALL check(nf90_inq_varid(ncid,'b',b_varid))
             CALL check(nf90_inq_varid(ncid,'h_total',total_depth_varid))
             CALL check(nf90_inq_varid(ncid,'eta_top',eta_top_varid))
@@ -7679,13 +7680,42 @@
             CALL check(nf90_inq_varid(ncid,'hMax',hMax_varid))
             CALL check(nf90_inq_varid(ncid,'pDynMax',pDynMax_varid))
             CALL check(nf90_inq_varid(ncid,'modVelMax',modVelMax_varid))
-            IF (n_solid>0) THEN
-                CALL check(nf90_inq_dimid(ncid,'solid_class',class_dim))
-                CALL verify_netcdf_dimension(class_dim,n_solid)
-                CALL check(nf90_inq_varid(ncid,'deposit',shared_class_varid(1)))
-                CALL check(nf90_inq_varid(ncid,'erosion',shared_class_varid(2)))
-                CALL check(nf90_inq_varid(ncid,'erodible',shared_class_varid(3)))
-            END IF
+            DO layer=1,n_layers
+                suffix=''
+                IF (n_layers==2) THEN
+                    WRITE(number,'(I0)') layer
+                    suffix='_l'//TRIM(number)
+                END IF
+                CALL check(nf90_inq_varid(ncid,'h'//TRIM(suffix),layer_field_varid(1,layer)))
+                CALL check(nf90_inq_varid(ncid,'u'//TRIM(suffix),layer_field_varid(2,layer)))
+                CALL check(nf90_inq_varid(ncid,'v'//TRIM(suffix),layer_field_varid(3,layer)))
+                CALL check(nf90_inq_varid(ncid,'T'//TRIM(suffix),layer_field_varid(4,layer)))
+                CALL check(nf90_inq_varid(ncid,'mass'//TRIM(suffix),layer_field_varid(5,layer)))
+                CALL check(nf90_inq_varid(ncid,'rho_m'//TRIM(suffix),layer_field_varid(6,layer)))
+                IF (n_solid>0) &
+                    CALL check(nf90_inq_varid(ncid,'solid_fraction'//TRIM(suffix),layer_field_varid(7,layer)))
+                IF (idx_pore>0) &
+                    CALL check(nf90_inq_varid(ncid,'pore_pressure'//TRIM(suffix),layer_field_varid(8,layer)))
+                IF (idx_stoch>0) &
+                    CALL check(nf90_inq_varid(ncid,'stochastic'//TRIM(suffix),layer_field_varid(9,layer)))
+                DO component=1,n_solid
+                    IF (n_solid==1) EXIT
+                    WRITE(number,'(I0)') component
+                    CALL check(nf90_inq_varid(ncid,'solid_fraction_class'//TRIM(number)//TRIM(suffix), &
+                        solid_class_varid(component,layer)))
+                END DO
+                DO component=1,n_add_gas
+                    WRITE(number,'(I0)') component
+                    CALL check(nf90_inq_varid(ncid,'gas_fraction_class'//TRIM(number)//TRIM(suffix), &
+                        gas_class_varid(component,layer)))
+                END DO
+            END DO
+            DO component=1,n_solid
+                WRITE(number,'(I0)') component
+                CALL check(nf90_inq_varid(ncid,'deposit_class'//TRIM(number),shared_class_varid(1,component)))
+                CALL check(nf90_inq_varid(ncid,'erosion_class'//TRIM(number),shared_class_varid(2,component)))
+                CALL check(nf90_inq_varid(ncid,'erodible_class'//TRIM(number),shared_class_varid(3,component)))
+            END DO
             RETURN
         END IF
 
@@ -7693,10 +7723,6 @@
         CALL check(nf90_def_dim(ncid,'x',comp_cells_x,dimids(1)))
         CALL check(nf90_def_dim(ncid,'y',comp_cells_y,dimids(2)))
         CALL check(nf90_def_dim(ncid,'time',NF90_UNLIMITED,dimids(3)))
-        CALL check(nf90_def_dim(ncid,'component',n_vars,component_dim))
-        CALL check(nf90_def_dim(ncid,'layer',n_layers,layer_dim))
-        layer_dimids=[component_dim,layer_dim,dimids(1),dimids(2),dimids(3)]
-
         CALL check(nf90_def_var(ncid,'x',nf90_double,[dimids(1)],x_varid))
         CALL check(nf90_def_var(ncid,'y',nf90_double,[dimids(2)],y_varid))
         CALL check(nf90_def_var(ncid,'time',nf90_double,[dimids(3)],t_varid))
@@ -7706,14 +7732,40 @@
         CALL check(nf90_put_att(ncid,x_varid,'units','meters'))
         CALL check(nf90_put_att(ncid,y_varid,'units','meters'))
         CALL check(nf90_put_att(ncid,t_varid,'units','seconds'))
-        CALL check(nf90_def_var(ncid,'q_layers',nf90_double,layer_dimids, &
-            layer_q_varid,deflate_level=5,shuffle=.TRUE.))
-        CALL check(nf90_put_att(ncid,layer_q_varid,'long_name','canonical conservative components by layer'))
-        CALL check(nf90_put_att(ncid,layer_q_varid,'units','SI per component'))
-        CALL check(nf90_def_var(ncid,'qp_layers',nf90_double,layer_dimids, &
-            layer_qp_varid,deflate_level=5,shuffle=.TRUE.))
-        CALL check(nf90_put_att(ncid,layer_qp_varid,'long_name','canonical primitive components by layer'))
-        CALL check(nf90_put_att(ncid,layer_qp_varid,'units','SI per component'))
+        DO layer=1,n_layers
+            suffix=''
+            IF (n_layers==2) THEN
+                WRITE(number,'(I0)') layer
+                suffix='_l'//TRIM(number)
+            END IF
+            CALL define_shared_output('h'//TRIM(suffix),'flow thickness','meters',layer_field_varid(1,layer))
+            CALL define_shared_output('u'//TRIM(suffix),'horizontal x velocity','meters/seconds', &
+                layer_field_varid(2,layer))
+            CALL define_shared_output('v'//TRIM(suffix),'horizontal y velocity','meters/seconds', &
+                layer_field_varid(3,layer))
+            CALL define_shared_output('T'//TRIM(suffix),'temperature','kelvin',layer_field_varid(4,layer))
+            CALL define_shared_output('mass'//TRIM(suffix),'layer mass per unit area','kg/m2', &
+                layer_field_varid(5,layer))
+            CALL define_shared_output('rho_m'//TRIM(suffix),'mixture bulk density','kg/m3', &
+                layer_field_varid(6,layer))
+            IF (n_solid>0) CALL define_shared_output('solid_fraction'//TRIM(suffix), &
+                'total solid volume fraction','1',layer_field_varid(7,layer))
+            IF (idx_pore>0) CALL define_shared_output('pore_pressure'//TRIM(suffix), &
+                'excess pore pressure','Pa',layer_field_varid(8,layer))
+            IF (idx_stoch>0) CALL define_shared_output('stochastic'//TRIM(suffix), &
+                'transported stochastic state','1',layer_field_varid(9,layer))
+            DO component=1,n_solid
+                IF (n_solid==1) EXIT
+                WRITE(number,'(I0)') component
+                CALL define_shared_output('solid_fraction_class'//TRIM(number)//TRIM(suffix), &
+                    'solid-class volume fraction','1',solid_class_varid(component,layer))
+            END DO
+            DO component=1,n_add_gas
+                WRITE(number,'(I0)') component
+                CALL define_shared_output('gas_fraction_class'//TRIM(number)//TRIM(suffix), &
+                    'additional gas-class volume fraction','1',gas_class_varid(component,layer))
+            END DO
+        END DO
         CALL define_shared_output('b','bed elevation','meters',b_varid)
         CALL define_shared_output('h_total','total flow thickness','meters',total_depth_varid)
         CALL define_shared_output('eta_top','upper free surface','meters',eta_top_varid)
@@ -7722,19 +7774,15 @@
         CALL define_shared_output('hMax','maximum flow thickness','meters',hMax_varid)
         CALL define_shared_output('pDynMax','maximum dynamic pressure','Pa',pDynMax_varid)
         CALL define_shared_output('modVelMax','maximum flow velocity','meters/seconds',modVelMax_varid)
-        IF (n_solid>0) THEN
-            CALL check(nf90_def_dim(ncid,'solid_class',n_solid,class_dim))
-            shared_class_dims=[class_dim,dimids(1),dimids(2),dimids(3)]
-            CALL check(nf90_def_var(ncid,'deposit',nf90_double,shared_class_dims,shared_class_varid(1)))
-            CALL check(nf90_def_var(ncid,'erosion',nf90_double,shared_class_dims,shared_class_varid(2)))
-            CALL check(nf90_def_var(ncid,'erodible',nf90_double,shared_class_dims,shared_class_varid(3)))
-            CALL check(nf90_put_att(ncid,shared_class_varid(1),'long_name','deposition per solid class'))
-            CALL check(nf90_put_att(ncid,shared_class_varid(2),'long_name','erosion per solid class'))
-            CALL check(nf90_put_att(ncid,shared_class_varid(3),'long_name','erodible inventory per solid class'))
-            CALL check(nf90_put_att(ncid,shared_class_varid(1),'units','meters'))
-            CALL check(nf90_put_att(ncid,shared_class_varid(2),'units','meters'))
-            CALL check(nf90_put_att(ncid,shared_class_varid(3),'units','meters'))
-        END IF
+        DO component=1,n_solid
+            WRITE(number,'(I0)') component
+            CALL define_shared_output('deposit_class'//TRIM(number),'deposition of solid class','meters', &
+                shared_class_varid(1,component))
+            CALL define_shared_output('erosion_class'//TRIM(number),'erosion of solid class','meters', &
+                shared_class_varid(2,component))
+            CALL define_shared_output('erodible_class'//TRIM(number),'erodible solid class','meters', &
+                shared_class_varid(3,component))
+        END DO
         CALL check(nf90_enddef(ncid))
         CALL check(nf90_put_var(ncid,x_varid,x_comp))
         CALL check(nf90_put_var(ncid,y_varid,y_comp))
@@ -7819,28 +7867,68 @@
         USE geometry_2d, ONLY : B_cent,comp_cells_x,comp_cells_y
         REAL(wp), INTENT(IN) :: time_in
         CLASS(state_type), INTENT(IN) :: state
-        REAL(wp), ALLOCATABLE :: tensor(:,:,:,:,:),field(:,:),classes(:,:,:,:)
-        INTEGER :: five_start(5),five_count(5),three_start(3),three_count(3)
-        INTEGER :: four_start(4),four_count(4),i
+        REAL(wp), ALLOCATABLE :: field(:,:)
+        INTEGER :: three_start(3),three_count(3),layer,i
 
         IF (SIZE(state%q,2)/=n_layers .OR. SIZE(state%qp,2)/=n_layers) &
             CALL fatal_error('NetCDF state layer extent does not match the model')
         IF (SIZE(state%q,1)/=n_vars .OR. SIZE(state%qp,1)/=n_vars) &
             CALL fatal_error('NetCDF component extent does not match the model')
-        five_start=[1,1,1,1,nc_time_idx]
-        five_count=[n_vars,n_layers,comp_cells_x,comp_cells_y,1]
         three_start=[1,1,nc_time_idx]
         three_count=[comp_cells_x,comp_cells_y,1]
         CALL check(nf90_put_var(ncid,t_varid,[time_in],start=[nc_time_idx],count=[1]))
 
-        ALLOCATE(tensor(n_vars,n_layers,comp_cells_x,comp_cells_y,1))
-        tensor(:,:,:,:,1)=state%q
-        CALL check(nf90_put_var(ncid,layer_q_varid,tensor,start=five_start,count=five_count))
-        tensor(:,:,:,:,1)=state%qp
-        CALL check(nf90_put_var(ncid,layer_qp_varid,tensor,start=five_start,count=five_count))
-        DEALLOCATE(tensor)
-
         ALLOCATE(field(comp_cells_x,comp_cells_y))
+        DO layer=1,n_layers
+            field=state%qp(idx_h,layer,:,:)
+            CALL check(nf90_put_var(ncid,layer_field_varid(1,layer),field, &
+                start=three_start,count=three_count))
+            field=state%qp(idx_u,layer,:,:)
+            CALL check(nf90_put_var(ncid,layer_field_varid(2,layer),field, &
+                start=three_start,count=three_count))
+            field=state%qp(idx_v,layer,:,:)
+            CALL check(nf90_put_var(ncid,layer_field_varid(3,layer),field, &
+                start=three_start,count=three_count))
+            field=state%qp(idx_T,layer,:,:)
+            CALL check(nf90_put_var(ncid,layer_field_varid(4,layer),field, &
+                start=three_start,count=three_count))
+            field=state%q(idx_totMassEqn,layer,:,:)
+            CALL check(nf90_put_var(ncid,layer_field_varid(5,layer),field, &
+                start=three_start,count=three_count))
+            field=0.0_wp
+            WHERE (state%qp(idx_h,layer,:,:)>0.0_wp)
+                field=state%q(idx_totMassEqn,layer,:,:)/state%qp(idx_h,layer,:,:)
+            END WHERE
+            CALL check(nf90_put_var(ncid,layer_field_varid(6,layer),field, &
+                start=three_start,count=three_count))
+            IF (n_solid>0) THEN
+                field=SUM(state%qp(idx_solid_first:idx_solid_last,layer,:,:),DIM=1)
+                CALL check(nf90_put_var(ncid,layer_field_varid(7,layer),field, &
+                    start=three_start,count=three_count))
+                IF (n_solid>1) THEN
+                    DO i=1,n_solid
+                        field=state%qp(idx_solid_first+i-1,layer,:,:)
+                        CALL check(nf90_put_var(ncid,solid_class_varid(i,layer),field, &
+                            start=three_start,count=three_count))
+                    END DO
+                END IF
+            END IF
+            IF (idx_pore>0) THEN
+                field=state%qp(idx_pore,layer,:,:)
+                CALL check(nf90_put_var(ncid,layer_field_varid(8,layer),field, &
+                    start=three_start,count=three_count))
+            END IF
+            IF (idx_stoch>0) THEN
+                field=state%qp(idx_stoch,layer,:,:)
+                CALL check(nf90_put_var(ncid,layer_field_varid(9,layer),field, &
+                    start=three_start,count=three_count))
+            END IF
+            DO i=1,n_add_gas
+                field=state%qp(idx_add_gas_first+i-1,layer,:,:)
+                CALL check(nf90_put_var(ncid,gas_class_varid(i,layer),field, &
+                    start=three_start,count=three_count))
+            END DO
+        END DO
         CALL check(nf90_put_var(ncid,b_varid,B_cent,start=three_start,count=three_count))
         field=SUM(state%qp(idx_h,:,:,:),DIM=1)
         CALL check(nf90_put_var(ncid,total_depth_varid,field,start=three_start,count=three_count))
@@ -7854,27 +7942,18 @@
         CALL check(nf90_put_var(ncid,pDynMax_varid,state%pdynmax,start=three_start,count=three_count))
         CALL check(nf90_put_var(ncid,modVelMax_varid,state%mod_vel_max, &
             start=three_start,count=three_count))
+        DO i=1,n_solid
+            field=state%deposit(:,:,i)
+            CALL check(nf90_put_var(ncid,shared_class_varid(1,i),field, &
+                start=three_start,count=three_count))
+            field=state%erosion(:,:,i)
+            CALL check(nf90_put_var(ncid,shared_class_varid(2,i),field, &
+                start=three_start,count=three_count))
+            field=state%erodible(i,:,:)
+            CALL check(nf90_put_var(ncid,shared_class_varid(3,i),field, &
+                start=three_start,count=three_count))
+        END DO
         DEALLOCATE(field)
-
-        IF (n_solid>0) THEN
-            four_start=[1,1,1,nc_time_idx]
-            four_count=[n_solid,comp_cells_x,comp_cells_y,1]
-            ALLOCATE(classes(n_solid,comp_cells_x,comp_cells_y,1))
-            DO i=1,n_solid
-                classes(i,:,:,1)=state%deposit(:,:,i)
-            END DO
-            CALL check(nf90_put_var(ncid,shared_class_varid(1),classes, &
-                start=four_start,count=four_count))
-            DO i=1,n_solid
-                classes(i,:,:,1)=state%erosion(:,:,i)
-            END DO
-            CALL check(nf90_put_var(ncid,shared_class_varid(2),classes, &
-                start=four_start,count=four_count))
-            classes(:,:,:,1)=state%erodible
-            CALL check(nf90_put_var(ncid,shared_class_varid(3),classes, &
-                start=four_start,count=four_count))
-            DEALLOCATE(classes)
-        END IF
 
         nc_time_idx=nc_time_idx+1
         CALL check(nf90_sync(ncid))

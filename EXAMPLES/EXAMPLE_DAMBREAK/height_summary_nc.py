@@ -39,13 +39,12 @@ def nc_read_height(nc_path: Path, var_hint: str = None):
         from netCDF4 import Dataset
         ds = Dataset(nc_path.as_posix(), 'r')
 
-        if var_hint and var_hint != 'qp_layers':
-            raise ValueError('Only canonical qp_layers is supported as a height source')
-        # Canonical Fortran shape (component,layer,x,y,time) appears in
-        # netCDF4 Python as (time,y,x,layer,component).
-        if 'qp_layers' not in ds.variables:
-            raise RuntimeError('Canonical qp_layers variable is missing')
-        H = np.asarray(ds.variables['qp_layers'][:,:,:,:,0], dtype=float)[:,:,:,0]
+        if var_hint and var_hint != 'h':
+            raise ValueError('Only the physical h field is supported as a height source')
+        if 'h' not in ds.variables:
+            raise RuntimeError('Physical h field is missing')
+        # Fortran (x,y,time) appears in netCDF4 Python as (time,y,x).
+        H = np.asarray(ds.variables['h'][:], dtype=float)
 
         x = y = t = None
         for ax in ('x', 'xc', 'lon', 'longitude'):
@@ -71,10 +70,10 @@ def nc_read_height(nc_path: Path, var_hint: str = None):
         import h5py
         f = h5py.File(nc_path.as_posix(), 'r')
 
-        if 'qp_layers' not in f:
-            raise RuntimeError('Canonical qp_layers dataset is missing')
-        # NetCDF/HDF5 and netCDF4 expose the same reversed dimension order.
-        H = np.asarray(f['qp_layers'][...], dtype=float)[:,:,:,0,0]
+        if 'h' not in f:
+            raise RuntimeError('Physical h dataset is missing')
+        # NetCDF/HDF5 stores the dimensions in reversed order.
+        H = np.asarray(f['h'][...], dtype=float)
         t = f['time'][...] if 'time' in f.keys() else None
         x = f['x'][...] if 'x' in f.keys() else None
         y = f['y'][...] if 'y' in f.keys() else None
