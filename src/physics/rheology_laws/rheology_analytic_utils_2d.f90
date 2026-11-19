@@ -6,6 +6,7 @@ MODULE rheology_analytic_utils_2d
 
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
+    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
     IMPLICIT NONE
@@ -858,6 +859,13 @@ CONTAINS
             delta = left_estimate + right_estimate - whole
 
             IF (depth .LE. 0 .AND. ABS(delta) .GT. 15.0_wp*tolerance) THEN
+                WRITE(error_unit,'(A,I0,6(A,ES24.16))') 'EXACT_QUADRATURE_FAILURE model=',flow_model, &
+                    ' lower=',lower,' upper=',upper,' whole=',whole, &
+                    ' left=',left_estimate,' right=',right_estimate,' delta=',delta
+                WRITE(error_unit,'(A,3(ES24.16,1X))') 'EXACT_QUADRATURE_TOLERANCE=', &
+                    tolerance,ABS(delta),15.0_wp*tolerance
+                WRITE(error_unit,'(A,*(ES24.16,1X))') 'EXACT_QUADRATURE_COEFFICIENTS=',coefficients
+                FLUSH(error_unit)
                 CALL fatal_analytic_input_error('Exact velocity time-integral quadrature failed to converge')
 
             END IF

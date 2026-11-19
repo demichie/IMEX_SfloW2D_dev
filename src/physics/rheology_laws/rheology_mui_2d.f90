@@ -20,6 +20,7 @@
 !********************************************************************************
 MODULE rheology_mui_2d
     USE diagnostics_2d, ONLY : fatal_error
+    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE parameters_2d, ONLY : wp, n_solid
     USE state_types, ONLY : physical_state_real, physical_state_complex
     USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
@@ -187,6 +188,7 @@ CONTAINS
         REAL(wp) :: speed_before, speed_after, particle_diameter, particle_density
         REAL(wp) :: effective_depth, vertical_stress, normal_stress
         REAL(wp) :: inertial_slope, basal_factor, sqrt_gravity
+        CHARACTER(LEN=8) :: diagnostic_env
 
         ASSOCIATE(h => state%h,                                                                                        &
                     rhom => state%rho_m,                                                                               &
@@ -237,6 +239,18 @@ CONTAINS
                     (effective_depth * sqrt_gravity *                                                                  &
                     SQRT(normal_stress/particle_density))
         basal_factor = normal_stress / (rhom*h*speed_ratio)
+        diagnostic_env=''
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_DIAGNOSTICS',diagnostic_env)
+        IF (TRIM(diagnostic_env)=='1') THEN
+            WRITE(error_unit,'(A,*(ES24.16,1X))') 'MUI_ANALYTIC_STATE h rho_m u v dt speed_ratio red_grav', &
+                h,rhom,velocity_before,dt,speed_ratio,red_grav
+            WRITE(error_unit,'(A,*(ES24.16,1X))') 'MUI_ANALYTIC_STRESS normal curvature speed', &
+                normal_stress,curvature_acceleration,speed_before
+            WRITE(error_unit,'(A,*(ES24.16,1X))') 'MUI_ANALYTIC_COEFFICIENTS=', &
+                basal_factor*config%mu_s*config%I_0, basal_factor*config%mu_2*inertial_slope, &
+                basal_factor*config%muI_inf*inertial_slope**2, config%I_0, inertial_slope
+            FLUSH(error_unit)
+        END IF
         CALL solve_exact_velocity_flow(EXACT_FLOW_MUI,                                                                 &
                     [basal_factor*config%mu_s*config%I_0, basal_factor*config%mu_2*inertial_slope,                     &
                     basal_factor*config%muI_inf*inertial_slope**2, config%I_0, inertial_slope],                        &

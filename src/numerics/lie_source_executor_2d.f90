@@ -7,6 +7,7 @@
 
 MODULE lie_source_executor_2d
     USE diagnostics_2d, ONLY : fatal_error
+    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE thermal_parameters_2d, ONLY : thermal_config_type
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
@@ -719,6 +720,16 @@ CONTAINS
                     analytic_input=q_local
                     IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,layer,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
+                    ! Opt-in cell witness precedes the analytic call, which may terminate in quadrature.
+                    ! Run with OMP_NUM_THREADS=1 to keep the last witness unambiguous.
+                    IF (executor%diagnostics_enabled .AND. &
+                        ANY(executor%groups(group_index)%source_names=='rheology_mui')) THEN
+                        WRITE(error_unit,'(A,4(A,I0),2(A,ES24.16))') 'MUI_ANALYTIC_CELL', &
+                            ' j=',j,' k=',k,' layer=',layer,' group=',executor%groups(group_index)%id, &
+                            ' t=',source_time,' dt=',time_step
+                        WRITE(error_unit,'(A,*(ES24.16,1X))') 'MUI_ANALYTIC_Q=',analytic_input(1:n_eqns)
+                        FLUSH(error_unit)
+                    END IF
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
                         time_step, analytic_rate, status, executor%source_physical_scratch(tid), &
