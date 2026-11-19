@@ -39,7 +39,7 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
             for before, after in zip(originals, upper):
                 self.assertEqual(before[:40], after[:40])
                 self.assertEqual(len(after), 140)
-                self.assertEqual([float(after[i:i + 20]) for i in range(40, 140)],
+                self.assertEqual([float(after[i:i + 20]) for i in range(40, 140, prepare.FIELD_WIDTH)],
                                  [0.0] * 5)
             with self.assertRaises(FileExistsError):
                 prepare.write_layer_snapshots(original, l1, l2, nx=3, ny=2, n_vars=5)
