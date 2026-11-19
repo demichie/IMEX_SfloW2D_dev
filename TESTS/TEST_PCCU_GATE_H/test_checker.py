@@ -24,6 +24,20 @@ class FieldCheckerTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 instrument(bad)
 
+    def test_full_precision_observer_hook_follows_advance(self):
+        source = ("    CALL simulation%advance_timestep(pre_spatial_primitives_ready= &\\n"
+                  "        cfl/=-1.0_wp .AND. .NOT.lateral_source_flag)\\n"
+                  "    CALL output_solution()\\n")
+        instrumented = instrument(source, include_states=True)
+        self.assertEqual(instrumented.count("CALL simulation%advance_timestep"), 1)
+        self.assertIn("WRITE(state_unit) simulation%state%q(1:3,1,:,:)", instrumented)
+        self.assertLess(instrumented.index("CALL simulation%advance_timestep"),
+                        instrumented.index("WRITE(state_unit)"))
+        self.assertLess(instrumented.index("WRITE(state_unit)"),
+                        instrumented.index("CALL output_solution"))
+        with self.assertRaises(AssertionError):
+            instrument("    CALL simulation%advance_timestep()\\n", include_states=True)
+
     def test_single_cell_corruption(self):
         h = np.ones((8, 10)); bed = np.zeros_like(h)
         self.assertEqual(c.compare(h, h, bed, h, 10)["cells_compared"], 80)
