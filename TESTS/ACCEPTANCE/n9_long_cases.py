@@ -212,18 +212,15 @@ def diagnostic_comparison(full, resumed, run_name):
 def observations(fields, metadata, restart, case):
     """Check native physical schema and observe budgets without new tolerances."""
     times = fields['time']
-    # Native files contain one canonical component x layer tensor.
-    # C NetCDF order is [time,y,x,layer,component].
-    q = fields['q_layers'][:,:,:,0,:]
-    qp = fields['qp_layers'][:,:,:,0,:]
-    h = qp[:,:,:,0]
+    # Native NetCDF contains scalar (time,y,x) physical fields.
+    h = fields['h']
     density = np.zeros_like(h)
     wet_density = h > 1.e-10
-    density[wet_density] = q[:,:,:,0][wet_density] / h[wet_density]
+    density[wet_density] = fields['rho_m'][wet_density]
     solid_fraction = np.zeros_like(h)
-    if q.shape[-1] > 4:
-        solid_fraction[wet_density] = q[:,:,:,4][wet_density] / (2000*h[wet_density])
-    temperature = qp[:,:,:,3]
+    if 'solid_fraction' in fields:
+        solid_fraction[wet_density] = fields['solid_fraction'][wet_density]
+    temperature = fields['T']
     end, interval = (200, 5) if case == 'ETNA' else (3600, 60)
     assert np.array_equal(times, np.arange(0, end+1, interval))
     assert np.array_equal(fields['x'], 499813+(np.arange(250)+.5)*10)
@@ -233,10 +230,6 @@ def observations(fields, metadata, restart, case):
         assert metadata[name]['nc_type'] == 6, (name, 'not NC_DOUBLE')
         if name in ('x','y','time'):
             expected = [name]
-        elif name in ('q_layers','qp_layers'):
-            expected = ['time','y','x','layer','component']
-        elif name in ('deposit','erosion','erodible'):
-            expected = ['time','y','x','solid_class']
         else:
             expected = ['time','y','x']
         assert metadata[name]['dimensions'] == expected, name
@@ -244,6 +237,7 @@ def observations(fields, metadata, restart, case):
     for name, unit in [('b','meters'),('h_total','meters'),('eta_top','meters'),
                        ('mass_total','kg/m2')]:
         assert metadata[name]['units'] == unit, (name, metadata[name])
+    assert not any(name in fields for name in ('q_layers','qp_layers'))
     assert h.min() >= 0
     assert np.array_equal(fields['b'], np.broadcast_to(fields['b'][0], h.shape))
     eta_error = float(np.max(np.abs(fields['eta_top']-(fields['b']+h))))
