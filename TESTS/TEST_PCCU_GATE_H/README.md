@@ -68,3 +68,11 @@ original Gate-H failure remains in force.
 
 For a persistent local case, set `KEEP_TEST_WORKDIR=1` as above; otherwise
 the temporary directory is removed by the runner.
+
+The same observer also runs an exact **two-step replay** (`--steps 2`),
+checking both accepted `dt` values against the full run. The
+`prefix_2_step_evidence.json` report captures the earliest post-initial
+discrepancies: if the first step matches but the second does not, inspect
+state conversions and the reconstructed second-step traces. For multi-step
+prefixes the reported inferred rate is a *mean rate*, not an instantaneous
+spatial residual.

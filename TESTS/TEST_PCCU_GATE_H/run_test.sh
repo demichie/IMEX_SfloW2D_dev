@@ -59,6 +59,10 @@ do
                 "$observer" "$case_dir" "$mode"; then
                 echo "WARNING: first-step Gate-H diagnostic could not be completed" >&2
             fi
+            if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_first_step.py" \
+                "$observer" "$case_dir" "$mode" --steps 2; then
+                echo "WARNING: two-step Gate-H diagnostic could not be completed" >&2
+            fi
         fi
         if ! python3 "$test_dir/analyze_case.py" "$case_dir" "$mode" "$reference"; then
             failed=1
