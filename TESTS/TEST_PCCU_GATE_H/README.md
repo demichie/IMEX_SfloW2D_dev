@@ -94,3 +94,12 @@ threshold, plus the maximum error reached and the worst cell, in
 `trajectory_evidence.json`. This avoids drawing conclusions from the
 12-decimal-digit ASCII snapshots. It does not modify any numerical object,
 physical formula or acceptance limit.
+
+At the first out-of-contract timestep, the trajectory diagnostic also
+re-evaluates one KT-PYTHON step from the **actual full-precision Fortran state
+at the immediately preceding timestep**. The `same_input_one_step` record
+reports conservative rates and 3-by-3 discrepancy patches. Unlike a
+comparison of two evolved trajectories, this isolates a difference in
+the update applied to the same starting conservative state. The result
+helps distinguish differences in active worksets, reconstruction and
+nonconservative sources from previously accumulated errors.

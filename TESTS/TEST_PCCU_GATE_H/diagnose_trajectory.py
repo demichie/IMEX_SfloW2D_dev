@@ -56,6 +56,40 @@ def diagnose(case_dir, mode):
                 "python_q":reference[ij][:3].tolist(),
                 "signed_difference":difference[ij].tolist()
             }
+    # Re-evaluate the first discrepant step from the *same* Fortran
+    # pre-step state. This removes pre-existing trajectory drift and
+    # exposes a genuinely different spatial update at that step.
+    if first is not None:
+        step=first["step_number"]
+        previous=initial.copy() if step==1 else np.zeros_like(initial)
+        if step>1:
+            previous[...,:3]=states[step-2]
+            previous[...,3]=0.0  # Gate-H has no solid species.
+        predicted,_,_=kt.advance(previous,vertices,dx,dx,[dt[step-1]],params,
+                                  return_diagnostics=True)
+        local_error=states[step-1]-predicted[...,:3]
+        local_scaled=np.max(np.abs(local_error),axis=(0,1))/scales
+        component=int(np.argmax(local_scaled))
+        j,i=np.unravel_index(np.argmax(np.abs(local_error[...,component])),shape)
+        jj=slice(max(0,j-1),min(shape[0],j+2))
+        ii=slice(max(0,i-1),min(shape[1],i+2))
+        first["same_input_one_step"]={
+            "max_scaled_error":local_scaled.tolist(),
+            "component_index":component,
+            "worst_cell_ij":[int(i),int(j)],
+            "fortran_previous_q":previous[j,i,:3].tolist(),
+            "fortran_accepted_q":states[step-1,j,i,:].tolist(),
+            "python_update_from_fortran_q":predicted[j,i,:3].tolist(),
+            "fortran_applied_rate":((states[step-1,j,i,:]-previous[j,i,:3])/dt[step-1]).tolist(),
+            "python_rate":((predicted[j,i,:3]-previous[j,i,:3])/dt[step-1]).tolist(),
+            "mass_error_patch":local_error[jj,ii,0].tolist(),
+            "momentum_x_error_patch":local_error[jj,ii,1].tolist(),
+            "momentum_y_error_patch":local_error[jj,ii,2].tolist(),
+            "previous_mass_patch":previous[jj,ii,0].tolist(),
+        }
+        print(f"TRAJECTORY SAME-INPUT {mode} dx={dx:g} "
+              f"step={step} worst={(i,j)} scaled={local_scaled.tolist()}",flush=True)
+        print(f"TRAJECTORY SAME-INPUT local={first['same_input_one_step']}",flush=True)
     report={"mode":mode,"dx":dx,"steps":len(dt),
             "first_out_of_contract_step":first,
             "max_scaled_errors_over_trajectory":max_errors.tolist(),
