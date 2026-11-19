@@ -13,8 +13,10 @@ def capture(executable, case):
     """Copy only initial inputs, then verify the I/O hook is numerically inert."""
     directory = case/"accepted-time-observer"
     directory.mkdir()
-    for name in ("IMEX_SfloW2D.inp", "topography_dem.asc", "gateH_0000.q_2d"):
+    for name in ("IMEX_SfloW2D.inp", "gateH_0000.q_2d"):
         shutil.copyfile(case/name, directory/name)
+    (directory/"DEM").mkdir()
+    shutil.copyfile(case/"DEM/topography_dem.asc", directory/"DEM/topography_dem.asc")
     with (directory/"run.log").open("w") as stream:
         subprocess.run([str(executable.resolve())], cwd=directory,
                        env=os.environ.copy(), stdout=stream, stderr=subprocess.STDOUT,

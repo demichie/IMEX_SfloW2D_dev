@@ -76,7 +76,7 @@ def common_input(case_dir, shape, dx):
     initial_data = np.loadtxt(case_dir/"gateH_0000.q_2d")
     state = np.zeros(shape+(4,))
     state[..., :3] = initial_data[:,2:5].reshape(shape+(3,))
-    with (case_dir/"topography_dem.asc").open() as stream:
+    with (case_dir/"DEM/topography_dem.asc").open() as stream:
         header = dict((key.lower(),float(value)) for key,value in
                       (stream.readline().split() for _ in range(6)))
         raster = np.flipud(np.loadtxt(stream))

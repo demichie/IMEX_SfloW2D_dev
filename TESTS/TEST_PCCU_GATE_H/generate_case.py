@@ -97,8 +97,10 @@ def main():
         f"cellsize {dx}\n"
         "NODATA_value -9999\n"
     )
+    dem_dir = outdir / "DEM"
+    dem_dir.mkdir(exist_ok=True)
     np.savetxt(
-        outdir / "topography_dem.asc",
+        dem_dir / "topography_dem.asc",
         np.flipud(bed_dem),
         header=header,
         comments="",
