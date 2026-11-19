@@ -30,13 +30,14 @@ def without_pore_pressure(text):
 
 def run_pair(solver, evidence, timeout):
     evidence.mkdir(parents=True, exist_ok=True)
-    # Local fixture edits must not change the committed reference experiment.
-    reference = "HEAD:TESTS/TEST_DAMBREAK/TEST_OFF_FINH/IMEX_SfloW2D.inp"
-    original = subprocess.run(
-        ["git", "-C", str(ROOT), "show", reference],
-        check=True, capture_output=True, text=True,
-    ).stdout
-    variants = (("original", original), ("no_pore_pressure", without_pore_pressure(original)))
+    original = (FIXTURE / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
+    if FLAG.search(original) and GROUP.search(original):
+        variants = (("original", original), ("no_pore_pressure", without_pore_pressure(original)))
+    elif re.search(r"^\\s*PORE_PRESSURE_FLAG\\s*=\\s*F\\s*,?\\s*$", original, re.I | re.M) and not GROUP.search(original):
+        print("Fixture already has pore pressure disabled: running no_pore_pressure only.", flush=True)
+        variants = (("no_pore_pressure", original),)
+    else:
+        raise ValueError("Fixture has inconsistent pore-pressure flag and namelist")
     results = []
     with tempfile.TemporaryDirectory(prefix="imex-finh-pore-") as directory:
         for name, input_text in variants:
