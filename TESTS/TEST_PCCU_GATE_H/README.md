@@ -103,3 +103,14 @@ comparison of two evolved trajectories, this isolates a difference in
 the update applied to the same starting conservative state. The result
 helps distinguish differences in active worksets, reconstruction and
 nonconservative sources from previously accumulated errors.
+
+## Conservation of nearly dry cell momentum
+
+The reference now preserves the accepted conservative state in positive-mass,
+near-dry cells rather than zeroing their momenta at the reconstruction-depth
+threshold. Fortran `update_spatial_cell` keeps conservative momenta unchanged
+apart from the physical spatial update; regularization of dry velocities is
+performed in primitive and interface reconstruction. The previous Python
+post-step projections were not part of the numerical model, and the new
+`test_kt_reference.py` case guards against their reintroduction. The Gate-H
+comparison limits and all solver physics are unchanged.

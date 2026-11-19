@@ -38,7 +38,7 @@
   "reference_core_sha256": {
     "hp_pccu_1d_core.py": "c35f8ec13f1b0c8e93eb1e31c02e6308bcf679bf182bd00eb265ca3f54ee7f38",
     "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
-    "kt_python_2d_core.py": "a6e88b4845d753bfef6200a67bee78d85995be3a9014c34000d419ae484d8936"
+    "kt_python_2d_core.py": "880923deb7361ab016822b01c31705d1e768e9f71b45644d071650db23702ded"
   },
   "historical_policy": "HP-PCCU/SSPRK2 archives are historical evidence, not an acceptance oracle for the new KT scheme.",
   "analytic_invariants": "Keep nonnegativity, uphill leakage, symmetry and the 5e-10 mass-budget threshold. Include independently integrated open-boundary mass transport.",

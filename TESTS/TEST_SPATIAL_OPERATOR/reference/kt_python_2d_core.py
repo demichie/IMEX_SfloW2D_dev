@@ -319,12 +319,9 @@ def advance(initial, vertices, dx, dy, dt_values, p, return_diagnostics=False):
             raise AssertionError('negative/nonfinite raw reference final state')
         raw_h = (q[...,0]-q[...,3])/p.rho_c+q[...,3]/p.rho_s
         minimum = min(minimum,float(np.min(raw_h)))
-        tolerance = 4096*EPS*np.maximum(abs(q[...,0]),np.finfo(float).tiny)
-        small_negative = (q[...,3] < 0) & (q[...,3] >= -tolerance)
-        q[...,3][small_negative] = 0
-        q[q[...,0] < EPS]=0
-        h,*_=primitive(q,p)
-        q[...,1:3][h <= p.dry_h_tol]=0
+        # Match Fortran update_spatial_cell: do not project the accepted
+        # conservative state. Near-dry velocities are regularized only in
+        # the primitive and reconstructed face variables.
     if return_diagnostics:
         return q,minimum,dict(boundary_mass_transfer=float(boundary_transfer))
     return q,minimum
