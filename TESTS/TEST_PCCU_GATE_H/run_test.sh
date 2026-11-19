@@ -55,6 +55,10 @@ do
         python3 "$test_dir/capture_times.py" "$observer" "$case_dir"
         if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_fields.py" "$case_dir" "$mode"; then
             failed=1
+            if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_first_step.py" \
+                "$observer" "$case_dir" "$mode"; then
+                echo "WARNING: first-step Gate-H diagnostic could not be completed" >&2
+            fi
         fi
         if ! python3 "$test_dir/analyze_case.py" "$case_dir" "$mode" "$reference"; then
             failed=1

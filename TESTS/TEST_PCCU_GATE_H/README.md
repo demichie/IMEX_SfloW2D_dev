@@ -47,3 +47,24 @@ The original HP-PCCU cores, `reference_metrics.csv` and contracts v1-v3 remain
 historical archives. Their different numerical scheme and SSPRK2 trajectories
 are not acceptance oracles for the current KT operator. Other historical test
 suites that explicitly exercise HP-PCCU are not migrated by this Gate-H test.
+
+## First-step failure localization
+
+When a full-field comparison fails, `run_test.sh` automatically invokes
+`diagnose_first_step.py`. It prepares a separate `first-step-diagnostic/`
+run with exactly the original first accepted timestep as end time and
+output event, and uses the already compiled observational main. It
+**verifies that this replay accepted one timestep with matching `dt`**
+before comparing the first conservative snapshot with a *single* independent
+KT-PYTHON update. Thus no Fortran numerical kernel is modified.
+
+The script retains `first_step_evidence.json` alongside the existing
+`field_evidence.json`; it prints the worst mass cell, its three conservative
+variables, the inferred first-step Fortran rate `(Q1-Q0)/dt`, the direct
+Python spatial residual and a surrounding 3-by-3 error stencil. This is a
+diagnostic, **not** a relaxation of `field_contract_v4.json`. If the
+replay cannot be verified, the diagnostic fails independently and the
+original Gate-H failure remains in force.
+
+For a persistent local case, set `KEEP_TEST_WORKDIR=1` as above; otherwise
+the temporary directory is removed by the runner.
