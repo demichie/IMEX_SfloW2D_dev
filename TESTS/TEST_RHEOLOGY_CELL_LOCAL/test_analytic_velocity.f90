@@ -685,6 +685,30 @@ CALL eval_rheology_mui_voellmy_implicit(quadratic_config,cs, &
   CALL assert_flow_semigroup(EXACT_FLOW_MUI,                               &
        [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp], 0.5_wp,             &
        'mu(I) drag')
+  ! Regression from the granular dam-break wet/dry front: the original
+  ! adaptive Simpson integration exhausted its recursion depth near u=0.
+  CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
+       [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+        1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+       1.2402500000000004e-5_wp,0.5009884985665396_wp,speed_after)
+  IF (speed_after<0.0_wp .OR. speed_after>0.5009884985665396_wp) &
+       ERROR STOP 'mu(I) thin-front analytic update must dissipate speed'
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+        1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+       0.5009884985665396_wp,'mu(I) thin-front semigroup')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,1.0_wp,1.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) complex-root primitive')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,2.0_wp,1.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) repeated-root primitive')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,2.0_wp,0.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) linear-denominator limit')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,0.0_wp,0.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) constant-denominator limit')
   CALL assert_flow_semigroup(EXACT_FLOW_MUI_VOELLMY,                       &
        [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp, 0.02_wp], 0.5_wp,    &
        'mu(I)-Voellmy drag')

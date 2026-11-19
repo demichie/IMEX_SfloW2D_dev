@@ -769,6 +769,13 @@ CONTAINS
 
             END IF
 
+            ! mu(I) has a rational inverse drag rate with an elementary
+            ! primitive. Avoid quadrature of its sharp low-speed variation.
+            IF (flow_model==EXACT_FLOW_MUI) THEN
+                integral = integrate_inverse_mui_closed(coefficients,lower,upper)
+                RETURN
+            END IF
+
             branch_speed = -HUGE(1.0_wp)
 
             SELECT CASE (flow_model)
@@ -793,6 +800,110 @@ CONTAINS
             END IF
 
     END FUNCTION integrate_inverse_decay_rate
+
+
+    !> @brief Accurate log(1+x) for nonnegative increments.
+    !> @details For small x, the atanh series avoids losing relative accuracy
+    !> when evaluating the definite primitive over a narrow speed interval.
+    !> @param[in] x Nonnegative dimensionless increment.
+    !> @return Natural logarithm of 1+x.
+    PURE FUNCTION positive_log_increment(x) RESULT(value)
+        REAL(wp), INTENT(IN) :: x
+        REAL(wp) :: value,z,z2,term
+        INTEGER :: i
+
+        IF (x<0.125_wp) THEN
+            z=x/(2.0_wp+x)
+            z2=z*z
+            term=z
+            value=term
+            DO i=3,13,2
+                term=term*z2
+                value=value+term/REAL(i,wp)
+            END DO
+            value=2.0_wp*value
+        ELSE
+            value=LOG(1.0_wp+x)
+        END IF
+    END FUNCTION positive_log_increment
+
+    !> @brief Closed definite integral of the mu(I) inverse decay rate.
+    !> @details For D(u)=(a+b*u+c*u**2)/(d+e*u), integrate 1/D
+    !> with the interval shifted to zero. Distinct negative real roots
+    !> use stable logarithmic increments; a repeated root, a complex-root
+    !> quadratic and linear/constant limits have separate exact primitives.
+    !> @param[in] coefficients Frozen [a,b,c,d,e] mu(I) decay coefficients.
+    !> @param[in] lower Lower velocity bound [m/s].
+    !> @param[in] upper Upper velocity bound [m/s].
+    !> @return Elapsed time [s] over the specified speed interval.
+    FUNCTION integrate_inverse_mui_closed(coefficients,lower,upper) RESULT(integral)
+        REAL(wp), INTENT(IN) :: coefficients(:),lower,upper
+        REAL(wp) :: integral,a,b,c,d,e,q0,q1,n0,width,discriminant
+        REAL(wp) :: sqrt_discriminant,near_root,far_root,residue_near,residue_far,j_integral
+
+        a=coefficients(1)
+        b=coefficients(2)
+        c=coefficients(3)
+        d=coefficients(4)
+        e=coefficients(5)
+        width=upper-lower
+        q0=a+lower*(b+c*lower)
+        q1=b+2.0_wp*c*lower
+        n0=d+e*lower
+
+        IF (q0<=0.0_wp .OR. q1<0.0_wp .OR. c<0.0_wp) &
+            CALL fatal_analytic_input_error('Nonpositive mu(I) denominator in exact time integral')
+
+        IF (c==0.0_wp) THEN
+            IF (q1==0.0_wp) THEN
+                integral=width*(n0+0.5_wp*e*width)/q0
+            ELSE
+                integral=e*width/q1+(n0-e*q0/q1)*positive_log_increment(q1*width/q0)/q1
+            END IF
+            RETURN
+        END IF
+
+        discriminant=q1*q1-4.0_wp*c*q0
+        IF (discriminant>0.0_wp) THEN
+            sqrt_discriminant=SQRT(discriminant)
+            IF (sqrt_discriminant>SQRT(EPSILON(1.0_wp))*q1) THEN
+                ! Stable negative roots -near_root and -far_root.
+                near_root=2.0_wp*q0/(q1+sqrt_discriminant)
+                far_root=(q1+sqrt_discriminant)/(2.0_wp*c)
+                residue_near=(n0-e*near_root)/(c*(far_root-near_root))
+                residue_far=(e*far_root-n0)/(c*(far_root-near_root))
+                integral=residue_near*positive_log_increment(width/near_root) + &
+                    residue_far*positive_log_increment(width/far_root)
+                RETURN
+            END IF
+        END IF
+
+        IF (discriminant>=0.0_wp) THEN
+            ! Repeated-root primitive; the near-double-root case differs
+            ! from this limit only by floating-point roundoff.
+            near_root=q1/(2.0_wp*c)
+            integral=(e/c)*positive_log_increment(width/near_root) + &
+                (n0-e*near_root)/c*width/(near_root*(near_root+width))
+        ELSE
+            sqrt_discriminant=SQRT(-discriminant)
+            IF (sqrt_discriminant<=SQRT(EPSILON(1.0_wp))*q1) THEN
+                near_root=q1/(2.0_wp*c)
+                integral=(e/c)*positive_log_increment(width/near_root) + &
+                    (n0-e*near_root)/c*width/(near_root*(near_root+width))
+            ELSE
+                ! Difference of arctangents evaluated as one ATAN2.
+                j_integral=2.0_wp/sqrt_discriminant * &
+                    ATAN2(2.0_wp*c*width*sqrt_discriminant, &
+                    -discriminant+(q1+2.0_wp*c*width)*q1)
+                integral=e/(2.0_wp*c)*positive_log_increment( &
+                    (q1*width+c*width*width)/q0) + &
+                    (n0-e*q1/(2.0_wp*c))*j_integral
+            END IF
+        END IF
+
+        IF (.NOT.ieee_is_finite(integral) .OR. integral<0.0_wp) &
+            CALL fatal_analytic_input_error('Invalid mu(I) closed time integral')
+    END FUNCTION integrate_inverse_mui_closed
 
         !> \brief Integrate reciprocal decay rate over a velocity interval.
         !> \details Evaluate a bounded reciprocal-decay integral with numerical safeguards around
