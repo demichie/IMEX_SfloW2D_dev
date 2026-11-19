@@ -153,6 +153,25 @@ def run(case_dir, mode, autonomous=False):
         current = {"status": "failed", "failure": str(error),
                    "h_Linf_m": float(np.max(np.abs(actual-same))),
                    "cells_compared": actual.size}
+    # On a mismatch, retain the worst cell and its complete conservative
+    # state; this separates a wet/dry-front discrepancy from a bulk-flow
+    # pressure/curvature discrepancy without relaxing any tolerance.
+    max_index = np.unravel_index(np.argmax(np.abs(actual-same)), actual.shape)
+    max_j, max_i = (int(value) for value in max_index)
+    local_diagnostic = {
+        "cell_ij": [max_i, max_j],
+        "cell_xy_m": [float(x[max_index]), float(y[max_index])],
+        "initial_h_m": float(geometry["h0"][max_index]),
+        "bed_m": float(bed[max_index]),
+        "computed_h_m": float(actual[max_index]),
+        "reference_h_m": float(same[max_index]),
+        "signed_h_difference_m": float((actual-same)[max_index]),
+        "computed_conservative": data[:, 2:5].reshape(bed.shape+(3,))[max_index].tolist(),
+        "reference_conservative": reference[..., :3][max_index].tolist(),
+        "neighbor_h_error_m": (actual-same)[
+            max(0,max_j-1):min(actual.shape[0],max_j+2),
+            max(0,max_i-1):min(actual.shape[1],max_i+2)].tolist(),
+    }
     evidence = {"mode": mode, "dx": dx, "comparison_time": CONTRACT["time"],
         "contract_sha256": hashlib.sha256(CONTRACT_PATH.read_bytes()).hexdigest(),
         "reference_core_sha256": CONTRACT["reference_core_sha256"],
@@ -163,12 +182,13 @@ def run(case_dir, mode, autonomous=False):
             "reason": "different spatial scheme; retained historical contract is not applied"},
         "autonomous_CFL_diagnostic": {"executed_in_this_run": False,
             "reason": "this comparison uses the certified actual accepted time sequence"},
+        "worst_height_cell": local_diagnostic,
         "status": "failed" if failures else "passed", "failures": failures}
     np.savez(case_dir/"reference_fields.npz", h_IMEX=same, eta_IMEX=same+bed, q_IMEX=reference)
     evidence["reference_fields_sha256"] = hashlib.sha256((case_dir/"reference_fields.npz").read_bytes()).hexdigest()
     (case_dir/"field_evidence.json").write_text(json.dumps(evidence, indent=2, allow_nan=False)+"\n")
     if failures:
-        raise AssertionError("; ".join(failures))
+        raise AssertionError("; ".join(failures)+f"; worst cell: {local_diagnostic}")
     print(f"PASS: KT-PYTHON full fields {mode} dx={dx:g}, h Linf={current['h_Linf_m']:.3e} m", flush=True)
 
 
