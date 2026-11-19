@@ -18,7 +18,7 @@ def instrument(source, include_spatial=False):
     The CFL proposal is already saved in cfl_dt immediately after
     compute_timestep; do not duplicate or modify the numerical evaluation.
     """
-    marker = re.compile(r"(?m)^(?P<indent> *)CALL simulation%advance_timestep\\(")
+    marker = re.compile(r"(?m)^(?P<indent> *)CALL simulation%advance_timestep\(")
     matches = list(marker.finditer(source))
     if len(matches) != 1:
         raise AssertionError("unexpected main signature: exactly one advance hook required")
@@ -32,13 +32,13 @@ def instrument(source, include_spatial=False):
         record += ", cfl_dt"
 
     hook = (
-        f"{indent}BLOCK\\n"
-        f"{indent}    INTEGER :: accepted_time_unit\\n"
-        f"{indent}    OPEN(NEWUNIT=accepted_time_unit,FILE='accepted_times.bin', &\\n"
-        f"{indent}        ACCESS='STREAM',FORM='UNFORMATTED',STATUS='UNKNOWN',POSITION='APPEND')\\n"
-        f"{indent}    WRITE(accepted_time_unit) {record}\\n"
-        f"{indent}    CLOSE(accepted_time_unit)\\n"
-        f"{indent}END BLOCK\\n"
+        f"{indent}BLOCK\n"
+        f"{indent}    INTEGER :: accepted_time_unit\n"
+        f"{indent}    OPEN(NEWUNIT=accepted_time_unit,FILE='accepted_times.bin', &\n"
+        f"{indent}        ACCESS='STREAM',FORM='UNFORMATTED',STATUS='UNKNOWN',POSITION='APPEND')\n"
+        f"{indent}    WRITE(accepted_time_unit) {record}\n"
+        f"{indent}    CLOSE(accepted_time_unit)\n"
+        f"{indent}END BLOCK\n"
     )
     return source[:matches[0].start()] + hook + source[matches[0].start():]
 
