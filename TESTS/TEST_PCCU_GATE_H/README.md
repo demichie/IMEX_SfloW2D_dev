@@ -76,3 +76,21 @@ discrepancies: if the first step matches but the second does not, inspect
 state conversions and the reconstructed second-step traces. For multi-step
 prefixes the reported inferred rate is a *mean rate*, not an instantaneous
 spatial residual.
+
+## Full-precision accepted-state trajectory audit
+
+The Gate-H observer now additionally emits `accepted_states.bin`: one
+Fortran stream-unformatted record of the three canonical L1 conservative
+components over the complete grid, immediately after each accepted advance.
+The original canonical snapshot is still checked byte-for-byte to establish
+that recording was non-invasive. The SHA-256 of the state stream is kept
+in `accepted_time_evidence.json`.
+
+Upon a failed full-field comparison, `diagnose_trajectory.py` reads those
+full-precision states and independently advances KT-PYTHON through the **same**
+accepted `dt` sequence, comparing each step's conservative mass and momenta.
+It records the first step exceeding the existing roundoff-scaled Gate-H
+threshold, plus the maximum error reached and the worst cell, in
+`trajectory_evidence.json`. This avoids drawing conclusions from the
+12-decimal-digit ASCII snapshots. It does not modify any numerical object,
+physical formula or acceptance limit.

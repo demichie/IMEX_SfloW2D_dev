@@ -51,10 +51,16 @@ def capture(executable, case):
     if actual != requested:
         raise AssertionError(f"observational OpenMP team {actual} != requested {requested}")
     shutil.copyfile(directory/"accepted_times.bin", case/"accepted_times.bin")
+    recorded_states = directory/"accepted_states.bin"
+    if recorded_states.exists():
+        shutil.copyfile(recorded_states, case/"accepted_states.bin")
     evidence = {"canonical_output_byte_identical": True, "actual_threads": actual,
                 "canonical_output_sha256": hashlib.sha256(original).hexdigest(),
                 "accepted_times_sha256": hashlib.sha256((case/"accepted_times.bin").read_bytes()).hexdigest(),
                 "numerical_modules_instrumented": False}
+    if (case/"accepted_states.bin").exists():
+        evidence["accepted_states_sha256"] = hashlib.sha256(
+            (case/"accepted_states.bin").read_bytes()).hexdigest()
     (case/"accepted_time_evidence.json").write_text(json.dumps(evidence, indent=2)+"\n")
 
 

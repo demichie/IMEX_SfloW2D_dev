@@ -36,7 +36,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_kt_reference.py"
 OMP_NUM_THREADS=${IMEX_AUDIT_FORCE_THREADS:-${OMP_NUM_THREADS:-1}}
 OMP_DYNAMIC=FALSE
 export OMP_NUM_THREADS OMP_DYNAMIC
-python3 "$test_dir/build_dt_observer.py" "$executable" "$work_dir/observer-build" "$repo_dir"
+python3 "$test_dir/build_dt_observer.py" "$executable" "$work_dir/observer-build" "$repo_dir" --include-states
 observer="$work_dir/observer-build/observe_accepted_times"
 
 failed=0
@@ -55,6 +55,10 @@ do
         python3 "$test_dir/capture_times.py" "$observer" "$case_dir"
         if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_fields.py" "$case_dir" "$mode"; then
             failed=1
+            if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_trajectory.py" \
+                "$case_dir" "$mode"; then
+                echo "WARNING: full-precision trajectory diagnostic could not be completed" >&2
+            fi
             if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_first_step.py" \
                 "$observer" "$case_dir" "$mode"; then
                 echo "WARNING: first-step Gate-H diagnostic could not be completed" >&2
