@@ -28,16 +28,26 @@ def without_pore_pressure(text):
     return text
 
 
+def select_variants(original):
+    """Use the local fixture as provided; never require a Git checkout."""
+    enabled = len(FLAG.findall(original))
+    disabled = len(re.findall(r"^\s*PORE_PRESSURE_FLAG\s*=\s*F\s*,?\s*$", original, re.I | re.M))
+    groups = len(GROUP.findall(original))
+    if enabled == 1 and disabled == 0 and groups == 1:
+        return (("original", original), ("no_pore_pressure", without_pore_pressure(original)))
+    if enabled == 0 and disabled == 1 and groups == 0:
+        print("Fixture already has pore pressure disabled; running that variant only.", flush=True)
+        return (("no_pore_pressure", original),)
+    raise ValueError(
+        f"Expected a consistent pore-pressure input, got enabled={enabled}, "
+        f"disabled={disabled}, namelists={groups}"
+    )
+
+
 def run_pair(solver, evidence, timeout):
     evidence.mkdir(parents=True, exist_ok=True)
     original = (FIXTURE / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
-    if FLAG.search(original) and GROUP.search(original):
-        variants = (("original", original), ("no_pore_pressure", without_pore_pressure(original)))
-    elif re.search(r"^\\s*PORE_PRESSURE_FLAG\\s*=\\s*F\\s*,?\\s*$", original, re.I | re.M) and not GROUP.search(original):
-        print("Fixture already has pore pressure disabled: running no_pore_pressure only.", flush=True)
-        variants = (("no_pore_pressure", original),)
-    else:
-        raise ValueError("Fixture has inconsistent pore-pressure flag and namelist")
+    variants = select_variants(original)
     results = []
     with tempfile.TemporaryDirectory(prefix="imex-finh-pore-") as directory:
         for name, input_text in variants:

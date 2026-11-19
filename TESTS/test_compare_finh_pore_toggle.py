@@ -3,7 +3,7 @@
 
 import unittest
 
-from compare_finh_pore_toggle import without_pore_pressure
+from compare_finh_pore_toggle import select_variants, without_pore_pressure
 
 
 class TestPoreToggle(unittest.TestCase):
@@ -27,6 +27,27 @@ class TestPoreToggle(unittest.TestCase):
         self.assertIn("RHEOLOGY_FLAG=T", changed)
         self.assertIn("RHEOLOGY%MU_S=0.55D0", changed)
         self.assertNotIn("&PORE_PRESSURE_PARAMETERS", changed)
+
+    def test_uses_both_variants_when_input_is_original(self):
+        original = (
+            "&NEWRUN_PARAMETERS\n PORE_PRESSURE_FLAG = T,\n /\n"
+            "&PORE_PRESSURE_PARAMETERS\n PORE_PRESSURE%F_INHIBIT_MODE='OFF',\n /\n"
+        )
+        variants = select_variants(original)
+        self.assertEqual([name for name, _ in variants], ["original", "no_pore_pressure"])
+        self.assertIn("PORE_PRESSURE_FLAG = F,", variants[1][1])
+
+    def test_accepts_manually_disabled_fixture_without_git(self):
+        disabled = "&NEWRUN_PARAMETERS\n PORE_PRESSURE_FLAG = F,\n /\n"
+        self.assertEqual(select_variants(disabled), (("no_pore_pressure", disabled),))
+
+    def test_rejects_inconsistent_disabled_fixture(self):
+        invalid = (
+            "&NEWRUN_PARAMETERS\n PORE_PRESSURE_FLAG = F,\n /\n"
+            "&PORE_PRESSURE_PARAMETERS\n /\n"
+        )
+        with self.assertRaises(ValueError):
+            select_variants(invalid)
 
     def test_rejects_missing_namelist(self):
         with self.assertRaises(ValueError):
