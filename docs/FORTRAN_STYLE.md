@@ -37,6 +37,47 @@ The repository already provides `python3 TESTS/TEST_SOURCE_DOCUMENTATION/check_d
 
 This is a formatting/documentation phase, not an opportunity to alter formulas or the Lie algorithm.
 
+## Optional fprettify configuration (experimental)
+
+The repository provides a root-level [`.fprettify.rc`](../.fprettify.rc) as an
+**opt-in formatting experiment**, not as a replacement for this standard.
+The configuration sets a four-space indent, strict lexical indentation and a
+120-column line target. It deliberately disables whitespace rewriting,
+declaration normalization, comment stripping and source-token replacements
+while we assess the tool on this codebase.
+
+To try it, install a version with configuration-file support (including the
+optional `configargparse` dependency), then inspect the changes **without
+modifying the source**:
+
+```sh
+python3 -m pip install 'fprettify==0.3.7' configargparse
+fprettify --config-file .fprettify.rc --diff src/numerics/source_registry_2d.f90
+fprettify --config-file .fprettify.rc --diff src/physics/rheology_laws/rheology_mui_2d.f90
+```
+
+When reviewing any proposed change, check the lexical construct nesting,
+continuation-marker placement, argument packing, `!$OMP` directives,
+string-literal continuations, Doxygen adjacency and blank-line grouping.
+In particular, the formatter's `line-length = 120` is a formatting target;
+it **does not guarantee** the project's requirement that existing trailing
+`&` markers appear in column 120, nor does it enforce Doxygen's 100-column
+prose width. Its indentation and whitespace decisions may also differ from
+the canonical style. Do not accept a change merely because it was generated
+by the tool.
+
+If a change is worth adopting, format **one reviewed file at a time**, inspect
+the diff, run the existing style and documentation checks above, and verify
+that every non-whitespace executable token, evaluation order, OpenMP
+directive and numerical result is preserved. Re-run the formatter to check
+that the formatting is stable; compile and run the relevant tests on any
+formatted Fortran file. Keep this feature **out of mandatory GitHub Actions**
+until representative files and idempotence are validated. Never reformat
+all of `src/` as part of an unrelated functional change.
+
+The Markdown rules here remain the authoritative specification; the
+configuration only automates the supported subset.
+
 ## Canonical names and scientific ownership
 
 - Give the same physical quantity the same name through producer, caller and
