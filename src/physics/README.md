@@ -35,6 +35,20 @@ of any single constitutive law and supports wider OpenMP loops, future
 MPI decomposition, GPU-oriented execution, and alternative physical
 evaluators without embedding grid indices in the physical kernels.
 
+## Detailed subdirectory guides
+
+Each physical family documents its own files, implemented equations and
+validation boundaries:
+
+- [Rheological constitutive laws](rheology_laws/README.md)
+- [Mass exchange with bed and atmosphere](mass_exchange/README.md)
+- [Mass injection](mass_injection_terms/README.md)
+- [Interlayer mass transfer](interlayer_mass_exchange/README.md)
+- [Interlayer momentum drag](interlayer_momentum_exchange/README.md)
+- [Pore-pressure laws](pore_pressure/README.md)
+- [Thermal laws](thermal_laws/README.md)
+- [Shared substrate parameters](substrate/README.md)
+
 ## Physical contributions to the equations
 
 The model evolves conservative cell quantities such as mixture mass,
