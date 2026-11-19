@@ -84,7 +84,7 @@ static int verify_partial_time_record(const char *path, double expected_time)
         goto done;
     }
 
-    status = nc_inq_varid(ncid, "q_layers", &field_varid);
+    status = nc_inq_varid(ncid, "h", &field_varid);
     if (report_netcdf_error(status, "find partial field variable")) goto done;
     status = nc_inq_var(ncid, field_varid, NULL, NULL, &field_rank,
                         field_dimids, NULL);
@@ -214,12 +214,15 @@ static int compare_variable_data(int left_ncid, int right_ncid,
     return 0;
 }
 
+/* Require identical field names, types, dimension names and lengths, then
+ * compare every stored double bit-for-bit, including physical inventories.
+ * This deliberately does not depend on any internal q/qp tensor layout. */
 static int compare_outputs(const char *reference_path, const char *resumed_path)
 {
     int reference_ncid, resumed_ncid, status, result = 1;
-    int x_dimid, y_dimid, time_dimid;
-    size_t x_length, y_length, time_length, reference_time_length;
-    size_t field_count;
+    int reference_ndims, reference_nvars, resumed_ndims, resumed_nvars;
+    int reference_unlimited, resumed_unlimited;
+    int var_index;
 
     status = nc_open(reference_path, NC_NOWRITE, &reference_ncid);
     if (report_netcdf_error(status, "open reference")) return 1;
@@ -229,74 +232,89 @@ static int compare_outputs(const char *reference_path, const char *resumed_path)
         return 1;
     }
 
-    status = nc_inq_dimid(reference_ncid, "x", &x_dimid);
-    if (report_netcdf_error(status, "find x dimension")) goto done;
-    if (report_netcdf_error(nc_inq_dimlen(reference_ncid, x_dimid, &x_length),
-                            "read x dimension")) goto done;
-    status = nc_inq_dimid(reference_ncid, "y", &y_dimid);
-    if (report_netcdf_error(status, "find y dimension")) goto done;
-    if (report_netcdf_error(nc_inq_dimlen(reference_ncid, y_dimid, &y_length),
-                            "read y dimension")) goto done;
-    status = nc_inq_dimid(reference_ncid, "time", &time_dimid);
-    if (report_netcdf_error(status, "find time dimension")) goto done;
-    if (report_netcdf_error(nc_inq_dimlen(reference_ncid, time_dimid,
-                                           &reference_time_length),
-                            "read reference time dimension")) goto done;
-    if (reference_time_length == 0) {
-        fprintf(stderr, "reference NetCDF has no time records\n");
+    status = nc_inq(reference_ncid, &reference_ndims, &reference_nvars,
+                    NULL, &reference_unlimited);
+    if (report_netcdf_error(status, "inspect reference schema")) goto done;
+    status = nc_inq(resumed_ncid, &resumed_ndims, &resumed_nvars,
+                    NULL, &resumed_unlimited);
+    if (report_netcdf_error(status, "inspect resumed schema")) goto done;
+    if (reference_ndims != resumed_ndims || reference_nvars != resumed_nvars) {
+        fprintf(stderr, "NetCDF variable or dimension counts differ\n");
+        goto done;
+    }
+    /* Only coordinate dimensions x, y, time belong to the physical schema. */
+    if (reference_ndims != 3) {
+        fprintf(stderr, "unexpected physical NetCDF dimension count: %d\n",
+                reference_ndims);
         goto done;
     }
 
-    status = nc_inq_dimid(resumed_ncid, "x", &x_dimid);
-    if (report_netcdf_error(status, "find resumed x dimension")) goto done;
-    if (report_netcdf_error(nc_inq_dimlen(resumed_ncid, x_dimid, &time_length),
-                            "read resumed x dimension")) goto done;
-    if (time_length != x_length) {
-        fprintf(stderr, "NetCDF x dimensions differ\n");
-        goto done;
-    }
-    status = nc_inq_dimid(resumed_ncid, "y", &y_dimid);
-    if (report_netcdf_error(status, "find resumed y dimension")) goto done;
-    if (report_netcdf_error(nc_inq_dimlen(resumed_ncid, y_dimid, &time_length),
-                            "read resumed y dimension")) goto done;
-    if (time_length != y_length) {
-        fprintf(stderr, "NetCDF y dimensions differ\n");
-        goto done;
-    }
-    status = nc_inq_dimid(resumed_ncid, "time", &time_dimid);
-    if (report_netcdf_error(status, "find resumed time dimension")) goto done;
-    if (report_netcdf_error(nc_inq_dimlen(resumed_ncid, time_dimid, &time_length),
-                            "read resumed time dimension")) goto done;
-    if (time_length != reference_time_length) {
-        fprintf(stderr, "NetCDF time dimensions differ: %zu vs %zu\n",
-                reference_time_length, time_length);
-        goto done;
+    for (var_index = 0; var_index < reference_ndims; ++var_index) {
+        char name[NC_MAX_NAME + 1];
+        int reference_dimid, resumed_dimid;
+        size_t reference_length, resumed_length;
+
+        status = nc_inq_dim(reference_ncid, var_index, name, &reference_length);
+        if (report_netcdf_error(status, "inspect reference dimension")) goto done;
+        status = nc_inq_dimid(resumed_ncid, name, &resumed_dimid);
+        if (report_netcdf_error(status, "find resumed dimension")) goto done;
+        status = nc_inq_dimlen(resumed_ncid, resumed_dimid, &resumed_length);
+        if (report_netcdf_error(status, "inspect resumed dimension")) goto done;
+        status = nc_inq_dimid(reference_ncid, name, &reference_dimid);
+        if (report_netcdf_error(status, "find reference dimension")) goto done;
+        if (reference_length != resumed_length || reference_length == 0) {
+            fprintf(stderr, "NetCDF dimension %s differs or is empty\n", name);
+            goto done;
+        }
     }
 
-    if (x_length > SIZE_MAX / y_length ||
-        x_length * y_length > SIZE_MAX / time_length) {
-        fprintf(stderr, "NetCDF dimensions exceed comparison capacity\n");
-        goto done;
-    }
-    /* The canonical q tensor has 1 layer and n_vars components here. */
-    {
-        int component_dimid, layer_dimid;
-        size_t n_components, n_layers;
-        status = nc_inq_dimid(reference_ncid, "component", &component_dimid);
-        if (report_netcdf_error(status, "find component dimension")) goto done;
-        status = nc_inq_dimlen(reference_ncid, component_dimid, &n_components);
-        if (report_netcdf_error(status, "read component dimension")) goto done;
-        status = nc_inq_dimid(reference_ncid, "layer", &layer_dimid);
-        if (report_netcdf_error(status, "find layer dimension")) goto done;
-        status = nc_inq_dimlen(reference_ncid, layer_dimid, &n_layers);
-        if (report_netcdf_error(status, "read layer dimension")) goto done;
-        if (n_components > SIZE_MAX / (x_length * y_length * time_length) ||
-            n_layers > SIZE_MAX / (n_components * x_length * y_length * time_length)) goto done;
-        field_count = x_length * y_length * time_length * n_components * n_layers;
-    }
-    if (compare_variable_data(reference_ncid, resumed_ncid, "time", time_length) ||
-        compare_variable_data(reference_ncid, resumed_ncid, "q_layers", field_count)) {
-        goto done;
+    for (var_index = 0; var_index < reference_nvars; ++var_index) {
+        char name[NC_MAX_NAME + 1];
+        nc_type reference_type, resumed_type;
+        int reference_rank, resumed_rank, resumed_varid;
+        int reference_dimensions[NC_MAX_VAR_DIMS];
+        int resumed_dimensions[NC_MAX_VAR_DIMS];
+        size_t value_count = 1;
+        int axis;
+
+        status = nc_inq_var(reference_ncid, var_index, name, &reference_type,
+                            &reference_rank, reference_dimensions, NULL);
+        if (report_netcdf_error(status, "inspect reference variable")) goto done;
+        status = nc_inq_varid(resumed_ncid, name, &resumed_varid);
+        if (report_netcdf_error(status, "find resumed variable")) goto done;
+        status = nc_inq_var(resumed_ncid, resumed_varid, NULL, &resumed_type,
+                            &resumed_rank, resumed_dimensions, NULL);
+        if (report_netcdf_error(status, "inspect resumed variable")) goto done;
+        if (reference_type != NC_DOUBLE || resumed_type != NC_DOUBLE ||
+            reference_rank != resumed_rank || reference_rank < 1) {
+            fprintf(stderr, "NetCDF variable type or rank differs: %s\n", name);
+            goto done;
+        }
+        for (axis = 0; axis < reference_rank; ++axis) {
+            char reference_name[NC_MAX_NAME + 1];
+            char resumed_name[NC_MAX_NAME + 1];
+            size_t length;
+
+            status = nc_inq_dim(reference_ncid, reference_dimensions[axis],
+                                reference_name, &length);
+            if (report_netcdf_error(status, "inspect reference field axis")) goto done;
+            status = nc_inq_dimname(resumed_ncid, resumed_dimensions[axis],
+                                    resumed_name);
+            if (report_netcdf_error(status, "inspect resumed field axis")) goto done;
+            if (strcmp(reference_name, resumed_name) != 0 ||
+                length == 0 || value_count > SIZE_MAX / length) {
+                fprintf(stderr, "NetCDF axis mismatch or overflow: %s\n", name);
+                goto done;
+            }
+            value_count *= length;
+        }
+        if (value_count > SIZE_MAX / sizeof(double)) {
+            fprintf(stderr, "NetCDF field exceeds addressable size: %s\n", name);
+            goto done;
+        }
+        if (compare_variable_data(reference_ncid, resumed_ncid, name, value_count)) {
+            goto done;
+        }
     }
     result = 0;
 
