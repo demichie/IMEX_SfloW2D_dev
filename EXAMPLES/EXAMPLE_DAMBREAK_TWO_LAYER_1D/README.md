@@ -1,0 +1,45 @@
+# Two-layer 1D dam-break on flat topography
+
+A diagnostic test of the production two-layer spatial operator. The mesh has
+**200 cells in x and exactly one cell in y** (`COMP_CELLS_Y=1`).
+The topography is constant zero; no transverse evolution is intended.
+
+Initially L1 is 2 m deep for `0 <= x < 60 m`, with zero velocity, and
+dry elsewhere. L2 starts completely dry. The initial L1 volume is 120 m3.
+Both layers use the existing primitive-input initializer. Solid volume
+fraction in L1 is 50%, temperature 300 K. Rheology, erosion, settling,
+elutriation and interlayer drag are disabled to isolate spatial transport.
+
+## Generate inputs
+
+From this directory:
+
+```bash
+python3 prepare.py
+```
+
+This generates only `DEM/topography.asc` and `DEM/l1_thickness.asc`.
+There is no need to run the solver to prepare initial conditions.
+
+## Run
+
+With the executable built at `../../src/IMEX_SfloW2D`:
+
+```bash
+IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D
+```
+
+The simulation ends at 3 s and writes output every 0.25 s in
+`OUTPUT/dambreak_two_layer_1d/`. This is a numerical smoke test, not
+validation of the full coupled two-layer equations.
+
+## Interpretation
+
+Verify that L1 momentum develops from rest and that its wet front propagates
+in the positive x direction. Since all L2 transfer processes are disabled,
+L2 should remain dry. Check total L1 mass conservation, zero transverse
+momentum, and the timestep history. For a separate L1 single-layer baseline,
+repeat with `N_LAYERS=1` and the corresponding single-layer input contract;
+do not change the physics or numerical parameters between comparisons.
+
+The single y cell has no y-direction interior flux and is intentional.
