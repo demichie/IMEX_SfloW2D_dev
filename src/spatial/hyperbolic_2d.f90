@@ -774,13 +774,17 @@ CONTAINS
 
         REAL(wp) :: a_minus, a_plus
         REAL(wp) :: source_inflow, other_inflow, face_inflow
-        LOGICAL :: dry_donor_left,dry_donor_right
+        LOGICAL :: dry_donor_left,dry_donor_right,front_trace_enabled,trace_front_face
         INTEGER :: j, k, l, diagnostic_status
         CHARACTER(LEN=1) :: diagnostic_flag
 
+        diagnostic_flag=''
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_FRONT_MASS_DIAGNOSTICS',diagnostic_flag,STATUS=diagnostic_status)
+        front_trace_enabled=diagnostic_status==0 .AND. diagnostic_flag=='1'
+
         IF ( comp_cells_x .GT. 1 ) THEN
 
-            !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right)
+            !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right,trace_front_face)
             DO l = 1, solve_interfaces_x
 
                 j = j_stag_x(l)
@@ -794,6 +798,17 @@ CONTAINS
                     qp_center(1,j-1,k) .LE. dry_thickness_tolerance
                 IF ( j .LE. comp_cells_x ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
+                trace_front_face=.FALSE.
+                IF (front_trace_enabled .AND. recon%layer==1) THEN
+                    IF (j>1 .AND. j<=comp_cells_x) THEN
+                        trace_front_face=qp_center(1,j-1,k)>dry_thickness_tolerance .AND. &
+                            qp_center(1,j,k)<=dry_thickness_tolerance
+                    END IF
+                END IF
+                IF (trace_front_face) THEN
+                    WRITE(*,'(A,2(I0,1X),A,ES24.16)') &
+                        'FRONT_KERNEL enter face(j,k)=',j,k,' t=',t
+                END IF
                 IF (PRESENT(lower_recon)) THEN
                     CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
@@ -805,7 +820,7 @@ CONTAINS
                     dry_donor_left,dry_donor_right,t,                                                                  &
                     this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k), &
                     bed_face_left=lower_recon%eta_interfaceL(j,k), &
-                    bed_face_right=lower_recon%eta_interfaceR(j,k) )
+                    bed_face_right=lower_recon%eta_interfaceR(j,k),diagnose_front=trace_front_face )
                 ELSE
                     CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
@@ -815,7 +830,12 @@ CONTAINS
                     a_minus, a_plus, this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),                      &
                     PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
-                    this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
+                    this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k), &
+                    diagnose_front=trace_front_face )
+                END IF
+                IF (trace_front_face) THEN
+                    WRITE(*,'(A,2(ES24.16,1X))') 'FRONT_KERNEL exit left,right=', &
+                        this%G_interface_xL(1,j,k),this%G_interface_xR(1,j,k)
                 END IF
 
                 ! Apply the boundary's one-way condition to the final numerical flux.
@@ -1049,13 +1069,14 @@ CONTAINS
     !> \param[in] dry_donor_right Whether the positive side uses a dry-donor trace.
     !> \param[in] t Current simulation or stage time [s].
     !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
+    !> @param[in] diagnose_front Enable opt-in diagnostic for a wet-to-dry x-face.
     !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
     SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face, h_selected_left,h_selected_right,                      &
             qp_adv_left,qp_adv_right,                                                                                  &
             grav_coeff,a_minus,a_plus,gamma_left_cached,gamma_right_cached,                                          &
             direction,normal_momentum_index,face_i,                                                                    &
             face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                                                     &
-            value_left,value_right,bed_face_left,bed_face_right)
+            value_left,value_right,bed_face_left,bed_face_right,diagnose_front)
 
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : limit_component_mass_flux
@@ -1078,6 +1099,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: face_i, face_j
         LOGICAL, INTENT(IN) :: use_dry_donor
         LOGICAL, INTENT(IN) :: dry_donor_left,dry_donor_right
+        LOGICAL, INTENT(IN), OPTIONAL :: diagnose_front
         REAL(wp), INTENT(IN) :: t
         REAL(wp), INTENT(OUT) :: value_left(n_eqns), value_right(n_eqns)
 
@@ -1092,8 +1114,11 @@ CONTAINS
         REAL(wp) :: eta_path_left, eta_path_right
         REAL(wp) :: h_eta_left,h_eta_right
         LOGICAL :: source_trace_left,source_trace_right
-        LOGICAL :: face_conversion_ok
+        LOGICAL :: face_conversion_ok,trace_front
         ! Source-side flags remain necessary for hydrostatic path endpoints.
+
+        trace_front=.FALSE.
+        IF (PRESENT(diagnose_front)) trace_front=diagnose_front
 
         qp_adv_left_use=qp_adv_left
         qp_adv_right_use=qp_adv_right
@@ -1156,8 +1181,18 @@ CONTAINS
 
         CALL eval_pccu_advective_flux(a_minus,a_plus,u_normal_left,u_normal_right,                                  &
             q_adv_left_use,q_adv_right_use,flux_left,flux_right,interface_flux)
+        IF (trace_front) THEN
+            WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_KERNEL input qL,qR,uL,uR=', &
+                q_adv_left_use(1),q_adv_right_use(1),u_normal_left,u_normal_right
+            WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_KERNEL speeds,endpoint_fluxL,fluxR=', &
+                a_minus,a_plus,flux_left(1),flux_right(1)
+            WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL after_pccu=',interface_flux(1)
+            WRITE(*,'(A,3(L1,1X))') 'FRONT_KERNEL dry_flags enable,left,right=', &
+                use_dry_donor,dry_donor_left,dry_donor_right
+        END IF
 
         CALL limit_component_mass_flux(interface_flux)
+        IF (trace_front) WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL after_component_limiter=',interface_flux(1)
 
         ! Positivity guard: when the total mass flux points out of a dry donor,
         ! suppress the complete inertial flux vector, not only the mass equation.
@@ -1166,15 +1201,19 @@ CONTAINS
             IF ( (interface_flux(1) .GT. 0.0_wp) .AND.                                                                 &
                 (dry_donor_left .OR.                                                                                   &
                 (qp_adv_left_use(1) .LE. dry_thickness_tolerance)) ) THEN
+                IF (trace_front) WRITE(*,'(A)') 'FRONT_KERNEL suppressed_by_dry_left'
                 interface_flux=0.0_wp
             ELSEIF ( (interface_flux(1) .LT. 0.0_wp) .AND.                                                             &
                 (dry_donor_right .OR.                                                                                  &
                 (qp_adv_right_use(1) .LE. dry_thickness_tolerance)) ) THEN
+                IF (trace_front) WRITE(*,'(A)') 'FRONT_KERNEL suppressed_by_dry_right'
                 interface_flux=0.0_wp
 
             END IF
 
         END IF
+
+        IF (trace_front) WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL after_dry_guard=',interface_flux(1)
 
         ! Suppress only the roundoff-level mass diffusion of a hydrostatic rest
         ! state. Zero normal velocity alone is not enough: on a flat bed, for
@@ -1187,9 +1226,15 @@ CONTAINS
         IF ( ( qp_adv_left(normal_momentum_index) .EQ. 0.0_wp ) .AND.                                                  &
             ( qp_adv_right(normal_momentum_index) .EQ. 0.0_wp ) .AND.                                                  &
             ( ABS(eta_left-eta_right) .LE. eta_roundoff ) ) THEN
+            IF (trace_front) WRITE(*,'(A)') 'FRONT_KERNEL suppressed_by_rest_guard'
             interface_flux(1) = 0.0_wp
             interface_flux(4:n_vars) = 0.0_wp
 
+        END IF
+
+        IF (trace_front) THEN
+            WRITE(*,'(A,3(ES24.16,1X))') 'FRONT_KERNEL after_rest_guard,eta_diff,tolerance=', &
+                interface_flux(1),eta_left-eta_right,eta_roundoff
         END IF
 
         qp_path_left=qp_adv_left_use
@@ -1245,6 +1290,11 @@ CONTAINS
             path_contribution)
 
         CALL eval_oriented_pccu_pair(interface_flux,path_contribution,a_minus, a_plus,value_left,value_right)
+        IF (trace_front) THEN
+            WRITE(*,'(A,3(ES24.16,1X))') 'FRONT_KERNEL oriented flux,path,left=', &
+                interface_flux(1),path_contribution(1),value_left(1)
+            WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL oriented_right=',value_right(1)
+        END IF
 
         ! A dry adjacent column receives no share of the nonconservative path;
         ! the wet side retains its own oriented contribution.
@@ -1252,6 +1302,9 @@ CONTAINS
             IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) value_left=interface_flux
             IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) value_right=interface_flux
 
+        END IF
+        IF (trace_front) THEN
+            WRITE(*,'(A,2(ES24.16,1X))') 'FRONT_KERNEL final left,right=',value_left(1),value_right(1)
         END IF
 
     END SUBROUTINE eval_pccu_interface

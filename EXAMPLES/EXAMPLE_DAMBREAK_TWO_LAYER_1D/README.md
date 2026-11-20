@@ -76,3 +76,28 @@ and characteristic speed bounds. These distinguish a missing active face,
 dry reconstructed states, and vanishing coupled characteristic speeds.
 If the front mass flux remains identically zero, inspect `FRONT_TRACE`
 rather than the later Lie source or commit stages.
+
+### Inspecting the flux kernel
+
+With `IMEX_FRONT_MASS_DIAGNOSTICS=1`, the same L1 wet-to-dry
+x-face is also logged **inside** the numerical flux kernel. Use
+`grep FRONT_KERNEL front.log | head -n 40` to inspect one or two
+timesteps. The records are identical for `N_LAYERS=1` and
+`N_LAYERS=2`; run both with the same initial L1 state to identify
+the first divergent stage.
+
+- `FRONT_KERNEL enter`: the face was actually visited by `eval_flux_PCCU`.
+  If the later `FRONT_TRACE` reports the face as active but this entry is
+  absent, inspect the compact interface worklist.
+- `input`, `speeds`, `after_pccu`: conservative face masses, normal
+  velocities, characteristic bounds, endpoint and raw PCCU mass fluxes.
+- `after_component_limiter`, `after_dry_guard`,
+  `after_rest_guard`: successive flux values, with a
+  `suppressed_by_...` reason when a zeroing branch executes.
+- `oriented`, `final`, `exit`: oriented face contributions after
+  hydrostatic path splitting, dry-side treatment and return to the caller.
+
+Diagnostics are read-only, are disabled by default and do not change the
+physical model. For the 1D example, there is only one right-facing wet/dry
+front; in a general 2D domain, diagnostic lines from multiple x-faces can
+interleave under OpenMP.
