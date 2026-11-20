@@ -41,7 +41,7 @@ MODULE time_integration_2d
         !> Persistent status worklist for primitive and spatial checks.
         INTEGER, ALLOCATABLE :: cell_status(:)
         TYPE(lie_source_executor_type) :: lie_executor
-        LOGICAL :: profile_enabled=.FALSE.
+        LOGICAL :: profile_enabled=.FALSE.,front_mass_diagnostics=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
         REAL(wp) :: profile_source_executor=0.0_wp,profile_publish=0.0_wp
@@ -63,6 +63,13 @@ CONTAINS
             value=''
             CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
             this%profile_enabled=status==0 .AND. TRIM(value)=='1'
+        END BLOCK
+        BLOCK
+            CHARACTER(LEN=8) :: value
+            INTEGER :: status
+            value=''
+            CALL GET_ENVIRONMENT_VARIABLE('IMEX_FRONT_MASS_DIAGNOSTICS',value,STATUS=status)
+            this%front_mass_diagnostics=status==0 .AND. TRIM(value)=='1'
         END BLOCK
         ALLOCATE(this%spatial_rate(n_eqns,n_layers,comp_cells_x,comp_cells_y))
         ALLOCATE(this%q_trial(n_vars,n_layers,comp_cells_x,comp_cells_y))
@@ -106,7 +113,8 @@ CONTAINS
         LOGICAL :: reuse_cfl_traces
         REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:),qp_pre2(:,:,:),qp_pre_all(:,:,:,:)
         REAL(wp) :: coupled_dt
-        INTEGER :: l,j,k,first_failure,eq,failed_layer,layer_status,layer
+        INTEGER :: l,j,k,first_failure,eq,failed_layer,layer_status,layer,front_j,front_k
+        REAL(wp) :: face_left,face_right
         INTEGER :: tick,tock,tick_rate
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
@@ -190,6 +198,36 @@ CONTAINS
                 reuse_cfl_traces=reuse_cfl_traces)
         END IF
 
+        ! Select the first wet-to-dry x-face of L1 from the published state.
+        ! The right cell sees the mass influx from G_interface_xR.
+        front_j=0
+        front_k=0
+        IF (this%front_mass_diagnostics .AND. comp_cells_x>1) THEN
+            find_front: DO k=1,comp_cells_y
+                DO j=2,comp_cells_x
+                    IF (state%q(idx_totMassEqn,1,j-1,k)<=0.0_wp) CYCLE
+                    IF (state%q(idx_totMassEqn,1,j,k)>0.0_wp) CYCLE
+                    IF (.NOT.domain%solve_mask(j,k)) CYCLE
+                    front_j=j
+                    front_k=k
+                    EXIT find_front
+                END DO
+            END DO find_front
+            IF (front_j>0) THEN
+                CALL spatial_operators(1)%front_mass_flux(front_j,front_k,face_left,face_right)
+                WRITE(*,'(A,2(I0,1X),A,2(ES24.16,1X),A,2(ES24.16,1X))') &
+                    'FRONT_MASS face(j,k)=',front_j,front_k,' t,dt=',t,dt, &
+                    ' flux_to_left,right=',face_left,face_right
+                WRITE(*,'(A,3(ES24.16,1X))') 'FRONT_MASS before,spatial_rate,expected_after=', &
+                    state%q(idx_totMassEqn,1,front_j,front_k), &
+                    this%spatial_rate(idx_totMassEqn,1,front_j,front_k), &
+                    state%q(idx_totMassEqn,1,front_j,front_k)- &
+                    dt*this%spatial_rate(idx_totMassEqn,1,front_j,front_k)
+            ELSE
+                WRITE(*,'(A,ES24.16)') 'FRONT_MASS no wet-to-dry x-face at t=',t
+            END IF
+        END IF
+
         ! Both layer candidates are checked before any authoritative fluid publication.
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,layer,layer_status)
         DO l=1,domain%solve_cells
@@ -245,6 +283,11 @@ CONTAINS
 
         END IF
 
+        IF (front_j>0) THEN
+            WRITE(*,'(A,ES24.16)') 'FRONT_MASS after_spatial L1=', &
+                this%q_trial(idx_totMassEqn,1,front_j,front_k)
+        END IF
+
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_spatial=this%profile_spatial+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -293,6 +336,11 @@ CONTAINS
             CALL SYSTEM_CLOCK(tock)
             this%profile_sources=this%profile_sources+REAL(tock-tick,wp)/REAL(tick_rate,wp)
         END IF
+        IF (front_j>0) THEN
+            WRITE(*,'(A,ES24.16)') 'FRONT_MASS after_sources L1=', &
+                this%q_trial(idx_totMassEqn,1,front_j,front_k)
+        END IF
+
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
         IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
@@ -306,6 +354,10 @@ CONTAINS
             state%qp(:,:,j,k)=this%qp_trial(:,:,j,k)
         END DO
         !$OMP END PARALLEL DO
+        IF (front_j>0) THEN
+            WRITE(*,'(A,ES24.16)') 'FRONT_MASS published L1=', &
+                state%q(idx_totMassEqn,1,front_j,front_k)
+        END IF
         ! The source executor refreshed substrate aggregates after its cell sweep.
         ! Recomputing them here would traverse the whole domain a second time.
         IF (needs_geometry_update) CALL commit_geometry_transaction

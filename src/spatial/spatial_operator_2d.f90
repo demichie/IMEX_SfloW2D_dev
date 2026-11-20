@@ -40,6 +40,7 @@ MODULE spatial_operator_2d
         PROCEDURE, PUBLIC :: evaluate => evaluate_spatial_operator
         PROCEDURE, PUBLIC :: evaluate_coupled => evaluate_coupled_spatial_operator
         PROCEDURE, PUBLIC :: diagnose_cell => diagnose_spatial_cell
+        PROCEDURE, PUBLIC :: front_mass_flux => spatial_front_mass_flux
         PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
         PROCEDURE, PUBLIC :: compute_coupled_timestep => compute_coupled_spatial_timestep
         PROCEDURE, PUBLIC :: prepare_hp_workset => prepare_spatial_hp_workset
@@ -57,6 +58,19 @@ CONTAINS
         INTEGER, INTENT(IN) :: j,k,eq
         CALL this%hp_pccu%diagnose_cell(this%reconstruction,j,k,eq)
     END SUBROUTINE diagnose_spatial_cell
+
+    !> @brief Read the mass flux facing each cell at a selected x-interface.
+    !> @details Only used for opt-in diagnostics; never recomputes numerical fluxes.
+    SUBROUTINE spatial_front_mass_flux(this,j,k,flux_left,flux_right)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        INTEGER, INTENT(IN) :: j,k
+        REAL(wp), INTENT(OUT) :: flux_left,flux_right
+
+        IF (j<1 .OR. j>comp_interfaces_x .OR. k<1 .OR. k>comp_cells_y) &
+            CALL fatal_error('Front diagnostic face outside computational domain')
+        flux_left=this%hp_pccu%G_interface_xL(idx_totMassEqn,j,k)
+        flux_right=this%hp_pccu%G_interface_xR(idx_totMassEqn,j,k)
+    END SUBROUTINE spatial_front_mass_flux
 
     !> \brief Initialize the reconstruction and KT flux workspace.
     !>

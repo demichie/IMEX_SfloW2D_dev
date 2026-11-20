@@ -46,3 +46,25 @@ of L1 parameters;
 do not change the physics or numerical parameters between comparisons.
 
 The single y cell has no y-direction interior flux and is intentional.
+
+## Wet/dry-front mass diagnostic
+
+Enable the same opt-in diagnostic in both a single-layer reference and the
+two-layer run:
+
+```bash
+IMEX_FRONT_MASS_DIAGNOSTICS=1 IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D > front.log 2>&1
+grep FRONT_MASS front.log | head -n 30
+```
+
+At each accepted timestep the solver finds the first x-face whose L1
+left cell is wet and right cell dry. It prints the face index, time and
+timestep, the oriented numerical mass fluxes delivered to each adjacent
+cell, and the right cell's L1 mass before and after the spatial update,
+after source groups, and after publication. A positive `flux_to_right`
+means rightward mass transport; the right-cell spatial mass residual must
+then be negative when this is its only nonzero mass flux. If the spatial
+candidate gains mass but the post-source value becomes zero, investigate
+the source executor. If the post-source value is positive but the
+published value is zero, investigate the final state commit. The diagnostic
+reads existing flux arrays and does not alter the physical state.
