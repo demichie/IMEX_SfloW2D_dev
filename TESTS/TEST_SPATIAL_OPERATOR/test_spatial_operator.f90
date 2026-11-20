@@ -3127,7 +3127,22 @@ CONTAINS
                 upper_center,upper_w,upper_e,upper_s,upper_n)
             IF (upper_e(2,2)/=saved_e+0.125_wp .OR. upper_w(3,2)/=adjacent_w) &
                 ERROR STOP 'Upper-layer base averaged opposite L1 traces'
+            ! The L2 base can jump across a face: both traces must stay independent.
+            IF (ABS((upper_e(2,2)-upper_w(3,2))- &
+                ((saved_e+0.125_wp)-adjacent_w))>1.0E-12_wp) &
+                ERROR STOP 'Upper-layer face-base jump was not preserved'
             test_reconstruction%eta_cellE(2,2)=saved_e
+            CALL test_reconstruction%prepare_upper_layer_bed(primitive(idx_h,:,:), &
+                upper_center,upper_w,upper_e,upper_s,upper_n)
+            ! Kurganov-Petrova's cell-owned base-average identity is independent
+            ! of any jump across a face between adjacent reconstructed cells.
+            DO iy=2,3
+                DO ix=2,3
+                    IF (ABS(0.25_wp*(upper_w(ix,iy)+upper_e(ix,iy)+ &
+                        upper_s(ix,iy)+upper_n(ix,iy))-upper_center(ix,iy))>1.0E-10_wp) &
+                        ERROR STOP 'Upper-layer cell-owned base-average identity failed'
+                END DO
+            END DO
             DEALLOCATE(upper_center,upper_w,upper_e,upper_s,upper_n)
         END IF
 

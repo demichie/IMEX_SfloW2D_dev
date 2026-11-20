@@ -4,7 +4,7 @@
 !>          fully accepted timestep publishes fluid, substrate and geometry.
 MODULE time_integration_2d
     USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                  &
-            idx_add_gas_first,idx_add_gas_last,sea_mass_removal_flag,n_layers
+            idx_add_gas_first,idx_add_gas_last,sea_mass_removal_flag,n_layers,idx_h
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             B_zone
@@ -284,8 +284,14 @@ CONTAINS
                 CALL spatial_operators(failed_layer)%diagnose_cell(j,k,eq)
             END DO
             IF (n_layers==2 .AND. layer_status==1) THEN
-                CALL spatial_operators(failed_layer)%diagnose_positivity(j,k, &
-                    qp_pre_all(:,failed_layer,j,k),state%q(idx_totMassEqn,failed_layer,j,k),dt)
+                IF (failed_layer==2) THEN
+                    CALL spatial_operators(2)%diagnose_positivity(j,k,qp_pre_all(:,2,j,k), &
+                        state%q(idx_totMassEqn,2,j,k),dt, &
+                        lower=spatial_operators(1),lower_h_cell=qp_pre_all(idx_h,1,j,k))
+                ELSE
+                    CALL spatial_operators(1)%diagnose_positivity(j,k,qp_pre_all(:,1,j,k), &
+                        state%q(idx_totMassEqn,1,j,k),dt)
+                END IF
             END IF
             IF (layer_status==1)                                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')

@@ -156,3 +156,30 @@ mass flux. Dry-donor suppression and a degenerate-speed fallback can
 alter it; compare the reported decomposition with the actual
 `LIE_SPATIAL_FAILURE` mass update and `LIE_FACE_FAILURE` fluxes.
 This is read-only failure evidence, not a positivity fix.
+
+## L2 face-base and reconstruction audit
+
+The failure-only `KP_BASE` diagnostic uses the completed L1 reconstruction as
+the effective L2 base. It prints, in W/E/S/N order, each cell-owned base,
+the opposite reconstructed base at the same interface, their jump
+(`opposite - own`), and the difference between the cell-owned base
+average and `B_cent + h1_cell`. These are distinct questions:
+a jump between adjacent cells is allowed by the current reconstruction
+contract, while the cell-owned four-face average must still reproduce
+the cell-center effective base.
+
+The `KP_TRACE` records separate first-pass primitive reconstructions
+(`raw_h`, `raw_mass`, `raw_density`) from the selected PCCU transport
+traces (`KP_POSITIVITY h_W,E,S,N`, `mass_W,E,S,N`, and
+`selected_density`). Both mass sets use the canonical
+`primitive_to_conservative` conversion. Compare their differences
+from the published conservative cell mass to determine whether a
+large reconstruction offset is already present before the L2
+hydrostatic/transport selection. The test
+`TESTS/TEST_SPATIAL_OPERATOR` also checks the effective base's
+cell-owned average identity and independently retained face jumps.
+
+These diagnostics do not prove that the two-layer pressure system
+satisfies the Kurganov-Petrova theorem; they test the necessary mass
+reconstruction and numerical speed hypotheses without modifying the
+numerical method or mass-exchange sources.

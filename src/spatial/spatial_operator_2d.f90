@@ -13,7 +13,7 @@ MODULE spatial_operator_2d
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : T_ambient
-    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y, dx, dy
+    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y, dx, dy, B_cent
     USE state_conversions, ONLY : conservative_to_primitive,primitive_to_conservative
     USE domain_2d, ONLY : domain_type
     USE reconstruction_2d, ONLY : reconstruction_workspace_type
@@ -69,10 +69,16 @@ CONTAINS
     !> @param[in] qp_cell Published primitive state in that cell.
     !> @param[in] mass_cell Published conservative mixture mass per unit area.
     !> @param[in] dt Rejected forward-Euler spatial timestep.
-    SUBROUTINE diagnose_spatial_positivity(this,j,k,qp_cell,mass_cell,dt)
+    !> @param[in] lower Optional lower-layer spatial operator for L2 base diagnostics.
+    !> @param[in] lower_h_cell Lower-layer cell depth for the effective center base.
+    SUBROUTINE diagnose_spatial_positivity(this,j,k,qp_cell,mass_cell,dt,lower,lower_h_cell)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k
         REAL(wp), INTENT(IN) :: qp_cell(n_vars),mass_cell,dt
+        CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower
+        REAL(wp), INTENT(IN), OPTIONAL :: lower_h_cell
+        REAL(wp) :: base_own(4),base_opposite(4),base_center
+        REAL(wp) :: raw_h(4),raw_mass(4),raw_density(4),selected_density(4)
         REAL(wp) :: h(4),mass_face(4),u(4),am(4),ap(4),coefficient(4)
         REAL(wp) :: h_neighbor(4),mass_neighbor(4),u_neighbor(4),coefficient_neighbor(4)
         REAL(wp) :: lambda(4),qp_face(n_vars),q_face(n_vars),denominator
@@ -143,6 +149,50 @@ CONTAINS
                 END IF
             END IF
         END DO
+
+        raw_h=[this%reconstruction%qp_cellW(idx_h,j,k),this%reconstruction%qp_cellE(idx_h,j,k), &
+            this%reconstruction%qp_cellS(idx_h,j,k),this%reconstruction%qp_cellN(idx_h,j,k)]
+        raw_mass=0.0_wp
+        DO side=1,4
+            IF (side==1) qp_face=this%reconstruction%qp_cellW(:,j,k)
+            IF (side==2) qp_face=this%reconstruction%qp_cellE(:,j,k)
+            IF (side==3) qp_face=this%reconstruction%qp_cellS(:,j,k)
+            IF (side==4) qp_face=this%reconstruction%qp_cellN(:,j,k)
+            IF (raw_h(side)>0.0_wp) THEN
+                CALL primitive_to_conservative(qp_face,q_face,accepted)
+                IF (accepted) raw_mass(side)=q_face(idx_totMassEqn)
+            END IF
+        END DO
+        raw_density=0.0_wp
+        selected_density=0.0_wp
+        WHERE (raw_h>0.0_wp) raw_density=raw_mass/MAX(raw_h,TINY(1.0_wp))
+        WHERE (h>0.0_wp) selected_density=mass_face/MAX(h,TINY(1.0_wp))
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_TRACE raw_h_W,E,S,N=',raw_h
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_TRACE raw_mass_W,E,S,N=',raw_mass
+        WRITE(*,'(A,3(ES24.16,1X))') 'KP_TRACE raw_mass_cell,face_average,difference=', &
+            mass_cell,0.25_wp*SUM(raw_mass),0.25_wp*SUM(raw_mass)-mass_cell
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_TRACE raw_density_W,E,S,N=',raw_density
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_TRACE selected_density_W,E,S,N=',selected_density
+        IF (PRESENT(lower) .AND. PRESENT(lower_h_cell)) THEN
+            IF (this%reconstruction%layer/=2 .OR. lower%reconstruction%layer/=1) &
+                ERROR STOP 'Invalid L1/L2 positivity geometry diagnosis'
+            base_center=B_cent(j,k)+lower_h_cell
+            base_own=[lower%reconstruction%eta_cellW(j,k),lower%reconstruction%eta_cellE(j,k), &
+                lower%reconstruction%eta_cellS(j,k),lower%reconstruction%eta_cellN(j,k)]
+            base_opposite=[lower%reconstruction%eta_interfaceL(j,k), &
+                lower%reconstruction%eta_interfaceR(j+1,k), &
+                lower%reconstruction%eta_interfaceB(j,k), &
+                lower%reconstruction%eta_interfaceT(j,k+1)]
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_BASE L2_base_W,E,S,N=',base_own
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_BASE opposite_W,E,S,N=',base_opposite
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_BASE jump_opposite_minus_own_W,E,S,N=', &
+                base_opposite-base_own
+            WRITE(*,'(A,3(ES24.16,1X))') 'KP_BASE center,mean,mean_minus_center=', &
+                base_center,0.25_wp*SUM(base_own),0.25_wp*SUM(base_own)-base_center
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_BASE eta2_minus_base_W,E,S,N=', &
+                [this%reconstruction%eta_cellW(j,k),this%reconstruction%eta_cellE(j,k), &
+                this%reconstruction%eta_cellS(j,k),this%reconstruction%eta_cellN(j,k)]-base_own
+        END IF
 
         average_h=SUM(h)*0.25_wp
         average_mass=SUM(mass_face)*0.25_wp
