@@ -1479,27 +1479,31 @@ CONTAINS
     !> @details Exercises the full production isolated and coupled HP-PCCU
     !>          operators, with identical L1 primitive states and a dry upper layer.
     SUBROUTINE check_dry_upper_dambreak_reduction
-        TYPE(domain_type) :: paired
+        TYPE(domain_type) :: paired,solo_domain
         TYPE(spatial_operator_type) :: isolated,lower,upper
-        REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+        REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny),q_single(n_vars,nx,ny)
         REAL(wp) :: p_single(n_vars,nx,ny),p1(n_vars,nx,ny),p2(n_vars,nx,ny)
         REAL(wp) :: single_rate(n_eqns,nx,ny),rate1(n_eqns,nx,ny),rate2(n_eqns,nx,ny)
         REAL(wp) :: initial(n_vars),conservative(n_vars)
         REAL(wp) :: saved_b(nx+1,ny+1)
-        REAL(wp) :: dt_single,dt_lower,dt_upper,dt_coupled,tolerance
-        INTEGER :: first_dry,k,j,eq,l
-        LOGICAL :: accepted
+        REAL(wp) :: dt_single,dt_lower,dt_upper,dt_coupled,tolerance,step,time
+        INTEGER :: first_dry,k,j,eq,l,iteration
+        LOGICAL :: accepted,saved_gas,saved_liquid
 
         IF (nx<12) RETURN
         first_dry=nx/2+1
         saved_b=B_vertex
+        saved_gas=gas_flag
+        saved_liquid=liquid_flag
+        gas_flag=.TRUE.
+        liquid_flag=.FALSE.
         B_vertex=0.0_wp
         CALL refresh_topography_geometry
 
         initial=0.0_wp
         initial(idx_h)=2.0_wp
         initial(idx_T)=T_ambient
-        initial(idx_solid_first)=0.2_wp
+        initial(idx_solid_first)=0.5_wp
         CALL primitive_to_conservative(initial,conservative,accepted)
         IF (.NOT.accepted) ERROR STOP 'Invalid dry-upper dam-break initial material'
         q1=0.0_wp
@@ -1509,6 +1513,7 @@ CONTAINS
                 q1(:,j,k)=conservative
             END DO
         END DO
+        q_single=q1
         p_single=0.0_wp
         p1=0.0_wp
         p2=0.0_wp
@@ -1517,6 +1522,7 @@ CONTAINS
         p2(idx_T,:,:)=T_ambient
 
         CALL paired%initialize
+        CALL solo_domain%initialize
         CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
         CALL isolated%initialize(1)
         CALL lower%initialize(1)
@@ -1562,13 +1568,61 @@ CONTAINS
                     ERROR STOP 'Dry upper layer generates a nonzero spatial residual'
             END DO
         END DO
+        ! Repeat the gas-solid dam-break with dry L2 over multiple Euler spatial stages.
+        ! Rebuild both active masks and all HP stencils after each accepted update.
+        ! This distinguishes a first-step agreement from a later shoreline failure.
+        time=0.0_wp
+        DO iteration=1,24
+            CALL solo_domain%check_solve(q_single,time,.FALSE.)
+            CALL paired%check_solve(q1,time,.FALSE.,q_other=q2)
+            CALL isolated%prepare_hp_workset(solo_domain)
+            CALL lower%prepare_hp_workset(paired)
+            CALL upper%prepare_hp_workset(paired)
+            CALL isolated%compute_timestep(q_single,p_single,time,dt_single,solo_domain)
+            CALL lower%compute_timestep(q1,p1,time,dt_lower,paired)
+            CALL upper%compute_timestep(q2,p2,time,dt_upper,paired, &
+                lower_operator=lower,h_lower=p1(idx_h,:,:))
+            CALL isolated%evaluate(p_single,single_rate,time,solo_domain,reuse_cfl_traces=.TRUE.)
+            CALL lower%evaluate_coupled(upper,p1,p2,rate1,rate2,time,paired,dt_coupled)
+            step=0.25_wp*MIN(dt_single,dt_lower,dt_upper,dt_coupled)
+            IF (step<=0.0_wp .OR. .NOT.ieee_is_finite(step)) &
+                ERROR STOP 'Dry upper dam-break produced an invalid timestep'
+            DO l=1,solo_domain%solve_cells
+                j=solo_domain%j_cent(l)
+                k=solo_domain%k_cent(l)
+                q_single(1:n_eqns,j,k)=q_single(1:n_eqns,j,k)-step*single_rate(:,j,k)
+                IF (.NOT.conservative_mass_admissible(q_single(1:n_eqns,j,k))) &
+                    ERROR STOP 'Isolated multi-step dam-break is inadmissible'
+            END DO
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                q1(1:n_eqns,j,k)=q1(1:n_eqns,j,k)-step*rate1(:,j,k)
+                q2(1:n_eqns,j,k)=q2(1:n_eqns,j,k)-step*rate2(:,j,k)
+                IF (.NOT.conservative_mass_admissible(q1(1:n_eqns,j,k))) &
+                    ERROR STOP 'Coupled dry-upper multi-step dam-break is inadmissible'
+            END DO
+            tolerance=1.0E-9_wp*MAX(1.0_wp,MAXVAL(ABS(q_single)))
+            IF (MAXVAL(ABS(q_single-q1))>tolerance) THEN
+                WRITE(*,*) 'DRY_UPPER_MULTISTEP step,time=',iteration,time
+                WRITE(*,*) 'DRY_UPPER_MULTISTEP max difference=',MAXVAL(ABS(q_single-q1))
+                ERROR STOP 'Dry L2 changes L1 after repeated spatial updates'
+            END IF
+            IF (ANY(q2/=0.0_wp)) ERROR STOP 'Dry L2 developed nonzero conservative state'
+            time=time+step
+        END DO
+        IF (q1(idx_totMassEqn,first_dry,(ny+1)/2)<=0.0_wp) &
+            ERROR STOP 'Coupled L1 wet/dry front did not advance over repeated spatial updates'
         CALL upper%finalize
         CALL lower%finalize
         CALL isolated%finalize
         CALL paired%finalize
+        CALL solo_domain%finalize
         B_vertex=saved_b
+        gas_flag=saved_gas
+        liquid_flag=saved_liquid
         CALL refresh_topography_geometry
-        WRITE(*,*) 'PASS: dry L2 preserves L1 dam-break front and complete spatial residual'
+        WRITE(*,*) 'PASS: dry L2 preserves L1 dam-break front and multi-step spatial evolution'
     END SUBROUTINE check_dry_upper_dambreak_reduction
 
     SUBROUTINE check_total_depth_cfl_equivalence
