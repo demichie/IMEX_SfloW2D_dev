@@ -2164,7 +2164,20 @@ CONTAINS
             ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
             ERROR STOP 'Stationary pressure-free interlayer face is not zero'
 
-        WRITE(*,*) 'PASS: stationary pressure-free interlayer face'
+        ! Etna regression: HP reconstruction can leave sub-tolerance L1/L2
+        ! depths and a nonzero pressure path, while coupled speeds are zero
+        ! because both endpoints are classified as dry.
+        CALL eval_interlayer_oriented_face(1, &
+            4.5474735088646412E-13_wp,1.0913936421275139E-11_wp, &
+            2.9393493406553771E+03_wp,3.1132807000000112E+03_wp, &
+            0.0_wp,0.0_wp,0.0_wp,3.1132806999999993E+03_wp,1.0_wp, &
+            0.0_wp,0.0_wp,l1left,l1right,l2left,l2right)
+
+        IF (ANY(l1left/=0.0_wp) .OR. ANY(l1right/=0.0_wp) .OR. &
+            ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
+            ERROR STOP 'Sub-tolerance interlayer face produced pressure with zero wave speeds'
+
+        WRITE(*,*) 'PASS: stationary and sub-tolerance dry interlayer faces'
     END SUBROUTINE check_degenerate_interlayer_face
 
     !> @brief Validate oriented coupled pressure corrections with supplied common speeds.
