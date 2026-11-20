@@ -1088,7 +1088,8 @@ CONTAINS
             END IF
         END IF
         ! Refresh derived inventories only after all cells have been accepted.
-        IF (executor%has_exchange_group) CALL state%refresh_substrate_totals()
+        IF (executor%has_exchange_group) &
+            CALL state%refresh_substrate_totals(domain%j_cent(1:domain%solve_cells),domain%k_cent(1:domain%solve_cells))
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)

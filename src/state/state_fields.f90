@@ -160,9 +160,12 @@ CONTAINS
     !>          granular flows it is derived from class inventories and porosity.
     !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
     !> inventories.
-    SUBROUTINE refresh_substrate_totals(this)
+    !> @param[in] active_j Optional x indices of cells changed by the current Lie step.
+    !> @param[in] active_k Optional y indices, paired with active_j.
+    SUBROUTINE refresh_substrate_totals(this,active_j,active_k)
         CLASS(state_type), INTENT(INOUT) :: this
-        INTEGER :: j,k
+        INTEGER, INTENT(IN), OPTIONAL :: active_j(:),active_k(:)
+        INTEGER :: j,k,cell,ncells
         ! Lava deposit_tot is authoritative; never reset it or use granular porosity.
         IF (lava_flag) THEN
             this%erosion_tot=0.0_wp
@@ -179,12 +182,25 @@ CONTAINS
         IF (.NOT.ieee_is_finite(substrate%erodible_porosity) .OR. &
             substrate%erodible_porosity<0.0_wp .OR. substrate%erodible_porosity>=1.0_wp) &
             ERROR STOP 'Invalid substrate porosity for aggregate thickness'
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j,k) SCHEDULE(STATIC)
-        DO k=1,comp_cells_y
-            DO j=1,comp_cells_x
-                this%deposit_tot(j,k)=SUM(this%deposit(j,k,:))/(1.0_wp-substrate%erodible_porosity)
-                this%erosion_tot(j,k)=SUM(this%erosion(j,k,:))/(1.0_wp-substrate%erodible_porosity)
-            END DO
+        ! Initial/restart refreshes cover the full grid; a Lie step only changes active cells.
+        IF (PRESENT(active_j) .NEQV. PRESENT(active_k)) &
+            ERROR STOP 'Substrate refresh requires paired active indices'
+        ncells=comp_cells_x*comp_cells_y
+        IF (PRESENT(active_j)) THEN
+            IF (SIZE(active_j)/=SIZE(active_k)) ERROR STOP 'Mismatched substrate active indices'
+            ncells=SIZE(active_j)
+        END IF
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(cell,j,k) SCHEDULE(STATIC)
+        DO cell=1,ncells
+            IF (PRESENT(active_j)) THEN
+                j=active_j(cell)
+                k=active_k(cell)
+            ELSE
+                j=MOD(cell-1,comp_cells_x)+1
+                k=(cell-1)/comp_cells_x+1
+            END IF
+            this%deposit_tot(j,k)=SUM(this%deposit(j,k,:))/(1.0_wp-substrate%erodible_porosity)
+            this%erosion_tot(j,k)=SUM(this%erosion(j,k,:))/(1.0_wp-substrate%erodible_porosity)
         END DO
         !$OMP END PARALLEL DO
     END SUBROUTINE refresh_substrate_totals
