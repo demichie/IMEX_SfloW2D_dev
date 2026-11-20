@@ -322,8 +322,8 @@
         output_netcdf_flag, output_runout_flag, verbose_level, serial_flag,                                            &
         interactive_debug_flag
 
-    NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time,                                        &
-        T_init, u_init, v_init, sed_vol_perc
+    NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time
+    NAMELIST /initial_parameters/ T_init, u_init, v_init, sed_vol_perc
     NAMELIST /initial_l1_parameters/ T_init, u_init, v_init, sed_vol_perc
     NAMELIST /initial_l2_parameters/ T_init_l2, u_init_l2, v_init_l2, sed_vol_perc_l2
 
@@ -1200,7 +1200,8 @@
         INTEGER :: ios, ios_bc_l1, ios_bc_l2, layer, n_rheology_legacy, n_rheology_l1, n_rheology_l2
         INTEGER :: n_thermal_legacy, n_thermal_l1, n_thermal_l2
         INTEGER :: n_pore_legacy, n_pore_l1, n_pore_l2
-        CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line
+        INTEGER :: n_initial_base, n_initial_l1, n_initial_l2
+        CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line, initial_line
         CHARACTER(LEN=256) :: source_input_error
         LOGICAL :: boundary_stochastic_enabled, boundary_pore_enabled
 
@@ -2332,6 +2333,36 @@
                         CALL fatal_error('Invalid initial state filename extension')
                     check_file=restart_file(dot_idx+1:dot_idx+3)
                 END IF
+                IF (check_file=='asc') THEN
+                    ! Choose one name for the same authoritative L1 primitive values.
+                    n_initial_base=0
+                    n_initial_l1=0
+                    n_initial_l2=0
+                    REWIND(input_unit)
+                    DO
+                        READ(input_unit,'(A)',IOSTAT=ios) initial_line
+                        IF (ios<0) EXIT
+                        IF (ios/=0) CALL fatal_error('Unable to scan initial NAMELIST groups')
+                        initial_line=uppercase_source_text(ADJUSTL(initial_line))
+                        IF (INDEX(initial_line,'&INITIAL_PARAMETERS')==1) n_initial_base=n_initial_base+1
+                        IF (INDEX(initial_line,'&INITIAL_L1_PARAMETERS')==1) n_initial_l1=n_initial_l1+1
+                        IF (INDEX(initial_line,'&INITIAL_L2_PARAMETERS')==1) n_initial_l2=n_initial_l2+1
+                    END DO
+                    REWIND(input_unit)
+                    IF (n_initial_base+n_initial_l1/=1) &
+                        CALL fatal_error('Provide exactly one INITIAL_PARAMETERS or INITIAL_L1_PARAMETERS')
+                    IF (n_layers==1 .AND. n_initial_l2/=0) &
+                        CALL fatal_error('INITIAL_L2_PARAMETERS requires N_LAYERS=2')
+                    IF (n_layers==2 .AND. (n_initial_base/=0 .OR. n_initial_l1/=1 .OR. n_initial_l2/=1)) &
+                        CALL fatal_error('N_LAYERS=2 requires INITIAL_L1_PARAMETERS and INITIAL_L2_PARAMETERS')
+                    IF (n_initial_base==1) THEN
+                        READ(input_unit,NML=initial_parameters,IOSTAT=ios)
+                    ELSE
+                        READ(input_unit,NML=initial_l1_parameters,IOSTAT=ios)
+                    END IF
+                    IF (ios/=0) CALL fatal_error('Invalid initial L1 NAMELIST')
+                    REWIND(input_unit)
+                END IF
                 IF (n_layers==2 .AND. check_file=='asc') THEN
                     IF (n_restart_files/=2) &
                         CALL fatal_error('Two-layer primitive initialization requires two RESTART_FILES entries')
@@ -2342,10 +2373,6 @@
                         IF (TRIM(restart_files(i_file)(dot_idx+1:))/='asc') &
                             CALL fatal_error('Two-layer primitive input requires .asc or NONE for each layer')
                     END DO
-                    REWIND(input_unit)
-                    READ(input_unit,NML=initial_l1_parameters,IOSTAT=ios)
-                    IF (ios/=0) CALL fatal_error('Missing or invalid INITIAL_L1_PARAMETERS')
-                    REWIND(input_unit)
                     READ(input_unit,NML=initial_l2_parameters,IOSTAT=ios)
                     IF (ios/=0) CALL fatal_error('Missing or invalid INITIAL_L2_PARAMETERS')
                     REWIND(input_unit)
@@ -2367,7 +2394,7 @@
                         (ANY(sed_vol_perc(1:n_solid) .GT. 100.0_wp)) .OR.                                              &
                         (SUM(sed_vol_perc(1:n_solid)) .GT. 100.0_wp)) THEN
 
-                        WRITE (*, *) 'ERROR: problem with namelist RESTART_PARAMETERS'
+                        WRITE (*, *) 'ERROR: invalid initial parameters'
                         WRITE (*, *) 'SED_VOL_PERC =', sed_vol_perc(1:n_solid)
                         STOP
 
@@ -2396,9 +2423,9 @@
 
                     IF (T_init .EQ. 0.0_wp) THEN
 
-                        WRITE (*, *) 'ERROR: problem with namelist RESTART_PARAMETERS'
+                        WRITE (*, *) 'ERROR: invalid initial parameters'
                         WRITE (*, *) 'T_init=', T_init
-                        WRITE (*, *) 'Add T_init to the namelist RESTART_PARAMETERS'
+                        WRITE (*, *) 'Add T_init to INITIAL_PARAMETERS or INITIAL_L1_PARAMETERS'
                         STOP
 
                     END IF
