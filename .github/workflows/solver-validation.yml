@@ -13,6 +13,11 @@ on:
         type: boolean
         required: false
         default: false
+      two_layer_extended:
+        description: 'Run extended Etna conservation, restart and 1/2/4 OpenMP checks'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -132,9 +137,9 @@ jobs:
 
   two-layer-smoke:
     name: Experimental TL13a two-layer Etna smoke
-    if: ${{ inputs.two_layer_smoke }}
+    if: ${{ inputs.two_layer_smoke || inputs.two_layer_extended }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 80
     env:
       FC: gfortran
       OMP_NUM_THREADS: '1'
@@ -154,16 +159,26 @@ jobs:
           ./configure --with-netcdf=/usr --enable-strict-debug
           make -j4
       - name: Run short controlled Etna two-layer simulation
+        if: ${{ inputs.two_layer_smoke }}
         run: |
           python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py \
             --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
             --workdir "$GITHUB_WORKSPACE/tl13a-evidence" \
+            --timeout 900
+      - name: Run extended two-layer conservation, restart and OpenMP checks
+        if: ${{ inputs.two_layer_extended }}
+        run: |
+          python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/extended_validation.py \
+            --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
+            --workdir "$GITHUB_WORKSPACE/tl13a-extended-evidence" \
             --timeout 900
       - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: two-layer-smoke-${{ github.run_id }}
-          path: tl13a-evidence/
+          path: |
+            tl13a-evidence/
+            tl13a-extended-evidence/
           if-no-files-found: warn
           retention-days: 30

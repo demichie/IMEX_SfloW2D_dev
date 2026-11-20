@@ -140,3 +140,31 @@ spurious energy/momentum production; separate L1/L2 outputs and shared
 substrate budgets; restart continuation; and OpenMP reproducibility.
 A passing input parser or a created L2 field alone is not scientific
 validation.
+
+## Extended TL13a functional regression
+
+The optional `two_layer_extended=true` workflow input runs the separate
+`extended_validation.py` checker. The script reuses the **same** canonical
+Etna input, initial L1/L2 snapshots, production solver and snapshot/budget
+reader. It runs a continuous trajectory with outputs at 0, 0.005 and 0.01 s,
+restarts an otherwise identical trajectory from the midpoint binary checkpoint,
+and compares the final conservative state and checkpoint. Independent runs
+with 2 and 4 OpenMP threads are compared to the 1-thread reference.
+
+Budget assertions cover L1/L2 mass and solids additivity, nonnegativity,
+total mass and total solids conservation (relative tolerance 1e-6), and
+strictly positive L2 mass growth. The cross-run conservative and budget
+comparisons use 5e-10 relative and 1e-8 absolute tolerances. These are
+**regression criteria**, not experimentally established error bounds.
+
+Run locally (requires built solver):
+
+```bash
+python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/extended_validation.py \
+  --solver src/IMEX_SfloW2D \
+  --workdir /tmp/imex-tl13a-extended
+```
+
+The run preserves its evidence directory. Longer time and alternative
+physics configurations, shear stability, convergence and quantitative
+scientific validation remain separate work under TL13b.

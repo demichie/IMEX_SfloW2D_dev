@@ -225,3 +225,16 @@ pore-pressure configuration when present, before computing component counts.
 The L2 method/group checks are included in the existing source scheduling
 validation. No physical formulas, state schema or input-file aliases changed.
 Strict/debug CI and the experimental Etna run remain unverified on this SHA.
+
+## TL13a — extended functional regression (20 November 2026)
+
+An explicit `two_layer_extended` dispatch option now tests the real Etna
+two-layer driver beyond the initial smoke stage: 0/0.005/0.01-second
+outputs, L2 emergence, mass/solid budget additivity and approximate
+conservation, initial L2 dryness, numerical restart equivalence and
+full-checkpoint equality, and independent 1/2/4-thread conservative
+snapshot comparisons. All runs use the canonical Etna input and explicit
+experimental activation; existing production tests are unaffected.
+This is a new unverified **functional** gate, not acceptance of the
+coupled characteristic spectrum or hyperbolicity with shear. The extended
+job must be executed and its numerical outcomes inspected before closure.
