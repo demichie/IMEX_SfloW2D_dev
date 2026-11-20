@@ -353,3 +353,19 @@ exercises real terrain/atmosphere contact masks directly and now supplies
 its L2 terrain-carrier-loss and atmospheric-entrainment assertions remain
 unchanged. The paired transaction regression also verifies that a sole
 wet L2 cannot trigger vaporization coupled to substrate deposition.
+
+## Regression follow-up — spatial/Lie L2-only deposition assertion
+
+The integrated spatial/Lie test previously required positive substrate
+deposition for every nonempty column. This contradicted the new physical
+contract for a column containing only L2: interlayer settling may create
+L1, but L2 cannot deposit directly to the bed. The scenario 3 assertion
+now requires zero substrate deposition and positive L1 mass growth relative
+to the reference without active deposition. Scenarios 1/2 continue to
+require positive L1 deposition, scenario 4 zero deposition, and all four
+retain the per-cell solids budget and conservative-state admissibility
+checks. The OpenMP payload comparison remains unchanged.
+
+The runtime array-temporary warning at `compute_spatial_timestep` is
+independent of this source-physics test failure and was not addressed.
+The amended assertion requires a fresh strict/optimized regression run.

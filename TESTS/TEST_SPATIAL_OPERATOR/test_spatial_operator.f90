@@ -820,8 +820,8 @@ CONTAINS
             END DO
         END DO
         ! Integrate external deposition and internal exchange in the same
-        ! cell-outer timestep. The shared terrain inventory receives deposits
-        ! only from the exposed layer; the paired transfer conserves solids.
+        ! cell-outer timestep. Only L1 can deposit into the shared substrate;
+        ! L2-to-L1 settling must still create a dry lower layer conservatively.
         CALL workspace%finalize()
         CALL registry%finalize()
         groups(3)%id=4
@@ -919,13 +919,23 @@ CONTAINS
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
 
             expected_deposition=SUM(coupled_state%deposit(:,:,1))
-            IF (scenario==4) THEN
+            SELECT CASE(scenario)
+            CASE(1,2)
+                ! L1 is initially wet; only its substrate-deposition law acts.
+                IF (expected_deposition<=0.0_wp) &
+                    ERROR STOP 'Wet L1 did not deposit into shared substrate'
+            CASE(3)
+                ! A sole wet L2 may settle into initially dry L1, but must
+                ! not directly deposit into the substrate during this step.
+                IF (expected_deposition/=0.0_wp) &
+                    ERROR STOP 'L2 deposited directly into shared substrate'
+                IF (.NOT.ANY(coupled_state%q(idx_totMassEqn,1,:,:)> &
+                    base_q(idx_totMassEqn,1,:,:))) &
+                    ERROR STOP 'Settling failed to create L1 from isolated L2'
+            CASE(4)
                 IF (expected_deposition/=0.0_wp) &
                     ERROR STOP 'Dry paired column deposited solids'
-            ELSE
-                IF (expected_deposition<=0.0_wp) &
-                    ERROR STOP 'Exposed layer did not deposit into shared substrate'
-            END IF
+            END SELECT
             DO l=1,paired%solve_cells
                 j=paired%j_cent(l)
                 k=paired%k_cent(l)
