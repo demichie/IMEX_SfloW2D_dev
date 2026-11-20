@@ -330,7 +330,8 @@ CONTAINS
               [0.0_wp,0.0_wp],1.0_wp,mask,transfers,rates, &
               transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
               terrain_exposed=contacts%terrain_exposed(layer), &
-              atmosphere_exposed=contacts%atmosphere_exposed(layer))
+              atmosphere_exposed=contacts%atmosphere_exposed(layer), &
+               static_deposition_allowed=layer==1)
           IF (contacts%terrain_exposed(layer)) THEN
              IF (rates(idx_totMassEqn)>=0.0_wp) ERROR STOP 'Terrain contact did not enable carrier loss'
           ELSE
@@ -342,7 +343,8 @@ CONTAINS
               [0.0_wp,0.0_wp],1.0_wp,mask,transfers,rates, &
               transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
               terrain_exposed=contacts%terrain_exposed(layer), &
-              atmosphere_exposed=contacts%atmosphere_exposed(layer))
+              atmosphere_exposed=contacts%atmosphere_exposed(layer), &
+               static_deposition_allowed=layer==1)
           IF (contacts%atmosphere_exposed(layer)) THEN
              IF (rates(idx_totMassEqn)<=0.0_wp) ERROR STOP 'Atmosphere contact did not enable entrainment'
           ELSE

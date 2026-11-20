@@ -11,7 +11,7 @@ PROGRAM test_interlayer_lie_transaction
     USE state_conversions, ONLY : primitive_to_conservative
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
-    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_DEPOSITION
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
     USE parameters_2d, ONLY : mass_exchange_rates_type
     USE interlayer_momentum_exchange_2d, ONLY : apply_interlayer_momentum_exchange_analytic, &
         interlayer_momentum_exchange_config_type
@@ -103,6 +103,14 @@ PROGRAM test_interlayer_lie_transaction
         atmosphere_exposed=.TRUE.,static_deposition_allowed=.FALSE.)
     CALL require(ALL(deposition_rates%solid_deposition_rate==0.0_wp) .AND. &
         ALL(exchange_source==0.0_wp),'isolated L2 cannot deposit directly into substrate')
+    ! L2 vaporization must also remain disabled: it derives from the
+    ! substrate deposition rather than being an independent mass source.
+    CALL eval_mass_exchange_explicit(rheology_l2,mass_l2,check2,0,[0.0_wp,0.0_wp],dt, &
+        IBSET(IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1),SOURCE_ID_EXCHANGE_VAPORIZATION-1), &
+        deposition_rates,exchange_source,transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
+        terrain_exposed=.TRUE.,atmosphere_exposed=.TRUE.,static_deposition_allowed=.FALSE.)
+    CALL require(ALL(deposition_rates%solid_deposition_rate==0.0_wp) .AND. &
+        ALL(exchange_source==0.0_wp),'L2 cannot drive deposition-coupled vaporization')
     CALL build_physical_state_from_qp(qp(:,2),check1,accepted=ok)
     CALL require(ok,'equivalent L1 physical state for deposition test')
     CALL eval_mass_exchange_explicit(rheology_l2,mass_l2,check1,0,[0.0_wp,0.0_wp],dt, &

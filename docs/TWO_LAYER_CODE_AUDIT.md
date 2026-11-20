@@ -346,3 +346,10 @@ budget accounting still require a separate scientific decision.
 **Verification status:** source review and new regression assertions are
 recorded, but strict/optimized builds and integrated Actions on this change
 must succeed before declaring the implementation fully verified.
+
+**Dependency follow-up:** `TEST_MASS_EXCHANGE/test_projection_stress.f90`
+exercises real terrain/atmosphere contact masks directly and now supplies
+`static_deposition_allowed=(layer==1)` to the common mass coordinator;
+its L2 terrain-carrier-loss and atmospheric-entrainment assertions remain
+unchanged. The paired transaction regression also verifies that a sole
+wet L2 cannot trigger vaporization coupled to substrate deposition.
