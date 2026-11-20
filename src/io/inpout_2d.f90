@@ -6800,8 +6800,6 @@
 
         END IF
 
-        RETURN
-
         IF (n_layers==2) CALL output_two_layer_esri(output_idx,state)
 
     END SUBROUTINE output_esri

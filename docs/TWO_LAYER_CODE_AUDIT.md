@@ -139,3 +139,16 @@ its final branch SHA. Previously green CI and currently running workflows
 on preceding commits do **not** validate these edits. The scientific
 formulations, source ordering, input NAMELIST group names and production
 `N_LAYERS=2` gate are unchanged.
+
+## TL13a — ESRI two-layer output integration (20 November 2026)
+
+The production `output_esri` routine previously returned before its
+`output_two_layer_esri` call, making all L2/combined ESRI raster output
+unreachable. The unconditional `RETURN` has been removed. The existing
+`TEST_SPATIAL_OPERATOR` two-layer I/O round-trip now enables ESRI output
+through `output_solution` and checks creation of L2 depth, L2 temperature,
+combined depth and upper-surface rasters. This is a structural regression of
+the real output entry point; it is not a production two-layer run. Run strict
+and optimized CI on this exact commit to verify the newly exercised path.
+The `N_LAYERS=2` production gate remains closed pending controlled end-to-end
+functional validation and TL13b scientific approval.
