@@ -210,13 +210,14 @@ CONTAINS
             h1_left,h2_left,gamma_left,eta2_left,metric, &
             h1_right,h2_right,gamma_right,eta2_right,metric,path_l1,path_l2)
 
-        ! The coupled speed envelope treats both endpoints as dry when their
-        ! total depth is below dry_thickness_tolerance. At such a face,
-        ! roundoff-scale reconstructed depths may leave a nonzero pressure
-        ! path even though no propagating fluid state exists.
+        ! The coupled speed envelope skips each layer whose reconstructed
+        ! depth is dry, even if their summed depth slightly exceeds the
+        ! threshold. Use the same layer-wise criterion here: neither layer
+        ! can generate a wave at an all-dry face, while tiny reconstructed
+        ! depths can still produce a roundoff pressure path.
         IF (a_plus-a_minus<=pccu_speed_tolerance) THEN
-            IF (h1_left+h2_left<=dry_thickness_tolerance .AND. &
-                h1_right+h2_right<=dry_thickness_tolerance) THEN
+            IF (MAX(h1_left,h2_left)<=dry_thickness_tolerance .AND. &
+                MAX(h1_right,h2_right)<=dry_thickness_tolerance) THEN
                 left_l1=0.0_wp
                 right_l1=0.0_wp
                 left_l2=0.0_wp

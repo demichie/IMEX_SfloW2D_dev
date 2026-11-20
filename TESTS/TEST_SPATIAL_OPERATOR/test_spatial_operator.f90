@@ -2154,6 +2154,8 @@ CONTAINS
     SUBROUTINE check_degenerate_interlayer_face
         REAL(wp) :: l1left(n_eqns),l1right(n_eqns)
         REAL(wp) :: l2left(n_eqns),l2right(n_eqns)
+        REAL(wp) :: q1_left(n_vars),q2_left(n_vars),q1_right(n_vars),q2_right(n_vars)
+        REAL(wp) :: a_minus,a_plus,h1,h2
 
         CALL eval_interlayer_oriented_face(1, &
             0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
@@ -2177,7 +2179,33 @@ CONTAINS
             ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
             ERROR STOP 'Sub-tolerance interlayer face produced pressure with zero wave speeds'
 
-        WRITE(*,*) 'PASS: stationary and sub-tolerance dry interlayer faces'
+        ! Etna at t=0.704 s: both L1 and L2 are independently dry on
+        ! either side, but their summed left depth exceeds the dry limit.
+        h1=7.0940586738288403E-11_wp
+        h2=4.3200998334214091E-11_wp
+        IF (h1+h2<=dry_thickness_tolerance) &
+            ERROR STOP 'Etna combined-subthreshold test has no total-depth overlap'
+        q1_left=0.0_wp
+        q2_left=0.0_wp
+        q1_right=0.0_wp
+        q2_right=0.0_wp
+        q1_left(idx_h)=h1
+        q2_left(idx_h)=h2
+        q1_right(idx_h)=9.0949470177292824E-13_wp
+        CALL eval_total_depth_face_speed_bounds(q1_left,q2_left,q1_right,q2_right, &
+            1.0_wp,idx_u,a_minus,a_plus)
+        IF (a_minus/=0.0_wp .OR. a_plus/=0.0_wp) &
+            ERROR STOP 'Two individually dry layers generated coupled wave speeds'
+
+        CALL eval_interlayer_oriented_face(1, &
+            h1,h2,2.9393493406551688E+03_wp,3.0977476200003166E+03_wp, &
+            9.0949470177292824E-13_wp,0.0_wp,0.0_wp,3.0977476200000010E+03_wp, &
+            1.0_wp,a_minus,a_plus,l1left,l1right,l2left,l2right)
+        IF (ANY(l1left/=0.0_wp) .OR. ANY(l1right/=0.0_wp) .OR. &
+            ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
+            ERROR STOP 'Individually dry layers produced a nonzero interlayer force'
+
+        WRITE(*,*) 'PASS: stationary and layer-wise dry interlayer faces'
     END SUBROUTINE check_degenerate_interlayer_face
 
     !> @brief Validate oriented coupled pressure corrections with supplied common speeds.
