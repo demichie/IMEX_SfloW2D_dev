@@ -136,3 +136,23 @@ provide optional regression evidence.
 
 The `.asc` rasters and `OUTPUT/` are generated and untracked. The
 only copied source data is `DEM/Etna2014_crop.zip`.
+
+## Positivity diagnosis of L2
+
+On a rejected spatial update, the solver prints `KP_POSITIVITY` records
+after `LIE_SPATIAL_FAILURE` when `N_LAYERS=2`. They report the
+cell-owned W/E/S/N transport depths, their four-face mean (equation 3.31
+of Kurganov–Petrova), conservative face masses obtained from the same
+selected traces as the PCCU mass flux, and the characteristic speed
+bounds and CFL values. The diagnostic also reconstructs the eight mass
+terms analogous to equation 3.32, distinguishing the four cell-owned
+terms from the four incoming neighbor terms. `conservation_offset`
+reports the difference between the published cell mass and the mean
+of the reconstructed face masses; a nonzero offset means the eight-term
+positivity argument does not apply without that extra contribution.
+
+The eight-term decomposition assumes the unmodified central-upwind
+mass flux. Dry-donor suppression and a degenerate-speed fallback can
+alter it; compare the reported decomposition with the actual
+`LIE_SPATIAL_FAILURE` mass update and `LIE_FACE_FAILURE` fluxes.
+This is read-only failure evidence, not a positivity fix.

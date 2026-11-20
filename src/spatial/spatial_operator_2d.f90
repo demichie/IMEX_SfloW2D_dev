@@ -14,7 +14,7 @@ MODULE spatial_operator_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : T_ambient
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y, dx, dy
-    USE state_conversions, ONLY : conservative_to_primitive
+    USE state_conversions, ONLY : conservative_to_primitive,primitive_to_conservative
     USE domain_2d, ONLY : domain_type
     USE reconstruction_2d, ONLY : reconstruction_workspace_type
     USE hyperbolic_2d, ONLY : hyperbolic_workspace_type, add_interlayer_terms
@@ -40,6 +40,7 @@ MODULE spatial_operator_2d
         PROCEDURE, PUBLIC :: evaluate => evaluate_spatial_operator
         PROCEDURE, PUBLIC :: evaluate_coupled => evaluate_coupled_spatial_operator
         PROCEDURE, PUBLIC :: diagnose_cell => diagnose_spatial_cell
+        PROCEDURE, PUBLIC :: diagnose_positivity => diagnose_spatial_positivity
         PROCEDURE, PUBLIC :: front_mass_flux => spatial_front_mass_flux
         PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
         PROCEDURE, PUBLIC :: compute_coupled_timestep => compute_coupled_spatial_timestep
@@ -58,6 +59,144 @@ CONTAINS
         INTEGER, INTENT(IN) :: j,k,eq
         CALL this%hp_pccu%diagnose_cell(this%reconstruction,j,k,eq)
     END SUBROUTINE diagnose_spatial_cell
+
+    !> @brief Diagnose the four-face positivity decomposition after a rejected spatial step.
+    !> @details Uses the final transport traces and actual coupled face bounds, without
+    !> changing fluxes or candidate states. The decomposition assumes a central-upwind
+    !> mass flux; dry-donor guards are reported separately by the existing face diagnosis.
+    !> @param[in] this Prepared layer-local spatial and reconstruction workspaces.
+    !> @param[in] j,k Coordinates of the rejected cell.
+    !> @param[in] qp_cell Published primitive state in that cell.
+    !> @param[in] mass_cell Published conservative mixture mass per unit area.
+    !> @param[in] dt Rejected forward-Euler spatial timestep.
+    SUBROUTINE diagnose_spatial_positivity(this,j,k,qp_cell,mass_cell,dt)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        INTEGER, INTENT(IN) :: j,k
+        REAL(wp), INTENT(IN) :: qp_cell(n_vars),mass_cell,dt
+        REAL(wp) :: h(4),mass_face(4),u(4),am(4),ap(4),coefficient(4)
+        REAL(wp) :: h_neighbor(4),mass_neighbor(4),u_neighbor(4),coefficient_neighbor(4)
+        REAL(wp) :: lambda(4),qp_face(n_vars),q_face(n_vars),denominator
+        REAL(wp) :: average_h,average_mass
+        LOGICAL :: accepted,valid_coefficients
+        INTEGER :: side
+
+        ! W,E,S,N are cell-owned traces; L/R and B/T name face sides.
+        h(1)=this%reconstruction%h_selected_interfaceR(j,k)
+        h(2)=this%reconstruction%h_selected_interfaceL(j+1,k)
+        h(3)=this%reconstruction%h_selected_interfaceT(j,k)
+        h(4)=this%reconstruction%h_selected_interfaceB(j,k+1)
+        u(1)=this%reconstruction%qp_adv_interfaceR(idx_u,j,k)
+        u(2)=this%reconstruction%qp_adv_interfaceL(idx_u,j+1,k)
+        u(3)=this%reconstruction%qp_adv_interfaceT(idx_v,j,k)
+        u(4)=this%reconstruction%qp_adv_interfaceB(idx_v,j,k+1)
+        am(1)=this%hp_pccu%a_interface_xNeg(j,k)
+        am(2)=this%hp_pccu%a_interface_xNeg(j+1,k)
+        am(3)=this%hp_pccu%a_interface_yNeg(j,k)
+        am(4)=this%hp_pccu%a_interface_yNeg(j,k+1)
+        ap(1)=this%hp_pccu%a_interface_xPos(j,k)
+        ap(2)=this%hp_pccu%a_interface_xPos(j+1,k)
+        ap(3)=this%hp_pccu%a_interface_yPos(j,k)
+        ap(4)=this%hp_pccu%a_interface_yPos(j,k+1)
+        lambda=[dt/dx,dt/dx,dt/dy,dt/dy]
+
+        mass_face=0.0_wp
+        mass_neighbor=0.0_wp
+        DO side=1,4
+            IF (side==1) qp_face=this%reconstruction%qp_adv_interfaceR(:,j,k)
+            IF (side==2) qp_face=this%reconstruction%qp_adv_interfaceL(:,j+1,k)
+            IF (side==3) qp_face=this%reconstruction%qp_adv_interfaceT(:,j,k)
+            IF (side==4) qp_face=this%reconstruction%qp_adv_interfaceB(:,j,k+1)
+            qp_face(idx_h)=h(side)
+            IF (h(side)>0.0_wp) THEN
+                CALL primitive_to_conservative(qp_face,q_face,accepted)
+                IF (accepted) THEN
+                    mass_face(side)=q_face(idx_totMassEqn)
+                ELSE
+                    WRITE(*,'(A,I0)') 'KP_POSITIVITY face_conversion_rejected side=',side
+                END IF
+            END IF
+
+            IF (side==1) THEN
+                qp_face=this%reconstruction%qp_adv_interfaceL(:,j,k)
+                h_neighbor(side)=this%reconstruction%h_selected_interfaceL(j,k)
+                u_neighbor(side)=qp_face(idx_u)
+            ELSEIF (side==2) THEN
+                qp_face=this%reconstruction%qp_adv_interfaceR(:,j+1,k)
+                h_neighbor(side)=this%reconstruction%h_selected_interfaceR(j+1,k)
+                u_neighbor(side)=qp_face(idx_u)
+            ELSEIF (side==3) THEN
+                qp_face=this%reconstruction%qp_adv_interfaceB(:,j,k)
+                h_neighbor(side)=this%reconstruction%h_selected_interfaceB(j,k)
+                u_neighbor(side)=qp_face(idx_v)
+            ELSE
+                qp_face=this%reconstruction%qp_adv_interfaceT(:,j,k+1)
+                h_neighbor(side)=this%reconstruction%h_selected_interfaceT(j,k+1)
+                u_neighbor(side)=qp_face(idx_v)
+            END IF
+            qp_face(idx_h)=h_neighbor(side)
+            IF (h_neighbor(side)>0.0_wp) THEN
+                CALL primitive_to_conservative(qp_face,q_face,accepted)
+                IF (accepted) THEN
+                    mass_neighbor(side)=q_face(idx_totMassEqn)
+                ELSE
+                    WRITE(*,'(A,I0)') 'KP_POSITIVITY neighbor_conversion_rejected side=',side
+                END IF
+            END IF
+        END DO
+
+        average_h=SUM(h)*0.25_wp
+        average_mass=SUM(mass_face)*0.25_wp
+        WRITE(*,'(A,I0)') 'KP_POSITIVITY layer=',this%reconstruction%layer
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY h_W,E,S,N=',h
+        WRITE(*,'(A,3(ES24.16,1X))') 'KP_POSITIVITY h_cell,face_average,difference=', &
+            qp_cell(idx_h),average_h,average_h-qp_cell(idx_h)
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY mass_W,E,S,N=',mass_face
+        WRITE(*,'(A,3(ES24.16,1X))') 'KP_POSITIVITY mass_cell,face_average,difference=', &
+            mass_cell,average_mass,average_mass-mass_cell
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY u_W,E,v_S,N=',u
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY a_minus_W,E,S,N=',am
+        WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY a_plus_W,E,S,N=',ap
+        WRITE(*,'(A,2(ES24.16,1X))') 'KP_POSITIVITY cfl_x,cfl_y=', &
+            MAXVAL(lambda(1:2)*MAX(ap(1:2),-am(1:2))), &
+            MAXVAL(lambda(3:4)*MAX(ap(3:4),-am(3:4)))
+        WRITE(*,'(A,4(L1,1X))') 'KP_POSITIVITY speed_encloses_W,E,S,N=', &
+            u>=am .AND. u<=ap
+
+        coefficient=0.0_wp
+        coefficient_neighbor=0.0_wp
+        valid_coefficients=.TRUE.
+        DO side=1,4
+            denominator=ap(side)-am(side)
+            IF (denominator<=1.0E-14_wp) THEN
+                valid_coefficients=.FALSE.
+                CYCLE
+            END IF
+            IF (side==1 .OR. side==3) THEN
+                coefficient(side)=0.25_wp-lambda(side)*am(side)*(u(side)-ap(side))/denominator
+                coefficient_neighbor(side)=lambda(side)*ap(side)*(u_neighbor(side)-am(side))/denominator
+            ELSE
+                coefficient(side)=0.25_wp-lambda(side)*ap(side)*(u(side)-am(side))/denominator
+                coefficient_neighbor(side)=lambda(side)*am(side)*(u_neighbor(side)-ap(side))/denominator
+            END IF
+        END DO
+        IF (valid_coefficients) THEN
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY own_coeff_W,E,S,N=',coefficient
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY own_mass_terms_W,E,S,N=', &
+                coefficient*mass_face
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY neighbor_mass_W,E,S,N=',mass_neighbor
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY neighbor_coeff_W,E,S,N=',coefficient_neighbor
+            WRITE(*,'(A,4(L1,1X))') 'KP_POSITIVITY neighbor_speed_enclosed_W,E,S,N=', &
+                u_neighbor>=am .AND. u_neighbor<=ap
+            WRITE(*,'(A,4(ES24.16,1X))') 'KP_POSITIVITY neighbor_mass_terms_W,E,S,N=', &
+                coefficient_neighbor*mass_neighbor
+            WRITE(*,'(A,3(ES24.16,1X))') 'KP_POSITIVITY eight_terms,conservation_offset,total=', &
+                SUM(coefficient*mass_face)+SUM(coefficient_neighbor*mass_neighbor), &
+                mass_cell-average_mass, &
+                SUM(coefficient*mass_face)+SUM(coefficient_neighbor*mass_neighbor)+mass_cell-average_mass
+        ELSE
+            WRITE(*,'(A)') 'KP_POSITIVITY degenerate_face: eight-term split needs branch handling'
+        END IF
+    END SUBROUTINE diagnose_spatial_positivity
 
     !> @brief Read the mass flux facing each cell at a selected x-interface.
     !> @details Only used for opt-in diagnostics; never recomputes numerical fluxes.

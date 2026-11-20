@@ -283,6 +283,10 @@ CONTAINS
                     this%spatial_rate(eq,failed_layer,j,k),this%q_trial(eq,failed_layer,j,k)
                 CALL spatial_operators(failed_layer)%diagnose_cell(j,k,eq)
             END DO
+            IF (n_layers==2 .AND. layer_status==1) THEN
+                CALL spatial_operators(failed_layer)%diagnose_positivity(j,k, &
+                    qp_pre_all(:,failed_layer,j,k),state%q(idx_totMassEqn,failed_layer,j,k),dt)
+            END IF
             IF (layer_status==1)                                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')
             CALL fatal_error('Lie spatial state conversion rejected')
