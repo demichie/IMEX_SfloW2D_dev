@@ -3203,7 +3203,7 @@ CONTAINS
     TYPE(stochastic_config_type) :: saved_stochastic_l2
     REAL(wp), ALLOCATABLE :: original_q(:,:,:,:),original_b(:,:)
     REAL(wp), ALLOCATABLE :: stored_total(:,:,:)
-    REAL(wp) :: primitive(n_vars),total_before
+    REAL(wp) :: primitive(n_vars),total_before,saved_t_end
     INTEGER :: unit_budget
     REAL(wp) :: budget(11)
     CHARACTER(LEN=256) :: header
@@ -3425,7 +3425,13 @@ CONTAINS
     output_netcdf_flag=.FALSE.
     output_idx=0
     dt_output=1.0_wp
+    ! Snapshot verification must not implicitly invoke the unrelated
+    ! final-time maximum/vulnerability writer.
+    saved_t_end=t_end
+    t_end=clock%t+2.0_wp*dt_output
+    clock%steady_deadline=HUGE(1.0_wp)
     CALL output_solution(clock%t,states,clock)
+    t_end=saved_t_end
     n_restart_files=2
     restart_files(1)=snapshot_file_path(TRIM(run_name)//'_L1_0000.q_2d')
     restart_files(2)=snapshot_file_path(TRIM(run_name)//'_L2_0000.q_2d')
