@@ -111,7 +111,10 @@ CONTAINS
         LOGICAL :: transport_stochastic(n_layers),pore_enabled(n_layers),stochastic_enabled(n_layers)
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
         LOGICAL :: reuse_cfl_traces
-        REAL(wp), POINTER, CONTIGUOUS :: qp_pre(:,:,:),qp_pre2(:,:,:),qp_pre_all(:,:,:,:)
+        ! The full 4D buffer is contiguous; fixing the layer index produces a
+        ! noncontiguous 3D section when N_LAYERS=2. Pass those sections directly
+        ! so explicit-shape callees receive correctly packed values.
+        REAL(wp), POINTER, CONTIGUOUS :: qp_pre_all(:,:,:,:)
         REAL(wp) :: coupled_dt
         INTEGER :: l,j,k,first_failure,eq,failed_layer,layer_status,layer,front_j,front_k
         REAL(wp) :: face_left,face_right
@@ -159,8 +162,6 @@ CONTAINS
             this%qp_before(:,1,:,:)=state%qp(:,1,:,:)
             qp_pre_all=>this%qp_before
         END IF
-        qp_pre=>qp_pre_all(:,1,:,:)
-        IF (n_layers==2) qp_pre2=>qp_pre_all(:,2,:,:)
         IF (.NOT.reuse_cfl_traces) THEN
             ! Each cell initializes its own status in the conversion sweep.
         !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,conversion_ok)
@@ -190,11 +191,12 @@ CONTAINS
         ! The production L1 path retains its original evaluation and floating-point order.
         IF (n_layers==2) THEN
             IF (SIZE(spatial_operators)/=2) CALL fatal_error('TL07 coupled Lie needs two spatial operators')
-            CALL spatial_operators(1)%evaluate_coupled(spatial_operators(2),qp_pre,qp_pre2, &
+            CALL spatial_operators(1)%evaluate_coupled(spatial_operators(2), &
+                qp_pre_all(:,1,:,:),qp_pre_all(:,2,:,:), &
                 this%spatial_rate(:,1,:,:),this%spatial_rate(:,2,:,:),t,domain,coupled_dt)
             IF (dt>coupled_dt) CALL fatal_error('TL07 timestep exceeds preliminary coupled CFL bound')
         ELSE
-            CALL spatial_operators(1)%evaluate(qp_pre,this%spatial_rate(:,1,:,:),t,domain, &
+            CALL spatial_operators(1)%evaluate(qp_pre_all(:,1,:,:),this%spatial_rate(:,1,:,:),t,domain, &
                 reuse_cfl_traces=reuse_cfl_traces)
         END IF
 

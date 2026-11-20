@@ -1483,6 +1483,7 @@ CONTAINS
         TYPE(spatial_operator_type) :: isolated,lower,upper
         REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny),q_single(n_vars,nx,ny)
         REAL(wp) :: p_single(n_vars,nx,ny),p1(n_vars,nx,ny),p2(n_vars,nx,ny)
+        REAL(wp) :: p_layers(n_vars,2,nx,ny)
         REAL(wp) :: single_rate(n_eqns,nx,ny),rate1(n_eqns,nx,ny),rate2(n_eqns,nx,ny)
         REAL(wp) :: initial(n_vars),conservative(n_vars)
         REAL(wp) :: saved_b(nx+1,ny+1)
@@ -1536,7 +1537,14 @@ CONTAINS
         CALL upper%compute_timestep(q2,p2,0.0_wp,dt_upper,paired, &
             lower_operator=lower,h_lower=p1(idx_h,:,:))
         CALL isolated%evaluate(p_single,single_rate,0.0_wp,paired,reuse_cfl_traces=.TRUE.)
-        CALL lower%evaluate_coupled(upper,p1,p2,rate1,rate2,0.0_wp,paired,dt_coupled)
+        ! The production integrator passes a layer slice of a four-dimensional
+        ! primitive state. For two layers that 3D section is NOT contiguous.
+        p_layers(:,1,:,:)=p1
+        p_layers(:,2,:,:)=p2
+        IF (IS_CONTIGUOUS(p_layers(:,1,:,:))) &
+            ERROR STOP 'Two-layer primitive slice unexpectedly contiguous'
+        CALL lower%evaluate_coupled(upper,p_layers(:,1,:,:),p_layers(:,2,:,:), &
+            rate1,rate2,0.0_wp,paired,dt_coupled)
 
         ! A positive discharge into the first dry cell has a negative
         ! spatial mass residual: q_new=q_old-dt*spatial_rate.
@@ -1583,7 +1591,10 @@ CONTAINS
             CALL upper%compute_timestep(q2,p2,time,dt_upper,paired, &
                 lower_operator=lower,h_lower=p1(idx_h,:,:))
             CALL isolated%evaluate(p_single,single_rate,time,solo_domain,reuse_cfl_traces=.TRUE.)
-            CALL lower%evaluate_coupled(upper,p1,p2,rate1,rate2,time,paired,dt_coupled)
+            p_layers(:,1,:,:)=p1
+            p_layers(:,2,:,:)=p2
+            CALL lower%evaluate_coupled(upper,p_layers(:,1,:,:),p_layers(:,2,:,:), &
+                rate1,rate2,time,paired,dt_coupled)
             step=0.25_wp*MIN(dt_single,dt_lower,dt_upper,dt_coupled)
             IF (step<=0.0_wp .OR. .NOT.ieee_is_finite(step)) &
                 ERROR STOP 'Dry upper dam-break produced an invalid timestep'
