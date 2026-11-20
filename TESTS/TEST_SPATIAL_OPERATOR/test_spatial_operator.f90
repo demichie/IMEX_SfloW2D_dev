@@ -3434,7 +3434,7 @@ CONTAINS
     TYPE(stochastic_workspace_type) :: noise(2)
     TYPE(stochastic_config_type) :: saved_stochastic_l2
     REAL(wp), ALLOCATABLE :: original_q(:,:,:,:),original_b(:,:)
-    REAL(wp), ALLOCATABLE :: stored_total(:,:,:)
+    REAL(wp), ALLOCATABLE :: stored_total(:,:,:),expected_volume(:,:)
     REAL(wp) :: primitive(n_vars),total_before,saved_t_end,reference_l1_mass
     INTEGER :: unit_budget
     REAL(wp) :: budget(11)
@@ -3500,6 +3500,7 @@ CONTAINS
             primitive(idx_T)=T_ambient
             primitive(idx_u)=0.1_wp
             primitive(idx_pore)=0.1_wp
+            primitive(idx_solid_first)=0.5_wp
             states%qp(:,1,j,k)=primitive
             CALL primitive_to_conservative(primitive,states%q(:,1,j,k),accepted=accepted)
             IF (.NOT.accepted) ERROR STOP 'Invalid L1 I/O primitive'
@@ -3507,6 +3508,7 @@ CONTAINS
             primitive(idx_u)=-0.2_wp
             primitive(idx_pore)=0.0_wp
             primitive(idx_stoch)=0.2_wp
+            primitive(idx_solid_first)=0.75_wp
             states%qp(:,2,j,k)=primitive
             CALL primitive_to_conservative(primitive,states%q(:,2,j,k),accepted=accepted)
             IF (.NOT.accepted) ERROR STOP 'Invalid L2 I/O primitive'
@@ -3576,7 +3578,7 @@ CONTAINS
     IF (ios==nf90_noerr) ERROR STOP 'Obsolete q_layers tensor still present'
     ios=nf90_inq_varid(netcdf_id,'qp_layers',variable_id)
     IF (ios==nf90_noerr) ERROR STOP 'Obsolete qp_layers tensor still present'
-    ALLOCATE(stored_total(nx,ny,1))
+    ALLOCATE(stored_total(nx,ny,1),expected_volume(nx,ny))
     ios=nf90_inq_varid(netcdf_id,'h_l1',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing ParaView-compatible L1 depth'
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)
@@ -3600,12 +3602,39 @@ CONTAINS
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)
     IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 pore pressure'
     IF (ANY(stored_total(:,:,1)/=states%qp(idx_pore,1,:,:))) ERROR STOP 'NetCDF L1 pore pressure mismatch'
+    ! Check phase-volume output against the authoritative solid mass inventory.
     ios=nf90_inq_varid(netcdf_id,'solid_fraction_l1',variable_id)
-    IF (ios/=nf90_noerr) ERROR STOP 'Missing L1 solid fraction'
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing L1 solid volume fraction'
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)
-    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 solid fraction'
-    IF (ANY(stored_total(:,:,1)/=SUM(states%qp(idx_solid_first:idx_solid_last,1,:,:),DIM=1))) &
-        ERROR STOP 'NetCDF L1 solid fraction mismatch'
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 solid volume fraction'
+    expected_volume=0.0_wp
+    WHERE (states%qp(idx_h,1,:,:)>0.0_wp)
+        expected_volume=states%q(idx_solid_first,1,:,:)/(rho_s(1)*states%qp(idx_h,1,:,:))
+    END WHERE
+    IF (ANY(ABS(stored_total(:,:,1)-expected_volume)>1.0E-12_wp)) &
+        ERROR STOP 'NetCDF L1 volume fraction differs from solid phase inventory'
+    ios=nf90_inq_varid(netcdf_id,'solid_mass_fraction_l1',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing L1 solid mass fraction'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total)
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read L1 solid mass fraction'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_solid_first,1,:,:))) &
+        ERROR STOP 'NetCDF L1 solid mass fraction mismatch'
+    ios=nf90_inq_varid(netcdf_id,'solid_fraction_l2',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing L2 solid volume fraction'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total,start=[1,1,2],count=[nx,ny,1])
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended L2 solid volume fraction'
+    expected_volume=0.0_wp
+    WHERE (states%qp(idx_h,2,:,:)>0.0_wp)
+        expected_volume=states%q(idx_solid_first,2,:,:)/(rho_s(1)*states%qp(idx_h,2,:,:))
+    END WHERE
+    IF (ANY(ABS(stored_total(:,:,1)-expected_volume)>1.0E-12_wp)) &
+        ERROR STOP 'NetCDF appended L2 volume fraction differs from solid phase inventory'
+    ios=nf90_inq_varid(netcdf_id,'solid_mass_fraction_l2',variable_id)
+    IF (ios/=nf90_noerr) ERROR STOP 'Missing L2 solid mass fraction'
+    ios=nf90_get_var(netcdf_id,variable_id,stored_total,start=[1,1,2],count=[nx,ny,1])
+    IF (ios/=nf90_noerr) ERROR STOP 'Cannot read appended L2 solid mass fraction'
+    IF (ANY(stored_total(:,:,1)/=states%qp(idx_solid_first,2,:,:))) &
+        ERROR STOP 'NetCDF appended L2 solid mass fraction mismatch'
     ios=nf90_inq_varid(netcdf_id,'deposit_class1',variable_id)
     IF (ios/=nf90_noerr) ERROR STOP 'Missing scalar deposit-class field'
     ios=nf90_get_var(netcdf_id,variable_id,stored_total)

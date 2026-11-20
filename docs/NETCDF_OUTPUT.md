@@ -18,12 +18,16 @@ fields have suffix `_l1` or `_l2`; both layers share the same field convention.
 | `mass` | Layer mass per unit area | kg/m² |
 | `rho_m` | Bulk density, computed as mass/depth in wet cells; zero in dry cells | kg/m³ |
 | `solid_fraction` | Total solid volume fraction (when solids are configured) | 1 |
+| `solid_mass_fraction` | Total solid mass fraction (when solids are configured) | 1 |
 | `pore_pressure` | Excess pore pressure (only when its state component is configured) | Pa |
 | `stochastic` | Transported stochastic state (when configured) | 1 |
 
 For multiple solid classes, `solid_fraction_class1`, `solid_fraction_class2`,
-etc. expose individual volume fractions. Extra gas classes use
-`gas_fraction_class1`, etc. Shared solid inventories are
+etc. expose individual **volume** fractions, while
+`solid_mass_fraction_class1`, `solid_mass_fraction_class2`, etc. expose
+individual **mass** fractions. Additional gas species similarly use
+`gas_fraction_class1` (volume) and `gas_mass_fraction_class1` (mass),
+with corresponding fields for each class. Shared solid inventories are
 `deposit_class1`, `erosion_class1`, `erodible_class1`, etc.
 Each is a separate `(x,y,time)` field; no extra `component`, `layer`
 or `solid_class` dimensions occur in visualization variables.
@@ -31,6 +35,20 @@ or `solid_class` dimensions occur in visualization variables.
 The shared fields `b`, `h_total`, `eta_top`, `mass_total`,
 `deposit_tot`, `hMax`, `pDynMax`, `modVelMax` retain their
 previous meanings and units. Coordinates are `x`, `y`, and `time`.
+
+Volume fractions are computed from the authoritative primitive state using
+`primitive_to_volume_fractions`, which also returns zero for dry cells.
+Mass fractions come directly from the primitive composition. For a single
+solid class, `solid_fraction` and `solid_mass_fraction` are the respective
+class fractions as well as the totals; separate class fields are emitted
+only when multiple classes are configured. All layer-specific fields use
+`_l1`/`_l2` when there are two layers.
+
+**Schema change:** Existing NetCDF files created before this change have
+`solid_fraction` values that contain mass fractions despite being described
+as volume fractions. They do not have the new mass-fraction variables.
+Regenerate old visualization files before appending; binary checkpoints
+remain authoritative.
 
 The binary checkpoint remains the **only** restart state file. It preserves the
 complete authoritative conservative arrays and all restart metadata; NetCDF is
@@ -44,8 +62,8 @@ The dam-break `height_summary_nc.py` reads the physical `h` variable.
 ## Verification
 
 The structural two-layer `TEST_SPATIAL_OPERATOR` test checks scalar fields
-in both layers, absent obsolete tensors, solid inventories and appended time
-records. Run the relevant actions and a single-layer dam-break example to
+in both layers, volume fractions against conservative solid inventories,
+separate mass fractions, absent obsolete tensors, and appended time records. Run the relevant actions and a single-layer dam-break example to
 verify the full output chain in the current environment.
 
 ## Degenerate spatial axes (1D simulations)

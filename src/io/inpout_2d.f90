@@ -303,8 +303,9 @@
     ! The authoritative q/qp arrays remain solely in the simulation state.
     INTEGER :: ncid
     INTEGER :: dimids(3)           !< [x,y,time].
-    INTEGER :: layer_field_varid(9,2) !< h,u,v,T,mass,rho_m,solid_fraction,pore_pressure,stochastic.
+    INTEGER :: layer_field_varid(10,2) !< h,u,v,T,mass,rho_m,solid_volume,pore,stochastic,solid_mass.
     INTEGER, ALLOCATABLE :: solid_class_varid(:,:),gas_class_varid(:,:)
+    INTEGER, ALLOCATABLE :: solid_mass_class_varid(:,:),gas_mass_class_varid(:,:)
     INTEGER, ALLOCATABLE :: shared_class_varid(:,:)
     INTEGER :: eta_top_varid,total_depth_varid
     INTEGER :: total_mass_varid
@@ -7849,8 +7850,11 @@
 
         IF (ALLOCATED(solid_class_varid)) DEALLOCATE(solid_class_varid)
         IF (ALLOCATED(gas_class_varid)) DEALLOCATE(gas_class_varid)
+        IF (ALLOCATED(solid_mass_class_varid)) DEALLOCATE(solid_mass_class_varid)
+        IF (ALLOCATED(gas_mass_class_varid)) DEALLOCATE(gas_mass_class_varid)
         IF (ALLOCATED(shared_class_varid)) DEALLOCATE(shared_class_varid)
         ALLOCATE(solid_class_varid(n_solid,n_layers),gas_class_varid(n_add_gas,n_layers))
+        ALLOCATE(solid_mass_class_varid(n_solid,n_layers),gas_mass_class_varid(n_add_gas,n_layers))
         ALLOCATE(shared_class_varid(3,n_solid))
         layer_field_varid=-1
 
@@ -7896,8 +7900,10 @@
                 CALL check(nf90_inq_varid(ncid,'T'//TRIM(suffix),layer_field_varid(4,layer)))
                 CALL check(nf90_inq_varid(ncid,'mass'//TRIM(suffix),layer_field_varid(5,layer)))
                 CALL check(nf90_inq_varid(ncid,'rho_m'//TRIM(suffix),layer_field_varid(6,layer)))
-                IF (n_solid>0) &
+                IF (n_solid>0) THEN
                     CALL check(nf90_inq_varid(ncid,'solid_fraction'//TRIM(suffix),layer_field_varid(7,layer)))
+                    CALL check(nf90_inq_varid(ncid,'solid_mass_fraction'//TRIM(suffix),layer_field_varid(10,layer)))
+                END IF
                 IF (idx_pore>0) &
                     CALL check(nf90_inq_varid(ncid,'pore_pressure'//TRIM(suffix),layer_field_varid(8,layer)))
                 IF (idx_stoch>0) &
@@ -7907,11 +7913,15 @@
                     WRITE(number,'(I0)') component
                     CALL check(nf90_inq_varid(ncid,'solid_fraction_class'//TRIM(number)//TRIM(suffix), &
                         solid_class_varid(component,layer)))
+                    CALL check(nf90_inq_varid(ncid,'solid_mass_fraction_class'//TRIM(number)//TRIM(suffix), &
+                        solid_mass_class_varid(component,layer)))
                 END DO
                 DO component=1,n_add_gas
                     WRITE(number,'(I0)') component
                     CALL check(nf90_inq_varid(ncid,'gas_fraction_class'//TRIM(number)//TRIM(suffix), &
                         gas_class_varid(component,layer)))
+                    CALL check(nf90_inq_varid(ncid,'gas_mass_fraction_class'//TRIM(number)//TRIM(suffix), &
+                        gas_mass_class_varid(component,layer)))
                 END DO
             END DO
             DO component=1,n_solid
@@ -7952,8 +7962,12 @@
                 layer_field_varid(5,layer))
             CALL define_shared_output('rho_m'//TRIM(suffix),'mixture bulk density','kg/m3', &
                 layer_field_varid(6,layer))
-            IF (n_solid>0) CALL define_shared_output('solid_fraction'//TRIM(suffix), &
-                'total solid volume fraction','1',layer_field_varid(7,layer))
+            IF (n_solid>0) THEN
+                CALL define_shared_output('solid_fraction'//TRIM(suffix), &
+                    'total solid volume fraction','1',layer_field_varid(7,layer))
+                CALL define_shared_output('solid_mass_fraction'//TRIM(suffix), &
+                    'total solid mass fraction','1',layer_field_varid(10,layer))
+            END IF
             IF (idx_pore>0) CALL define_shared_output('pore_pressure'//TRIM(suffix), &
                 'excess pore pressure','Pa',layer_field_varid(8,layer))
             IF (idx_stoch>0) CALL define_shared_output('stochastic'//TRIM(suffix), &
@@ -7963,11 +7977,15 @@
                 WRITE(number,'(I0)') component
                 CALL define_shared_output('solid_fraction_class'//TRIM(number)//TRIM(suffix), &
                     'solid-class volume fraction','1',solid_class_varid(component,layer))
+                CALL define_shared_output('solid_mass_fraction_class'//TRIM(number)//TRIM(suffix), &
+                    'solid-class mass fraction','1',solid_mass_class_varid(component,layer))
             END DO
             DO component=1,n_add_gas
                 WRITE(number,'(I0)') component
                 CALL define_shared_output('gas_fraction_class'//TRIM(number)//TRIM(suffix), &
                     'additional gas-class volume fraction','1',gas_class_varid(component,layer))
+                CALL define_shared_output('gas_mass_fraction_class'//TRIM(number)//TRIM(suffix), &
+                    'additional gas-class mass fraction','1',gas_mass_class_varid(component,layer))
             END DO
         END DO
         CALL define_shared_output('b','bed elevation','meters',b_varid)
@@ -8068,6 +8086,39 @@
         CALL check_restart_io(ios,message,'closing two-layer budget',filename)
     END SUBROUTINE write_two_layer_budget
 
+    !> @brief Evaluate one solid or gas phase volume-fraction field for NetCDF.
+    !> @details Uses the canonical physical conversion and a caller-owned 2D field.
+    !> @param[in] state Authoritative primitive cell states.
+    !> @param[in] layer Material layer index.
+    !> @param[in] solid_phase Select solids instead of additional gases.
+    !> @param[in] component One-based phase index, or zero for all solids.
+    !> @param[out] field Resulting volume fractions; dry cells are zero.
+    SUBROUTINE compute_netcdf_volume_fraction(state,layer,solid_phase,component,field)
+        CLASS(state_type), INTENT(IN) :: state
+        INTEGER, INTENT(IN) :: layer,component
+        LOGICAL, INTENT(IN) :: solid_phase
+        REAL(wp), INTENT(OUT) :: field(:,:)
+        REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
+        INTEGER :: j,k
+
+        field=0.0_wp
+        DO k=1,SIZE(field,2)
+            DO j=1,SIZE(field,1)
+                IF (state%qp(idx_h,layer,j,k)<=EPSILON(1.0_wp)) CYCLE
+                CALL primitive_to_volume_fractions(state%qp(:,layer,j,k),alphas,alphag)
+                IF (solid_phase) THEN
+                    IF (component==0) THEN
+                        field(j,k)=SUM(alphas)
+                    ELSE
+                        field(j,k)=alphas(component)
+                    END IF
+                ELSE
+                    field(j,k)=alphag(component)
+                END IF
+            END DO
+        END DO
+    END SUBROUTINE compute_netcdf_volume_fraction
+
     !> \brief Append one time record of physical, topographic and transport fields to NetCDF.
     !>
     !> \param[in] time_in Simulation time associated with the appended NetCDF record [s].
@@ -8107,12 +8158,16 @@
             END WHERE
             CALL write_netcdf_visual_field(layer_field_varid(6,layer),field)
             IF (n_solid>0) THEN
-                field=SUM(state%qp(idx_solid_first:idx_solid_last,layer,:,:),DIM=1)
+                CALL compute_netcdf_volume_fraction(state,layer,.TRUE.,0,field)
                 CALL write_netcdf_visual_field(layer_field_varid(7,layer),field)
+                field=SUM(state%qp(idx_solid_first:idx_solid_last,layer,:,:),DIM=1)
+                CALL write_netcdf_visual_field(layer_field_varid(10,layer),field)
                 IF (n_solid>1) THEN
                     DO i=1,n_solid
-                        field=state%qp(idx_solid_first+i-1,layer,:,:)
+                        CALL compute_netcdf_volume_fraction(state,layer,.TRUE.,i,field)
                         CALL write_netcdf_visual_field(solid_class_varid(i,layer),field)
+                        field=state%qp(idx_solid_first+i-1,layer,:,:)
+                        CALL write_netcdf_visual_field(solid_mass_class_varid(i,layer),field)
                     END DO
                 END IF
             END IF
@@ -8125,8 +8180,10 @@
                 CALL write_netcdf_visual_field(layer_field_varid(9,layer),field)
             END IF
             DO i=1,n_add_gas
-                field=state%qp(idx_add_gas_first+i-1,layer,:,:)
+                CALL compute_netcdf_volume_fraction(state,layer,.FALSE.,i,field)
                 CALL write_netcdf_visual_field(gas_class_varid(i,layer),field)
+                field=state%qp(idx_add_gas_first+i-1,layer,:,:)
+                CALL write_netcdf_visual_field(gas_mass_class_varid(i,layer),field)
             END DO
         END DO
         CALL write_netcdf_visual_field(b_varid,B_cent)
