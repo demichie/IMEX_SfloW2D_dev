@@ -3,7 +3,7 @@
 
 The original Etna ellipsoid script and the single-layer solver are authoritative:
 no constitutive formulas or interpolation rules are reimplemented in Python.
-The production N_LAYERS=2 gate remains closed.
+The production N_LAYERS=2 gate is closed unless validation is explicitly opted in.
 """
 
 import argparse
@@ -159,7 +159,7 @@ def prepare(directory, solver):
         write_layer_snapshots(matches[0], l1, l2)
     print("L1: original Etna conservative state:", l1)
     print("L2: zero mass, momentum, energy and solid content:", l2)
-    print("N_LAYERS=2 is still disabled in the production solver.")
+    print("N_LAYERS=2 requires IMEX_TWO_LAYER_VALIDATION=1 for controlled testing.")
 
 
 def main():

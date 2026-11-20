@@ -87,7 +87,34 @@ python3 -m unittest discover -s EXAMPLES/EXAMPLE_ETNA_TWO_LAYER \
 This test requires only Python's standard library, uses synthetic small
 snapshots and does not need the solver or DEM.
 
-## Future two-layer execution — NOT YET ENABLED
+## Controlled two-layer execution — experimental TL13a
+
+The production parser still rejects `N_LAYERS=2` by default. For a
+controlled integration run only, set `IMEX_TWO_LAYER_VALIDATION=1`.
+This opt-in is not an endorsement of the coupled scientific model.
+
+To run the short prepared Etna end-to-end smoke test from the repository
+root (requires compiled solver, Python 3, NumPy, pandas and the DEM archive):
+
+```bash
+python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py \
+  --solver src/IMEX_SfloW2D \
+  --workdir /tmp/imex-etna-tl13a
+```
+
+Use an empty directory for `--workdir` and inspect its solver outputs.
+The test prepares the canonical single-layer Etna initial state and strictly
+dry upper layer, runs to `t=0.001 s`, then checks snapshot time indices,
+L1/L2 conservative files, upper-layer ESRI rasters, total mass budget
+arithmetic, NetCDF presence and binary restart presence. It does **not**
+yet validate restart continuation, physical conservation accuracy, L2
+growth over longer times or OpenMP bitwise identity.
+
+The `solver-validation.yml` GitHub Action exposes an optional
+`two_layer_smoke` dispatch input. Set it to `true` to run this
+experimental job; ordinary CI jobs continue without experimental activation.
+
+## Two-layer reference input and future scientific validation
 
 The checked-in `IMEX_SfloW2D.inp` requests `N_LAYERS=2`,
 explicit `RHEOLOGY_L1/L2_PARAMETERS`,
@@ -98,15 +125,14 @@ It points to the two generated `.q_2d` files in `INITIAL_CONDITIONS`.
 The model's common topography is the generated
 `DEM/new_dem.asc`, as in the original dense avalanche.
 
-**Do not remove the solver's two-layer gate merely to run this input.**
-After the solver is enabled through the approved numerical/scientific
-validation process, the execution command from this directory will be:
+**Do not remove the production safety gate.** In a disposable prepared
+validation directory only, the controlled execution command is:
 
 ```bash
-../../bin/IMEX_SfloW2D
+IMEX_TWO_LAYER_VALIDATION=1 ../../bin/IMEX_SfloW2D
 ```
 
-At that point acceptance must check: exact L2 dryness at t=0; onset of
+Before functional or scientific acceptance, check: exact L2 dryness at t=0; onset of
 elutriation only after flow motion; nonnegative L1/L2 mass and component
 inventories; solid/carrier conservation across internal transfer; no
 spurious energy/momentum production; separate L1/L2 outputs and shared
