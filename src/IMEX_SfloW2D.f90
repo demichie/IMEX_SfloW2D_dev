@@ -133,7 +133,8 @@ PROGRAM IMEX_SfloW2D
     LOGICAL :: runout_exists, mass_exists
     LOGICAL :: timestep_diagnostics_enabled
     INTEGER :: timestep_count
-    REAL(wp) :: cfl_dt,cfl_max_a_x,cfl_max_a_y
+    REAL(wp) :: cfl_dt,cfl_max_a_x,cfl_max_a_y,coupled_cfl_dt,upper_cfl_dt
+    REAL(wp), ALLOCATABLE :: coupled_term_l1(:,:,:),coupled_term_l2(:,:,:)
     CHARACTER(LEN=8) :: timestep_diagnostics_setting
 
     WRITE(*,*) '---------------------'
@@ -184,6 +185,11 @@ PROGRAM IMEX_SfloW2D
     CALL init_grid
 
     CALL simulation%initialize
+
+    IF (n_layers==2) THEN
+        ALLOCATE(coupled_term_l1(n_vars,SIZE(simulation%state%q,3),SIZE(simulation%state%q,4)))
+        ALLOCATE(coupled_term_l2(n_vars,SIZE(simulation%state%q,3),SIZE(simulation%state%q,4)))
+    END IF
 
     lie_source_groups=simulation%source_registry%groups()
     boundary_source_enabled=.FALSE.
@@ -454,16 +460,12 @@ PROGRAM IMEX_SfloW2D
 
         CALL update_param
 
-        IF ( simulation%runtime%t .EQ. t_start ) THEN
-
+        IF (n_layers==2) THEN
             CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
-                    simulation%runtime%t, .FALSE.)
-
+                simulation%runtime%t,.FALSE.,q_other=simulation%state%q(:,2,:,:))
         ELSE
-
             CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
-                    simulation%runtime%t, .FALSE.)
-
+                simulation%runtime%t,.FALSE.)
         END IF
 
         CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domains(1))
@@ -475,6 +477,26 @@ PROGRAM IMEX_SfloW2D
                 max_speed_x=cfl_max_a_x,max_speed_y=cfl_max_a_y, &
                 diagnose_max_x_face=timestep_diagnostics_enabled .AND. &
                     (timestep_count<20 .OR. MOD(timestep_count+1,100)==0))
+        IF (n_layers==2) THEN
+            CALL simulation%spatial_operators(2)%prepare_hp_workset(simulation%domains(1))
+            CALL simulation%spatial_operators(2)%compute_timestep( &
+                simulation%state%q(:,2,:,:),simulation%state%qp(:,2,:,:),simulation%runtime%t, &
+                upper_cfl_dt,simulation%domains(1), &
+                boundary_source_enabled=boundary_source_enabled, &
+                lower_operator=simulation%spatial_operators(1), &
+                h_lower=simulation%state%qp(idx_h,1,:,:))
+
+            ! Reuse the production coupled spatial kernel to obtain the
+            ! actual paired-face bound before accepting a timestep. Its
+            ! preliminary residuals are discarded; advance recomputes them
+            ! from the same prepared conservative state.
+            CALL simulation%spatial_operators(1)%evaluate_coupled( &
+                simulation%spatial_operators(2), &
+                simulation%state%qp(:,1,:,:),simulation%state%qp(:,2,:,:), &
+                coupled_term_l1,coupled_term_l2,simulation%runtime%t, &
+                simulation%domains(1),coupled_cfl_dt)
+            simulation%runtime%dt=MIN(simulation%runtime%dt,upper_cfl_dt,coupled_cfl_dt)
+        END IF
         cfl_dt=simulation%runtime%dt
 
         IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                                                         &
@@ -679,6 +701,7 @@ PROGRAM IMEX_SfloW2D
 
     END DO
 
+    IF (ALLOCATED(coupled_term_l1)) DEALLOCATE(coupled_term_l1,coupled_term_l2)
     CALL simulation%finalize
 
     IF ( output_netcdf_flag ) CALL close_netcdf

@@ -8,7 +8,8 @@ PROGRAM test_model_layout
 
   CALL assert_true('single layer supported', supported_layer_count(1))
   CALL assert_true('zero layers rejected', .NOT. supported_layer_count(0))
-  CALL assert_true('two layers rejected for now', .NOT. supported_layer_count(2))
+  CALL assert_true('two structural layers supported', supported_layer_count(2))
+  CALL assert_true('three layers rejected', .NOT. supported_layer_count(3))
 
   CALL layout%initialize(1, 6, 6, 1, 1, 0, 0)
 
@@ -40,6 +41,10 @@ PROGRAM test_model_layout
        layout%idx_pore == 9)
   CALL assert_true('full velocity indices', layout%idx_u == 2    &
        .AND. layout%idx_v == 3)
+
+  CALL layout%initialize(2, 9, 9, 2, 1, 1, 1)
+  CALL assert_true('two-layer layout initialized', layout%is_initialized())
+  CALL assert_true('two-layer slots preserved', layout%n_layers == 2)
 
   CALL layout%finalize
   CALL assert_true('layout finalized', .NOT. layout%is_initialized())

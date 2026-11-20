@@ -152,3 +152,22 @@ the real output entry point; it is not a production two-layer run. Run strict
 and optimized CI on this exact commit to verify the newly exercised path.
 The `N_LAYERS=2` production gate remains closed pending controlled end-to-end
 functional validation and TL13b scientific approval.
+
+## TL13a — controlled production-driver activation (20 November 2026)
+
+The structural layout now accepts one or two layer slots. The **only**
+activation gate in the production parser remains closed by default:
+`N_LAYERS=2` is rejected unless `IMEX_TWO_LAYER_VALIDATION=1` is explicitly
+set in the environment. This is a diagnostic opt-in, **not scientific approval**.
+The single-layer path retains its original layer count and numerical formulae.
+The driver now forms one OR workset at each step, prepares L1/L2 CFL traces,
+and obtains the preliminary coupled bound using the existing coupled spatial
+operator before choosing the timestep. The coupled Lie integrator then uses
+those traces through its existing production call. No alternate numerical
+integrator, state representation or physical source law is introduced.
+
+This commit has not yet completed an end-to-end two-layer run or scientific
+TL13b gate. Run both CI profiles, the single-layer regression set and a short
+controlled two-layer run with output/restart/OpenMP before claiming TL13a
+functional acceptance. The preliminary total-depth wave bound is not a
+validated coupled eigenvalue/hyperbolicity analysis.

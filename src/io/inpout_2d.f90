@@ -653,6 +653,7 @@
 
         LOGICAL :: lexist
         INTEGER :: ios, n_pore_legacy, n_pore_l1, n_pore_l2
+        CHARACTER(LEN=8) :: validation_mode
         CHARACTER(LEN=2048) :: pore_line
 
         ! Reset canonical NAMELIST objects between runs.
@@ -818,9 +819,17 @@
 
             END IF
 
-            IF (n_layers .NE. 1) THEN
-                CALL fatal_error('Only N_LAYERS=1 is currently supported')
-
+            ! Two-layer execution is opt-in for TL13a integration tests only.
+            ! This is the sole production-driver activation gate; the model
+            ! layout itself represents both supported structural layer counts.
+            IF (n_layers<1 .OR. n_layers>2) &
+                CALL fatal_error('N_LAYERS must be 1 or 2')
+            IF (n_layers==2) THEN
+                validation_mode=''
+                CALL GET_ENVIRONMENT_VARIABLE('IMEX_TWO_LAYER_VALIDATION',validation_mode)
+                IF (TRIM(validation_mode)/='1') &
+                    CALL fatal_error('N_LAYERS=2 requires IMEX_TWO_LAYER_VALIDATION=1 (unvalidated)')
+                WRITE(*,'(A)') 'TL13a experimental two-layer validation; NOT production validated'
             END IF
 
             idx_solid_first = 5

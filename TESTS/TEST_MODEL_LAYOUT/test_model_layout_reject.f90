@@ -6,9 +6,9 @@ PROGRAM test_model_layout_reject
 
   TYPE(model_layout_type) :: layout
 
-  ! This call must terminate with the explicit unsupported-layer diagnostic.
-  CALL layout%initialize(2, 4, 4, 0, 0, 0, 0)
+  ! This call must terminate with the explicit unsupported-layer diagnostic for three layers.
+  CALL layout%initialize(3, 4, 4, 0, 0, 0, 0)
 
-  ERROR STOP 'N_LAYERS=2 was accepted unexpectedly'
+  ERROR STOP 'N_LAYERS=3 was accepted unexpectedly'
 
 END PROGRAM test_model_layout_reject

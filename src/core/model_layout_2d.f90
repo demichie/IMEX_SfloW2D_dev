@@ -2,8 +2,8 @@
 !> @brief Describe immutable structural component indices for one configured model.
 !>
 !> The layout snapshots variable counts and component indices before solver
-!> workspaces are allocated. State arrays are now rank four (component,layer,x,y); two-layer
-!> execution remains explicitly disabled until the full solver is ready.
+!> workspaces are allocated. State arrays are rank four (component,layer,x,y). The production driver
+!> controls experimental two-layer execution at the input boundary.
 !********************************************************************************
 
 MODULE model_layout_2d
@@ -20,7 +20,7 @@ MODULE model_layout_2d
     !>          variable is absent. Appended physical velocities are not equations.
     TYPE :: model_layout_type
 
-        !> Number of material layers; currently only one is implemented.
+        !> Number of material layers; one or two structural layer slots.
         INTEGER :: n_layers = 0
         !> Number of conservative state components per cell.
         INTEGER :: n_vars = 0
@@ -59,15 +59,15 @@ CONTAINS
     !******************************************************************************
     !> @brief Report whether the requested layer count is implemented.
     !>
-    !> @param[in] n_layers Requested material-layer count; only one layer is currently supported.
-    !> @return True only for the currently implemented single-layer model.
+    !> @param[in] n_layers Requested material-layer count; one or two layers.
+    !> @return True for the structurally implemented one- or two-layer layouts.
     !******************************************************************************
 
     PURE LOGICAL FUNCTION supported_layer_count( n_layers )
 
         INTEGER, INTENT(IN) :: n_layers
 
-        supported_layer_count = n_layers .EQ. 1
+        supported_layer_count = n_layers >= 1 .AND. n_layers <= 2
 
     END FUNCTION supported_layer_count
 
@@ -76,7 +76,7 @@ CONTAINS
     !> @brief Validate variable counts and build the canonical component index layout.
     !>
     !> @param[in,out] this Canonical model variable-count and component-index descriptor.
-    !> @param[in] n_layers Requested material-layer count; only one layer is currently supported.
+    !> @param[in] n_layers Requested material-layer count; one or two layers.
     !> @param[in] n_vars Number of conservative variables in each cell state.
     !> @param[in] n_eqns Number of balance equations; currently equal to n_vars.
     !> @param[in] n_solid Number of independently transported solid classes.
@@ -101,7 +101,7 @@ CONTAINS
         CALL this%finalize
 
         IF ( .NOT. supported_layer_count(n_layers) ) THEN
-            ERROR STOP 'Only N_LAYERS=1 is currently supported'
+            ERROR STOP 'Model layout requires N_LAYERS=1 or N_LAYERS=2'
 
         END IF
 
