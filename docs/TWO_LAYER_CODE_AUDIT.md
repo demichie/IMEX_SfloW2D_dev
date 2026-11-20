@@ -300,3 +300,25 @@ the same domain implementation.
   functional job are green on the final commit.** No automated execution
   of the new domain ownership code has yet been observed. TL13b scientific
   validation and production acceptance remain separate and open.
+
+## TL13a functional closure — verified CI (20 November 2026)
+
+**Verified baseline:** `89a9f2b46e52f718417e28b7c4db7ee11bba65b9` on
+`feature/two-layer`, GitHub Actions workflow run
+[44712747883](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/44712747883):
+**completed / success**. Every job finished successfully:
+
+- `gfortran / optimized / integration` — success.
+- `gfortran / strict-debug / integration` — success.
+- `End-to-end OpenMP comparison (1, 2, 4 threads)` — success.
+- `Experimental TL13a two-layer Etna smoke` (short smoke and optional
+  extended conservation, continuation and two-layer OpenMP checks) — success.
+
+The full workflow verifies the definitive single shared-domain ownership
+change as well as the earlier Etna, budget and checkpoint integrations.
+**TL13a is functionally complete.** This statement refers strictly to the
+verified baseline SHA, not to future documentation-only commits, and does
+not authorize a production two-layer run. The experimental environment gate
+remains intact. **TL13b remains open:** principal-symbol hyperbolicity with
+shear, density contrasts, coupled pressure, wet/dry, refinement and model
+closure validation require separate scientific evidence.

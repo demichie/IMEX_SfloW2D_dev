@@ -219,7 +219,7 @@ abilitazione in produzione.
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
-| **TL13a — Gate funzionale** | Smoke Etna ed esteso (restart, conservazione, OpenMP two-layer) verdi su `847f7906`; chiusura CI complessiva pendente | Ottenere sul commit finale workflow optimized e strict/debug interamente verdi, oltre ai test two-layer. Gate produttivo non autorizzato. |
+| **TL13a — Gate funzionale** | **Completata** su `89a9f2b`: workflow `44712747883` interamente verde | Operatori e workset OR, smoke Etna, conservazione, restart e OpenMP two-layer, integrazione optimized/strict-debug e confronto OpenMP single-layer verificati. Il gate produttivo rimane chiuso fino alla validazione scientifica TL13b. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
@@ -506,3 +506,16 @@ lo stato conservativo, le condizioni al contorno, le leggi sorgente o
 il calcolo CFL. La chiusura TL13a richiede ancora regressioni integrate
 strict/optimized completate su quest'ultimo commit. TL13b resta il gate
 scientifico separato.
+
+
+**TL13a — chiusura funzionale (20 novembre 2026):** il workflow
+[44712747883](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/44712747883)
+ha concluso con successo tutti e quattro i job sul commit `89a9f2b`:
+integrazione optimized, integrazione strict/debug, confronto end-to-end
+OpenMP 1/2/4 e smoke/validazione estesa Etna two-layer. Questo valida anche
+la proprieta' unica di `simulation%domain` introdotta nell'ultimo blocco.
+**TL13a e' chiusa come gate funzionale**, non come approvazione scientifica.
+Il parser continua a richiedere `IMEX_TWO_LAYER_VALIDATION=1` per
+`N_LAYERS=2`; nessuna modifica al gate di produzione e' autorizzata.
+Prossimo blocco: TL13b-A, analisi del simbolo principale e degli autovalori
+accoppiati sotto shear, con verifiche dei limiti CFL nei regimi iperbolici.

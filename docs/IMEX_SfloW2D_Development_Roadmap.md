@@ -23,10 +23,10 @@ assumptions. Do not introduce competing implementation plans.
 | TL07 | Coupled Lie trial, source scheduling and optional layer physics exercised structurally | Validate actual two-layer production timestep |
 | TL08–TL11 | Interlayer settling, elutriation, carrier and analytic drag implemented/tested in isolated and integrated fixtures | Validate coupled mass/species/energy/momentum budgets through a complete run |
 | TL12 | Two-layer input, snapshots, named NetCDF physical fields, and binary restart structurally implemented | Verify real driver I/O, restart continuation and OpenMP |
-| TL13a | **Functional Etna evidence green; final integration gate pending** | Smoke and extended conservation/restart/OpenMP checks passed on `847f7906`, but the full optimized/strict-debug workflow was cancelled; rerun all profiles on the final cleanup SHA before closure |
+| TL13a | **Complete — functional gate verified on `89a9f2b`** | Run `44712747883`: optimized and strict/debug integration, single-layer OpenMP 1/2/4, controlled Etna two-layer smoke and extended conservation/restart/OpenMP all passed; the scientific/production approval gate remains TL13b |
 | TL13b | **Open** | Scientifically validate hyperbolicity/shear, density contrasts, coupled pressure, wet/dry, convergence and physical closures |
 
-## Invariants not to change during TL13a
+## Invariants preserved at TL13a closure
 
 - **One authoritative state:** `q/qp(component,layer,x,y)`; no synchronized
   copies, global duplicates or transitional internal APIs.
