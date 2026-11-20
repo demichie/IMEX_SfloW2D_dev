@@ -110,6 +110,7 @@ PROGRAM test_spatial_operator
   CLOSE(input_unit)
   q0=q
   CALL refresh_topography_geometry
+  CALL check_dry_upper_dambreak_reduction
   CALL check_interlayer_face_residual
   CALL check_interlayer_cell_assembly
   CALL check_two_layer_union_workset
@@ -1474,6 +1475,102 @@ CONTAINS
     !> @brief Verify identical-material total-depth bounds and CFL equivalence.
     !> @details Reuses a physically converted wet primitive state, including
     !> its temperature and composition. Tests both directions and dry limits.
+    !> @brief Verify that a dry L2 does not block the L1 wet/dry front.
+    !> @details Exercises the full production isolated and coupled HP-PCCU
+    !>          operators, with identical L1 primitive states and a dry upper layer.
+    SUBROUTINE check_dry_upper_dambreak_reduction
+        TYPE(domain_type) :: paired
+        TYPE(spatial_operator_type) :: isolated,lower,upper
+        REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+        REAL(wp) :: p_single(n_vars,nx,ny),p1(n_vars,nx,ny),p2(n_vars,nx,ny)
+        REAL(wp) :: single_rate(n_eqns,nx,ny),rate1(n_eqns,nx,ny),rate2(n_eqns,nx,ny)
+        REAL(wp) :: initial(n_vars),conservative(n_vars)
+        REAL(wp) :: saved_b(nx+1,ny+1)
+        REAL(wp) :: dt_single,dt_lower,dt_upper,dt_coupled,tolerance
+        INTEGER :: first_dry,k,j,eq,l
+        LOGICAL :: accepted
+
+        IF (nx<12) RETURN
+        first_dry=nx/2+1
+        saved_b=B_vertex
+        B_vertex=0.0_wp
+        CALL refresh_topography_geometry
+
+        initial=0.0_wp
+        initial(idx_h)=2.0_wp
+        initial(idx_T)=T_ambient
+        initial(idx_solid_first)=0.2_wp
+        CALL primitive_to_conservative(initial,conservative,accepted)
+        IF (.NOT.accepted) ERROR STOP 'Invalid dry-upper dam-break initial material'
+        q1=0.0_wp
+        q2=0.0_wp
+        DO k=1,ny
+            DO j=1,first_dry-1
+                q1(:,j,k)=conservative
+            END DO
+        END DO
+        p_single=0.0_wp
+        p1=0.0_wp
+        p2=0.0_wp
+        p_single(idx_T,:,:)=T_ambient
+        p1(idx_T,:,:)=T_ambient
+        p2(idx_T,:,:)=T_ambient
+
+        CALL paired%initialize
+        CALL paired%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+        CALL isolated%initialize(1)
+        CALL lower%initialize(1)
+        CALL upper%initialize(2)
+        CALL isolated%prepare_hp_workset(paired)
+        CALL lower%prepare_hp_workset(paired)
+        CALL upper%prepare_hp_workset(paired)
+
+        CALL isolated%compute_timestep(q1,p_single,0.0_wp,dt_single,paired)
+        CALL lower%compute_timestep(q1,p1,0.0_wp,dt_lower,paired)
+        CALL upper%compute_timestep(q2,p2,0.0_wp,dt_upper,paired, &
+            lower_operator=lower,h_lower=p1(idx_h,:,:))
+        CALL isolated%evaluate(p_single,single_rate,0.0_wp,paired,reuse_cfl_traces=.TRUE.)
+        CALL lower%evaluate_coupled(upper,p1,p2,rate1,rate2,0.0_wp,paired,dt_coupled)
+
+        ! A positive discharge into the first dry cell has a negative
+        ! spatial mass residual: q_new=q_old-dt*spatial_rate.
+        k=(ny+1)/2
+        IF (.NOT.paired%solve_mask(first_dry,k)) &
+            ERROR STOP 'Dry-upper dam-break first dry cell is outside the active workset'
+        IF (single_rate(idx_totMassEqn,first_dry,k)>=0.0_wp) &
+            ERROR STOP 'Isolated reference cannot advance the wet/dry front'
+        tolerance=1.0E-10_wp*MAX(1.0_wp,ABS(single_rate(idx_totMassEqn,first_dry,k)))
+        IF (ABS(rate1(idx_totMassEqn,first_dry,k)-single_rate(idx_totMassEqn,first_dry,k))>tolerance) THEN
+            WRITE(*,*) 'DRY_UPPER_FRONT isolated rate=',single_rate(idx_totMassEqn,first_dry,k)
+            WRITE(*,*) 'DRY_UPPER_FRONT coupled rate=',rate1(idx_totMassEqn,first_dry,k)
+            WRITE(*,*) 'DRY_UPPER_FRONT face=',first_dry,' row=',k
+            CALL isolated%diagnose_cell(first_dry,k,idx_totMassEqn)
+            CALL lower%diagnose_cell(first_dry,k,idx_totMassEqn)
+            ERROR STOP 'Dry upper layer blocks L1 wet/dry mass flux'
+        END IF
+        DO l=1,paired%solve_cells
+            j=paired%j_cent(l)
+            k=paired%k_cent(l)
+            DO eq=1,n_eqns
+                tolerance=1.0E-10_wp*MAX(1.0_wp,ABS(single_rate(eq,j,k)))
+                IF (ABS(rate1(eq,j,k)-single_rate(eq,j,k))>tolerance) THEN
+                    WRITE(*,*) 'DRY_UPPER_RATE equation,cell=',eq,j,k
+                    WRITE(*,*) 'DRY_UPPER_RATE isolated/coupled=',single_rate(eq,j,k),rate1(eq,j,k)
+                    ERROR STOP 'Dry upper layer changes L1 spatial residual'
+                END IF
+                IF (ABS(rate2(eq,j,k))>tolerance) &
+                    ERROR STOP 'Dry upper layer generates a nonzero spatial residual'
+            END DO
+        END DO
+        CALL upper%finalize
+        CALL lower%finalize
+        CALL isolated%finalize
+        CALL paired%finalize
+        B_vertex=saved_b
+        CALL refresh_topography_geometry
+        WRITE(*,*) 'PASS: dry L2 preserves L1 dam-break front and complete spatial residual'
+    END SUBROUTINE check_dry_upper_dambreak_reduction
+
     SUBROUTINE check_total_depth_cfl_equivalence
         REAL(wp) :: total(n_vars),lower(n_vars),upper(n_vars),dry(n_vars)
         REAL(wp) :: alo,ahi,reflo,refhi
