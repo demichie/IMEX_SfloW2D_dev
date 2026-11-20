@@ -7786,8 +7786,9 @@
     SUBROUTINE init_netcdf_output
         USE netcdf
         USE parameters_2d, ONLY : n_vars
-        USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,x_comp,y_comp
+        USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,x_comp,y_comp,dx,dy
         IMPLICIT NONE
+        REAL(wp) :: visible_x(MAX(2,comp_cells_x)),visible_y(MAX(2,comp_cells_y))
         INTEGER :: time_dim_len,expected_time_index
         INTEGER :: layer,i,component
         CHARACTER(LEN=24) :: suffix,number
@@ -7808,8 +7809,8 @@
             CALL check(nf90_inq_dimid(ncid,'x',dimids(1)))
             CALL check(nf90_inq_dimid(ncid,'y',dimids(2)))
             CALL check(nf90_inq_dimid(ncid,'time',dimids(3)))
-            CALL verify_netcdf_dimension(dimids(1),comp_cells_x)
-            CALL verify_netcdf_dimension(dimids(2),comp_cells_y)
+            CALL verify_netcdf_dimension(dimids(1),MAX(2,comp_cells_x))
+            CALL verify_netcdf_dimension(dimids(2),MAX(2,comp_cells_y))
             CALL check(nf90_inquire_dimension(ncid,dimids(3),len=time_dim_len))
             IF (output_idx<0 .OR. output_idx==HUGE(output_idx)) &
                 CALL fatal_error('Invalid NetCDF continuation index')
@@ -7870,8 +7871,8 @@
         END IF
 
         CALL check(nf90_create(nc_filename,nf90_clobber+nf90_netcdf4,ncid))
-        CALL check(nf90_def_dim(ncid,'x',comp_cells_x,dimids(1)))
-        CALL check(nf90_def_dim(ncid,'y',comp_cells_y,dimids(2)))
+        CALL check(nf90_def_dim(ncid,'x',MAX(2,comp_cells_x),dimids(1)))
+        CALL check(nf90_def_dim(ncid,'y',MAX(2,comp_cells_y),dimids(2)))
         CALL check(nf90_def_dim(ncid,'time',NF90_UNLIMITED,dimids(3)))
         CALL check(nf90_def_var(ncid,'x',nf90_double,[dimids(1)],x_varid))
         CALL check(nf90_def_var(ncid,'y',nf90_double,[dimids(2)],y_varid))
@@ -7934,8 +7935,17 @@
                 shared_class_varid(3,component))
         END DO
         CALL check(nf90_enddef(ncid))
-        CALL check(nf90_put_var(ncid,x_varid,x_comp))
-        CALL check(nf90_put_var(ncid,y_varid,y_comp))
+        ! A degenerate computational axis is expanded only in visualization.
+        ! Match the v2 converter: the extra coordinate is offset by 4% of
+        ! the other axis extent. The single-cell 1x1 case uses cell spacing.
+        visible_x(1:comp_cells_x)=x_comp
+        visible_y(1:comp_cells_y)=y_comp
+        IF (comp_cells_x==1) &
+            visible_x(2)=visible_x(1)+0.04_wp*MAX(ABS(y_comp(comp_cells_y)-y_comp(1)),dx)
+        IF (comp_cells_y==1) &
+            visible_y(2)=visible_y(1)+0.04_wp*MAX(ABS(x_comp(comp_cells_x)-x_comp(1)),dy)
+        CALL check(nf90_put_var(ncid,x_varid,visible_x))
+        CALL check(nf90_put_var(ncid,y_varid,visible_y))
         nc_time_idx=1
     END SUBROUTINE init_netcdf_output
 
@@ -8018,96 +8028,105 @@
         REAL(wp), INTENT(IN) :: time_in
         CLASS(state_type), INTENT(IN) :: state
         REAL(wp), ALLOCATABLE :: field(:,:)
-        INTEGER :: three_start(3),three_count(3),layer,i
+        INTEGER :: layer,i
 
         IF (SIZE(state%q,2)/=n_layers .OR. SIZE(state%qp,2)/=n_layers) &
             CALL fatal_error('NetCDF state layer extent does not match the model')
         IF (SIZE(state%q,1)/=n_vars .OR. SIZE(state%qp,1)/=n_vars) &
             CALL fatal_error('NetCDF component extent does not match the model')
-        three_start=[1,1,nc_time_idx]
-        three_count=[comp_cells_x,comp_cells_y,1]
         CALL check(nf90_put_var(ncid,t_varid,[time_in],start=[nc_time_idx],count=[1]))
 
         ALLOCATE(field(comp_cells_x,comp_cells_y))
         DO layer=1,n_layers
             field=state%qp(idx_h,layer,:,:)
-            CALL check(nf90_put_var(ncid,layer_field_varid(1,layer),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(layer_field_varid(1,layer),field)
             field=state%qp(idx_u,layer,:,:)
-            CALL check(nf90_put_var(ncid,layer_field_varid(2,layer),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(layer_field_varid(2,layer),field)
             field=state%qp(idx_v,layer,:,:)
-            CALL check(nf90_put_var(ncid,layer_field_varid(3,layer),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(layer_field_varid(3,layer),field)
             field=state%qp(idx_T,layer,:,:)
-            CALL check(nf90_put_var(ncid,layer_field_varid(4,layer),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(layer_field_varid(4,layer),field)
             field=state%q(idx_totMassEqn,layer,:,:)
-            CALL check(nf90_put_var(ncid,layer_field_varid(5,layer),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(layer_field_varid(5,layer),field)
             field=0.0_wp
             WHERE (state%qp(idx_h,layer,:,:)>0.0_wp)
                 field=state%q(idx_totMassEqn,layer,:,:)/state%qp(idx_h,layer,:,:)
             END WHERE
-            CALL check(nf90_put_var(ncid,layer_field_varid(6,layer),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(layer_field_varid(6,layer),field)
             IF (n_solid>0) THEN
                 field=SUM(state%qp(idx_solid_first:idx_solid_last,layer,:,:),DIM=1)
-                CALL check(nf90_put_var(ncid,layer_field_varid(7,layer),field, &
-                    start=three_start,count=three_count))
+                CALL write_netcdf_visual_field(layer_field_varid(7,layer),field)
                 IF (n_solid>1) THEN
                     DO i=1,n_solid
                         field=state%qp(idx_solid_first+i-1,layer,:,:)
-                        CALL check(nf90_put_var(ncid,solid_class_varid(i,layer),field, &
-                            start=three_start,count=three_count))
+                        CALL write_netcdf_visual_field(solid_class_varid(i,layer),field)
                     END DO
                 END IF
             END IF
             IF (idx_pore>0) THEN
                 field=state%qp(idx_pore,layer,:,:)
-                CALL check(nf90_put_var(ncid,layer_field_varid(8,layer),field, &
-                    start=three_start,count=three_count))
+                CALL write_netcdf_visual_field(layer_field_varid(8,layer),field)
             END IF
             IF (idx_stoch>0) THEN
                 field=state%qp(idx_stoch,layer,:,:)
-                CALL check(nf90_put_var(ncid,layer_field_varid(9,layer),field, &
-                    start=three_start,count=three_count))
+                CALL write_netcdf_visual_field(layer_field_varid(9,layer),field)
             END IF
             DO i=1,n_add_gas
                 field=state%qp(idx_add_gas_first+i-1,layer,:,:)
-                CALL check(nf90_put_var(ncid,gas_class_varid(i,layer),field, &
-                    start=three_start,count=three_count))
+                CALL write_netcdf_visual_field(gas_class_varid(i,layer),field)
             END DO
         END DO
-        CALL check(nf90_put_var(ncid,b_varid,B_cent,start=three_start,count=three_count))
+        CALL write_netcdf_visual_field(b_varid,B_cent)
         field=SUM(state%qp(idx_h,:,:,:),DIM=1)
-        CALL check(nf90_put_var(ncid,total_depth_varid,field,start=three_start,count=three_count))
+        CALL write_netcdf_visual_field(total_depth_varid,field)
         field=B_cent+field
-        CALL check(nf90_put_var(ncid,eta_top_varid,field,start=three_start,count=three_count))
+        CALL write_netcdf_visual_field(eta_top_varid,field)
         field=SUM(state%q(idx_totMassEqn,:,:,:),DIM=1)
-        CALL check(nf90_put_var(ncid,total_mass_varid,field,start=three_start,count=three_count))
-        CALL check(nf90_put_var(ncid,deposit_tot_varid,state%deposit_tot, &
-            start=three_start,count=three_count))
-        CALL check(nf90_put_var(ncid,hMax_varid,state%hmax,start=three_start,count=three_count))
-        CALL check(nf90_put_var(ncid,pDynMax_varid,state%pdynmax,start=three_start,count=three_count))
-        CALL check(nf90_put_var(ncid,modVelMax_varid,state%mod_vel_max, &
-            start=three_start,count=three_count))
+        CALL write_netcdf_visual_field(total_mass_varid,field)
+        CALL write_netcdf_visual_field(deposit_tot_varid,state%deposit_tot)
+        CALL write_netcdf_visual_field(hMax_varid,state%hmax)
+        CALL write_netcdf_visual_field(pDynMax_varid,state%pdynmax)
+        CALL write_netcdf_visual_field(modVelMax_varid,state%mod_vel_max)
         DO i=1,n_solid
             field=state%deposit(:,:,i)
-            CALL check(nf90_put_var(ncid,shared_class_varid(1,i),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(shared_class_varid(1,i),field)
             field=state%erosion(:,:,i)
-            CALL check(nf90_put_var(ncid,shared_class_varid(2,i),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(shared_class_varid(2,i),field)
             field=state%erodible(i,:,:)
-            CALL check(nf90_put_var(ncid,shared_class_varid(3,i),field, &
-                start=three_start,count=three_count))
+            CALL write_netcdf_visual_field(shared_class_varid(3,i),field)
         END DO
         DEALLOCATE(field)
 
         nc_time_idx=nc_time_idx+1
         CALL check(nf90_sync(ncid))
     END SUBROUTINE write_netcdf_timestep
+
+    !> @brief Write a physical cell field with duplicated visualization rows/columns
+    !>        when a computational dimension contains only one cell.
+    !> @details The authoritative state arrays retain their original dimensions.
+    SUBROUTINE write_netcdf_visual_field(varid,values)
+        USE netcdf
+        USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
+        INTEGER, INTENT(IN) :: varid
+        REAL(wp), INTENT(IN) :: values(:,:)
+        REAL(wp), ALLOCATABLE :: visible(:,:)
+        INTEGER :: nx_visible,ny_visible
+
+        IF (SIZE(values,1)/=comp_cells_x .OR. SIZE(values,2)/=comp_cells_y) &
+            CALL fatal_error('NetCDF field does not match computational cell dimensions')
+        nx_visible=MAX(2,comp_cells_x)
+        ny_visible=MAX(2,comp_cells_y)
+        IF (nx_visible==comp_cells_x .AND. ny_visible==comp_cells_y) THEN
+            CALL check(nf90_put_var(ncid,varid,values,start=[1,1,nc_time_idx],count=[nx_visible,ny_visible,1]))
+            RETURN
+        END IF
+
+        ALLOCATE(visible(nx_visible,ny_visible))
+        visible(1:comp_cells_x,1:comp_cells_y)=values
+        IF (comp_cells_x==1) visible(2,1:comp_cells_y)=visible(1,1:comp_cells_y)
+        IF (comp_cells_y==1) visible(:,2)=visible(:,1)
+        CALL check(nf90_put_var(ncid,varid,visible,start=[1,1,nc_time_idx],count=[nx_visible,ny_visible,1]))
+    END SUBROUTINE write_netcdf_visual_field
 
 
     !******************************************************************************

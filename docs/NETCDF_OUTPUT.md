@@ -47,3 +47,15 @@ The structural two-layer `TEST_SPATIAL_OPERATOR` test checks scalar fields
 in both layers, absent obsolete tensors, solid inventories and appended time
 records. Run the relevant actions and a single-layer dam-break example to
 verify the full output chain in the current environment.
+
+## Degenerate spatial axes (1D simulations)
+
+When `COMP_CELLS_X=1` or `COMP_CELLS_Y=1`, native NetCDF visualization
+uses two samples on that axis. Every physical field is duplicated along the
+missing dimension, without changing the computational cells, state, budgets,
+or binary restart. The second visualization coordinate is offset by 4% of
+the physical span along the other axis, matching the v2 Python converter;
+a 1-by-1 computational grid uses its cell spacing as a fallback. NetCDF
+history continuation validates the *visualization* dimensions, not the
+computational dimensions. Regenerate files created with the previous
+single-sample NetCDF schema before appending.
