@@ -42,7 +42,9 @@ def set_input(root, end_time, output_interval, restart_binary=False):
     if restart_binary:
         text = change_parameter(text, "N_RESTART_FILES", "1")
         original = re.compile(r"(?im)^[ \t]*RESTART_FILES[ \t]*=.*$")
-        checkpoint = f"'OUTPUT/{RUN}/restart/restart.bin',"
+        # The canonical in-place restart token must be resolved by the solver.
+        # An explicit path denotes an external restart and cannot reuse OUTPUT.
+        checkpoint = "'restart.bin',"
         text, count = original.subn(" RESTART_FILES=" + checkpoint, text)
         if count != 1:
             raise ValueError("Expected exactly one RESTART_FILES assignment")

@@ -257,3 +257,17 @@ nonzero physical source. A separate unchanged-physics Etna trajectory to
 reports time/L2-mass budgets on failure. This is a pending diagnostic,
 not evidence that positive mass has already been observed. No source
 law, coefficient or canonical example input is changed.
+
+## TL13a — binary in-place restart test input (20 November 2026)
+
+The extended Etna validation failed at the second invocation with
+`run output directory already exists`. The Python fixture supplied the
+explicit path `OUTPUT/exampleEtna_two_layer/restart/restart.bin`, which is
+correctly treated as an external binary restart by the production parser.
+In-place continuation instead requires the canonical token
+`RESTART_FILES='restart.bin'`; the solver resolves this token inside the
+existing output directory and applies its normal output manifest and
+snapshot-index safety checks. The fixture and its solver-independent
+regression now exercise that contract. No `OUTPUT_OVERWRITE` escape hatch
+was added and the output-path implementation was left unchanged.
+The end-to-end continuation is not verified on this revision yet.
