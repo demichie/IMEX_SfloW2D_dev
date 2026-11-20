@@ -150,8 +150,8 @@
     PRIVATE :: make_runout_headers
     PRIVATE :: finite_input_value
 
-    INTEGER :: n_restart_files
-    CHARACTER(LEN=2048), dimension(10) :: restart_files
+    INTEGER :: n_restart_files, n_restart_files_l2
+    CHARACTER(LEN=2048), dimension(10) :: restart_files, restart_files_l2
 
     CHARACTER(LEN=40) :: run_name           !< Name of the run
     CHARACTER(LEN=1024) :: output_base_directory
@@ -297,7 +297,7 @@
     REAL(wp) :: thickness_levels0(10)
     REAL(wp) :: dyn_pres_levels0(10)
 
-    REAL(wp) :: release_time(10)
+    REAL(wp) :: release_time(10), release_time_l2(10)
 
     ! NetCDF exposes named, three-dimensional physical fields.
     ! The authoritative q/qp arrays remain solely in the simulation state.
@@ -323,6 +323,8 @@
         interactive_debug_flag
 
     NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time
+    NAMELIST /restart_l1_parameters/ n_restart_files, restart_files, release_time
+    NAMELIST /restart_l2_parameters/ n_restart_files_l2, restart_files_l2, release_time_l2
     NAMELIST /initial_parameters/ T_init, u_init, v_init, sed_vol_perc
     NAMELIST /initial_l1_parameters/ T_init, u_init, v_init, sed_vol_perc
     NAMELIST /initial_l2_parameters/ T_init_l2, u_init_l2, v_init_l2, sed_vol_perc_l2
@@ -707,6 +709,9 @@
         restart_files(:) = ''
         restart_file = ''
         release_time(:) = 0.0_wp
+        n_restart_files_l2 = 1
+        restart_files_l2(:) = ''
+        release_time_l2(:) = 0.0_wp
         T_init = 0.0_wp
         u_init = 0.0_wp
         v_init = 0.0_wp
@@ -1201,7 +1206,8 @@
         INTEGER :: n_thermal_legacy, n_thermal_l1, n_thermal_l2
         INTEGER :: n_pore_legacy, n_pore_l1, n_pore_l2
         INTEGER :: n_initial_base, n_initial_l1, n_initial_l2
-        CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line, initial_line
+        INTEGER :: n_restart_base, n_restart_l1, n_restart_l2, n_active_files
+        CHARACTER(LEN=2048) :: rheology_line, thermal_line, pore_line, initial_line, restart_line
         CHARACTER(LEN=256) :: source_input_error
         LOGICAL :: boundary_stochastic_enabled, boundary_pore_enabled
 
@@ -2271,112 +2277,142 @@
 
         IF (restart) THEN
 
-            ! ---------- READ restart_parameters NAMELIST ----------------------------
-            READ (input_unit, restart_parameters, IOSTAT=ios)
-
-            IF (ios .NE. 0) THEN
-
-                WRITE (*, *) 'IOSTAT=', ios
-                WRITE (*, *) 'ERROR: problem with namelist RESTART_PARAMETERS'
-                WRITE (*, *) 'Please check the input file'
-                STOP
-
+            ! Select exactly one L1 spelling, as for the other layer NAMELIST groups.
+            n_restart_base=0
+            n_restart_l1=0
+            n_restart_l2=0
+            REWIND(input_unit)
+            DO
+                READ(input_unit,'(A)',IOSTAT=ios) restart_line
+                IF (ios<0) EXIT
+                IF (ios/=0) CALL fatal_error('Unable to scan restart NAMELIST groups')
+                restart_line=uppercase_source_text(ADJUSTL(restart_line))
+                IF (INDEX(restart_line,'&RESTART_PARAMETERS')==1) n_restart_base=n_restart_base+1
+                IF (INDEX(restart_line,'&RESTART_L1_PARAMETERS')==1) n_restart_l1=n_restart_l1+1
+                IF (INDEX(restart_line,'&RESTART_L2_PARAMETERS')==1) n_restart_l2=n_restart_l2+1
+            END DO
+            REWIND(input_unit)
+            IF (n_restart_base+n_restart_l1/=1) &
+                CALL fatal_error('Provide exactly one RESTART_PARAMETERS or RESTART_L1_PARAMETERS')
+            IF (n_layers==1 .AND. n_restart_l2/=0) &
+                CALL fatal_error('RESTART_L2_PARAMETERS requires N_LAYERS=2')
+            IF (n_restart_base==1) THEN
+                READ(input_unit,NML=restart_parameters,IOSTAT=ios)
             ELSE
+                READ(input_unit,NML=restart_l1_parameters,IOSTAT=ios)
+            END IF
+            IF (ios/=0) CALL fatal_error('Invalid L1 restart NAMELIST')
+            REWIND(input_unit)
 
-                IF (n_restart_files .LE. 0) THEN
+            IF (n_restart_files<1 .OR. n_restart_files>SIZE(restart_files)) &
+                CALL fatal_error('Invalid L1 N_RESTART_FILES')
+            DO i_file=1,n_restart_files
+                IF (TRIM(restart_files(i_file))=='') CALL fatal_error('Missing L1 RESTART_FILES entry')
+            END DO
+            IF (ANY(restart_files(n_restart_files+1:)/='')) &
+                CALL fatal_error('L1 RESTART_FILES exceeds N_RESTART_FILES')
+            IF (n_restart_files>1 .AND. ANY(restart_files(1:n_restart_files)=='NONE')) &
+                CALL fatal_error('NONE must be the sole file in a layer restart group')
 
-                    WRITE (*, *) 'n_restart_files must be >= 1'
-                    WRITE (*, *) 'n_restart_files', n_restart_files
-                    WRITE (*, *) 'ERROR: problem with namelist RESTART_PARAMETERS'
-                    WRITE (*, *) 'Please check the input file'
-                    STOP
+            restart_file=restart_files(1)
+            IF (TRIM(restart_file)=='NONE') THEN
+                check_file='asc'
+            ELSE
+                dot_idx=SCAN(TRIM(restart_file),'.',.TRUE.)
+                IF (dot_idx==0) CALL fatal_error('Missing L1 restart filename extension')
+                check_file=restart_file(dot_idx+1:dot_idx+3)
+            END IF
 
-                ELSE
-
-                    DO i_file = 1, n_restart_files
-
-                        IF (TRIM(restart_files(i_file)) .EQ. '') THEN
-
-                            WRITE (*, *) 'ERROR: problem with namelist RESTART_PARAMETERS'
-                            WRITE (*, *) 'n_restart_files', n_restart_files
-                            WRITE (*, *) 'restart_files ', restart_files
-                            WRITE (*, *) 'Please check the input file'
-                            STOP
-
-                        END IF
-
-                    END DO
-
-                    DO i_file = n_restart_files + 1, 10
-
-                        IF (TRIM(restart_files(i_file)) .NE. '') THEN
-
-                            WRITE (*, *) 'WARNING: problem with namelist RESTART_PARAMETERS'
-                            WRITE (*, *) 'n_restart_files', n_restart_files
-                            WRITE (*, *) 'restart_files', restart_files
-                            WRITE (*, *) 'Please check the input file'
-
-                        END IF
-
-                    END DO
-
-                    restart_file = restart_files(1)
-
-                END IF
-
-                IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') restart_file=restart_files(2)
-                IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') THEN
-                    check_file='asc'
-                ELSE
-                    dot_idx=SCAN(restart_file,'.',.TRUE.)
-                    IF (dot_idx==0 .OR. dot_idx+3>LEN_TRIM(restart_file)) &
-                        CALL fatal_error('Invalid initial state filename extension')
-                    check_file=restart_file(dot_idx+1:dot_idx+3)
-                END IF
-                IF (check_file=='asc') THEN
-                    ! Choose one name for the same authoritative L1 primitive values.
-                    n_initial_base=0
-                    n_initial_l1=0
-                    n_initial_l2=0
-                    REWIND(input_unit)
-                    DO
-                        READ(input_unit,'(A)',IOSTAT=ios) initial_line
-                        IF (ios<0) EXIT
-                        IF (ios/=0) CALL fatal_error('Unable to scan initial NAMELIST groups')
-                        initial_line=uppercase_source_text(ADJUSTL(initial_line))
-                        IF (INDEX(initial_line,'&INITIAL_PARAMETERS')==1) n_initial_base=n_initial_base+1
-                        IF (INDEX(initial_line,'&INITIAL_L1_PARAMETERS')==1) n_initial_l1=n_initial_l1+1
-                        IF (INDEX(initial_line,'&INITIAL_L2_PARAMETERS')==1) n_initial_l2=n_initial_l2+1
-                    END DO
-                    REWIND(input_unit)
-                    IF (n_initial_base+n_initial_l1/=1) &
-                        CALL fatal_error('Provide exactly one INITIAL_PARAMETERS or INITIAL_L1_PARAMETERS')
-                    IF (n_layers==1 .AND. n_initial_l2/=0) &
-                        CALL fatal_error('INITIAL_L2_PARAMETERS requires N_LAYERS=2')
-                    IF (n_layers==2 .AND. (n_initial_base/=0 .OR. n_initial_l1/=1 .OR. n_initial_l2/=1)) &
-                        CALL fatal_error('N_LAYERS=2 requires INITIAL_L1_PARAMETERS and INITIAL_L2_PARAMETERS')
-                    IF (n_initial_base==1) THEN
-                        READ(input_unit,NML=initial_parameters,IOSTAT=ios)
+            IF (n_layers==2 .AND. check_file/='bin') THEN
+                IF (n_restart_base/=0) &
+                    CALL fatal_error('N_LAYERS=2 requires RESTART_L1_PARAMETERS for text initialization')
+                IF (n_restart_l2/=1) &
+                    CALL fatal_error('N_LAYERS=2 requires RESTART_L2_PARAMETERS for text initialization')
+                READ(input_unit,NML=restart_l2_parameters,IOSTAT=ios)
+                IF (ios/=0) CALL fatal_error('Invalid RESTART_L2_PARAMETERS')
+                REWIND(input_unit)
+                IF (n_restart_files_l2<1 .OR. n_restart_files_l2>SIZE(restart_files_l2)) &
+                    CALL fatal_error('Invalid L2 N_RESTART_FILES_L2')
+                DO i_file=1,n_restart_files_l2
+                    IF (TRIM(restart_files_l2(i_file))=='') CALL fatal_error('Missing L2 RESTART_FILES_L2 entry')
+                END DO
+                IF (ANY(restart_files_l2(n_restart_files_l2+1:)/='')) &
+                    CALL fatal_error('L2 RESTART_FILES_L2 exceeds N_RESTART_FILES_L2')
+                IF (n_restart_files_l2>1 .AND. ANY(restart_files_l2(1:n_restart_files_l2)=='NONE')) &
+                    CALL fatal_error('NONE must be the sole file in a layer restart group')
+                IF (TRIM(restart_file)=='NONE') THEN
+                    restart_file=restart_files_l2(1)
+                    IF (TRIM(restart_file)=='NONE') THEN
+                        check_file='asc'
                     ELSE
-                        READ(input_unit,NML=initial_l1_parameters,IOSTAT=ios)
+                        dot_idx=SCAN(TRIM(restart_file),'.',.TRUE.)
+                        IF (dot_idx==0) CALL fatal_error('Missing L2 restart filename extension')
+                        check_file=restart_file(dot_idx+1:dot_idx+3)
                     END IF
-                    IF (ios/=0) CALL fatal_error('Invalid initial L1 NAMELIST')
-                    REWIND(input_unit)
                 END IF
-                IF (n_layers==2 .AND. check_file=='asc') THEN
-                    IF (n_restart_files/=2) &
-                        CALL fatal_error('Two-layer primitive initialization requires two RESTART_FILES entries')
-                    DO i_file=1,2
-                        IF (TRIM(restart_files(i_file))=='NONE') CYCLE
-                        dot_idx=SCAN(TRIM(restart_files(i_file)),'.',.TRUE.)
-                        IF (dot_idx==0) CALL fatal_error('Missing two-layer primitive raster extension')
-                        IF (TRIM(restart_files(i_file)(dot_idx+1:))/='asc') &
-                            CALL fatal_error('Two-layer primitive input requires .asc or NONE for each layer')
+            ELSEIF (n_restart_l2/=0) THEN
+                CALL fatal_error('RESTART_L2_PARAMETERS is not used for binary checkpoint initialization')
+            END IF
+
+            IF (check_file=='asc') THEN
+                ! Each input group describes a list of releases belonging to one layer.
+                DO layer=1,n_layers
+                    n_active_files=n_restart_files
+                    IF (layer==2) n_active_files=n_restart_files_l2
+                    DO i_file=1,n_active_files
+                        IF (layer==1) THEN
+                            restart_file=restart_files(i_file)
+                        ELSE
+                            restart_file=restart_files_l2(i_file)
+                        END IF
+                        IF (TRIM(restart_file)=='NONE') CYCLE
+                        dot_idx=SCAN(TRIM(restart_file),'.',.TRUE.)
+                        IF (dot_idx==0) CALL fatal_error('Missing primitive raster extension')
+                        IF (TRIM(restart_file(dot_idx+1:))/='asc') &
+                            CALL fatal_error('Mixed primitive and conservative restart files')
                     END DO
+                END DO
+                IF (n_layers==2) THEN
+                    ! A shared coupled state cannot yet defer each layer independently.
+                    IF (ANY(release_time(1:n_restart_files)/=0.0_wp) .OR. &
+                        ANY(release_time_l2(1:n_restart_files_l2)/=0.0_wp)) &
+                        CALL fatal_error('Two-layer delayed release needs layer-local activation; not implemented')
+                END IF
+
+                ! Choose one name for the same authoritative L1 primitive values.
+                n_initial_base=0
+                n_initial_l1=0
+                n_initial_l2=0
+                REWIND(input_unit)
+                DO
+                    READ(input_unit,'(A)',IOSTAT=ios) initial_line
+                    IF (ios<0) EXIT
+                    IF (ios/=0) CALL fatal_error('Unable to scan initial NAMELIST groups')
+                    initial_line=uppercase_source_text(ADJUSTL(initial_line))
+                    IF (INDEX(initial_line,'&INITIAL_PARAMETERS')==1) n_initial_base=n_initial_base+1
+                    IF (INDEX(initial_line,'&INITIAL_L1_PARAMETERS')==1) n_initial_l1=n_initial_l1+1
+                    IF (INDEX(initial_line,'&INITIAL_L2_PARAMETERS')==1) n_initial_l2=n_initial_l2+1
+                END DO
+                REWIND(input_unit)
+                IF (n_initial_base+n_initial_l1/=1) &
+                    CALL fatal_error('Provide exactly one INITIAL_PARAMETERS or INITIAL_L1_PARAMETERS')
+                IF (n_layers==1 .AND. n_initial_l2/=0) &
+                    CALL fatal_error('INITIAL_L2_PARAMETERS requires N_LAYERS=2')
+                IF (n_layers==2 .AND. (n_initial_base/=0 .OR. n_initial_l1/=1 .OR. n_initial_l2/=1)) &
+                    CALL fatal_error('N_LAYERS=2 requires INITIAL_L1_PARAMETERS and INITIAL_L2_PARAMETERS')
+                IF (n_initial_base==1) THEN
+                    READ(input_unit,NML=initial_parameters,IOSTAT=ios)
+                ELSE
+                    READ(input_unit,NML=initial_l1_parameters,IOSTAT=ios)
+                END IF
+                IF (ios/=0) CALL fatal_error('Invalid initial L1 NAMELIST')
+                REWIND(input_unit)
+
+                IF (n_layers==2) THEN
                     READ(input_unit,NML=initial_l2_parameters,IOSTAT=ios)
                     IF (ios/=0) CALL fatal_error('Missing or invalid INITIAL_L2_PARAMETERS')
                     REWIND(input_unit)
-                    IF (TRIM(restart_files(1))/='NONE') THEN
+                    IF (ANY(restart_files(1:n_restart_files)/='NONE')) THEN
                         IF (ANY(sed_vol_perc<0.0_wp) .OR. ANY(sed_vol_perc>100.0_wp) .OR. &
                             SUM(sed_vol_perc)>100.0_wp .OR. T_init<=0.0_wp) &
                             CALL fatal_error('Invalid L1 initial temperature or solid percentages')
@@ -2384,12 +2420,13 @@
                     ELSE
                         alphas_init(1:n_solid)=0.0_wp
                     END IF
-                    IF (TRIM(restart_files(2))/='NONE') THEN
+                    IF (ANY(restart_files_l2(1:n_restart_files_l2)/='NONE')) THEN
                         IF (ANY(sed_vol_perc_l2<0.0_wp) .OR. ANY(sed_vol_perc_l2>100.0_wp) .OR. &
                             SUM(sed_vol_perc_l2)>100.0_wp .OR. T_init_l2<=0.0_wp) &
                             CALL fatal_error('Invalid L2 initial temperature or solid percentages')
                     END IF
-                ELSEIF (check_file .EQ. 'asc') THEN
+                ELSE
+
                     IF ((ANY(sed_vol_perc(1:n_solid) .LT. 0.0_wp)) .OR.                                                &
                         (ANY(sed_vol_perc(1:n_solid) .GT. 100.0_wp)) .OR.                                              &
                         (SUM(sed_vol_perc(1:n_solid)) .GT. 100.0_wp)) THEN
@@ -2431,9 +2468,26 @@
                     END IF
 
                 END IF
-
+            ELSEIF (check_file=='q_2') THEN
+                IF (n_layers==2) THEN
+                    IF (release_time(1)/=0.0_wp .OR. release_time_l2(1)/=0.0_wp) &
+                        CALL fatal_error('Conservative L1/L2 snapshots cannot have delayed release times')
+                END IF
+                IF (n_restart_files/=1 .OR. (n_layers==2 .AND. n_restart_files_l2/=1)) &
+                    CALL fatal_error('Conservative text initialization requires one snapshot per layer')
+                IF (INDEX(TRIM(restart_files(1)),'.q_2d')==0) &
+                    CALL fatal_error('L1 conservative initialization requires a .q_2d file')
+                IF (n_layers==2) THEN
+                    IF (INDEX(TRIM(restart_files_l2(1)),'.q_2d')==0) &
+                        CALL fatal_error('L2 conservative initialization requires a .q_2d file')
+                END IF
+            ELSEIF (check_file=='bin') THEN
+                IF (n_restart_files/=1) CALL fatal_error('Binary checkpoint requires one file')
+            ELSE
+                CALL fatal_error('Unsupported restart input type')
             END IF
-
+            restart_file=restart_files(1)
+            IF (TRIM(restart_file)=='NONE') restart_file=restart_files_l2(1)
         END IF
 
         ! ------- READ numeric_parameters NAMELIST ----------------------------------
@@ -5494,7 +5548,8 @@
 
         INTEGER :: i_vars, i_solid
 
-        INTEGER :: i_file, layer, layer_output_idx
+        INTEGER :: i_file, layer, layer_output_idx, n_layer_files
+        REAL(wp) :: current_release_time
 
         ! The input layout is fixed before populating the conservative and primitive state.
         CALL configure_canonical_state_indices()
@@ -5510,18 +5565,13 @@
 
         thickness_init(:, :) = 0.0_wp
 
-        restart_file = restart_files(1)
-        IF (n_layers==2) THEN
-            IF (n_restart_files/=2) &
-                CALL fatal_error('Two-layer text initialization needs exactly two RESTART_FILES entries')
-            IF (TRIM(restart_file)=='NONE') restart_file=restart_files(2)
-        END IF
-        IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') THEN
+        restart_file=restart_files(1)
+        IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') restart_file=restart_files_l2(1)
+        IF (TRIM(restart_file)=='NONE') THEN
             check_file='asc'
         ELSE
-            dot_idx=SCAN(restart_file,'.',.TRUE.)
-            IF (dot_idx==0 .OR. dot_idx+3>LEN_TRIM(restart_file)) &
-                CALL fatal_error('Invalid initial state filename extension')
+            dot_idx=SCAN(TRIM(restart_file),'.',.TRUE.)
+            IF (dot_idx==0) CALL fatal_error('Invalid initial state filename extension')
             check_file=restart_file(dot_idx+1:dot_idx+3)
         END IF
         primitive_mode=check_file=='asc'
@@ -5568,168 +5618,170 @@
 
         END IF
 
-        WRITE (*, *) 'n_restart_files', n_restart_files
+        DO layer=1,n_layers
+            n_layer_files=n_restart_files
+            IF (layer==2) n_layer_files=n_restart_files_l2
 
-        DO i_file = 1, n_restart_files
-
-            restart_file = restart_files(i_file)
-            IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') CYCLE
-            IF (n_layers==2 .AND. primitive_mode) THEN
-                dot_idx=SCAN(restart_file,'.',.TRUE.)
-                IF (dot_idx==0) CALL fatal_error('Missing primitive raster extension')
-                IF (TRIM(restart_file(dot_idx+1:))/='asc') &
-                    CALL fatal_error('Each two-layer primitive file must be .asc or NONE')
-            END IF
-
-            INQUIRE (FILE=restart_file, exist=lexist)
-
-            WRITE (*, *)
-
-            IF (lexist .EQV. .FALSE.) THEN
-
-                WRITE (*, *) 'Restart: ', TRIM(restart_file), ' not found'
-                STOP
-
-            ELSE
-
-                OPEN (restart_unit, FILE=restart_file, STATUS='old')
-
-                IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Restart: ', TRIM(restart_file),                                &
-                    ' found'
-
-                WRITE (*, *) 'Release time: ', release_time(i_file)
-
-            END IF
-
-            dot_idx = SCAN(restart_file, ".", .TRUE.)
-
-            check_file = restart_file(dot_idx + 1:dot_idx + 3)
-
-            IF (check_file .EQ. 'asc') THEN
-
-                READ (restart_unit, *) chara, ncols
-                READ (restart_unit, *) chara, nrows
-                READ (restart_unit, *) chara, xllcorner
-                READ (restart_unit, *) chara, yllcorner
-                READ (restart_unit, *) chara, cellsize
-                READ (restart_unit, *) chara, nodata_value
-
-                ALLOCATE (thickness_input(ncols, nrows))
-
-                IF ((xllcorner - x0) .GT. 1.E-5_wp*cellsize) THEN
-
-                    WRITE (*, *)
-                    WRITE (*, *) 'WARNING: initial solution and domain extent'
-                    WRITE (*, *) 'xllcorner greater than x0', xllcorner, x0
-
+            DO i_file=1,n_layer_files
+                IF (layer==1) THEN
+                    restart_file=restart_files(i_file)
+                    current_release_time=release_time(i_file)
+                ELSE
+                    restart_file=restart_files_l2(i_file)
+                    current_release_time=release_time_l2(i_file)
                 END IF
+                IF (TRIM(restart_file)=='NONE') CYCLE
 
-                IF ((yllcorner - y0) .GT. 1.E-5_wp*cellsize) THEN
-
-                    WRITE (*, *)
-                    WRITE (*, *) 'WARNING: initial solution and domain extent'
-                    WRITE (*, *) 'yllcorner greater then y0', yllcorner, y0
-
-                END IF
-
-                IF (x0 + cell_size*(comp_cells_x + 1) - (xllcorner + cellsize*(ncols + 1))                             &
-                    .GT. 1.E-5_wp*cellsize) THEN
-
-                    WRITE (*, *)
-                    WRITE (*, *) 'WARNING: initial solution and domain extent'
-                    WRITE (*, *) 'xrrcorner greater than ', xllcorner, x0
-
-                END IF
-
-                IF (x0 + cell_size*(comp_cells_x + 1) - (xllcorner + cellsize*(ncols + 1))                             &
-                    .GT. 1.E-5_wp*cellsize) THEN
-
-                    WRITE (*, *)
-                    WRITE (*, *) 'WARNING: initial solution and domain extent'
-                    WRITE (*, *) 'yllcorner greater then y0', yllcorner, y0
-
-                END IF
-
-                IF (cellsize .NE. cell_size) THEN
-
-                    WRITE (*, *)
-                    WRITE (*, *) 'WARNING: changing resolution of restart'
-                    WRITE (*, *) 'cellsize not equal to cell_size', cellsize, cell_size
-                    WRITE (*, *)
-
-                END IF
-
-                DO k = 1, nrows
-
-                    WRITE (*, FMT="(A1,A,t21,F6.2,A)", ADVANCE="NO") ACHAR(13),                                        &
-                    & " Percent Complete: ", (REAL(k)/REAL(nrows))*100.0, "%"
-
-                    READ (restart_unit, *) thickness_input(1:ncols, nrows - k + 1)
-
-                END DO
+                INQUIRE (FILE=restart_file, exist=lexist)
 
                 WRITE (*, *)
 
-                WHERE (thickness_input .EQ. nodata_value)
+                IF (lexist .EQV. .FALSE.) THEN
 
-                    thickness_input = 0.0_wp
+                    WRITE (*, *) 'Restart: ', TRIM(restart_file), ' not found'
+                    STOP
 
-                END WHERE
+                ELSE
 
-                IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total volume from restart =',                                  &
-                    cellsize**2*SUM(thickness_input)
+                    OPEN (restart_unit, FILE=restart_file, STATUS='old')
 
-                !----- NEW INITIALIZATION OF THICKNESS FROM RESTART
-                ALLOCATE (x1(ncols + 1), y1(nrows + 1))
+                    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Restart: ', TRIM(restart_file), &
+                        ' found'
 
-                DO j = 1, ncols + 1
+                    WRITE (*, *) 'Release time: ', current_release_time
 
-                    x1(j) = xllcorner + (j - 1)*cellsize
+                END IF
 
-                END DO
+                dot_idx = SCAN(restart_file, ".", .TRUE.)
 
-                DO k = 1, nrows + 1
+                check_file = restart_file(dot_idx + 1:dot_idx + 3)
 
-                    y1(k) = yllcorner + (k - 1)*cellsize
+                IF (check_file .EQ. 'asc') THEN
 
-                END DO
+                    READ (restart_unit, *) chara, ncols
+                    READ (restart_unit, *) chara, nrows
+                    READ (restart_unit, *) chara, xllcorner
+                    READ (restart_unit, *) chara, yllcorner
+                    READ (restart_unit, *) chara, cellsize
+                    READ (restart_unit, *) chara, nodata_value
 
-                DO j = 1, comp_cells_x
+                    ALLOCATE (thickness_input(ncols, nrows))
 
-                    xl = x0 + (j - 1)*cell_size
-                    xr = x0 + (j)*cell_size
+                    IF ((xllcorner - x0) .GT. 1.E-5_wp*cellsize) THEN
 
-                    DO k = 1, comp_cells_y
+                        WRITE (*, *)
+                        WRITE (*, *) 'WARNING: initial solution and domain extent'
+                        WRITE (*, *) 'xllcorner greater than x0', xllcorner, x0
 
-                        yl = y0 + (k - 1)*cell_size
-                        yr = y0 + (k)*cell_size
+                    END IF
 
-                        CALL regrid_scalar(x1, y1, thickness_input, xl, xr, yl, yr, thickness_interp)
+                    IF ((yllcorner - y0) .GT. 1.E-5_wp*cellsize) THEN
 
-                        IF (n_layers==2) THEN
-                            thickness_layers(j,k,i_file)=thickness_layers(j,k,i_file)+thickness_interp
-                        ELSE
-                            thickness_init(j,k)=thickness_init(j,k)+thickness_interp
-                        END IF
+                        WRITE (*, *)
+                        WRITE (*, *) 'WARNING: initial solution and domain extent'
+                        WRITE (*, *) 'yllcorner greater then y0', yllcorner, y0
 
-                        IF (thickness_interp .GT. 0.0_wp) THEN
+                    END IF
 
-                            domain%solve_mask_time(j, k) = release_time(i_file)
+                    IF (x0 + cell_size*(comp_cells_x + 1) - (xllcorner + cellsize*(ncols + 1)) &
+                        .GT. 1.E-5_wp*cellsize) THEN
 
-                        END IF
+                        WRITE (*, *)
+                        WRITE (*, *) 'WARNING: initial solution and domain extent'
+                        WRITE (*, *) 'xrrcorner greater than ', xllcorner, x0
+
+                    END IF
+
+                    IF (x0 + cell_size*(comp_cells_x + 1) - (xllcorner + cellsize*(ncols + 1)) &
+                        .GT. 1.E-5_wp*cellsize) THEN
+
+                        WRITE (*, *)
+                        WRITE (*, *) 'WARNING: initial solution and domain extent'
+                        WRITE (*, *) 'yllcorner greater then y0', yllcorner, y0
+
+                    END IF
+
+                    IF (cellsize .NE. cell_size) THEN
+
+                        WRITE (*, *)
+                        WRITE (*, *) 'WARNING: changing resolution of restart'
+                        WRITE (*, *) 'cellsize not equal to cell_size', cellsize, cell_size
+                        WRITE (*, *)
+
+                    END IF
+
+                    DO k = 1, nrows
+
+                        WRITE (*, FMT="(A1,A,t21,F6.2,A)", ADVANCE="NO") ACHAR(13), &
+                        & " Percent Complete: ", (REAL(k)/REAL(nrows))*100.0, "%"
+
+                        READ (restart_unit, *) thickness_input(1:ncols, nrows - k + 1)
 
                     END DO
 
-                END DO
+                    WRITE (*, *)
 
-                DEALLOCATE (thickness_input)
+                    WHERE (thickness_input .EQ. nodata_value)
 
-                DEALLOCATE (x1, y1)
+                        thickness_input = 0.0_wp
 
-            END IF
+                    END WHERE
 
-            CLOSE (restart_unit)
+                    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total volume from restart =', &
+                        cellsize**2*SUM(thickness_input)
 
+                    !----- NEW INITIALIZATION OF THICKNESS FROM RESTART
+                    ALLOCATE (x1(ncols + 1), y1(nrows + 1))
+
+                    DO j = 1, ncols + 1
+
+                        x1(j) = xllcorner + (j - 1)*cellsize
+
+                    END DO
+
+                    DO k = 1, nrows + 1
+
+                        y1(k) = yllcorner + (k - 1)*cellsize
+
+                    END DO
+
+                    DO j = 1, comp_cells_x
+
+                        xl = x0 + (j - 1)*cell_size
+                        xr = x0 + (j)*cell_size
+
+                        DO k = 1, comp_cells_y
+
+                            yl = y0 + (k - 1)*cell_size
+                            yr = y0 + (k)*cell_size
+
+                            CALL regrid_scalar(x1, y1, thickness_input, xl, xr, yl, yr, thickness_interp)
+
+                            IF (n_layers==2) THEN
+                                thickness_layers(j,k,layer)=thickness_layers(j,k,layer)+thickness_interp
+                            ELSE
+                                thickness_init(j,k)=thickness_init(j,k)+thickness_interp
+                            END IF
+
+                            IF (thickness_interp .GT. 0.0_wp) THEN
+
+                                domain%solve_mask_time(j, k) = current_release_time
+
+                            END IF
+
+                        END DO
+
+                    END DO
+
+                    DEALLOCATE (thickness_input)
+
+                    DEALLOCATE (x1, y1)
+
+                END IF
+
+                CLOSE (restart_unit)
+
+            END DO
         END DO
 
         IF (primitive_mode) THEN
@@ -5914,7 +5966,8 @@
 
             DO layer=1,n_layers
 
-                restart_file=restart_files(layer)
+                restart_file=restart_files(1)
+                IF (layer==2) restart_file=restart_files_l2(1)
                 IF (INDEX(TRIM(restart_file),'.q_2d')==0) &
                     CALL fatal_error('Conservative initialization expects a .q_2d file for each layer')
                 OPEN (restart_unit, FILE=restart_file, STATUS='old')

@@ -45,6 +45,7 @@ PROGRAM test_spatial_operator
   USE runtime_2d, ONLY : runtime_state_type
   USE output_paths, ONLY : initialize_output_paths,output_file_path,snapshot_file_path
   USE inpout_2d, ONLY : write_restart_file,read_restart_file,read_solution,n_restart_files,restart_files
+  USE inpout_2d, ONLY : n_restart_files_l2,restart_files_l2
   USE inpout_2d, ONLY : T_init_l2,u_init_l2,v_init_l2,sed_vol_perc_l2
   USE inpout_2d, ONLY : init_netcdf_output,write_netcdf_timestep,close_netcdf
   USE inpout_2d, ONLY : write_two_layer_budget,run_name,restart,output_runout_flag,output_solution
@@ -3216,7 +3217,7 @@ CONTAINS
     TYPE(stochastic_config_type) :: saved_stochastic_l2
     REAL(wp), ALLOCATABLE :: original_q(:,:,:,:),original_b(:,:)
     REAL(wp), ALLOCATABLE :: stored_total(:,:,:)
-    REAL(wp) :: primitive(n_vars),total_before,saved_t_end
+    REAL(wp) :: primitive(n_vars),total_before,saved_t_end,reference_l1_mass
     INTEGER :: unit_budget
     REAL(wp) :: budget(11)
     CHARACTER(LEN=256) :: header
@@ -3446,12 +3447,13 @@ CONTAINS
     clock%steady_deadline=HUGE(1.0_wp)
     CALL output_solution(clock%t,states,clock)
     t_end=saved_t_end
-    n_restart_files=2
+    n_restart_files=1
+    n_restart_files_l2=1
     restart_files(1)=snapshot_file_path(TRIM(run_name)//'_L1_0000.q_2d')
-    restart_files(2)=snapshot_file_path(TRIM(run_name)//'_L2_0000.q_2d')
+    restart_files_l2(1)=snapshot_file_path(TRIM(run_name)//'_L2_0000.q_2d')
     INQUIRE(FILE=TRIM(restart_files(1)),EXIST=found_file)
     IF (.NOT.found_file) ERROR STOP 'Missing original L1 conservative snapshot'
-    INQUIRE(FILE=TRIM(restart_files(2)),EXIST=found_file)
+    INQUIRE(FILE=TRIM(restart_files_l2(1)),EXIST=found_file)
     IF (.NOT.found_file) ERROR STOP 'Missing L2 conservative snapshot'
     ! The same production output entry point must write both conservative
     ! snapshots and the additional L2/combined ESRI rasters.
@@ -3503,12 +3505,13 @@ CONTAINS
     u_init_l2=2.0_wp
     v_init_l2=0.0_wp
     subtract_init_flag=.FALSE.
-    n_restart_files=2
+    n_restart_files=1
+    n_restart_files_l2=1
     DO primitive_case=1,4
         restart_files(1)='two_layer_primitive.asc'
-        restart_files(2)='two_layer_primitive.asc'
+        restart_files_l2(1)='two_layer_primitive.asc'
         IF (primitive_case==2 .OR. primitive_case==4) restart_files(1)='NONE'
-        IF (primitive_case==1 .OR. primitive_case==4) restart_files(2)='NONE'
+        IF (primitive_case==1 .OR. primitive_case==4) restart_files_l2(1)='NONE'
         states%q=0.0_wp
         CALL read_solution(states,io_domain)
         SELECT CASE(primitive_case)
@@ -3516,6 +3519,7 @@ CONTAINS
             IF (.NOT.ANY(states%q(idx_totMassEqn,1,:,:)>0.0_wp) .OR. &
                 ANY(states%q(:,2,:,:)/=0.0_wp)) &
                 ERROR STOP 'Primitive L1-only initialization did not leave L2 dry'
+            reference_l1_mass=SUM(states%q(idx_totMassEqn,1,:,:))
         CASE(2)
             IF (.NOT.ANY(states%q(idx_totMassEqn,2,:,:)>0.0_wp) .OR. &
                 ANY(states%q(:,1,:,:)/=0.0_wp)) &
@@ -3532,6 +3536,18 @@ CONTAINS
         END SELECT
         IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
     END DO
+    ! Two same-time primitive files belong to L1, not to L1 and L2.
+    n_restart_files=2
+    n_restart_files_l2=1
+    restart_files(1)='two_layer_primitive.asc'
+    restart_files(2)='two_layer_primitive.asc'
+    restart_files_l2(1)='NONE'
+    states%q=0.0_wp
+    CALL read_solution(states,io_domain)
+    IF (ABS(SUM(states%q(idx_totMassEqn,1,:,:))-2.0_wp*reference_l1_mass)> &
+        1.0E-12_wp*reference_l1_mass) ERROR STOP 'Multiple L1 releases were not accumulated'
+    IF (ANY(states%q(:,2,:,:)/=0.0_wp)) ERROR STOP 'Multiple L1 releases changed L2'
+    IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
     OPEN(NEWUNIT=ascii_unit,FILE='two_layer_primitive.asc',STATUS='OLD')
     CLOSE(ascii_unit,STATUS='DELETE')
     WRITE(*,*) 'PASS: independent L1/L2 primitive .asc/NONE initialization for four wet/dry states'

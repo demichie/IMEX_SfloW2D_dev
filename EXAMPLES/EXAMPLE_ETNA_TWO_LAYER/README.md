@@ -60,14 +60,17 @@ The current Etna example starts with:
 | Horizontal velocity | 0 m/s | 0 m/s |
 | Solids by volume | 50% | 0% |
 
-In the input, `RESTART_FILES` has one entry per layer in L1/L2 order.
-For each entry, specify an ESRII `.asc` thickness raster or `'NONE'` for
-an initially dry layer. Independent primitive values are configured in
-`INITIAL_L1_PARAMETERS` and `INITIAL_L2_PARAMETERS`. To start only L2,
-use `RESTART_FILES='NONE','./DEM/l2_thickness.asc'` and configure L2's
-temperature, velocity and solid volume percentages. Both layers can also
-start wet. The input percentages refer to the *common* solid species
-configured for the simulation.
+The input uses independent `RESTART_L1_PARAMETERS` and
+`RESTART_L2_PARAMETERS` groups. Each layer has its own file list and count:
+`RESTART_FILES` belongs only to L1, while `RESTART_FILES_L2` belongs only
+to L2. Use an ESRI `.asc` thickness raster, or a sole `'NONE'` entry for
+a dry layer. Independent primitives are defined by `INITIAL_L1_PARAMETERS`
+and `INITIAL_L2_PARAMETERS`. To start only L2, set L1's `RESTART_FILES='NONE'`
+and L2's `RESTART_FILES_L2='./DEM/l2_thickness.asc'`. Both layers can also
+start wet. Only same-time initial rasters are supported in the coupled model;
+nonzero per-layer release times require future activation logic and are
+rejected explicitly. The percentages refer to the *common* solid species.
+See [restart input](../../docs/RESTART_INPUT.md) for the complete contract.
 
 These primitive inputs are for **new initial states**, not continuation
 from a previous run. Conservative `.q_2d` snapshots and binary restart

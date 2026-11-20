@@ -38,9 +38,11 @@ validation of the full coupled two-layer equations.
 Verify that L1 momentum develops from rest and that its wet front propagates
 in the positive x direction. Since all L2 transfer processes are disabled,
 L2 should remain dry. Check total L1 mass conservation, zero transverse
-momentum, and the timestep history. For a separate L1 single-layer baseline, use `N_LAYERS=1` and one
-`RESTART_FILES` entry. Either `INITIAL_PARAMETERS` or `INITIAL_L1_PARAMETERS`
-can specify the same L1 primitives;
+momentum, and the timestep history. For a separate L1 single-layer baseline, use `N_LAYERS=1` and remove
+`RESTART_L2_PARAMETERS` and the other L2 namelists. Single-layer input
+accepts either `RESTART_PARAMETERS` or `RESTART_L1_PARAMETERS` and either
+`INITIAL_PARAMETERS` or `INITIAL_L1_PARAMETERS`, with one canonical set
+of L1 parameters;
 do not change the physics or numerical parameters between comparisons.
 
 The single y cell has no y-direction interior flux and is intentional.
