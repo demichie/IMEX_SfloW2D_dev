@@ -1,14 +1,14 @@
 # Etna DEM input
 
-From `EXAMPLES/EXAMPLE_ETNA_TWO_LAYER`, copy the **only shared input file**
-into this directory:
+From `EXAMPLES/EXAMPLE_ETNA_TWO_LAYER`, copy **only** the shared archive:
 
 ```bash
 cp ../EXAMPLE_ETNA/DEM/Etna2014_crop.zip DEM/
+python3 prepare.py
 ```
 
-The example-local `prepare.py` extracts `Etna2014_crop.asc` and runs the
-example-local `create_input_ellipsoid.py` and `input_ellipsoid.py` to produce
-`new_dem.asc`, `init_volume.asc`, and `ellipsoid.asc`. Do not commit the
-copied ZIP or generated rasters. All other scripts and inputs are stored
-inside this example.
+`prepare.py` uses the local ellipsoid scripts, extracts
+`Etna2014_crop.asc` and produces `new_dem.asc`, `init_volume.asc`
+and `ellipsoid.asc`. It does **not** execute the Fortran solver.
+The two-layer executable reads `init_volume.asc` directly as the
+initial L1 thickness. L2 starts dry via `RESTART_FILES='...','NONE'`.

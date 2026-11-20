@@ -370,3 +370,21 @@ checks. The OpenMP payload comparison remains unchanged.
 The runtime array-temporary warning at `compute_spatial_timestep` is
 independent of this source-physics test failure and was not addressed.
 The amended assertion requires a fresh strict/optimized regression run.
+
+## Two-layer primitive initial states (20 November 2026)
+
+The production `read_solution` ASCII thickness path now handles two independent
+layers, using the existing shared mixture conversion. Each of the two
+`RESTART_FILES` entries can name a primitive thickness `.asc` raster, or
+`NONE` for a strictly dry layer. `INITIAL_L1_PARAMETERS` and
+`INITIAL_L2_PARAMETERS` provide separate temperature, velocity and
+solid-volume percentages. L1 retains canonical single-layer primitive
+variable ownership; L2 adds only its independent input values.
+
+Etna now uses `DEM/init_volume.asc` for L1 and `NONE` for L2 without a
+preliminary executable initialization, duplicate mixture formulas, or
+intermediate `.q_2d` files. The existing conservative `.q_2d` and binary
+restart paths are retained and must remain unchanged. Direct two-layer
+`SUBTRACT_INIT_FLAG` is rejected until its coupled terrain/substrate meaning
+is validated. New strict/optimized and end-to-end tests are required for
+acceptance; static inspection alone is not sufficient.

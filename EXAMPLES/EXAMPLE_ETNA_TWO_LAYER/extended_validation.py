@@ -16,7 +16,6 @@ import subprocess
 import sys
 
 from prepare import EXAMPLE, FIELD_WIDTH, N_VARS, NX, NY, prepare
-from initialize_layers import initialize
 from run_validation import change_parameter, check_run
 
 RUN = "exampleEtna_two_layer"
@@ -239,7 +238,6 @@ def run_validation(solver, root, horizon, growth_horizon, timeout):
     template = root / "initial"
     template.mkdir(parents=True)
     prepare(template)
-    initialize(template, solver)
     runs = {name: root / name for name in ("reference", "resumed", "threads2", "threads4")}
     for directory in runs.values():
         shutil.copytree(template, directory)

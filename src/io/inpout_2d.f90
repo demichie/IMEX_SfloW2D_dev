@@ -5741,7 +5741,7 @@
                             WRITE (*, *)
                             WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
                             erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)*                              &
-                                                            (SUM(initial_alphas(1:n_solid))/                                  &
+                                (SUM(initial_alphas(1:n_solid))/ &
                                                             (1.0_wp - substrate%erodible_porosity))
 
                             IF (MINVAL(erodible_init(:, :)) .LT. 0.0_wp) THEN
@@ -5774,9 +5774,9 @@
                 alphag_init_local = 0.0_wp
                 CALL evaluate_mixture_from_volume(                                                                         &
                         ! IN
-                initial_temperature, alphag_init_local,                                                                                 &
+                    initial_temperature, alphag_init_local, &
                 ! INOUT
-                initial_alphas,                                                                                               &
+                    initial_alphas, &
                 ! OUT
                 rho_m, inv_rho_m, rho_c,                                                                                   &
                 mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
@@ -5801,7 +5801,8 @@
 
                 WHERE (thickness_init .GT. 0.0_wp)
 
-                    state%q(idx_engyEqn,layer, :, :) = state%q(idx_totMassEqn,layer, :, :)*initial_temperature*sp_heat_mix
+                    state%q(idx_engyEqn,layer, :, :) = &
+                        state%q(idx_totMassEqn,layer, :, :)*initial_temperature*sp_heat_mix
 
                 END WHERE
 
@@ -5812,7 +5813,7 @@
 
                     WHERE (thickness_init .GT. 0.0_wp)
 
-                        state%q(solid_idx,layer, :, :) = thickness_init(:, :)*initial_alphas(solid_idx - 4)*                      &
+                        state%q(solid_idx,layer, :, :) = thickness_init(:, :)* &
                                                     rho_s(solid_idx - 4)
 
                     END WHERE

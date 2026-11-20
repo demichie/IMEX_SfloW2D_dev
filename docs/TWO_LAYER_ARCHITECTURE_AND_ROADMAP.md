@@ -529,3 +529,11 @@ initially dry L2. The physical meaning of L2-only terrain erosion/carrier
 loss/lava immobilization and the buoyancy sink remains under review.
 The TL13a validation baseline is still `89a9f2b`; new changes require
 fresh strict/optimized and end-to-end evidence before acceptance.
+
+
+**Primitive initial-state path (20 November 2026):** the Etna example now
+uses direct independent two-layer primitive `.asc` / `NONE` initialization,
+reusing the canonical single-layer mixture formulas. No auxiliary
+single-layer solver run or intermediate initial `.q_2d` files are required.
+Conservative/binary restart paths remain available. Runtime acceptance
+requires fresh regression evidence on the updated branch.

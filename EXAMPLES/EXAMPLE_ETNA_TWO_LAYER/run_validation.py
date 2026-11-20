@@ -11,7 +11,6 @@ import sys
 import tempfile
 
 from prepare import EXAMPLE, FIELD_WIDTH, N_VARS, prepare
-from initialize_layers import initialize
 
 
 def change_parameter(text, name, value):
@@ -110,7 +109,6 @@ def run_test(solver, root, end_time, timeout):
     if gate.returncode == 0 or "requires IMEX_TWO_LAYER_VALIDATION=1" not in gate.stdout:
         raise RuntimeError("Default two-layer production gate was not enforced")
     prepare(root)
-    initialize(root, solver)
     text = change_parameter(text, "T_END", f"{end_time:.16g}")
     text = change_parameter(text, "DT_OUTPUT", f"{end_time:.16g}")
     (root / "IMEX_SfloW2D.inp").write_text(text, encoding="utf-8")
