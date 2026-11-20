@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-from prepare import EXAMPLE, N_VARS, prepare
+from prepare import EXAMPLE, FIELD_WIDTH, N_VARS, prepare
 
 
 def change_parameter(text, name, value):
@@ -30,10 +30,11 @@ def check_snapshot(path, expect_dry=False):
         for line in stream:
             if not line.strip():
                 continue
-            columns = line.split()
-            if len(columns) != N_VARS + 2:
-                raise ValueError(f"Invalid snapshot record in {path}")
-            values = [float(value.replace("D", "E")) for value in columns]
+            record = line.rstrip("\r\n")
+            if len(record) != FIELD_WIDTH * (N_VARS + 2):
+                raise ValueError(f"Invalid fixed-width snapshot record in {path}")
+            values = [float(record[i:i + FIELD_WIDTH].replace("D", "E"))
+                      for i in range(0, len(record), FIELD_WIDTH)]
             if not all(math.isfinite(value) for value in values):
                 raise ValueError(f"Non-finite conservative field in {path}")
             if values[2] < -1e-12:
