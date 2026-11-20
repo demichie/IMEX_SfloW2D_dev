@@ -275,6 +275,9 @@
 
     ! absolute precentages of solids in the initial volume
     REAL(wp), ALLOCATABLE :: sed_vol_perc(:)
+    ! L1 reuses the canonical single-layer primitives; L2 has separate inputs.
+    REAL(wp) :: T_init_l2, u_init_l2, v_init_l2
+    REAL(wp), ALLOCATABLE :: sed_vol_perc_l2(:)
 
 
     TYPE(rheology_config_type), POINTER :: rheology => rheology_l1
@@ -321,6 +324,8 @@
 
     NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time,                                        &
         T_init, u_init, v_init, sed_vol_perc
+    NAMELIST /initial_l1_parameters/ T_init, u_init, v_init, sed_vol_perc
+    NAMELIST /initial_l2_parameters/ T_init_l2, u_init_l2, v_init_l2, sed_vol_perc_l2
 
     NAMELIST /newrun_parameters/ n_solid, x0, y0,                                                     &
         comp_cells_x, comp_cells_y, cell_size, rheology_flag,                                                          &
@@ -705,6 +710,9 @@
         T_init = 0.0_wp
         u_init = 0.0_wp
         v_init = 0.0_wp
+        T_init_l2 = 0.0_wp
+        u_init_l2 = 0.0_wp
+        v_init_l2 = 0.0_wp
 
         !-- Inizialization of the Variables for the namelist newrun_parameters
         sea_mass_removal_flag = .FALSE.
@@ -843,8 +851,9 @@
             ALLOCATE (xs_bcS(n_solid))
             ALLOCATE (xs_bcN(n_solid))
 
-            ALLOCATE (sed_vol_perc(n_solid))
+            ALLOCATE (sed_vol_perc(n_solid),sed_vol_perc_l2(n_solid))
             sed_vol_perc(1:n_solid) = -1.0_wp
+            sed_vol_perc_l2(1:n_solid) = -1.0_wp
 
             ALLOCATE (rho_s(n_solid))
             ALLOCATE (diam_s(n_solid))
@@ -2314,12 +2323,46 @@
 
                 END IF
 
-                dot_idx = SCAN(restart_file, ".", .TRUE.)
-
-                check_file = restart_file(dot_idx + 1:dot_idx + 3)
-
-                IF (check_file .EQ. 'asc') THEN
-
+                IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') restart_file=restart_files(2)
+                IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') THEN
+                    check_file='asc'
+                ELSE
+                    dot_idx=SCAN(restart_file,'.',.TRUE.)
+                    IF (dot_idx==0 .OR. dot_idx+3>LEN_TRIM(restart_file)) &
+                        CALL fatal_error('Invalid initial state filename extension')
+                    check_file=restart_file(dot_idx+1:dot_idx+3)
+                END IF
+                IF (n_layers==2 .AND. check_file=='asc') THEN
+                    IF (n_restart_files/=2) &
+                        CALL fatal_error('Two-layer primitive initialization requires two RESTART_FILES entries')
+                    DO i_file=1,2
+                        IF (TRIM(restart_files(i_file))=='NONE') CYCLE
+                        dot_idx=SCAN(TRIM(restart_files(i_file)),'.',.TRUE.)
+                        IF (dot_idx==0) CALL fatal_error('Missing two-layer primitive raster extension')
+                        IF (TRIM(restart_files(i_file)(dot_idx+1:))/='asc') &
+                            CALL fatal_error('Two-layer primitive input requires .asc or NONE for each layer')
+                    END DO
+                    REWIND(input_unit)
+                    READ(input_unit,NML=initial_l1_parameters,IOSTAT=ios)
+                    IF (ios/=0) CALL fatal_error('Missing or invalid INITIAL_L1_PARAMETERS')
+                    REWIND(input_unit)
+                    READ(input_unit,NML=initial_l2_parameters,IOSTAT=ios)
+                    IF (ios/=0) CALL fatal_error('Missing or invalid INITIAL_L2_PARAMETERS')
+                    REWIND(input_unit)
+                    IF (TRIM(restart_files(1))/='NONE') THEN
+                        IF (ANY(sed_vol_perc<0.0_wp) .OR. ANY(sed_vol_perc>100.0_wp) .OR. &
+                            SUM(sed_vol_perc)>100.0_wp .OR. T_init<=0.0_wp) &
+                            CALL fatal_error('Invalid L1 initial temperature or solid percentages')
+                        alphas_init(1:n_solid)=0.01_wp*sed_vol_perc
+                    ELSE
+                        alphas_init(1:n_solid)=0.0_wp
+                    END IF
+                    IF (TRIM(restart_files(2))/='NONE') THEN
+                        IF (ANY(sed_vol_perc_l2<0.0_wp) .OR. ANY(sed_vol_perc_l2>100.0_wp) .OR. &
+                            SUM(sed_vol_perc_l2)>100.0_wp .OR. T_init_l2<=0.0_wp) &
+                            CALL fatal_error('Invalid L2 initial temperature or solid percentages')
+                    END IF
+                ELSEIF (check_file .EQ. 'asc') THEN
                     IF ((ANY(sed_vol_perc(1:n_solid) .LT. 0.0_wp)) .OR.                                                &
                         (ANY(sed_vol_perc(1:n_solid) .GT. 100.0_wp)) .OR.                                              &
                         (SUM(sed_vol_perc(1:n_solid)) .GT. 100.0_wp)) THEN
@@ -5405,12 +5448,15 @@
 
         REAL(wp), ALLOCATABLE :: thickness_input(:, :)
         REAL(wp), ALLOCATABLE :: thickness_vertex(:, :)
+        REAL(wp), ALLOCATABLE :: thickness_layers(:,:,:)
 
         REAL(wp), ALLOCATABLE :: x1(:), y1(:)
 
         REAL(wp) :: xl, xr, yl, yr
 
         REAL(wp) :: rho_c, rho_m, inv_rho_m, mass_fract(n_solid)
+        REAL(wp) :: initial_temperature, initial_u, initial_v, initial_alphas(n_solid)
+        LOGICAL :: primitive_mode
         REAL(wp) :: alphag_init_local(n_add_gas)
         REAL(wp) :: xg_init(n_add_gas), xc_init
         REAL(wp) :: sp_heat_c, sp_heat_mix
@@ -5438,23 +5484,25 @@
         thickness_init(:, :) = 0.0_wp
 
         restart_file = restart_files(1)
-
-        dot_idx = SCAN(restart_file, ".", .TRUE.)
-
-        IF ((dot_idx .EQ. 0) .OR. (dot_idx + 3 .GT. LEN_TRIM(restart_file))) THEN
-            WRITE (*, *) 'ERROR: restart file has no valid extension: ',                                               &
-                TRIM(restart_file)
-            STOP
-
-        END IF
-
-        check_file = restart_file(dot_idx + 1:dot_idx + 3)
-
         IF (n_layers==2) THEN
             IF (n_restart_files/=2) &
-                CALL fatal_error('Two-layer text initialization requires exactly two RESTART_FILES')
-            IF (check_file/='q_2') &
-                CALL fatal_error('Two-layer initialization requires separate L1/L2 .q_2d files')
+                CALL fatal_error('Two-layer text initialization needs exactly two RESTART_FILES entries')
+            IF (TRIM(restart_file)=='NONE') restart_file=restart_files(2)
+        END IF
+        IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') THEN
+            check_file='asc'
+        ELSE
+            dot_idx=SCAN(restart_file,'.',.TRUE.)
+            IF (dot_idx==0 .OR. dot_idx+3>LEN_TRIM(restart_file)) &
+                CALL fatal_error('Invalid initial state filename extension')
+            check_file=restart_file(dot_idx+1:dot_idx+3)
+        END IF
+        primitive_mode=check_file=='asc'
+        IF (n_layers==2 .AND. check_file/='asc' .AND. check_file/='q_2') &
+            CALL fatal_error('Two-layer text initialization needs .asc or .q_2d files')
+        IF (n_layers==2 .AND. primitive_mode) THEN
+            ALLOCATE(thickness_layers(comp_cells_x,comp_cells_y,2))
+            thickness_layers=0.0_wp
         END IF
 
         IF (check_file .EQ. 'asc') THEN
@@ -5498,6 +5546,13 @@
         DO i_file = 1, n_restart_files
 
             restart_file = restart_files(i_file)
+            IF (n_layers==2 .AND. TRIM(restart_file)=='NONE') CYCLE
+            IF (n_layers==2 .AND. primitive_mode) THEN
+                dot_idx=SCAN(restart_file,'.',.TRUE.)
+                IF (dot_idx==0) CALL fatal_error('Missing primitive raster extension')
+                IF (TRIM(restart_file(dot_idx+1:))/='asc') &
+                    CALL fatal_error('Each two-layer primitive file must be .asc or NONE')
+            END IF
 
             INQUIRE (FILE=restart_file, exist=lexist)
 
@@ -5624,7 +5679,11 @@
 
                         CALL regrid_scalar(x1, y1, thickness_input, xl, xr, yl, yr, thickness_interp)
 
-                        thickness_init(j, k) = thickness_init(j, k) + thickness_interp
+                        IF (n_layers==2) THEN
+                            thickness_layers(j,k,i_file)=thickness_layers(j,k,i_file)+thickness_interp
+                        ELSE
+                            thickness_init(j,k)=thickness_init(j,k)+thickness_interp
+                        END IF
 
                         IF (thickness_interp .GT. 0.0_wp) THEN
 
@@ -5646,160 +5705,181 @@
 
         END DO
 
-        IF (check_file .EQ. 'asc') THEN
+        IF (primitive_mode) THEN
+            IF (n_layers==2 .AND. subtract_init_flag) &
+                CALL fatal_error('Two-layer SUBTRACT_INIT_FLAG with raster initialization is not validated')
+            output_idx=0
+            DO layer=1,n_layers
+                IF (n_layers==2) THEN
+                    thickness_init=thickness_layers(:,:,layer)
+                    IF (.NOT.ANY(thickness_init>0.0_wp)) CYCLE
+                END IF
+                IF (layer==1) THEN
+                    initial_temperature=T_init
+                    initial_u=u_init
+                    initial_v=v_init
+                    initial_alphas=alphas_init(1:n_solid)
+                ELSE
+                    initial_temperature=T_init_l2
+                    initial_u=u_init_l2
+                    initial_v=v_init_l2
+                    initial_alphas=0.01_wp*sed_vol_perc_l2
+                END IF
+                IF (subtract_init_flag) THEN
 
-            IF (subtract_init_flag) THEN
+                    WRITE (*, *) 'Subtracting initial thickness from nodal topography'
+                    ALLOCATE( thickness_vertex(comp_cells_x+1,comp_cells_y+1) )
+                    CALL project_cell_field_to_vertices(thickness_init, thickness_vertex)
+                    B_vertex = B_vertex - thickness_vertex
+                    DEALLOCATE( thickness_vertex )
+                    CALL refresh_topography_geometry
 
-                WRITE (*, *) 'Subtracting initial thickness from nodal topography'
-                ALLOCATE( thickness_vertex(comp_cells_x+1,comp_cells_y+1) )
-                CALL project_cell_field_to_vertices(thickness_init, thickness_vertex)
-                B_vertex = B_vertex - thickness_vertex
-                DEALLOCATE( thickness_vertex )
-                CALL refresh_topography_geometry
+                    IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
 
-                IF (mass_exchange_l1%erosion%coefficient .GT. 0.0_wp) THEN
+                        IF (MAXVAL(erodible_init(:, :)) .GT. 0.0_wp) THEN
 
-                    IF (MAXVAL(erodible_init(:, :)) .GT. 0.0_wp) THEN
+                            WRITE (*, *)
+                            WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
+                            erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)*                              &
+                                                            (SUM(initial_alphas(1:n_solid))/                                  &
+                                                            (1.0_wp - substrate%erodible_porosity))
 
-                        WRITE (*, *)
-                        WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
-                        erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)*                              &
-                                                        (SUM(alphas_init(1:n_solid))/                                  &
-                                                        (1.0_wp - substrate%erodible_porosity))
+                            IF (MINVAL(erodible_init(:, :)) .LT. 0.0_wp) THEN
 
-                        IF (MINVAL(erodible_init(:, :)) .LT. 0.0_wp) THEN
+                                WRITE (*, *) 'WARNING: MINVAL(erodible_init) = ',                                          &
+                                    MINVAL(erodible_init(:, :))
+                                WRITE (*, *) 'Initial erodible thick. negative values changed to 0'
 
-                            WRITE (*, *) 'WARNING: MINVAL(erodible_init) = ',                                          &
-                                MINVAL(erodible_init(:, :))
-                            WRITE (*, *) 'Initial erodible thick. negative values changed to 0'
+                                erodible_init = MAX(0.0_wp, erodible_init)
 
-                            erodible_init = MAX(0.0_wp, erodible_init)
+                            END IF
+
+                            DO i_solid = 1, n_solid
+
+                                state%erodible(i_solid, :, :) = erodible_fract(i_solid)*                                   &
+                            (1.0_wp - substrate%erodible_porosity)*erodible_init(:, :)
+
+                            END DO
+
+                            WRITE (*, *)
 
                         END IF
-
-                        DO i_solid = 1, n_solid
-
-                            state%erodible(i_solid, :, :) = erodible_fract(i_solid)*                                   &
-                        (1.0_wp - substrate%erodible_porosity)*erodible_init(:, :)
-
-                        END DO
-
-                        WRITE (*, *)
 
                     END IF
 
                 END IF
 
-            END IF
+                !----- END NEW INITIALIZATION OF THICKNESS FROM RESTART
 
-            !----- END NEW INITIALIZATION OF THICKNESS FROM RESTART
+                alphag_init_local = 0.0_wp
+                CALL evaluate_mixture_from_volume(                                                                         &
+                        ! IN
+                initial_temperature, alphag_init_local,                                                                                 &
+                ! INOUT
+                initial_alphas,                                                                                               &
+                ! OUT
+                rho_m, inv_rho_m, rho_c,                                                                                   &
+                mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
 
-            alphag_init_local = 0.0_wp
-            CALL evaluate_mixture_from_volume(                                                                         &
-                    ! IN
-            T_init, alphag_init_local,                                                                                 &
-            ! INOUT
-            alphas_init,                                                                                               &
-            ! OUT
-            rho_m, inv_rho_m, rho_c,                                                                                   &
-            mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
+                state%q(idx_totMassEqn,layer, :, :) = thickness_init(:, :)*rho_m
 
-            state%q(idx_totMassEqn,1, :, :) = thickness_init(:, :)*rho_m
+                IF (VERBOSE_LEVEL .GE. 0) THEN
 
-            IF (VERBOSE_LEVEL .GE. 0) THEN
+                    WRITE (*, *) 'Total volume on computational grid =', cell_size**2*                                     &
+                        SUM(thickness_init(:, :))
+                    WRITE (*, *) 'Total mass on computational grid =', cell_size**2*                                       &
+                        SUM(state%q(idx_totMassEqn,layer, :, :))
 
-                WRITE (*, *) 'Total volume on computational grid =', cell_size**2*                                     &
-                    SUM(thickness_init(:, :))
-                WRITE (*, *) 'Total mass on computational grid =', cell_size**2*                                       &
-                    SUM(state%q(idx_totMassEqn,1, :, :))
+                END IF
+                ! rhom*h*u
+                state%q(idx_uEqn,layer, :, :) = state%q(idx_totMassEqn,layer, :, :)*initial_u
+                ! rhom*h*v
+                state%q(idx_vEqn,layer, :, :) = state%q(idx_totMassEqn,layer, :, :)*initial_v
 
-            END IF
-            ! rhom*h*u
-            state%q(idx_uEqn,1, :, :) = state%q(idx_totMassEqn,1, :, :)*u_init
-            ! rhom*h*v
-            state%q(idx_vEqn,1, :, :) = state%q(idx_totMassEqn,1, :, :)*v_init
-
-            ! energy (total or internal)
-            state%q(idx_engyEqn,1, :, :) = 0.0_wp
-
-            WHERE (thickness_init .GT. 0.0_wp)
-
-                state%q(idx_engyEqn,1, :, :) = state%q(idx_totMassEqn,1, :, :)*T_init*sp_heat_mix
-
-            END WHERE
-
-            DO solid_idx = 5, 4 + n_solid
-
-                ! rhos*h*alphas
-                state%q(solid_idx,1, :, :) = 0.0_wp
+                ! energy (total or internal)
+                state%q(idx_engyEqn,layer, :, :) = 0.0_wp
 
                 WHERE (thickness_init .GT. 0.0_wp)
 
-                    state%q(solid_idx,1, :, :) = thickness_init(:, :)*alphas_init(solid_idx - 4)*                      &
-                                                rho_s(solid_idx - 4)
+                    state%q(idx_engyEqn,layer, :, :) = state%q(idx_totMassEqn,layer, :, :)*initial_temperature*sp_heat_mix
 
                 END WHERE
 
-            END DO
+                DO solid_idx = 5, 4 + n_solid
 
-            WRITE (*, *) 'MAXVAL(q(5,:,:))', MAXVAL(state%q(5:4 + n_solid,1, :, :))
+                    ! rhos*h*alphas
+                    state%q(solid_idx,layer, :, :) = 0.0_wp
 
-            IF (VERBOSE_LEVEL .GE. 0) THEN
+                    WHERE (thickness_init .GT. 0.0_wp)
 
-                WRITE (*, *) 'Total sediment volume =', cell_size**2*SUM(thickness_init*                               &
-                                                                                            SUM(alphas_init))
+                        state%q(solid_idx,layer, :, :) = thickness_init(:, :)*initial_alphas(solid_idx - 4)*                      &
+                                                    rho_s(solid_idx - 4)
 
-            END IF
-
-            DO stoch_idx = 5 + n_solid + n_add_gas, 4 + n_solid + n_add_gas + n_stoch_vars
-
-                ! rho_m*h*Zs
-                state%q(stoch_idx,1, :, :) = 0.0_wp
-
-                WHERE (thickness_init .GT. 0.0_wp)
-
-                    state%q(stoch_idx,1, :, :) = thickness_init(:, :)*rho_m*1.0_wp
-
-                END WHERE
-
-            END DO
-
-            DO pore_idx = 5 + n_solid + n_add_gas + n_stoch_vars, 4 + n_solid + n_add_gas                              &
-                + n_stoch_vars + n_pore_vars
-
-                ! rho_m*h*Zs
-                state%q(pore_idx,1, :, :) = 0.0_wp
-
-                WHERE (thickness_init .GT. 0.0_wp)
-
-                    state%q(pore_idx,1, :, :) = thickness_init(:, :)*rho_m*1.0_wp
-
-                END WHERE
-
-            END DO
-
-            output_idx = 0
-
-            IF (verbose_level .GE. 1) THEN
-
-                WRITE (*, *) 'Min q(1,:,:) =', MINVAL(state%q(idx_totMassEqn,1, :, :))
-                WRITE (*, *) 'Max q(1,:,:) =', MAXVAL(state%q(idx_totMassEqn,1, :, :))
-                WRITE (*, *) 'SUM(q(1,:,:)) =', SUM(state%q(idx_totMassEqn,1, :, :))
-
-                DO k = 1, nrows
-
-                    WRITE (*, *) k, B_cent(:, k)
-                    CALL debug_pause('initial topography row')
+                    END WHERE
 
                 END DO
 
-                WRITE (*, *) 'SUM(B_cent(:,:)) =', SUM(B_cent(:, :))
-                CALL debug_pause('initial topography summary')
+                WRITE (*, *) 'MAXVAL(q(5,:,:))', MAXVAL(state%q(5:4 + n_solid,layer, :, :))
 
-            END IF
+                IF (VERBOSE_LEVEL .GE. 0) THEN
 
-            WRITE (*, *) 'n_vars', n_vars
+                    WRITE (*, *) 'Total sediment volume =', cell_size**2*SUM(thickness_init*                               &
+                                                                                                SUM(initial_alphas))
 
+                END IF
+
+                DO stoch_idx = 5 + n_solid + n_add_gas, 4 + n_solid + n_add_gas + n_stoch_vars
+
+                    ! rho_m*h*Zs
+                    state%q(stoch_idx,layer, :, :) = 0.0_wp
+
+                    WHERE (thickness_init .GT. 0.0_wp)
+
+                        state%q(stoch_idx,layer, :, :) = thickness_init(:, :)*rho_m*1.0_wp
+
+                    END WHERE
+
+                END DO
+
+                DO pore_idx = 5 + n_solid + n_add_gas + n_stoch_vars, 4 + n_solid + n_add_gas                              &
+                    + n_stoch_vars + n_pore_vars
+
+                    ! rho_m*h*Zs
+                    state%q(pore_idx,layer, :, :) = 0.0_wp
+
+                    WHERE (thickness_init .GT. 0.0_wp)
+
+                        state%q(pore_idx,layer, :, :) = thickness_init(:, :)*rho_m*1.0_wp
+
+                    END WHERE
+
+                END DO
+
+                output_idx = 0
+
+                IF (verbose_level .GE. 1) THEN
+
+                    WRITE (*, *) 'Min q(1,:,:) =', MINVAL(state%q(idx_totMassEqn,layer, :, :))
+                    WRITE (*, *) 'Max q(1,:,:) =', MAXVAL(state%q(idx_totMassEqn,layer, :, :))
+                    WRITE (*, *) 'SUM(q(1,:,:)) =', SUM(state%q(idx_totMassEqn,layer, :, :))
+
+                    DO k = 1, nrows
+
+                        WRITE (*, *) k, B_cent(:, k)
+                        CALL debug_pause('initial topography row')
+
+                    END DO
+
+                    WRITE (*, *) 'SUM(B_cent(:,:)) =', SUM(B_cent(:, :))
+                    CALL debug_pause('initial topography summary')
+
+                END IF
+
+                WRITE (*, *) 'n_vars', n_vars
+
+                IF (layer==1) alphas_init(1:n_solid)=initial_alphas
+            END DO
+            IF (ALLOCATED(thickness_layers)) DEALLOCATE(thickness_layers)
         END IF
 
         IF (check_file .EQ. 'q_2') THEN
