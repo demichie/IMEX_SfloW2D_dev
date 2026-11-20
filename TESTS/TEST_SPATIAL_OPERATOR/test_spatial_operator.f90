@@ -2351,6 +2351,8 @@ CONTAINS
     ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars,nx,ny))
     ALLOCATE(term(n_eqns,nx,ny),direct(n_eqns,nx,ny),cell_sources(n_eqns,nx,ny))
     ALLOCATE(B_vertex(nx+1,ny+1),B_cent(nx,ny),B_face_x(nx+1,ny),B_face_y(nx,ny+1))
+    ! Match the production init_grid allocations before exercising ESRI output.
+    ALLOCATE(grid_output(nx,ny),grid_output_int(nx,ny))
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
     ALLOCATE(grav_coeff(nx,ny),grav_coeff_stag_x(nx+1,ny),grav_coeff_stag_y(nx,ny+1))

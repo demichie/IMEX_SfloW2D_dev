@@ -199,3 +199,15 @@ exactly zero at initialization. The synthetic preparation regression now
 includes the two trailing records and rejects excessive trailing blanks.
 This correction does not alter any physical initial condition or numerical
 kernel. The controlled two-layer execution remains pending on the new SHA.
+
+## TL13a — ESRI fixture initialization (20 November 2026)
+
+The newly enabled `output_solution` ESRI regression reached the canonical
+`output_esri` writer but failed at its first `grid_output=-9999` assignment:
+`TEST_SPATIAL_OPERATOR` initializes its own geometry arrays without calling
+`geometry_2d:init_grid`, which normally allocates the shared real/integer
+ESRI grids. The test's canonical `initialize_fixture` now allocates
+`grid_output` and `grid_output_int` with the same `nx,ny` dimensions as
+`init_grid`. This fixes the missing test setup, without altering the
+production writer or its physical results. Strict/debug and optimized
+spatial regressions on this commit still require execution.
