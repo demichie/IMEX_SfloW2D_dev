@@ -361,7 +361,8 @@ deposition for every nonempty column. This contradicted the new physical
 contract for a column containing only L2: interlayer settling may create
 L1, but L2 cannot deposit directly to the bed. The scenario 3 assertion
 now requires zero substrate deposition and positive L1 mass growth relative
-to the reference without active deposition. Scenarios 1/2 continue to
+to the initially dry L1 state (the deposition-off reference also contains
+interlayer settling). Scenarios 1/2 continue to
 require positive L1 deposition, scenario 4 zero deposition, and all four
 retain the per-cell solids budget and conservative-state admissibility
 checks. The OpenMP payload comparison remains unchanged.

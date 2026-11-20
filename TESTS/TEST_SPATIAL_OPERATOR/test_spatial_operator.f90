@@ -930,7 +930,7 @@ CONTAINS
                 IF (expected_deposition/=0.0_wp) &
                     ERROR STOP 'L2 deposited directly into shared substrate'
                 IF (.NOT.ANY(coupled_state%q(idx_totMassEqn,1,:,:)> &
-                    base_q(idx_totMassEqn,1,:,:))) &
+                    before_q(idx_totMassEqn,1,:,:))) &
                     ERROR STOP 'Settling failed to create L1 from isolated L2'
             CASE(4)
                 IF (expected_deposition/=0.0_wp) &
