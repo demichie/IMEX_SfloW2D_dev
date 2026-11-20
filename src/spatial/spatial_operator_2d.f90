@@ -8,7 +8,7 @@
 !********************************************************************************
 
 MODULE spatial_operator_2d
-    USE parameters_2d, ONLY : idx_totMassEqn, idx_T, idx_u, idx_v, dry_thickness_tolerance
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_h, idx_T, idx_u, idx_v, dry_thickness_tolerance
 
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
     USE diagnostics_2d, ONLY : fatal_error
