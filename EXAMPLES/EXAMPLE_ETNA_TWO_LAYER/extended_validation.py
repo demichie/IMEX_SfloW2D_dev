@@ -14,7 +14,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 
 from prepare import EXAMPLE, FIELD_WIDTH, N_VARS, prepare
 from run_validation import change_parameter, check_run

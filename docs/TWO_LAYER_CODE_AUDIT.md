@@ -238,3 +238,8 @@ experimental activation; existing production tests are unaffected.
 This is a new unverified **functional** gate, not acceptance of the
 coupled characteristic spectrum or hyperbolicity with shear. The extended
 job must be executed and its numerical outcomes inspected before closure.
+
+The extended-checker Python logic has solver-independent tests for the
+binary-restart NAMELIST edit, three-record budgets, numerical snapshot
+comparison and rejection of negative inventories. These run before the
+optional extended Etna simulation in its workflow job.
