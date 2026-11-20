@@ -5740,13 +5740,13 @@
 
                             WRITE (*, *)
                             WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
-                            erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)*                              &
+                            erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)* &
                                 (SUM(initial_alphas(1:n_solid))/ &
                                                             (1.0_wp - substrate%erodible_porosity))
 
                             IF (MINVAL(erodible_init(:, :)) .LT. 0.0_wp) THEN
 
-                                WRITE (*, *) 'WARNING: MINVAL(erodible_init) = ',                                          &
+                                WRITE (*, *) 'WARNING: MINVAL(erodible_init) = ', &
                                     MINVAL(erodible_init(:, :))
                                 WRITE (*, *) 'Initial erodible thick. negative values changed to 0'
 
@@ -5756,7 +5756,7 @@
 
                             DO i_solid = 1, n_solid
 
-                                state%erodible(i_solid, :, :) = erodible_fract(i_solid)*                                   &
+                                state%erodible(i_solid, :, :) = erodible_fract(i_solid)* &
                             (1.0_wp - substrate%erodible_porosity)*erodible_init(:, :)
 
                             END DO
@@ -5772,22 +5772,22 @@
                 !----- END NEW INITIALIZATION OF THICKNESS FROM RESTART
 
                 alphag_init_local = 0.0_wp
-                CALL evaluate_mixture_from_volume(                                                                         &
+                CALL evaluate_mixture_from_volume( &
                         ! IN
                     initial_temperature, alphag_init_local, &
                 ! INOUT
                     initial_alphas, &
                 ! OUT
-                rho_m, inv_rho_m, rho_c,                                                                                   &
+                rho_m, inv_rho_m, rho_c, &
                 mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
 
                 state%q(idx_totMassEqn,layer, :, :) = thickness_init(:, :)*rho_m
 
                 IF (VERBOSE_LEVEL .GE. 0) THEN
 
-                    WRITE (*, *) 'Total volume on computational grid =', cell_size**2*                                     &
+                    WRITE (*, *) 'Total volume on computational grid =', cell_size**2* &
                         SUM(thickness_init(:, :))
-                    WRITE (*, *) 'Total mass on computational grid =', cell_size**2*                                       &
+                    WRITE (*, *) 'Total mass on computational grid =', cell_size**2* &
                         SUM(state%q(idx_totMassEqn,layer, :, :))
 
                 END IF
@@ -5824,7 +5824,7 @@
 
                 IF (VERBOSE_LEVEL .GE. 0) THEN
 
-                    WRITE (*, *) 'Total sediment volume =', cell_size**2*SUM(thickness_init*                               &
+                    WRITE (*, *) 'Total sediment volume =', cell_size**2*SUM(thickness_init* &
                                                                                                 SUM(initial_alphas))
 
                 END IF
@@ -5842,7 +5842,7 @@
 
                 END DO
 
-                DO pore_idx = 5 + n_solid + n_add_gas + n_stoch_vars, 4 + n_solid + n_add_gas                              &
+                DO pore_idx = 5 + n_solid + n_add_gas + n_stoch_vars, 4 + n_solid + n_add_gas &
                     + n_stoch_vars + n_pore_vars
 
                     ! rho_m*h*Zs
