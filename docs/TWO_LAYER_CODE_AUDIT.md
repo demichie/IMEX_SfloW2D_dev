@@ -243,3 +243,17 @@ The extended-checker Python logic has solver-independent tests for the
 binary-restart NAMELIST edit, three-record budgets, numerical snapshot
 comparison and rejection of negative inventories. These run before the
 optional extended Etna simulation in its workflow job.
+
+## TL13a — separate Rouse-driven L2 activation from initial short-time regression
+
+The first extended run failed the assertion that L2 must grow by t=0.01 s,
+although the initial Etna avalanche is at rest. In the canonical
+`LINEAR_USTAR` law, positive flux depends on shear-generated `ustar`, the
+settling/Rouse limiter and available donor solids; `ELUTRIATION_FLAG=T`
+alone does not produce positive flux. The short 0.01-second trajectories
+continue to check conservation, restart and OpenMP without assuming a
+nonzero physical source. A separate unchanged-physics Etna trajectory to
+2 seconds (configurable `--growth-horizon`) now requires L2 growth and
+reports time/L2-mass budgets on failure. This is a pending diagnostic,
+not evidence that positive mass has already been observed. No source
+law, coefficient or canonical example input is changed.

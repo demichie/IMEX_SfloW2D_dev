@@ -151,6 +151,16 @@ restarts an otherwise identical trajectory from the midpoint binary checkpoint,
 and compares the final conservative state and checkpoint. Independent runs
 with 2 and 4 OpenMP threads are compared to the 1-thread reference.
 
+The original Etna avalanche starts from rest. The shear/Rouse elutriation
+closure can therefore legitimately return zero flux over the first 0.01 s.
+**L2 emergence is not required during that initial interval.** A distinct
+single-thread trajectory using unchanged physical parameters runs to 2 s by
+default (outputs at 0, 1 and 2 s) and requires strictly positive L2 mass.
+This longer run is an *activation diagnostic*, not a calibrated physical
+prediction. Set `--growth-horizon` to adjust the duration when investigating
+the actual shear onset; an absent upper layer is reported as an explicit
+failure with its measured budget history, never silently accepted.
+
 Budget assertions cover L1/L2 mass and solids additivity, nonnegativity,
 consistency with each conservative snapshot (relative tolerance 2e-8),
 total mass and total solids conservation (relative tolerance 1e-6), and

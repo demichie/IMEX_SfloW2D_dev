@@ -165,7 +165,7 @@ def compare_snapshots(reference, candidate, index, tolerance=REL_COMPARISON):
             raise AssertionError("Empty comparison snapshot")
 
 
-def check_invariants(root, require_growth=True):
+def check_invariants(root, require_growth=False):
     records = budgets(root)
     for key in ("mass_total", "solid_system"):
         initial = records[0][key]
@@ -179,7 +179,15 @@ def check_invariants(root, require_growth=True):
         raise AssertionError("L2 must be exactly dry at initial output")
     max_mass_l2 = max(record["mass_L2"] for record in records[1:])
     if require_growth and max_mass_l2 <= 0.0:
-        raise AssertionError("No measurable L2 growth during extended elutriation run")
+        samples = ", ".join(
+            f"t={record['time']:.6g}:m2={record['mass_L2']:.6g}"
+            for record in records
+        )
+        raise AssertionError(
+            "No measurable L2 growth in the dedicated activation trajectory; "
+            "verify donor shear, Rouse cutoff and source scheduling. "
+            + samples
+        )
     input_text = (root / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
     match = re.search(r"(?im)^[ \t]*CELL_SIZE[ \t]*=[ \t]*([0-9.+EeDd-]+)", input_text)
     if match is None:
@@ -208,7 +216,8 @@ def check_invariants(root, require_growth=True):
                         f"{actual:.16g} vs {expected:.16g}"
                     )
     print(f"PASS {root.name}: {len(records)} snapshots, "
-          f"max L2 mass={max_mass_l2:.12g}, conserved mass and solids")
+          f"max L2 mass={max_mass_l2:.12g}, conserved mass and solids, "
+          f"L2 activation {'required' if require_growth else 'not assumed'}")
     return records
 
 
@@ -222,7 +231,7 @@ def compare_budgets(reference, candidate):
                 raise AssertionError(f"Budget mismatch index {n} field {key}")
 
 
-def run_validation(solver, root, horizon, timeout):
+def run_validation(solver, root, horizon, growth_horizon, timeout):
     midpoint = horizon / 2.0
     template = root / "initial"
     template.mkdir(parents=True)
@@ -266,6 +275,19 @@ def run_validation(solver, root, horizon, timeout):
             compare_snapshots(reference, candidate, index)
         print(f"PASS: two-layer OpenMP {threads} threads vs 1 thread")
 
+    # The reference Etna avalanche starts from rest. The shear/Rouse law may
+    # predict zero upward transfer in the first 0.01 seconds. Test activation
+    # on a separate, longer physical trajectory without changing coefficients
+    # or artificially seeding the upper layer.
+    growth = root / "growth"
+    shutil.copytree(template, growth)
+    set_input(growth, growth_horizon, growth_horizon / 2.0)
+    execute(solver, growth, 1, timeout, "growth_activation")
+    growth_records = check_invariants(growth, require_growth=True)
+    if len(growth_records) != 3:
+        raise AssertionError("Expected three outputs in the L2 activation trajectory")
+    print(f"PASS: L2 emerges from physically generated shear by t={growth_horizon:.6g} s")
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -276,15 +298,19 @@ def main():
                         help="Final simulation time in seconds (default 0.01)")
     parser.add_argument("--timeout", type=int, default=900,
                         help="Per-run timeout in seconds")
+    parser.add_argument("--growth-horizon", type=float, default=2.0,
+                        help="Separate Etna shear-activation horizon in seconds (default 2)")
     args = parser.parse_args()
     if not 0.0 < args.horizon <= 0.1:
-        parser.error("The validation horizon must satisfy 0 < t <= 0.1 s")
+        parser.error("The restart/OpenMP horizon must satisfy 0 < t <= 0.1 s")
+    if not args.horizon < args.growth_horizon <= 20.0:
+        parser.error("The L2 activation horizon must exceed the short test and be <= 20 s")
     root = args.workdir.resolve()
     if root.exists() and any(root.iterdir()):
         parser.error("Evidence directory must be new or empty")
     root.mkdir(parents=True, exist_ok=True)
     try:
-        run_validation(args.solver.resolve(), root, args.horizon, args.timeout)
+        run_validation(args.solver.resolve(), root, args.horizon, args.growth_horizon, args.timeout)
     except Exception as error:
         print(f"FAIL: TL13a extended validation: {error}", file=sys.stderr)
         return 1
