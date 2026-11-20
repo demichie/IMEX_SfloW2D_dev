@@ -214,6 +214,10 @@ CONTAINS
                 END DO
             END DO find_front
             IF (front_j>0) THEN
+                WRITE(*,'(A,L1,A,2(ES24.16,1X))') 'FRONT_TRACE face_active=', &
+                    domain%solve_mask_x(front_j,front_k), ' center_mass_L,R=', &
+                    state%q(idx_totMassEqn,1,front_j-1,front_k), &
+                    state%q(idx_totMassEqn,1,front_j,front_k)
                 CALL spatial_operators(1)%front_mass_flux(front_j,front_k,face_left,face_right)
                 WRITE(*,'(A,2(I0,1X),A,2(ES24.16,1X),A,2(ES24.16,1X))') &
                     'FRONT_MASS face(j,k)=',front_j,front_k,' t,dt=',t,dt, &

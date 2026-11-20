@@ -70,6 +70,19 @@ CONTAINS
             CALL fatal_error('Front diagnostic face outside computational domain')
         flux_left=this%hp_pccu%G_interface_xL(idx_totMassEqn,j,k)
         flux_right=this%hp_pccu%G_interface_xR(idx_totMassEqn,j,k)
+        WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_TRACE selected_hL,hR,etaL,etaR=', &
+            this%reconstruction%h_selected_interfaceL(j,k), &
+            this%reconstruction%h_selected_interfaceR(j,k), &
+            this%reconstruction%eta_interfaceL(j,k),this%reconstruction%eta_interfaceR(j,k)
+        WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_TRACE reconstructed_hL,hR,uL,uR=', &
+            this%reconstruction%qp_adv_interfaceL(idx_h,j,k), &
+            this%reconstruction%qp_adv_interfaceR(idx_h,j,k), &
+            this%reconstruction%qp_adv_interfaceL(idx_u,j,k), &
+            this%reconstruction%qp_adv_interfaceR(idx_u,j,k)
+        WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_TRACE h_froudeL,h_froudeR,a_minus,a_plus=', &
+            this%reconstruction%h_froude_interfaceL(j,k), &
+            this%reconstruction%h_froude_interfaceR(j,k), &
+            this%hp_pccu%a_interface_xNeg(j,k),this%hp_pccu%a_interface_xPos(j,k)
     END SUBROUTINE spatial_front_mass_flux
 
     !> \brief Initialize the reconstruction and KT flux workspace.

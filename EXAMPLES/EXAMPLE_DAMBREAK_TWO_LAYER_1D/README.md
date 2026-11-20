@@ -68,3 +68,11 @@ candidate gains mass but the post-source value becomes zero, investigate
 the source executor. If the post-source value is positive but the
 published value is zero, investigate the final state commit. The diagnostic
 reads existing flux arrays and does not alter the physical state.
+
+The companion `FRONT_TRACE` records show whether the selected x-face is
+active, the conservative masses in its adjacent cells, the reconstructed
+left/right depths and velocities, free-surface values, Froude-blend depths,
+and characteristic speed bounds. These distinguish a missing active face,
+dry reconstructed states, and vanishing coupled characteristic speeds.
+If the front mass flux remains identically zero, inspect `FRONT_TRACE`
+rather than the later Lie source or commit stages.
