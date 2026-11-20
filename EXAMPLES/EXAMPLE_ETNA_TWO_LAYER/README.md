@@ -152,6 +152,7 @@ and compares the final conservative state and checkpoint. Independent runs
 with 2 and 4 OpenMP threads are compared to the 1-thread reference.
 
 Budget assertions cover L1/L2 mass and solids additivity, nonnegativity,
+consistency with each conservative snapshot (relative tolerance 2e-8),
 total mass and total solids conservation (relative tolerance 1e-6), and
 strictly positive L2 mass growth. The cross-run conservative and budget
 comparisons use 5e-10 relative and 1e-8 absolute tolerances. These are

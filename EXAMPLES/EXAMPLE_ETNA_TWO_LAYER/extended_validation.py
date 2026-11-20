@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import sys
 
-from prepare import EXAMPLE, FIELD_WIDTH, N_VARS, prepare
+from prepare import EXAMPLE, FIELD_WIDTH, N_VARS, NX, NY, prepare
 from run_validation import change_parameter, check_run
 
 RUN = "exampleEtna_two_layer"
@@ -27,6 +27,7 @@ BUDGET_COLUMNS = (
 REL_CONSERVATION = 1.0e-6
 REL_COMPARISON = 5.0e-10
 ABS_COMPARISON = 1.0e-8
+REL_SNAPSHOT_BUDGET = 2.0e-8
 
 
 def set_input(root, end_time, output_interval, restart_binary=False):
@@ -111,7 +112,7 @@ def budgets(root):
                 raise AssertionError(f"{total} inconsistent at index {index}")
         for key in ("mass_L1", "mass_L2", "solid_L1", "solid_L2",
                     "solid_substrate", "volume_L1", "volume_L2"):
-            if record[key] < -1e-10 * max(1.0, abs(record["mass_total"])):
+            if record[key] < -1e-10:
                 raise AssertionError(f"Negative {key} at index {index}")
         result.append(record)
     return result
@@ -179,11 +180,33 @@ def check_invariants(root, require_growth=True):
     max_mass_l2 = max(record["mass_L2"] for record in records[1:])
     if require_growth and max_mass_l2 <= 0.0:
         raise AssertionError("No measurable L2 growth during extended elutriation run")
-    for n in range(len(records)):
+    input_text = (root / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
+    match = re.search(r"(?im)^[ \\t]*CELL_SIZE[ \\t]*=[ \\t]*([0-9.+EeDd-]+)", input_text)
+    if match is None:
+        raise AssertionError("Missing canonical cell size")
+    cell_size = float(match.group(1).replace("D", "E").replace("d", "e"))
+    if not math.isfinite(cell_size) or cell_size <= 0.0:
+        raise AssertionError("Invalid canonical cell size")
+    cell_area = cell_size * cell_size
+    for n, record in enumerate(records):
         for layer in (1, 2):
-            cell_count = sum(1 for _ in cells(snapshot(root, n, layer)))
-            if cell_count != 250 * 150:
-                raise AssertionError(f"Unexpected snapshot grid size {cell_count}")
+            count = 0
+            mass = 0.0
+            solids = 0.0
+            for state in cells(snapshot(root, n, layer)):
+                mass += state[2]
+                solids += state[6]
+                count += 1
+            if count != NX * NY:
+                raise AssertionError(f"Unexpected snapshot grid size {count}")
+            for key, actual in ((f"mass_L{layer}", mass * cell_area),
+                                (f"solid_L{layer}", solids * cell_area)):
+                expected = record[key]
+                if abs(actual - expected) > REL_SNAPSHOT_BUDGET * max(1.0, abs(expected)):
+                    raise AssertionError(
+                        f"Conservative snapshot/{key} mismatch at index {n}: "
+                        f"{actual:.16g} vs {expected:.16g}"
+                    )
     print(f"PASS {root.name}: {len(records)} snapshots, "
           f"max L2 mass={max_mass_l2:.12g}, conserved mass and solids")
     return records
