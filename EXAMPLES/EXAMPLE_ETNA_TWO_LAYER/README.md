@@ -14,13 +14,13 @@ After entering this directory from the repository root:
 
 ```bash
 cd EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
-cp ../EXAMPLE_ETNA/DEM/Etna2014_crop.zip DEM/
+cp ../EXAMPLE_ETNA/DEM/Etna2014_crop.zip DEM/\nunzip DEM/Etna2014_crop.zip -d DEM/
 ```
 
 Requirements for preprocessing: Python 3, NumPy and pandas.
 The compiled solver is expected at `../../src/IMEX_SfloW2D`.
 
-## 2. Prepare only the topography and initial thickness
+The DEM extraction is a manual prerequisite, not part of `prepare.py`.\nCheck that `DEM/Etna2014_crop.asc` exists before proceeding.\n\n## 2. Prepare only the topography and initial thickness
 
 ```bash
 python3 prepare.py
@@ -30,7 +30,7 @@ This **never starts the Fortran program**. It runs the local
 `create_input_ellipsoid.py` with parameters from `input_ellipsoid.py`
 and produces:
 
-- `DEM/Etna2014_crop.asc`: extracted original topography.
+- `DEM/Etna2014_crop.asc`: original topography (extracted manually beforehand).
 - `DEM/new_dem.asc`: modified terrain.
 - `DEM/init_volume.asc`: initial L1 thickness raster.
 - `DEM/ellipsoid.asc`: excavation geometry for inspection.
@@ -111,7 +111,7 @@ python3 extended_validation.py \
 ```
 
 The checkers run from this example and create isolated, new or empty
-work directories. They copy the local DEM ZIP for preprocessing but **do
+work directories. They copy the already extracted local DEM for preprocessing but **do
 not** invoke a preliminary single-layer solver to construct initial
 snapshots. The two-layer executable alone constructs its conservative
 initial state when each test begins.

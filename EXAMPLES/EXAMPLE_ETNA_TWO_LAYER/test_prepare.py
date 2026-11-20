@@ -11,9 +11,9 @@ HERE = Path(__file__).resolve().parent
 
 class EtnaTwoLayerPreparationTest(unittest.TestCase):
 
-    def test_terrain_requires_local_dem_zip(self):
+    def test_terrain_requires_extracted_dem(self):
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(FileNotFoundError, "Copy only the DEM ZIP"):
+            with self.assertRaisesRegex(FileNotFoundError, "Extract the original DEM manually"):
                 prepare.prepare_terrain(Path(directory))
 
     def test_prepare_does_not_invoke_fortran_or_create_snapshots(self):
@@ -21,7 +21,7 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
             root = Path(directory)
             dem = root / "DEM"
             dem.mkdir()
-            for name in ("Etna2014_crop.asc", "new_dem.asc", "init_volume.asc"):
+            for name in ("Etna2014_crop.asc", "new_dem.asc", "init_volume.asc", "ellipsoid.asc"):
                 (dem / name).write_text("existing", encoding="ascii")
             prepare.prepare(root)
             self.assertFalse((root / "INITIAL_CONDITIONS").exists())

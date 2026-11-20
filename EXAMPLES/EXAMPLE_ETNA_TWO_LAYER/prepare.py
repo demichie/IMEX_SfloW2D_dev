@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the Etna DEM and initial thickness without running the solver.
+"""Generate Etna terrain and thickness rasters without running the solver.
 
 The two-layer Fortran solver reads layer-specific primitive input directly.
-Only the original Etna DEM ZIP must be copied from the single-layer example.
+The original Etna DEM must be extracted manually before preprocessing.
 """
 
 import argparse
@@ -10,11 +10,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import zipfile
 
 
 EXAMPLE = Path(__file__).resolve().parent
-ARCHIVE_NAME = "Etna2014_crop.zip"
 DEM_MEMBER = "Etna2014_crop.asc"
 NX, NY, N_VARS = 250, 150, 5
 FIELD_WIDTH = 20
@@ -35,43 +33,37 @@ def replace_single_line(text, key, value):
 
 
 def prepare_terrain(directory):
-    """Extract the local DEM and generate the three terrain rasters."""
+    """Generate terrain rasters from the manually extracted original DEM."""
     dem_dir = directory / "DEM"
     original_dem = dem_dir / DEM_MEMBER
+    if not original_dem.is_file():
+        raise FileNotFoundError(
+            f"Missing {original_dem}. Extract the original DEM manually before preprocessing."
+        )
+
     output_files = (dem_dir / "new_dem.asc", dem_dir / "init_volume.asc",
                     dem_dir / "ellipsoid.asc")
-
-    if original_dem.is_file() and all(path.is_file() for path in output_files):
+    if all(path.is_file() for path in output_files):
         return
-
-    if not original_dem.is_file():
-        archive = dem_dir / ARCHIVE_NAME
-        if not archive.is_file():
-            raise FileNotFoundError(
-                f"Copy only the DEM ZIP ({ARCHIVE_NAME}) into {dem_dir} before preprocessing."
-            )
-        dem_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(archive) as source:
-            with source.open(DEM_MEMBER) as data, original_dem.open("wb") as target:
-                shutil.copyfileobj(data, target)
 
     subprocess.run([sys.executable, str(EXAMPLE / "create_input_ellipsoid.py")],
                    cwd=directory, check=True)
 
+
 def prepare(directory):
-    """Prepare the DEM rasters only. Never run the Fortran executable."""
+    """Prepare the terrain rasters only; never run the Fortran executable."""
     directory = directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
     if directory != EXAMPLE:
-        local_archive = EXAMPLE / "DEM" / ARCHIVE_NAME
-        target_archive = directory / "DEM" / ARCHIVE_NAME
-        if not target_archive.exists():
-            if not local_archive.is_file():
+        original_dem = EXAMPLE / "DEM" / DEM_MEMBER
+        target_dem = directory / "DEM" / DEM_MEMBER
+        if not target_dem.is_file():
+            if not original_dem.is_file():
                 raise FileNotFoundError(
-                    f"Missing {local_archive}. Copy the DEM ZIP into the example DEM directory first."
+                    f"Missing {original_dem}. Extract the DEM manually first."
                 )
-            target_archive.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(local_archive, target_archive)
+            target_dem.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(original_dem, target_dem)
     prepare_terrain(directory)
     print("DEM preprocessing complete. No solver has been executed.")
 
