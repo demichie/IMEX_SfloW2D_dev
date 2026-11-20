@@ -162,6 +162,7 @@ CONTAINS
     !> inventories.
     SUBROUTINE refresh_substrate_totals(this)
         CLASS(state_type), INTENT(INOUT) :: this
+        INTEGER :: j,k
         ! Lava deposit_tot is authoritative; never reset it or use granular porosity.
         IF (lava_flag) THEN
             this%erosion_tot=0.0_wp
@@ -178,8 +179,14 @@ CONTAINS
         IF (.NOT.ieee_is_finite(substrate%erodible_porosity) .OR. &
             substrate%erodible_porosity<0.0_wp .OR. substrate%erodible_porosity>=1.0_wp) &
             ERROR STOP 'Invalid substrate porosity for aggregate thickness'
-        this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-substrate%erodible_porosity)
-        this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-substrate%erodible_porosity)
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j,k) SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            DO j=1,comp_cells_x
+                this%deposit_tot(j,k)=SUM(this%deposit(j,k,:))/(1.0_wp-substrate%erodible_porosity)
+                this%erosion_tot(j,k)=SUM(this%erosion(j,k,:))/(1.0_wp-substrate%erodible_porosity)
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
     END SUBROUTINE refresh_substrate_totals
 
     !> @brief Test finiteness of all primitive components in one cell.
