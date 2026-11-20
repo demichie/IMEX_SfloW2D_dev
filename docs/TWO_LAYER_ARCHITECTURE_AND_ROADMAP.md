@@ -1,6 +1,6 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Stato:** 17 novembre 2026 · branch `feature/two-layer` · `N_LAYERS=2` disabilitato in produzione.
+**Stato:** 20 novembre 2026 · branch `feature/two-layer` · `N_LAYERS=2` rifiutato per default; opt-in `IMEX_TWO_LAYER_VALIDATION=1` soltanto per test TL13a.
 **Obiettivo:** completare L1 inferiore e L2 superiore preservando comportamento, input e risultati single-layer.
 Questa e' la specifica operativa delle scelte e del lavoro residuo, non una cronologia dei commit.
 L'evidenza tecnica delle fasi precedenti e' in [TWO_LAYER_CODE_AUDIT.md](TWO_LAYER_CODE_AUDIT.md).
@@ -219,7 +219,7 @@ abilitazione in produzione.
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
-| **TL13a — Gate funzionale** | Audit di chiusura e test di continuazione I/O pronti; validazione integrata pendente | Percorso end-to-end, assenza di architetture obsolete, build strict/optimized, regressioni, OpenMP e invarianti essenziali. Solo dopo, eventuale abilitazione **controllata** per test. |
+| **TL13a — Gate funzionale** | Opt-in sperimentale del driver e smoke test Etna disponibili; verifica integrata pendente | Eseguire il test Etna, build strict/optimized, regressioni, restart, OpenMP e invarianti essenziali. Abilitazione produttiva non autorizzata. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
@@ -481,3 +481,16 @@ snapshot-generation tests are part of `make check`. The solver still rejects
 `N_LAYERS=2`; this example is **not** evidence of two-layer production
 readiness. Future acceptance must verify cold-start physics, conservative
 budgets, restart, netCDF and OpenMP through the actual driver.
+
+
+**TL13a — opt-in del driver e smoke test (20 novembre 2026):** il layout
+ammette ora entrambi i layer, ma il parser rifiuta `N_LAYERS=2` senza
+`IMEX_TWO_LAYER_VALIDATION=1`. Il driver prepara il workset OR,
+le due ricostruzioni CFL e il bound spaziale accoppiato attraverso il kernel
+canonico. `EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py` prepara gli
+stati e verifica il gate di default, quindi tenta un breve run integrato
+con output conservativo, ESRI, NetCDF e checkpoint. La Action
+`solver-validation.yml` esegue questo test solo con input manuale
+`two_layer_smoke=true`. **Non vi sono ancora risultati di esecuzione su
+questo commit** e TL13a/TL13b restano aperte. Il bound preliminare
+non certifica l'iperbolicita' con shear e non autorizza uso produttivo.

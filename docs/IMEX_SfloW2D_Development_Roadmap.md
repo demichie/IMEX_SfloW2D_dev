@@ -7,9 +7,10 @@ inspect the branch HEAD, source code and the CI outcome for that exact revision.
 ## Current objective: TL13
 
 The single-layer production path remains the reference baseline. The two-layer
-architecture is structurally implemented but **`N_LAYERS=2` remains disabled
-in the production driver** until the controlled end-to-end functional gate and
-subsequent scientific validation.
+architecture is structurally implemented. **`N_LAYERS=2` is rejected by default**;
+`IMEX_TWO_LAYER_VALIDATION=1` permits an explicitly experimental TL13a run,
+not a production-approved configuration. Functional and scientific acceptance
+remain separate gates.
 
 The [two-layer architecture and roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
 is the single authoritative specification of layer ownership, contacts,
@@ -22,7 +23,7 @@ assumptions. Do not introduce competing implementation plans.
 | TL07 | Coupled Lie trial, source scheduling and optional layer physics exercised structurally | Validate actual two-layer production timestep |
 | TL08–TL11 | Interlayer settling, elutriation, carrier and analytic drag implemented/tested in isolated and integrated fixtures | Validate coupled mass/species/energy/momentum budgets through a complete run |
 | TL12 | Two-layer input, snapshots, named NetCDF physical fields, and binary restart structurally implemented | Verify real driver I/O, restart continuation and OpenMP |
-| TL13a | **Open** | Controlled two-layer end-to-end simulation with full parsing, IC/BC, evolving L1/L2, budgets, output, restart and determinism |
+| TL13a | **Open; experimental driver opt-in and smoke-test job added** | Run and verify a two-layer end-to-end case, full parsing, IC/BC, evolving L1/L2, budgets, restart and OpenMP determinism |
 | TL13b | **Open** | Scientifically validate hyperbolicity/shear, density contrasts, coupled pressure, wet/dry, convergence and physical closures |
 
 ## Invariants not to change during TL13a

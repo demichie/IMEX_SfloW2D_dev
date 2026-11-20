@@ -1,8 +1,9 @@
 # Etna two-layer: dense avalanche generating an upper dilute current
 
-This is a **prepared validation example**, not yet an executable two-layer
-production scenario. The production solver deliberately rejects `N_LAYERS=2`.
-Keep this gate closed until the full coupled validation is approved.
+This is an **experimental validation example**, not an approved two-layer
+production scenario. The solver rejects `N_LAYERS=2` by default; a controlled
+run requires `IMEX_TWO_LAYER_VALIDATION=1`. Keep the production gate closed
+until functional and scientific acceptance.
 
 ## Scientific initial condition
 

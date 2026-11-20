@@ -8,7 +8,7 @@ This document is the current audit, not a historical compatibility matrix.
 
 | Domain | Authoritative owner | Current invariant |
 | --- | --- | --- |
-| Model configuration | `model_layout_2d` and per-layer physical descriptors | State arrays have shape `(component,layer,x,y)`; production `supported_layer_count` still permits only one layer. |
+| Model configuration | `model_layout_2d` and per-layer physical descriptors | State arrays have shape `(component,layer,x,y)`; layout admits one or two layers, while the production parser requires explicit TL13a opt-in for two. |
 | Fluid and substrate inventories | `state_fields::state_type` | `q/qp` are per-layer; bed, deposit, erosion and erodible inventories are shared. |
 | Contact exposure | `layer_contacts_2d::evaluate_layer_contacts` | Four two-layer wet/dry occupations define atmosphere/substrate contacts, not layer-dependent copies of physics. |
 | Source scheduling | `source_registry_2d` | L1, L2 and INTERLAYER scopes are validated in one registry. |
@@ -74,8 +74,8 @@ This is intentionally a *single-layer production driver* test plus a
   contrasts, pressure and closure limits before any production release.
 
 **TL13a gate remains open:** structural two-layer integration and real
-single-layer end-to-end validation are distinct. A production two-layer
-integration run is unavailable while the intentional layout gate is closed;
+single-layer end-to-end validation are distinct. A two-layer integration run is now available only through explicit TL13a
+validation opt-in;
 scientific approval and TL13b remain separate.
 
 
@@ -171,3 +171,16 @@ TL13b gate. Run both CI profiles, the single-layer regression set and a short
 controlled two-layer run with output/restart/OpenMP before claiming TL13a
 functional acceptance. The preliminary total-depth wave bound is not a
 validated coupled eigenvalue/hyperbolicity analysis.
+
+## TL13a — new controlled smoke-test evidence route
+
+The optional `two_layer_smoke` input in the manual solver-validation
+workflow starts an isolated strict/debug Etna run. The standalone script
+`EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py` first verifies that
+`N_LAYERS=2` is rejected by default, then prepares the canonical L1 initial
+state and exactly dry L2, enables the diagnostic opt-in and checks the first
+advanced snapshots, L2 ESRI fields, manifest, mass-budget arithmetic,
+NetCDF file and checkpoint file. It preserves the solver's `runner.log`
+under the evidence directory. This test cannot replace long-time
+conservation, physical calibration, coupled wave-speed validation, restart
+continuation or OpenMP comparisons. Its first CI result is pending.

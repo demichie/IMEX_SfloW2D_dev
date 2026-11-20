@@ -135,15 +135,15 @@ CONTAINS
         CALL this%state%initialize( this%model_layout )
 
         ! Each layer owns its reconstruction, face fluxes and CFL scratch.
-        ! The production layout still admits only L1; do not activate L2 here.
+        ! Allocate the spatial workspaces for the requested structural layer count.
         ALLOCATE(this%spatial_operators(this%model_layout%n_layers))
 
         DO layer=1,SIZE(this%spatial_operators)
             CALL this%spatial_operators(layer)%initialize(layer)
         END DO
 
-        ! Keep active-cell, face and reconstruction worklists independent.
-        ! Only L1 is evolved until the two-layer scientific gates are complete.
+        ! Allocate layer-local worklist storage; the production integrator
+        ! uses the L1-owned shared OR workset when two layers are configured.
         ALLOCATE(this%domains(this%model_layout%n_layers))
         DO layer=1,SIZE(this%domains)
             CALL this%domains(layer)%initialize
