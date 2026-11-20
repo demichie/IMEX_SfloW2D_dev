@@ -2,3 +2,7 @@
 /INITIAL_CONDITIONS/*.q_2d
 /OUTPUT/
 /__pycache__/
+
+/DEM/*.zip
+/validation-smoke/
+/validation-extended/

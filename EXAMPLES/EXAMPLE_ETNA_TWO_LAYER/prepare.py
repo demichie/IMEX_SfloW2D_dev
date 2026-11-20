@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Prepare the Etna L1-only initial state and a strictly dry L2.
 
-The original Etna ellipsoid script and the single-layer solver are authoritative:
-no constitutive formulas or interpolation rules are reimplemented in Python.
+The local Etna ellipsoid script and single-layer seed input preserve the
+original Etna physical setup. The compiled single-layer solver is authoritative
+for converting its initial condition into conservative variables.
 The production N_LAYERS=2 gate is closed unless validation is explicitly opted in.
 """
 
@@ -17,8 +18,8 @@ import zipfile
 
 
 EXAMPLE = Path(__file__).resolve().parent
-ETNA = EXAMPLE.parent / "EXAMPLE_ETNA"
-ARCHIVE = ETNA / "DEM" / "Etna2014_crop.zip"
+ARCHIVE_NAME = "Etna2014_crop.zip"
+SEED_INPUT = EXAMPLE / "single_layer_seed.inp"
 DEM_MEMBER = "Etna2014_crop.asc"
 NX, NY, N_VARS = 250, 150, 5
 FIELD_WIDTH = 20
@@ -38,7 +39,7 @@ def replace_single_line(text, key, value):
 
 def seed_input():
     """Request only the original single-layer initial conservative snapshot."""
-    text = (ETNA / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
+    text = SEED_INPUT.read_text(encoding="utf-8")
     for name, value in (
         ("RUN_NAME", "'" + SEED_NAME + "'"),
         ("T_END", "0.0"),
@@ -52,7 +53,7 @@ def seed_input():
 
 
 def prepare_terrain(directory):
-    """Extract the one canonical DEM and run the unchanged Etna preprocessor."""
+    """Use the example-local ZIP and preprocessor to create the Etna rasters."""
     dem = directory / "DEM"
     dem.mkdir(parents=True, exist_ok=True)
     original = dem / DEM_MEMBER
@@ -61,13 +62,19 @@ def prepare_terrain(directory):
     if original.is_symlink() or new_dem.is_symlink() or initial_volume.is_symlink():
         raise ValueError("Refusing symlinked DEM files")
     if not original.exists():
-        with zipfile.ZipFile(ARCHIVE) as archive:
+        archive_path = dem / ARCHIVE_NAME
+        if not archive_path.is_file():
+            raise FileNotFoundError(
+                f"Missing {archive_path}. Copy only the DEM ZIP from "
+                "EXAMPLE_ETNA/DEM into this example's DEM directory."
+            )
+        with zipfile.ZipFile(archive_path) as archive:
             with archive.open(DEM_MEMBER) as source, original.open("xb") as output:
                 shutil.copyfileobj(source, output, length=1024 * 1024)
     if new_dem.exists() != initial_volume.exists():
         raise ValueError("Incomplete Etna preprocessing: remove or restore both generated rasters")
     if not new_dem.exists():
-        subprocess.run([sys.executable, str(ETNA / "create_input_ellipsoid.py")],
+        subprocess.run([sys.executable, str(EXAMPLE / "create_input_ellipsoid.py")],
                        cwd=directory, check=True)
 
 
@@ -151,6 +158,18 @@ def prepare(directory, solver):
     l2 = initial / "etna_L2_0000.q_2d"
     if l1.exists() or l2.exists():
         raise FileExistsError("Initial snapshots exist; remove both explicitly to regenerate")
+    # Evidence runs have isolated work directories. Stage only the local
+    # DEM ZIP; all Python scripts and seed inputs remain in this example.
+    if directory != EXAMPLE:
+        local_archive = EXAMPLE / "DEM" / ARCHIVE_NAME
+        target_archive = directory / "DEM" / ARCHIVE_NAME
+        if not target_archive.exists():
+            if not local_archive.is_file():
+                raise FileNotFoundError(
+                    f"Missing {local_archive}. Copy the DEM ZIP into the example DEM directory first."
+                )
+            target_archive.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(local_archive, target_archive)
     prepare_terrain(directory)
     binary = solver.resolve()
     if not binary.is_file():
@@ -175,7 +194,7 @@ def main():
     parser.add_argument("--directory", type=Path, default=EXAMPLE,
                         help="Target example directory (default: alongside prepare.py)")
     parser.add_argument("--solver", type=Path,
-                        default=EXAMPLE.parent.parent / "bin" / "IMEX_SfloW2D",
+                        default=EXAMPLE.parent.parent / "src" / "IMEX_SfloW2D",
                         help="Path to the compiled single-layer solver")
     args = parser.parse_args()
     prepare(args.directory, args.solver)

@@ -1,181 +1,150 @@
-# Etna two-layer: dense avalanche generating an upper dilute current
+# Etna two-layer — standalone experimental example
 
-This is an **experimental validation example**, not an approved two-layer
-production scenario. The solver rejects `N_LAYERS=2` by default; a controlled
-run requires `IMEX_TWO_LAYER_VALIDATION=1`. Keep the production gate closed
-until functional and scientific acceptance.
+This example runs from **its own directory**. It contains its own
+topography-preparation scripts, preprocessing parameters, single-layer seed
+input and two-layer input. **The only file to copy from another example is
+the shared Etna DEM ZIP.** No scripts are executed from sibling examples.
 
-## Scientific initial condition
+> **Experimental only:** `N_LAYERS=2` requires
+> `IMEX_TWO_LAYER_VALIDATION=1`. Functional regression tests passed for a
+> previous solver revision; scientific TL13b approval is still pending.
+> The default 200 s case has not been scientifically validated.
 
-The lower layer **L1** is exactly the initial dense pyroclastic avalanche from
-[`EXAMPLE_ETNA`](../EXAMPLE_ETNA/README.md): the same original Etna DEM,
-ellipsoidal excavation, initial 100000 m³ target, 50% solid volume concentration,
-373 K initial temperature, and Voellmy coefficients `mu=0.3`,
-`xi=300`. The original preprocessing script and the single-layer solver
-generate the conservative state: this example does **not** implement a second
-interpolation, mixture-density, or energy-conversion algorithm.
+## 1. Open the example directory
 
-The upper layer **L2 is entirely dry at t=0**. Every conserved component,
-including carrier mass, solids, momentum and energy, is identically zero in
-every cell. There is no manually prescribed dilute cloud, artificial initial
-depth, atmospheric release or separate L2 initial volume. The only configured
-mechanism that can initially generate upper-layer mass is **L1→L2
-elutriation**, with physically required carrier co-lift. The elutriation
-implementation supports a dry upper-layer cold start.
-
-The first diagnostic configuration disables L2→L1 settling and Chezy
-interlayer drag to isolate the development of the dilute layer. L2 is given
-`rheology_model='none'` as a provisional no-basal-resistance choice.
-The configured `LINEAR_USTAR` law uses 15% solids in uplifted parcels,
-`elutriation_efficiency=0.01`, and `rouse_critical=100`. **These are
-exploratory test coefficients, not a calibrated Etna eruption model**, and
-the intended L2 closure and physically defensible parameter ranges still
-require scientific validation. The original Etna L1 rheology, transport
-properties and initial state are not changed.
-
-## Prepare input data now
-
-Requirements: Python 3, NumPy, pandas, and a compiled single-layer
-`bin/IMEX_SfloW2D`. From the repository root:
+From the repository root, enter this directory **once**:
 
 ```bash
-python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/prepare.py
+cd EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
 ```
 
-The script:
+**All subsequent commands below run here**, not from the repository root.
+Requirements: Python 3, NumPy, pandas and a compiled
+`../../src/IMEX_SfloW2D` executable.
 
-1. Extracts `Etna2014_crop.asc` from the **single** tracked
-   `EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip`. No DEM is committed
-   a second time.
-2. Invokes the **unchanged** `EXAMPLE_ETNA/create_input_ellipsoid.py`
-   with its original `input_ellipsoid.py` parameters. The results
-   `DEM/new_dem.asc` and `DEM/init_volume.asc` reproduce the same
-   physical excavation.
-3. Runs an isolated **single-layer** Etna initialization with `T_END=0`
-   and conservative t=0 output enabled. No timestep of the dense avalanche
-   is advanced; all original physical inputs remain unchanged.
-4. Copies its initial conservative snapshot **byte for byte** to
-   `INITIAL_CONDITIONS/etna_L1_0000.q_2d`. It produces
-   `INITIAL_CONDITIONS/etna_L2_0000.q_2d` with identical cell coordinates
-   and strictly zero conservative components. A format/cell-count/mass
-   check prevents partial or accidentally empty initial conditions.
-
-The temporary single-layer initialization run is deleted after extraction.
-The generated DEM, snapshots, and eventual solver outputs are not tracked.
-
-To prepare a separate directory or use a custom compiled binary:
+## 2. Copy the DEM ZIP (once)
 
 ```bash
-python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/prepare.py \
-  --directory /absolute/path/to/etna-two-layer \
-  --solver /absolute/path/to/IMEX_SfloW2D
+cp ../EXAMPLE_ETNA/DEM/Etna2014_crop.zip DEM/
 ```
 
-When using an isolated directory, copy the tracked
-`EXAMPLE_ETNA_TWO_LAYER/IMEX_SfloW2D.inp` there before launching the
-eventual two-layer solver. The preparator deliberately never overwrites
-modified user input files or existing L1/L2 initial snapshots. If the
-original Etna ellipsoid configuration changes, remove/recreate both
-generated rasters and both initial snapshots before regenerating.
+This is the only dependency on `EXAMPLE_ETNA`. The ZIP is not tracked a
+second time in Git. Do **not** manually copy the preprocessing scripts or
+the original example input.
 
-Run the lightweight preparation regression independently:
+## 3. Generate the DEM and both initial layer snapshots (once)
 
 ```bash
-python3 -m unittest discover -s EXAMPLES/EXAMPLE_ETNA_TWO_LAYER \
-  -p 'test_*.py'
+python3 prepare.py
 ```
 
-This test requires only Python's standard library, uses synthetic small
-snapshots and does not need the solver or DEM.
+`prepare.py` uses only files in this example:
+- `DEM/Etna2014_crop.zip`: original topography, extracted locally.
+- `input_ellipsoid.py` and `create_input_ellipsoid.py`: the Etna ellipsoidal
+  excavation, preserving the original `x1=500430`, `y1=4177500`, and
+  `vol=100000` parameters. Outputs are `DEM/new_dem.asc`,
+  `DEM/init_volume.asc` and `DEM/ellipsoid.asc`.
+- `single_layer_seed.inp`: the original Etna **single-layer** configuration,
+  used exclusively for a temporary `T_END=0` initialization.
+- The **compiled solver** computes the conservative t=0 snapshot; Python
+  does not reproduce the model's mixture density or energy formulas.
 
-## Controlled two-layer execution — experimental TL13a
+The script writes:
+- `INITIAL_CONDITIONS/etna_L1_0000.q_2d`: original dense avalanche,
+  with an initial 100000 m³ excavation target, 50% solid volume fraction,
+  373 K, Voellmy `mu=0.3`, `xi=300`.
+- `INITIAL_CONDITIONS/etna_L2_0000.q_2d`: exactly zero conservative mass,
+  particles, momentum and energy, with matching grid coordinates.
 
-The production parser still rejects `N_LAYERS=2` by default. For a
-controlled integration run only, set `IMEX_TWO_LAYER_VALIDATION=1`.
-This opt-in is not an endorsement of the coupled scientific model.
+Preparing the inputs again will **not overwrite** existing initial snapshots.
+If you change the DEM or excavation setup, remove the generated DEM rasters
+and both snapshots explicitly before rerunning `python3 prepare.py`.
 
-To run the short prepared Etna end-to-end smoke test from the repository
-root (requires compiled solver, Python 3, NumPy, pandas and the DEM archive):
+## 4. Run the two-layer simulation
+
+The tracked `IMEX_SfloW2D.inp` is the two-layer run configuration.
+From the same directory:
 
 ```bash
-python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py \
-  --solver src/IMEX_SfloW2D \
-  --workdir /tmp/imex-etna-tl13a
+IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D
 ```
 
-Use an empty directory for `--workdir` and inspect its solver outputs.
-The test prepares the canonical single-layer Etna initial state and strictly
-dry upper layer, runs to `t=0.001 s`, then checks snapshot time indices,
-L1/L2 conservative files, upper-layer ESRI rasters, total mass budget
-arithmetic, NetCDF presence and binary restart presence. It does **not**
-yet validate restart continuation, physical conservation accuracy, L2
-growth over longer times or OpenMP bitwise identity.
+The current input specifies `N_LAYERS=2`, `T_END=200 s`,
+`DT_OUTPUT=5 s` and `CFL=0.24`. For a first exploratory run, consider
+temporarily setting `T_END=10.0` and `DT_OUTPUT=1.0`. The 10 s horizon is
+**not** an accepted scientific regression.
 
-The `solver-validation.yml` GitHub Action exposes an optional
-`two_layer_smoke` dispatch input. Set it to `true` to run this
-experimental job; ordinary CI jobs continue without experimental activation.
+Outputs are written under `OUTPUT/exampleEtna_two_layer/`, including
+L1/L2 conservative snapshots, ESRI fields, NetCDF, budget CSVs and binary
+restart files.
 
-## Two-layer reference input and future scientific validation
+**Physical setup:** L1 initially contains the same dense Etna avalanche
+as the original example; L2 starts entirely dry. L1→L2 elutriation can form
+the upper layer after shear develops; it carries both solids and carrier.
+The preliminary run disables L2→L1 settling and Chezy drag to isolate
+elutriation. L2 uses `rheology_model='none'`. The `LINEAR_USTAR` closure
+uses lifted solid fraction 0.15, efficiency 0.01 and Rouse threshold 100.
+These are exploratory coefficients, not calibrated predictions.
 
-The checked-in `IMEX_SfloW2D.inp` requests `N_LAYERS=2`,
-explicit `RHEOLOGY_L1/L2_PARAMETERS`,
-`TEMPERATURE_L1/L2_PARAMETERS`,
-`MASS_EXCHANGE_L1/L2_PARAMETERS`, each layer's four boundary NAMELISTs,
-and one canonical pair-wide `INTERLAYER_PARAMETERS`.
-It points to the two generated `.q_2d` files in `INITIAL_CONDITIONS`.
-The model's common topography is the generated
-`DEM/new_dem.asc`, as in the original dense avalanche.
+## 5. Optional local validation
 
-**Do not remove the production safety gate.** In a disposable prepared
-validation directory only, the controlled execution command is:
+The validation scripts are **already inside this directory**, and create
+separate evidence directories without changing `IMEX_SfloW2D.inp` or the
+prepared manual example.
+
+Run lightweight Python unit tests (no solver or DEM required):
 
 ```bash
-IMEX_TWO_LAYER_VALIDATION=1 ../../bin/IMEX_SfloW2D
+python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
-Before functional or scientific acceptance, check: exact L2 dryness at t=0; onset of
-elutriation only after flow motion; nonnegative L1/L2 mass and component
-inventories; solid/carrier conservation across internal transfer; no
-spurious energy/momentum production; separate L1/L2 outputs and shared
-substrate budgets; restart continuation; and OpenMP reproducibility.
-A passing input parser or a created L2 field alone is not scientific
-validation.
-
-## Extended TL13a functional regression
-
-The optional `two_layer_extended=true` workflow input runs the separate
-`extended_validation.py` checker. The script reuses the **same** canonical
-Etna input, initial L1/L2 snapshots, production solver and snapshot/budget
-reader. It runs a continuous trajectory with outputs at 0, 0.005 and 0.01 s,
-restarts an otherwise identical trajectory from the midpoint binary checkpoint,
-and compares the final conservative state and checkpoint. Independent runs
-with 2 and 4 OpenMP threads are compared to the 1-thread reference.
-
-The original Etna avalanche starts from rest. The shear/Rouse elutriation
-closure can therefore legitimately return zero flux over the first 0.01 s.
-**L2 emergence is not required during that initial interval.** A distinct
-single-thread trajectory using unchanged physical parameters runs to 2 s by
-default (outputs at 0, 1 and 2 s) and requires strictly positive L2 mass.
-This longer run is an *activation diagnostic*, not a calibrated physical
-prediction. Set `--growth-horizon` to adjust the duration when investigating
-the actual shear onset; an absent upper layer is reported as an explicit
-failure with its measured budget history, never silently accepted.
-
-Budget assertions cover L1/L2 mass and solids additivity, nonnegativity,
-consistency with each conservative snapshot (relative tolerance 2e-8),
-total mass and total solids conservation (relative tolerance 1e-6), and
-strictly positive L2 mass growth. The cross-run conservative and budget
-comparisons use 5e-10 relative and 1e-8 absolute tolerances. These are
-**regression criteria**, not experimentally established error bounds.
-
-Run locally (requires built solver):
+Run a controlled short smoke test (t=0.001 s):
 
 ```bash
-python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/extended_validation.py \
-  --solver src/IMEX_SfloW2D \
-  --workdir /tmp/imex-tl13a-extended
+python3 run_validation.py \
+  --solver ../../src/IMEX_SfloW2D \
+  --workdir ./validation-smoke
 ```
 
-The run preserves its evidence directory. Longer time and alternative
-physics configurations, shear stability, convergence and quantitative
-scientific validation remain separate work under TL13b.
+Run the more extensive conservation, restart and 1/2/4-thread checks:
+
+```bash
+python3 extended_validation.py \
+  --solver ../../src/IMEX_SfloW2D \
+  --workdir ./validation-extended
+```
+
+Both `--workdir` paths must be absent or empty. The scripts copy the
+**local DEM ZIP only** into their isolated working directories. Their
+preparation and solver runs use the local scripts and seed input.
+
+The short smoke test checks both layer snapshots, ESRI/NetCDF output,
+budget arithmetic and restart presence. The extended checker compares
+continuous and resumed evolution at 0, 0.005 and 0.01 s, OpenMP 1/2/4
+threads, component conservation, and a separate 2 s L2 formation
+trajectory. The upper layer need not form during the first 0.01 s because
+the avalanche initially rests. These are functional acceptance criteria,
+not scientific TL13b validation.
+
+## Files and ownership
+
+| File | Purpose |
+|---|---|
+| `IMEX_SfloW2D.inp` | Editable two-layer simulation input |
+| `single_layer_seed.inp` | Local original Etna single-layer t=0 seed template |
+| `input_ellipsoid.py` | Local topography/excavation parameters |
+| `create_input_ellipsoid.py` | Local terrain/initial-volume generator |
+| `prepare.py` | DEM extraction and conservative L1/L2 initial states |
+| `run_validation.py` | Short controlled solver regression |
+| `extended_validation.py` | Restart, budgets and OpenMP regression |
+| `test_*.py` | Script unit tests |
+| `DEM/Etna2014_crop.zip` | Only file copied from `EXAMPLE_ETNA`, untracked |
+
+The example's `DEM/*.asc`, `INITIAL_CONDITIONS/*.q_2d` and `OUTPUT/`
+are generated artifacts and are not tracked. The original single-layer
+example remains unchanged.
+
+**Scientific limitation:** the code implements a coupled two-layer
+experimental path, but coupled hyperbolicity/shear, longer evolution,
+constitutive calibration and physically justified lift-off still require
+TL13b analysis.

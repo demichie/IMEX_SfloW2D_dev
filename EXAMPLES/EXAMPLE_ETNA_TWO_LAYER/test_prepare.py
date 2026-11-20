@@ -68,6 +68,11 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
                     self.assertFalse(l1.exists())
                     self.assertFalse(l2.exists())
 
+    def test_terrain_requires_local_dem_zip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(FileNotFoundError, "Copy only the DEM ZIP"):
+                prepare.prepare_terrain(Path(directory))
+
     def test_seed_input_preserves_original_kinematics(self):
         text = prepare.seed_input()
         self.assertIn("T_END=0.0,", text)
@@ -76,6 +81,9 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
         self.assertIn("RHEOLOGY%XI = 300.0", text)
         self.assertIn("SED_VOL_PERC = 50.0", text)
         self.assertNotIn("N_LAYERS = 2", text)
+        self.assertTrue((HERE / "create_input_ellipsoid.py").is_file())
+        self.assertTrue((HERE / "input_ellipsoid.py").is_file())
+        self.assertTrue((HERE / "single_layer_seed.inp").is_file())
 
 
 if __name__ == "__main__":

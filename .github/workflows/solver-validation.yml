@@ -158,21 +158,28 @@ jobs:
           autoreconf -fi
           ./configure --with-netcdf=/usr --enable-strict-debug
           make -j4
+      - name: Stage the single shared DEM ZIP for the standalone example
+        run: |
+          set -euo pipefail
+          cp EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/DEM/
       - name: Run short controlled Etna two-layer simulation
         if: ${{ inputs.two_layer_smoke }}
+        working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
         run: |
-          python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py \
+          python3 run_validation.py \
             --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
             --workdir "$GITHUB_WORKSPACE/tl13a-evidence" \
             --timeout 900
       - name: Validate two-layer Python evidence checkers
         if: ${{ inputs.two_layer_extended }}
+        working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
         run: |
-          python3 -m unittest discover -s EXAMPLES/EXAMPLE_ETNA_TWO_LAYER -p 'test_*.py'
+          python3 -m unittest discover -s . -p 'test_*.py'
       - name: Run extended two-layer conservation, restart and OpenMP checks
         if: ${{ inputs.two_layer_extended }}
+        working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
         run: |
-          python3 EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/extended_validation.py \
+          python3 extended_validation.py \
             --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
             --workdir "$GITHUB_WORKSPACE/tl13a-extended-evidence" \
             --timeout 900
