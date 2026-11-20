@@ -181,7 +181,7 @@ def check_invariants(root, require_growth=True):
     if require_growth and max_mass_l2 <= 0.0:
         raise AssertionError("No measurable L2 growth during extended elutriation run")
     input_text = (root / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
-    match = re.search(r"(?im)^[ \\t]*CELL_SIZE[ \\t]*=[ \\t]*([0-9.+EeDd-]+)", input_text)
+    match = re.search(r"(?im)^[ \t]*CELL_SIZE[ \t]*=[ \t]*([0-9.+EeDd-]+)", input_text)
     if match is None:
         raise AssertionError("Missing canonical cell size")
     cell_size = float(match.group(1).replace("D", "E").replace("d", "e"))
