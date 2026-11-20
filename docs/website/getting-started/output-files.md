@@ -55,3 +55,6 @@ beside the matching ESRI ASCII rasters, using the exact time from the
 snapshot manifest. `UTILS/plot_runout.py` and `UTILS/plot_probes.py`
 accept CSV paths and save figures next to their inputs. See
 [`UTILS/README.md`](../../../UTILS/README.md) for usage and dependencies.
+
+For instructions on viewing NetCDF fields and preparing satellite textures,
+see the [ParaView and QGIS visualization guide](visualization.md).

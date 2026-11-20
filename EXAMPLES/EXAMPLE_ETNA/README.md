@@ -101,7 +101,7 @@ python ../../UTILS/plot_overlay.py OUTPUT/exampleEtna
 ```
 
 This requires `OUTPUT_ESRI_FLAG=T`. For NetCDF-only output, use
-[ParaView](../../UTILS/README_ParaView.md) instead.
+[ParaView](../../docs/website/getting-started/visualization.md) instead.
 
 
 ## Expected output

@@ -16,8 +16,8 @@ Replace example paths with the actual run name and output directory;
 to the corresponding source raster or CSV. Plotting existing PNG/PDF files
 does not modify solver outputs.
 
-- [ParaView and NetCDF](README_ParaView.md)
-- [Georeferenced textures](README_texture.md)
+For step-by-step ParaView visualization and QGIS/ParaView georeferenced
+textures, see the [visualization guide](../docs/website/getting-started/visualization.md).
 
 `plot_overlay.py` plots ESRI ASCII rasters using the exported computational
 terrain (`terrain/dem_esri.asc`) and the exact snapshot time in

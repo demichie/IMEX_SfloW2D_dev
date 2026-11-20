@@ -20,6 +20,8 @@ and CI for the exact active commit remain the source of truth.
   with illustrative, **not registered**, physics.
 - [NetCDF output](NETCDF_OUTPUT.md): named physical visualization fields;
   binary checkpoints hold the full restart state.
+- [Visualization with ParaView and QGIS](website/getting-started/visualization.md):
+  menu-by-menu instructions for scientific plots and geographic textures.
 
 ## Other authoritative sources
 

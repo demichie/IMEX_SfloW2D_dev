@@ -11,6 +11,7 @@ IMEX_SfloW2D combines physical flow models with high-resolution spatial discreti
 ## Documentation
 
 - **[Getting started](getting-started/index.md)** — build prerequisites and first simulation.
+- **[Visualization](getting-started/visualization.md)** — step-by-step ParaView and QGIS procedures.
 - **[Model](model/index.md)** — physical and numerical formulation overview.
 - **[Examples](examples/index.md)** — automatically discovered simulation cases, with input parameters and execution instructions.
 - **[Development](development/index.md)** — testing and development guidance.
