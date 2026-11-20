@@ -33,6 +33,31 @@ def replace_single_line(text, key, value):
 
 
 
+
+def prepare_terrain(directory):
+    """Extract the local DEM and generate the three terrain rasters."""
+    dem_dir = directory / "DEM"
+    original_dem = dem_dir / DEM_MEMBER
+    output_files = (dem_dir / "new_dem.asc", dem_dir / "init_volume.asc",
+                    dem_dir / "ellipsoid.asc")
+
+    if original_dem.is_file() and all(path.is_file() for path in output_files):
+        return
+
+    if not original_dem.is_file():
+        archive = dem_dir / ARCHIVE_NAME
+        if not archive.is_file():
+            raise FileNotFoundError(
+                f"Copy only the DEM ZIP ({ARCHIVE_NAME}) into {dem_dir} before preprocessing."
+            )
+        dem_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive) as source:
+            with source.open(DEM_MEMBER) as data, original_dem.open("wb") as target:
+                shutil.copyfileobj(data, target)
+
+    subprocess.run([sys.executable, str(EXAMPLE / "create_input_ellipsoid.py")],
+                   cwd=directory, check=True)
+
 def prepare(directory):
     """Prepare the DEM rasters only. Never run the Fortran executable."""
     directory = directory.resolve()
