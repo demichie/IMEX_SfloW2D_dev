@@ -45,6 +45,7 @@ PROGRAM test_spatial_operator
   USE runtime_2d, ONLY : runtime_state_type
   USE output_paths, ONLY : initialize_output_paths,output_file_path,snapshot_file_path
   USE inpout_2d, ONLY : write_restart_file,read_restart_file,read_solution,n_restart_files,restart_files
+  USE inpout_2d, ONLY : T_init_l2,u_init_l2,v_init_l2,sed_vol_perc_l2
   USE inpout_2d, ONLY : init_netcdf_output,write_netcdf_timestep,close_netcdf
   USE inpout_2d, ONLY : write_two_layer_budget,run_name,restart,output_runout_flag,output_solution
   USE inpout_2d, ONLY : output_cons_flag,output_esri_flag,output_netcdf_flag
@@ -3220,6 +3221,7 @@ CONTAINS
     REAL(wp) :: budget(11)
     CHARACTER(LEN=256) :: header
     INTEGER :: saved_layers,ios,netcdf_id,variable_id,seed_size,time_dim,time_length
+    INTEGER :: ascii_unit,ascii_row,primitive_case
     INTEGER, ALLOCATABLE :: old_rng(:)
     LOGICAL :: accepted,found_file,saved_pore_l1,created_erodible,created_erodible_fract
     CHARACTER(LEN=256) :: message
@@ -3476,6 +3478,63 @@ CONTAINS
     IF (.NOT.ANY(states%q(:,1,:,:)/=states%q(:,2,:,:))) &
         ERROR STOP 'Two-layer text initialization collapsed both layers into one field'
     IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
+
+    ! The same production reader must initialize either layer from primitive
+    ! raster thickness without requiring precomputed conservative snapshots.
+    OPEN(NEWUNIT=ascii_unit,FILE='two_layer_primitive.asc',STATUS='REPLACE')
+    WRITE(ascii_unit,'(A,1X,I0)') 'ncols',nx
+    WRITE(ascii_unit,'(A,1X,I0)') 'nrows',ny
+    WRITE(ascii_unit,'(A,1X,ES24.16)') 'xllcorner',x0
+    WRITE(ascii_unit,'(A,1X,ES24.16)') 'yllcorner',y0
+    WRITE(ascii_unit,'(A,1X,ES24.16)') 'cellsize',cell_size
+    WRITE(ascii_unit,'(A,1X,I0)') 'NODATA_value',-9999
+    DO ascii_row=1,ny
+        WRITE(ascii_unit,*) (0.4_wp,j=1,nx)
+    END DO
+    CLOSE(ascii_unit)
+    IF (.NOT.ALLOCATED(alphas_init)) ALLOCATE(alphas_init(n_solid))
+    IF (.NOT.ALLOCATED(sed_vol_perc_l2)) ALLOCATE(sed_vol_perc_l2(n_solid))
+    alphas_init=0.1_wp
+    sed_vol_perc_l2=20.0_wp
+    T_init=310.0_wp
+    u_init=1.0_wp
+    v_init=0.0_wp
+    T_init_l2=360.0_wp
+    u_init_l2=2.0_wp
+    v_init_l2=0.0_wp
+    subtract_init_flag=.FALSE.
+    n_restart_files=2
+    DO primitive_case=1,4
+        restart_files(1)='two_layer_primitive.asc'
+        restart_files(2)='two_layer_primitive.asc'
+        IF (primitive_case==2 .OR. primitive_case==4) restart_files(1)='NONE'
+        IF (primitive_case==1 .OR. primitive_case==4) restart_files(2)='NONE'
+        states%q=0.0_wp
+        CALL read_solution(states,io_domain)
+        SELECT CASE(primitive_case)
+        CASE(1)
+            IF (.NOT.ANY(states%q(idx_totMassEqn,1,:,:)>0.0_wp) .OR. &
+                ANY(states%q(:,2,:,:)/=0.0_wp)) &
+                ERROR STOP 'Primitive L1-only initialization did not leave L2 dry'
+        CASE(2)
+            IF (.NOT.ANY(states%q(idx_totMassEqn,2,:,:)>0.0_wp) .OR. &
+                ANY(states%q(:,1,:,:)/=0.0_wp)) &
+                ERROR STOP 'Primitive L2-only initialization did not leave L1 dry'
+        CASE(3)
+            IF (.NOT.ANY(states%q(idx_totMassEqn,1,:,:)>0.0_wp) .OR. &
+                .NOT.ANY(states%q(idx_totMassEqn,2,:,:)>0.0_wp)) &
+                ERROR STOP 'Primitive initialization did not create two wet layers'
+            IF (ANY(states%q(idx_uEqn,1,:,:)/=states%q(idx_totMassEqn,1,:,:)*u_init) .OR. &
+                ANY(states%q(idx_uEqn,2,:,:)/=states%q(idx_totMassEqn,2,:,:)*u_init_l2)) &
+                ERROR STOP 'Independent initial layer velocities were not preserved'
+        CASE(4)
+            IF (ANY(states%q/=0.0_wp)) ERROR STOP 'Two dry primitive layers created spurious mass'
+        END SELECT
+        IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
+    END DO
+    OPEN(NEWUNIT=ascii_unit,FILE='two_layer_primitive.asc',STATUS='OLD')
+    CLOSE(ascii_unit,STATUS='DELETE')
+    WRITE(*,*) 'PASS: independent L1/L2 primitive .asc/NONE initialization for four wet/dry states'
     IF (created_erodible) DEALLOCATE(erodible_init)
     IF (created_erodible_fract) DEALLOCATE(erodible_fract)
 
