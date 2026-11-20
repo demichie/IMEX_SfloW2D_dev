@@ -227,7 +227,7 @@ PROGRAM IMEX_SfloW2D
             ! ---------------------------------------------------------
             WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
             CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state, &
-                simulation%domains(1))
+                simulation%domain)
             CALL validate_restart_output_manifest(simulation%runtime)
 
             is_binary_restart = .TRUE.
@@ -252,7 +252,7 @@ PROGRAM IMEX_SfloW2D
             ! CASE 2: CLASSIC INITIALIZATION (Python / ASCII)
             ! ---------------------------------------------------------
             WRITE(*,*) 'Standard format detected: Executing read_solution.'
-            CALL read_solution(simulation%state, simulation%domains(1))
+            CALL read_solution(simulation%state, simulation%domain)
 
         END IF
 
@@ -277,13 +277,13 @@ PROGRAM IMEX_SfloW2D
     IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
     IF (n_layers==2) THEN
-        CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
+        CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
             simulation%runtime%t,.TRUE.,q_other=simulation%state%q(:,2,:,:))
     ELSE
-        CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
+        CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
             simulation%runtime%t,.TRUE.)
     END IF
-    CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domains(1))
+    CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
 
     ! For a new run or a classic restart, initialize the stochastic field only
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -298,7 +298,7 @@ PROGRAM IMEX_SfloW2D
                     .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
             END IF
             CALL simulation%stochastic(layer)%initialize_steady( &
-                simulation%state,simulation%domains(1), &
+                simulation%state,simulation%domain, &
                 simulation%stochastic(layer)%config%stochastic_transport_flag)
         END DO
     END IF
@@ -341,10 +341,10 @@ PROGRAM IMEX_SfloW2D
     !$OMP & thickness_exceeds,pressure_exceeds, &
     !$OMP & mod_vel,r_u,r_v,conversion_ok) REDUCTION(.OR.:conversion_failed)
 
-    DO l = 1,simulation%domains(1)%solve_cells
+    DO l = 1,simulation%domain%solve_cells
 
-        j = simulation%domains(1)%j_cent(l)
-        k = simulation%domains(1)%k_cent(l)
+        j = simulation%domain%j_cent(l)
+        k = simulation%domain%k_cent(l)
 
         IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
@@ -461,27 +461,27 @@ PROGRAM IMEX_SfloW2D
         CALL update_param
 
         IF (n_layers==2) THEN
-            CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
+            CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
                 simulation%runtime%t,.FALSE.,q_other=simulation%state%q(:,2,:,:))
         ELSE
-            CALL simulation%domains(1)%check_solve(simulation%state%q(:,1,:,:), &
+            CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
                 simulation%runtime%t,.FALSE.)
         END IF
 
-        CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domains(1))
+        CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
 
         CALL simulation%spatial_operators(1)%compute_timestep( &
                 simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
-                simulation%runtime%dt, simulation%domains(1), &
+                simulation%runtime%dt, simulation%domain, &
                 boundary_source_enabled=boundary_source_enabled, &
                 max_speed_x=cfl_max_a_x,max_speed_y=cfl_max_a_y, &
                 diagnose_max_x_face=timestep_diagnostics_enabled .AND. &
                     (timestep_count<20 .OR. MOD(timestep_count+1,100)==0))
         IF (n_layers==2) THEN
-            CALL simulation%spatial_operators(2)%prepare_hp_workset(simulation%domains(1))
+            CALL simulation%spatial_operators(2)%prepare_hp_workset(simulation%domain)
             CALL simulation%spatial_operators(2)%compute_timestep( &
                 simulation%state%q(:,2,:,:),simulation%state%qp(:,2,:,:),simulation%runtime%t, &
-                upper_cfl_dt,simulation%domains(1), &
+                upper_cfl_dt,simulation%domain, &
                 boundary_source_enabled=boundary_source_enabled, &
                 lower_operator=simulation%spatial_operators(1), &
                 h_lower=simulation%state%qp(idx_h,1,:,:))
@@ -494,7 +494,7 @@ PROGRAM IMEX_SfloW2D
                 simulation%spatial_operators(2), &
                 simulation%state%qp(:,1,:,:),simulation%state%qp(:,2,:,:), &
                 coupled_term_l1,coupled_term_l2,simulation%runtime%t, &
-                simulation%domains(1),coupled_cfl_dt)
+                simulation%domain,coupled_cfl_dt)
             simulation%runtime%dt=MIN(simulation%runtime%dt,upper_cfl_dt,coupled_cfl_dt)
         END IF
         cfl_dt=simulation%runtime%dt
@@ -569,10 +569,10 @@ PROGRAM IMEX_SfloW2D
         !$OMP & thickness_exceeds,pressure_exceeds,mod_vel,r_u,r_v)
 
 
-        DO l = 1,simulation%domains(1)%solve_cells
+        DO l = 1,simulation%domain%solve_cells
 
-            j = simulation%domains(1)%j_cent(l)
-            k = simulation%domains(1)%k_cent(l)
+            j = simulation%domain%j_cent(l)
+            k = simulation%domain%k_cent(l)
 
             IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
@@ -693,7 +693,7 @@ PROGRAM IMEX_SfloW2D
 
                 CALL output_solution(simulation%runtime%t, simulation%state, simulation%runtime)
                 CALL write_restart_file(output_file_path('restart', 'restart.bin'), simulation%runtime,                &
-                    simulation%stochastic, simulation%state, simulation%domains(1))
+                    simulation%stochastic, simulation%state, simulation%domain)
 
             END IF
 

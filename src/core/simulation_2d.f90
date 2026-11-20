@@ -4,7 +4,7 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, per-layer domains, layout, source registry and numerical workspaces. Initialization
+!> Owns state, runtime, one shared active-cell domain, layout, source registry and numerical workspaces. Initialization
 !> follows their dependency order; finalization releases their storage.
 !********************************************************************************
 
@@ -74,7 +74,7 @@ MODULE simulation_2d
         TYPE(layer_physics_type), ALLOCATABLE :: layer_physics(:) !< Validated before worker allocation.
         TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
         TYPE(state_type) :: state
-        TYPE(domain_type), ALLOCATABLE :: domains(:) !< Layer-local active cell and face worklists.
+        TYPE(domain_type) :: domain !< Shared OR active cell and face workset for all layer slots.
         TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
         TYPE(time_integration_workspace_type) :: time_integration
         TYPE(stochastic_workspace_type), ALLOCATABLE :: stochastic(:) !< Independent OU workspace for each layer.
@@ -142,12 +142,9 @@ CONTAINS
             CALL this%spatial_operators(layer)%initialize(layer)
         END DO
 
-        ! Allocate layer-local worklist storage; the production integrator
-        ! uses the L1-owned shared OR workset when two layers are configured.
-        ALLOCATE(this%domains(this%model_layout%n_layers))
-        DO layer=1,SIZE(this%domains)
-            CALL this%domains(layer)%initialize
-        END DO
+        ! One canonical active-cell/face workset covers the union of L1/L2.
+        ! Per-layer HP and flux data remain owned by spatial_operators.
+        CALL this%domain%initialize
 
         CALL this%time_integration%initialize(this%source_registry)
 
@@ -181,14 +178,14 @@ CONTAINS
         ! Lie sources, inside the integrator's unpublished trial transaction.
         IF (PRESENT(observer)) THEN
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domains(1),this%spatial_operators,                                              &
+                this%stochastic,this%domain,this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
                 layer_physics=this%layer_physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domains(1),this%spatial_operators,                                              &
+                this%stochastic,this%domain,this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
                 layer_physics=this%layer_physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -215,12 +212,7 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
         INTEGER :: layer
 
-        IF (ALLOCATED(this%domains)) THEN
-            DO layer=1,SIZE(this%domains)
-                CALL this%domains(layer)%finalize
-            END DO
-            DEALLOCATE(this%domains)
-        END IF
+        CALL this%domain%finalize
         CALL this%time_integration%finalize
 
         IF (ALLOCATED(this%spatial_operators)) THEN

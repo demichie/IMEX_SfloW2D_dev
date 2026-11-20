@@ -271,3 +271,32 @@ snapshot-index safety checks. The fixture and its solver-independent
 regression now exercise that contract. No `OUTPUT_OVERWRITE` escape hatch
 was added and the output-path implementation was left unchanged.
 The end-to-end continuation is not verified on this revision yet.
+
+## TL13a final closure audit — shared-domain ownership (20 November 2026)
+
+Source and Fortran test-tree audit found exactly one active-cell/face workset
+in use: `simulation%domains(1)`. The allocated second `domain_type` was
+initialized/finalized but never read or populated by the driver or Lie
+integrator. `simulation_context_type` now owns **one** `domain` for the
+union of L1/L2 wet and boundary-injection cells. The production driver and
+time integrator use that authoritative object; separate per-layer
+`spatial_operators` and stochastic workspaces remain as required.
+No physical quantities, numerical formulas, source scheduling, time bounds,
+or output/restart schemas were modified. The single-layer path still uses
+the same domain implementation.
+
+### Verified evidence and pending CI
+
+- `847f7906`, workflow run `44710265332`: the experimental Etna job
+  finished **success**, including short smoke, independent Python checker
+  tests, and extended conservation, L2 emergence, segmented binary restart,
+  and OpenMP 1/2/4 comparison. The overall run was later **cancelled**.
+- Optimized structural integration on that workflow finished successfully,
+  but strict/debug and remaining integration checks were interrupted.
+- The earlier `2e64c86` workflow run `44705008879` completed optimized
+  and strict/debug general integration successfully; this earlier SHA does
+  **not** verify the subsequent TL13a changes or domain cleanup.
+- **TL13a stays open until both integration profiles and the two-layer
+  functional job are green on the final commit.** No automated execution
+  of the new domain ownership code has yet been observed. TL13b scientific
+  validation and production acceptance remain separate and open.

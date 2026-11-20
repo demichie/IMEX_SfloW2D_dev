@@ -219,7 +219,7 @@ abilitazione in produzione.
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
-| **TL13a — Gate funzionale** | Opt-in sperimentale del driver e smoke test Etna disponibili; verifica integrata pendente | Eseguire il test Etna, build strict/optimized, regressioni, restart, OpenMP e invarianti essenziali. Abilitazione produttiva non autorizzata. |
+| **TL13a — Gate funzionale** | Smoke Etna ed esteso (restart, conservazione, OpenMP two-layer) verdi su `847f7906`; chiusura CI complessiva pendente | Ottenere sul commit finale workflow optimized e strict/debug interamente verdi, oltre ai test two-layer. Gate produttivo non autorizzato. |
 | **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
@@ -491,6 +491,18 @@ canonico. `EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/run_validation.py` prepara gli
 stati e verifica il gate di default, quindi tenta un breve run integrato
 con output conservativo, ESRI, NetCDF e checkpoint. La Action
 `solver-validation.yml` esegue questo test solo con input manuale
-`two_layer_smoke=true`. **Non vi sono ancora risultati di esecuzione su
-questo commit** e TL13a/TL13b restano aperte. Il bound preliminare
+`two_layer_smoke=true`. **Questa nota descrive la fase iniziale di attivazione:**
+le esecuzioni successive sono documentate nell'audit di chiusura TL13a.
+TL13a/TL13b restano aperte. Il bound preliminare
 non certifica l'iperbolicita' con shear e non autorizza uso produttivo.
+
+
+**TL13a — audit finale del workset (20 novembre 2026):** il driver e
+l'integratore utilizzavano esclusivamente `simulation%domains(1)`, mentre
+`simulation_2d` allocava anche un `domain_type` L2 mai usato. Il contesto
+possiede ora un unico `simulation%domain` (workset OR L1/L2), riusando i
+kernel e gli operatori spaziali per-layer esistenti. Non sono cambiati
+lo stato conservativo, le condizioni al contorno, le leggi sorgente o
+il calcolo CFL. La chiusura TL13a richiede ancora regressioni integrate
+strict/optimized completate su quest'ultimo commit. TL13b resta il gate
+scientifico separato.
