@@ -213,8 +213,18 @@ CONTAINS
         ! The shared PCCU kernel accepts stationary faces when the pressure
         ! jump is exactly zero. No artificial wave speed is introduced.
         IF (a_plus-a_minus<=pccu_speed_tolerance) THEN
-            IF (ANY(path_l1/=0.0_wp) .OR. ANY(path_l2/=0.0_wp)) &
+            IF (ANY(path_l1/=0.0_wp) .OR. ANY(path_l2/=0.0_wp)) THEN
+                WRITE(*,'(A,I0,A,3(ES24.16,1X))') 'INTERLAYER_DEGENERATE direction=',direction, &
+                    ' a_minus,a_plus,tolerance=',a_minus,a_plus,pccu_speed_tolerance
+                WRITE(*,'(A,4(ES24.16,1X))') 'INTERLAYER_DEGENERATE depths h1L,h2L,h1R,h2R=', &
+                    h1_left,h2_left,h1_right,h2_right
+                WRITE(*,'(A,4(ES24.16,1X))') 'INTERLAYER_DEGENERATE gammaL,gammaR,eta2L,eta2R=', &
+                    gamma_left,gamma_right,eta2_left,eta2_right
+                WRITE(*,'(A,ES24.16)') 'INTERLAYER_DEGENERATE gravity_metric=',metric
+                WRITE(*,'(A,*(ES24.16,1X))') 'INTERLAYER_DEGENERATE path_L1=',path_l1
+                WRITE(*,'(A,*(ES24.16,1X))') 'INTERLAYER_DEGENERATE path_L2=',path_l2
                 ERROR STOP 'Nonzero interlayer pressure with degenerate characteristic bounds'
+            END IF
             left_l1=0.0_wp
             right_l1=0.0_wp
             left_l2=0.0_wp
