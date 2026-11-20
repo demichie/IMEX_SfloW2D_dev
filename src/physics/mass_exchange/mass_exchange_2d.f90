@@ -54,9 +54,10 @@ CONTAINS
         !> @param[in] pore_enabled Selected layer pore pressure.
         !> @param[in] terrain_exposed True when this layer contacts the substrate.
         !> @param[in] atmosphere_exposed True when this layer contacts the atmosphere.
+        !> @param[in] static_deposition_allowed True only for L1; independent of geometric contact.
     SUBROUTINE eval_mass_exchange_explicit(config,mass_config,physical_state,B_zone,erodible,dt,source_mask, &
             total_rates,eqns_term, &
-            scratch,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed)
+            scratch,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed,static_deposition_allowed)
 
             TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
@@ -65,6 +66,7 @@ CONTAINS
             INTEGER, INTENT(IN) :: B_zone
             INTEGER, INTENT(IN) :: source_mask
             LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed
+            LOGICAL, INTENT(IN) :: static_deposition_allowed
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             TYPE(mass_exchange_scratch_type), TARGET, INTENT(INOUT), OPTIONAL :: scratch
@@ -81,13 +83,17 @@ CONTAINS
             ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                      &
                 liquid_loss_rates=>work%liquid_loss_rates)
             ! Contact eligibility applies only to external exchanges.
-            ! A layer without terrain contact cannot deposit into the substrate;
-            ! interlayer settling is a separate, conservatively coupled process.
+            ! Geometric terrain contact alone does not authorize static
+            ! deposition: only L1 can deposit into the substrate. L2 settling
+            ! must first transfer material to L1, even when L1 starts dry.
             do_erosion=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_EROSION-1)
-            do_deposition=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
+            do_deposition=terrain_exposed .AND. static_deposition_allowed .AND. &
+                BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
             do_liquid_loss=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
             do_entrainment=atmosphere_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
-            do_vaporization=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
+            ! Steam generation is coupled to the actual substrate deposition.
+            do_vaporization=terrain_exposed .AND. static_deposition_allowed .AND. &
+                BTEST(source_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
             do_lava=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1)
             IF (do_vaporization .AND. .NOT.do_deposition)                                                              &
                     CALL fatal_error('mass_exchange: vaporization requires same-group deposition')

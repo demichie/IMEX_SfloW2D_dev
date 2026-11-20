@@ -10,6 +10,9 @@ PROGRAM test_interlayer_lie_transaction
     USE state_physical, ONLY : build_physical_state_from_qp
     USE state_conversions, ONLY : primitive_to_conservative
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
+    USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_DEPOSITION
+    USE parameters_2d, ONLY : mass_exchange_rates_type
     USE interlayer_momentum_exchange_2d, ONLY : apply_interlayer_momentum_exchange_analytic, &
         interlayer_momentum_exchange_config_type
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
@@ -18,6 +21,7 @@ PROGRAM test_interlayer_lie_transaction
     IMPLICIT NONE
 
     TYPE(physical_state_real) :: scratch(4),check1,check2
+    TYPE(mass_exchange_rates_type) :: deposition_rates
     TYPE(interlayer_mass_exchange_config_type) :: config
     TYPE(mass_exchange_config_type) :: mass_l2
     TYPE(rheology_config_type) :: rheology_l2
@@ -25,7 +29,7 @@ PROGRAM test_interlayer_lie_transaction
     REAL(wp) :: q(6,2),qp(6,2),before(6,2),primitives(6,2),snapshot(6,2)
     REAL(wp) :: after_group0(6,2),after_later(6,2)
     REAL(wp) :: after_transfer(6,2),slip_before,slip_after
-    REAL(wp) :: dt
+    REAL(wp) :: dt,exchange_source(6)
     LOGICAL :: ok
     INTEGER :: i,status
 
@@ -85,6 +89,34 @@ PROGRAM test_interlayer_lie_transaction
     CALL require(ANY(q(:,1)/=before(:,1)),'both wet layers change state')
     CALL check_conservation(before,q,'wet L1 and L2')
     CALL check_admissibility(qp)
+
+    ! Geometric contact must not let a sole wet L2 deposit directly to bed.
+    ! The same physical deposition law is allowed for L1, including after
+    ! interlayer settling has created that formerly dry lower layer.
+    mass_l2%deposition%settling_flag=.TRUE.
+    CALL make_column(0.0_wp,1.0_wp,0.0_wp,2.0_wp,q,qp)
+    CALL build_physical_state_from_qp(qp(:,2),check2,accepted=ok)
+    CALL require(ok,'wet L2 physical state for substrate-deposition test')
+    CALL eval_mass_exchange_explicit(rheology_l2,mass_l2,check2,0,[0.0_wp,0.0_wp],dt, &
+        IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1),deposition_rates,exchange_source, &
+        transport_stochastic=.FALSE.,pore_enabled=.FALSE.,terrain_exposed=.TRUE., &
+        atmosphere_exposed=.TRUE.,static_deposition_allowed=.FALSE.)
+    CALL require(ALL(deposition_rates%solid_deposition_rate==0.0_wp) .AND. &
+        ALL(exchange_source==0.0_wp),'isolated L2 cannot deposit directly into substrate')
+    CALL build_physical_state_from_qp(qp(:,2),check1,accepted=ok)
+    CALL require(ok,'equivalent L1 physical state for deposition test')
+    CALL eval_mass_exchange_explicit(rheology_l2,mass_l2,check1,0,[0.0_wp,0.0_wp],dt, &
+        IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1),deposition_rates,exchange_source, &
+        transport_stochastic=.FALSE.,pore_enabled=.FALSE.,terrain_exposed=.TRUE., &
+        atmosphere_exposed=.TRUE.,static_deposition_allowed=.TRUE.)
+    CALL require(ANY(deposition_rates%solid_deposition_rate>0.0_wp), &
+        'L1 is allowed to deposit after settling creates it')
+    CALL eval_mass_exchange_explicit(rheology_l2,mass_l2,check1,0,[0.0_wp,0.0_wp],dt, &
+        IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1),deposition_rates,exchange_source, &
+        transport_stochastic=.FALSE.,pore_enabled=.FALSE.,terrain_exposed=.FALSE., &
+        atmosphere_exposed=.TRUE.,static_deposition_allowed=.TRUE.)
+    CALL require(ALL(deposition_rates%solid_deposition_rate==0.0_wp), &
+        'L1 static deposition also requires physical terrain contact')
 
     ! Group zero uses the immutable pre-spatial snapshot, but applies and
     ! limits on the spatial candidate. A later group reads that candidate.

@@ -519,3 +519,13 @@ Il parser continua a richiedere `IMEX_TWO_LAYER_VALIDATION=1` per
 `N_LAYERS=2`; nessuna modifica al gate di produzione e' autorizzata.
 Prossimo blocco: TL13b-A, analisi del simbolo principale e degli autovalori
 accoppiati sotto shear, con verifiche dei limiti CFL nei regimi iperbolici.
+
+
+**Mass-exchange eligibility audit (20 November 2026):** the geometric
+contact model is unchanged. Static substrate deposition (including its
+coupled vaporization) is restricted to L1 using the canonical Lie scope;
+L2 may settle into an initially dry L1, while L1 may elutriate into an
+initially dry L2. The physical meaning of L2-only terrain erosion/carrier
+loss/lava immobilization and the buoyancy sink remains under review.
+The TL13a validation baseline is still `89a9f2b`; new changes require
+fresh strict/optimized and end-to-end evidence before acceptance.

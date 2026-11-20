@@ -322,3 +322,27 @@ not authorize a production two-layer run. The experimental environment gate
 remains intact. **TL13b remains open:** principal-symbol hyperbolicity with
 shear, density contrasts, coupled pressure, wet/dry, refinement and model
 closure validation require separate scientific evidence.
+
+## TL13 follow-up — static deposition restricted to L1 (20 November 2026)
+
+The contact evaluator continues to report the actual geometric ground contact
+for an isolated wet L2. This does **not** make L2 eligible for static
+sediment deposition. The existing Lie group scope identifies L1, and that
+boolean is passed through `source_terms_2d` to the canonical
+`mass_exchange_2d` coordinator. Static substrate deposition and its
+coupled steam-vaporization process now require **both** terrain contact and
+L1 scope. Erosion, liquid carrier loss, lava immobilization and atmospheric
+air entrainment retain their original geometric eligibility, pending their
+separate physical review. No numerical/constitutive formulas were altered.
+
+The paired Lie transfer still supports L2-to-dry-L1 settling and
+L1-to-dry-L2 elutriation; neither transfer is conditioned on receiver
+presence. The existing atomic/conservation/wet-dry tests remain in
+`test_interlayer_lie_transaction.f90`, extended with explicit external
+substrate-deposition eligibility checks. Buoyancy deletion is **not**
+redefined here as a physical lift-off model; its density threshold and
+budget accounting still require a separate scientific decision.
+
+**Verification status:** source review and new regression assertions are
+recorded, but strict/optimized builds and integrated Actions on this change
+must succeed before declaring the implementation fully verified.
