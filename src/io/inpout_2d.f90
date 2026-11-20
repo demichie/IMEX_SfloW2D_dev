@@ -898,7 +898,8 @@
                 IF (INDEX(pore_line,'&PORE_PRESSURE_L2_PARAMETERS')==1) n_pore_l2=n_pore_l2+1
             END DO
             REWIND(input_unit)
-            IF (n_pore_l2/=0) CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
+            IF (n_pore_l2/=0 .AND. n_layers/=2) &
+                CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
             IF (n_pore_legacy+n_pore_l1>1) &
                 CALL fatal_error('Duplicate L1 pore-pressure NAMELIST groups')
             IF (n_pore_l1==1) THEN
@@ -939,6 +940,12 @@
                     'and PORE_PRESSURE_FRACTION will not be accounted for.'
                 WRITE (*, *) 'GAS_LOSS_FLAG and DYNAMIC_PERMEABILITY_FLAG will be set to FALSE.'
 
+            END IF
+
+            IF (n_layers==2 .AND. n_pore_l2==1) THEN
+                READ(input_unit,NML=pore_pressure_l2_parameters,IOSTAT=ios)
+                IF (ios/=0) CALL fatal_error('Invalid L2 pore-pressure NAMELIST')
+                REWIND(input_unit)
             END IF
 
             n_pore_vars=MERGE(1,0,pore_pressure_l1%pore_pressure_flag .OR. &
@@ -1622,7 +1629,8 @@
             IF (INDEX(pore_line,'&PORE_PRESSURE_L2_PARAMETERS')==1) n_pore_l2=n_pore_l2+1
         END DO
         REWIND(input_unit)
-        IF (n_pore_l2/=0) CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
+        IF (n_pore_l2/=0 .AND. n_layers/=2) &
+                CALL fatal_error('PORE_PRESSURE_L2_PARAMETERS requires N_LAYERS=2')
         IF (n_pore_legacy+n_pore_l1>1) &
             CALL fatal_error('Duplicate L1 pore-pressure NAMELIST groups')
         IF (n_pore_l1==1) THEN
@@ -1643,6 +1651,12 @@
         ELSE
             IF (n_pore_legacy/=0) &
                 CALL fatal_error('PORE_PRESSURE_PARAMETERS require PORE_PRESSURE_FLAG=T')
+        END IF
+
+        IF (n_layers==2 .AND. n_pore_l2==1) THEN
+            READ(input_unit,NML=pore_pressure_l2_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('Invalid L2 pore-pressure NAMELIST')
+            REWIND(input_unit)
         END IF
 
         n_pore_vars=MERGE(1,0,pore_pressure_l1%pore_pressure_flag .OR. &
@@ -1667,7 +1681,10 @@
             IF (INDEX(rheology_line,'&RHEOLOGY_L2_PARAMETERS')==1) n_rheology_l2=n_rheology_l2+1
         END DO
         REWIND(input_unit)
-        IF (n_rheology_l2/=0) CALL fatal_error('RHEOLOGY_L2_PARAMETERS requires N_LAYERS=2')
+        IF (n_layers==1 .AND. n_rheology_l2/=0) &
+            CALL fatal_error('RHEOLOGY_L2_PARAMETERS requires N_LAYERS=2')
+        IF (n_layers==2 .AND. (n_rheology_legacy/=0 .OR. n_rheology_l1/=1 .OR. n_rheology_l2/=1)) &
+            CALL fatal_error('N_LAYERS=2 requires RHEOLOGY_L1_PARAMETERS and RHEOLOGY_L2_PARAMETERS')
         IF (rheology_flag) THEN
             IF (n_rheology_legacy+n_rheology_l1/=1)                                                                    &
                 CALL fatal_error('Provide exactly one RHEOLOGY_PARAMETERS or RHEOLOGY_L1_PARAMETERS')
@@ -1688,6 +1705,11 @@
             ! Scheduling metadata is consumed before rheology coefficient checks.
         END IF
 
+        IF (n_layers==2) THEN
+            READ(input_unit,NML=rheology_l2_parameters,IOSTAT=ios)
+            IF (ios/=0) CALL fatal_error('Invalid RHEOLOGY_L2_PARAMETERS')
+            REWIND(input_unit)
+        END IF
 
         ! ------- READ phase-specific carrier transport parameters ------------------
 
@@ -2383,6 +2405,19 @@
             IF (rheology_l1%rheology_group<0 .OR. thermal_l1%thermal_group<0 .OR.                            &
                 pore_pressure_l1%pore_pressure_group<0) &
                 source_input_error='D18 physical GROUP must be nonnegative'
+            IF (n_layers==2) THEN
+                IF ((LEN_TRIM(rheology_l2%rheology_method)>0 .AND. &
+                    TRIM(rheology_l2%rheology_method)/='EXPLICIT' .AND. &
+                    TRIM(rheology_l2%rheology_method)/='NEWTON' .AND. &
+                    TRIM(rheology_l2%rheology_method)/='ANALYTIC') .OR. &
+                    (LEN_TRIM(pore_pressure_l2%pore_pressure_method)>0 .AND. &
+                    TRIM(pore_pressure_l2%pore_pressure_method)/='EXPLICIT' .AND. &
+                    TRIM(pore_pressure_l2%pore_pressure_method)/='NEWTON' .AND. &
+                    TRIM(pore_pressure_l2%pore_pressure_method)/='ANALYTIC')) &
+                    source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
+                IF (rheology_l2%rheology_group<0 .OR. pore_pressure_l2%pore_pressure_group<0) &
+                    source_input_error='D18 physical GROUP must be nonnegative'
+            END IF
 
         END IF
 

@@ -211,3 +211,17 @@ ESRI grids. The test's canonical `initialize_fixture` now allocates
 `init_grid`. This fixes the missing test setup, without altering the
 production writer or its physical results. Strict/debug and optimized
 spatial regressions on this commit still require execution.
+
+## TL13a — L2 rheology and pore-pressure input completion (20 November 2026)
+
+The first experimental Etna run passed the explicit validation gate but
+failed on the parser's unconditional rejection of `RHEOLOGY_L2_PARAMETERS`.
+The layer count was correctly two; the parser contained unfinished L2
+NAMELIST handling. The L2 rheology group is now required and read into the
+canonical `rheology_l2` configuration for two-layer runs, while single-layer
+input still rejects L2 groups. The existing early and later pore-pressure
+scans now reject L2 only with `N_LAYERS=1` and load the optional typed L2
+pore-pressure configuration when present, before computing component counts.
+The L2 method/group checks are included in the existing source scheduling
+validation. No physical formulas, state schema or input-file aliases changed.
+Strict/debug CI and the experimental Etna run remain unverified on this SHA.
