@@ -29,6 +29,10 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
                         stream.write(record(float(i), float(j),
                                             [float(i + j + 1), 2., 3., 4., 5.]))
                     stream.write("\n")
+            # Match the production Fortran writer: one separator for
+            # each grid row plus two extra blank records at EOF.
+            with original.open("a", encoding="ascii") as stream:
+                stream.write("\n\n")
             l1 = root / "L1_0000.q_2d"
             l2 = root / "L2_0000.q_2d"
             prepare.write_layer_snapshots(original, l1, l2, nx=3, ny=2, n_vars=5)
@@ -50,6 +54,7 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
             record(0., 0., [1., 0., 0., 0., 0.]),
             record(0., 0., [-1., 0., 0., 0., 0.]) + "\n",
             "broken record\n\n",
+            record(0., 0., [1., 0., 0., 0., 0.]) + "\n\n\n\n",
         ):
             with self.subTest(contents=contents):
                 with tempfile.TemporaryDirectory() as directory:

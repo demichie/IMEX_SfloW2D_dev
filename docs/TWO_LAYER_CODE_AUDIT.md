@@ -184,3 +184,18 @@ NetCDF file and checkpoint file. It preserves the solver's `runner.log`
 under the evidence directory. This test cannot replace long-time
 conservation, physical calibration, coupled wave-speed validation, restart
 continuation or OpenMP comparisons. Its first CI result is pending.
+
+## TL13a — Etna initial snapshot separators (20 November 2026)
+
+The production Fortran conservative snapshot writer emits one blank record
+per grid row **and two additional blank records after the final row**.
+The original Etna preparator counted every blank record as a grid-row
+separator and therefore rejected valid 250 x 150 snapshots with 152
+blank records. The preparator now validates the 150 row separators and
+allows up to the two canonical trailing records, rejecting additional
+records or internal misplaced separators. L1 remains a byte-for-byte
+copy of the single-layer snapshot; all L2 conservative components remain
+exactly zero at initialization. The synthetic preparation regression now
+includes the two trailing records and rejects excessive trailing blanks.
+This correction does not alter any physical initial condition or numerical
+kernel. The controlled two-layer execution remains pending on the new SHA.

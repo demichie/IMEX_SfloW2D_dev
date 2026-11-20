@@ -84,6 +84,7 @@ def write_layer_snapshots(source, l1, l2, nx=NX, ny=NY, n_vars=N_VARS):
     l2.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     rows = 0
+    trailing_separators = 0
     solid_mass = 0.0
     temp_path = None
     try:
@@ -95,7 +96,14 @@ def write_layer_snapshots(source, l1, l2, nx=NX, ny=NY, n_vars=N_VARS):
                     if not line.strip():
                         if count % nx != 0:
                             raise ValueError("Blank separator inside a grid row")
-                        rows += 1
+                        if rows < ny:
+                            rows += 1
+                        else:
+                            # The Fortran writer appends two blank records
+                            # after the final grid-row separator.
+                            if count != nx * ny or trailing_separators >= 2:
+                                raise ValueError("Unexpected trailing snapshot separator")
+                            trailing_separators += 1
                         output.write("\n")
                         continue
                     if rows != count // nx:
