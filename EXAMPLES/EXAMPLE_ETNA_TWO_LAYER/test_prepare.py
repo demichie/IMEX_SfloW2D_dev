@@ -68,6 +68,17 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
                     self.assertFalse(l1.exists())
                     self.assertFalse(l2.exists())
 
+    def test_prepare_does_not_invoke_solver(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dem = root / "DEM"
+            dem.mkdir()
+            (dem / "Etna2014_crop.asc").write_text("existing", encoding="ascii")
+            (dem / "new_dem.asc").write_text("existing", encoding="ascii")
+            (dem / "init_volume.asc").write_text("existing", encoding="ascii")
+            prepare.prepare(root)
+            self.assertFalse((root / "INITIAL_CONDITIONS").exists())
+
     def test_terrain_requires_local_dem_zip(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(FileNotFoundError, "Copy only the DEM ZIP"):
@@ -84,6 +95,7 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
         self.assertTrue((HERE / "create_input_ellipsoid.py").is_file())
         self.assertTrue((HERE / "input_ellipsoid.py").is_file())
         self.assertTrue((HERE / "single_layer_seed.inp").is_file())
+        self.assertTrue((HERE / "initialize_layers.py").is_file())
 
 
 if __name__ == "__main__":

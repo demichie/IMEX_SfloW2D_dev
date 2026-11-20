@@ -32,11 +32,14 @@ This is the only dependency on `EXAMPLE_ETNA`. The ZIP is not tracked a
 second time in Git. Do **not** manually copy the preprocessing scripts or
 the original example input.
 
-## 3. Generate the DEM and both initial layer snapshots (once)
+## 3. Prepare only the DEM (once)
 
 ```bash
 python3 prepare.py
 ```
+
+**This command never launches the Fortran solver.** It only extracts the
+topography ZIP and runs the local Python ellipsoid preprocessor.
 
 `prepare.py` uses only files in this example:
 - `DEM/Etna2014_crop.zip`: original topography, extracted locally.
@@ -45,22 +48,37 @@ python3 prepare.py
   `vol=100000` parameters. Outputs are `DEM/new_dem.asc`,
   `DEM/init_volume.asc` and `DEM/ellipsoid.asc`.
 - `single_layer_seed.inp`: the original Etna **single-layer** configuration,
-  used exclusively for a temporary `T_END=0` initialization.
-- The **compiled solver** computes the conservative t=0 snapshot; Python
-  does not reproduce the model's mixture density or energy formulas.
+  used only by the explicit initialization step below.
 
-The script writes:
+## 4. Generate the conservative initial states (explicit, once)
+
+```bash
+python3 initialize_layers.py
+```
+
+**This is a separate user-invoked command.** It runs the compiled Fortran
+solver once at `T_END=0` to calculate the canonical mass, momentum,
+energy and composition of L1 from the generated DEM rasters. There is
+**no time advancement** and **no two-layer simulation**, but the executable
+is launched for initialization. L2 is constructed with exactly zero
+conservative components.
+
+This avoids a second Python implementation of the Fortran density and
+energy formulas. You can skip this command if the two initial `.q_2d`
+files already exist and are valid.
+
+The initial-state generator writes:
 - `INITIAL_CONDITIONS/etna_L1_0000.q_2d`: original dense avalanche,
   with an initial 100000 m³ excavation target, 50% solid volume fraction,
   373 K, Voellmy `mu=0.3`, `xi=300`.
 - `INITIAL_CONDITIONS/etna_L2_0000.q_2d`: exactly zero conservative mass,
   particles, momentum and energy, with matching grid coordinates.
 
-Preparing the inputs again will **not overwrite** existing initial snapshots.
+The initialization command will **not overwrite** existing snapshots.
 If you change the DEM or excavation setup, remove the generated DEM rasters
-and both snapshots explicitly before rerunning `python3 prepare.py`.
+and both snapshots explicitly before regenerating them.
 
-## 4. Run the two-layer simulation
+## 5. Run the two-layer simulation
 
 The tracked `IMEX_SfloW2D.inp` is the two-layer run configuration.
 From the same directory:
@@ -86,7 +104,7 @@ elutriation. L2 uses `rheology_model='none'`. The `LINEAR_USTAR` closure
 uses lifted solid fraction 0.15, efficiency 0.01 and Rouse threshold 100.
 These are exploratory coefficients, not calibrated predictions.
 
-## 5. Optional local validation
+## 6. Optional local validation
 
 The validation scripts are **already inside this directory**, and create
 separate evidence directories without changing `IMEX_SfloW2D.inp` or the
@@ -134,7 +152,8 @@ not scientific TL13b validation.
 | `single_layer_seed.inp` | Local original Etna single-layer t=0 seed template |
 | `input_ellipsoid.py` | Local topography/excavation parameters |
 | `create_input_ellipsoid.py` | Local terrain/initial-volume generator |
-| `prepare.py` | DEM extraction and conservative L1/L2 initial states |
+| `prepare.py` | DEM extraction and ellipsoidal raster preprocessing only |
+| `initialize_layers.py` | Explicit, optional Fortran t=0 initialization of L1/L2 snapshots |
 | `run_validation.py` | Short controlled solver regression |
 | `extended_validation.py` | Restart, budgets and OpenMP regression |
 | `test_*.py` | Script unit tests |

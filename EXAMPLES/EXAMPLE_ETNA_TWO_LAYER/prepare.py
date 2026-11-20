@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
-"""Prepare the Etna L1-only initial state and a strictly dry L2.
+"""Prepare only the Etna DEM and ellipsoidal excavation rasters.
 
-The local Etna ellipsoid script and single-layer seed input preserve the
-original Etna physical setup. The compiled single-layer solver is authoritative
-for converting its initial condition into conservative variables.
-The production N_LAYERS=2 gate is closed unless validation is explicitly opted in.
+This script never launches IMEX_SfloW2D. Conservative initial snapshots
+are generated separately by the explicit initialize_layers.py command.
 """
 
 import argparse
-import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 import zipfile
 
 
@@ -149,17 +145,10 @@ def write_layer_snapshots(source, l1, l2, nx=NX, ny=NY, n_vars=N_VARS):
             temp_path.unlink(missing_ok=True)
 
 
-def prepare(directory, solver):
-    """Create the two-layer input data without invoking the disabled two-layer driver."""
+def prepare(directory):
+    """Prepare the DEM rasters only. Never run the Fortran executable."""
     directory = directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    initial = directory / "INITIAL_CONDITIONS"
-    l1 = initial / "etna_L1_0000.q_2d"
-    l2 = initial / "etna_L2_0000.q_2d"
-    if l1.exists() or l2.exists():
-        raise FileExistsError("Initial snapshots exist; remove both explicitly to regenerate")
-    # Evidence runs have isolated work directories. Stage only the local
-    # DEM ZIP; all Python scripts and seed inputs remain in this example.
     if directory != EXAMPLE:
         local_archive = EXAMPLE / "DEM" / ARCHIVE_NAME
         target_archive = directory / "DEM" / ARCHIVE_NAME
@@ -171,34 +160,15 @@ def prepare(directory, solver):
             target_archive.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(local_archive, target_archive)
     prepare_terrain(directory)
-    binary = solver.resolve()
-    if not binary.is_file():
-        raise FileNotFoundError(f"Build the single-layer solver first: {binary}")
-    with tempfile.TemporaryDirectory(prefix="etna-initial-") as temp_name:
-        temp = Path(temp_name)
-        (temp / "DEM").symlink_to((directory / "DEM").resolve(), target_is_directory=True)
-        (temp / "IMEX_SfloW2D.inp").write_text(seed_input(), encoding="utf-8")
-        subprocess.run([str(binary)], cwd=temp, check=True,
-                       env={**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"})
-        matches = list((temp / "OUTPUT" / SEED_NAME).rglob(f"{SEED_NAME}_0000.q_2d"))
-        if len(matches) != 1:
-            raise RuntimeError(f"Expected one t=0 Etna conservative snapshot, found {len(matches)}")
-        write_layer_snapshots(matches[0], l1, l2)
-    print("L1: original Etna conservative state:", l1)
-    print("L2: zero mass, momentum, energy and solid content:", l2)
-    print("N_LAYERS=2 requires IMEX_TWO_LAYER_VALIDATION=1 for controlled testing.")
+    print("DEM preprocessing complete. No solver has been executed.")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=EXAMPLE,
                         help="Target example directory (default: alongside prepare.py)")
-    parser.add_argument("--solver", type=Path,
-                        default=EXAMPLE.parent.parent / "src" / "IMEX_SfloW2D",
-                        help="Path to the compiled single-layer solver")
     args = parser.parse_args()
-    prepare(args.directory, args.solver)
-
+    prepare(args.directory)
 
 if __name__ == "__main__":
     main()
