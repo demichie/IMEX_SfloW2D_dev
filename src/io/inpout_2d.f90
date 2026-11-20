@@ -5814,7 +5814,7 @@
                     WHERE (thickness_init .GT. 0.0_wp)
 
                         state%q(solid_idx,layer, :, :) = thickness_init(:, :)* &
-                                                    rho_s(solid_idx - 4)
+                                                    rho_s(solid_idx - 4)*initial_alphas(solid_idx - 4)
 
                     END WHERE
 
