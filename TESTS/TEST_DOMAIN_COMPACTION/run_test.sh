@@ -16,3 +16,7 @@ fi
     compaction_kernels.f90 test_domain_compaction.f90 -o "$workdir/test_domain_compaction"
 
 "$workdir/test_domain_compaction" "$@"
+
+"$compiler" "${flags[@]}" -J"$workdir" \
+    test_domain_halo.f90 -o "$workdir/test_domain_halo"
+"$workdir/test_domain_halo"
