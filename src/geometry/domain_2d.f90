@@ -438,8 +438,8 @@ CONTAINS
 
         ! Face membership is the union of its adjacent solve cells. Computing
         ! each destination exactly once avoids the overlapping serial writes
-        ! previously used to mark faces from the compact solve list. Fuse the
-        ! first reconstruction halo with the face-mask scans and row counts.
+        ! previously used to mark faces from the compact solve list. This pass
+        ! also counts the x/y face worklists.
         !$OMP DO SCHEDULE(STATIC)
         DO k=1,comp_interfaces_y
             IF (k<=comp_cells_y) THEN
@@ -452,15 +452,6 @@ CONTAINS
                     IF (active) n=n+1
                 END DO
                 row_count_x(k)=n
-
-                DO j=1,comp_cells_x
-                    active=this%solve_mask(j,k)
-                    IF (j>1) active=active .OR. this%solve_mask(j-1,k)
-                    IF (j<comp_cells_x) active=active .OR. this%solve_mask(j+1,k)
-                    IF (k>1) active=active .OR. this%solve_mask(j,k-1)
-                    IF (k<comp_cells_y) active=active .OR. this%solve_mask(j,k+1)
-                    this%reconstruction_mask(j,k)=active
-                END DO
             END IF
 
             n=0
@@ -475,17 +466,18 @@ CONTAINS
         END DO
         !$OMP END DO
 
-        ! The read-only reconstruction halo has exactly two four-neighbour
-        ! rings. Reuse the existing temporary mask as the second destination,
-        ! rather than copying the entire reconstruction mask twice.
+        ! The HP mask already contains the solve cells and their first
+        ! four-neighbour ring. Dilating it once produces the same two-ring
+        ! reconstruction halo without recomputing the first ring.
+        ! The temporary mask keeps the read-only input stable across threads.
         !$OMP DO SCHEDULE(STATIC)
         DO k=1,comp_cells_y
             DO j=1,comp_cells_x
-                active=this%reconstruction_mask(j,k)
-                IF (j>1) active=active .OR. this%reconstruction_mask(j-1,k)
-                IF (j<comp_cells_x) active=active .OR. this%reconstruction_mask(j+1,k)
-                IF (k>1) active=active .OR. this%reconstruction_mask(j,k-1)
-                IF (k<comp_cells_y) active=active .OR. this%reconstruction_mask(j,k+1)
+                active=this%hp_eta_mask(j,k)
+                IF (j>1) active=active .OR. this%hp_eta_mask(j-1,k)
+                IF (j<comp_cells_x) active=active .OR. this%hp_eta_mask(j+1,k)
+                IF (k>1) active=active .OR. this%hp_eta_mask(j,k-1)
+                IF (k<comp_cells_y) active=active .OR. this%hp_eta_mask(j,k+1)
                 this%solve_mask_temp(j,k)=active
             END DO
         END DO
