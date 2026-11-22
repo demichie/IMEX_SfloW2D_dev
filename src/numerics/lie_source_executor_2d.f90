@@ -321,6 +321,11 @@ CONTAINS
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,layer
         INTEGER :: changed_jmin,changed_jmax,changed_kmin,changed_kmax
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
+        ! Retain only the earliest invalid substrate candidate across OpenMP workers.
+        ! Species columns: deposit, erosion, erodible; rates: deposition, erosion.
+        INTEGER :: substrate_witness_cell,substrate_witness_group
+        REAL(wp) :: substrate_witness_before(n_solid,3),substrate_witness_after(n_solid,3)
+        REAL(wp) :: substrate_witness_rates(n_solid,2),substrate_witness_lava(3)
         REAL(wp) :: cell_mass,cell_components
         REAL(wp) :: red_grav,rho_mix
         LOGICAL :: remove_buoyant
@@ -458,6 +463,8 @@ CONTAINS
         ! Independent cells share a fixed geometry. Reduce the first failed
         ! worklist index without a separate serial scan.
         first_failure=HUGE(0)
+        substrate_witness_cell=HUGE(0)
+        substrate_witness_group=-1
         !$OMP PARALLEL DEFAULT(SHARED)                                                                              &
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
         !$OMP& q_local,qp_local,q_layers,qp_layers,layer,contacts,contacts_valid,                                    &
@@ -682,6 +689,24 @@ CONTAINS
                         lava_candidate=lava_local+time_step*executor%source_transfers(tid)%lava_deposit_rate
                         IF (ANY(erodible_candidate<0.0_wp) .OR. ANY(deposit_candidate<0.0_wp) .OR.                 &
                             ANY(erosion_candidate<0.0_wp) .OR. lava_candidate<0.0_wp) THEN
+                            ! Failure-only witness: one synchronized copy, no per-cell
+                            ! allocation or output inside the OpenMP region.
+                            !$OMP CRITICAL(d19_substrate_witness)
+                            IF (cell<substrate_witness_cell) THEN
+                                substrate_witness_cell=cell
+                                substrate_witness_group=executor%groups(group_index)%id
+                                substrate_witness_before(:,1)=deposit_local
+                                substrate_witness_before(:,2)=erosion_local
+                                substrate_witness_before(:,3)=erodible_local
+                                substrate_witness_after(:,1)=deposit_candidate
+                                substrate_witness_after(:,2)=erosion_candidate
+                                substrate_witness_after(:,3)=erodible_candidate
+                                substrate_witness_rates(:,1)=executor%source_transfers(tid)%solid_deposition_rate
+                                substrate_witness_rates(:,2)=executor%source_transfers(tid)%solid_erosion_rate
+                                substrate_witness_lava=[lava_local,lava_candidate, &
+                                    executor%source_transfers(tid)%lava_deposit_rate]
+                            END IF
+                            !$OMP END CRITICAL(d19_substrate_witness)
                             cell_error=7
                             EXIT group_loop
                         END IF
@@ -994,6 +1019,34 @@ CONTAINS
                 failure_reason='D19: physical source transaction rejected'
             CASE(7)
                 failure_reason='D19: invalid candidate substrate inventory'
+                ! The reduction selects the first failed worklist cell. Emit its
+                ! exact pre-update and rejected post-update inventories serially.
+                IF (substrate_witness_cell==first_failure) THEN
+                    j=domain%j_cent(first_failure)
+                    k=domain%k_cent(first_failure)
+                    WRITE(error_unit,'(A,2(I0,1X),A,I0)') 'D19_SUBSTRATE cell=',j,k, &
+                        ' group=',substrate_witness_group
+                    WRITE(error_unit,'(A,2(ES24.16,1X))') 'D19_SUBSTRATE t,dt=',source_time,time_step
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE deposit_before=',substrate_witness_before(:,1)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE deposit_candidate=',substrate_witness_after(:,1)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erosion_before=',substrate_witness_before(:,2)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erosion_candidate=',substrate_witness_after(:,2)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erodible_before=',substrate_witness_before(:,3)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erodible_candidate=',substrate_witness_after(:,3)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE deposition_rate=',substrate_witness_rates(:,1)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erosion_rate=',substrate_witness_rates(:,2)
+                    WRITE(error_unit,'(A,3(ES24.16,1X))') 'D19_SUBSTRATE lava_before,candidate,rate=', &
+                        substrate_witness_lava
+                    FLUSH(error_unit)
+                END IF
             CASE(8)
                 failure_reason='D19: explicit candidate conversion failed'
                 IF (executor%diagnostics_enabled) THEN

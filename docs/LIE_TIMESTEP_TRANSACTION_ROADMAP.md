@@ -18,6 +18,11 @@ full-domain fluid states.
   accepted increments to the post-spatial candidate `q^*`.
 - Shared substrate inventories may be updated during the cell sweep.
   There is **no recoverable global substrate snapshot** in production.
+- On a rejected substrate candidate (D19, error 7), the executor prints a
+  failure-only `D19_SUBSTRATE` witness for the first failed worklist cell:
+  coordinates, Lie group, timestep, per-species before/candidate inventories,
+  deposition/erosion rates and lava inventory. Its OpenMP capture is
+  synchronized and does not alter the rejected source transaction.
 - The geometry transaction defers bed-cache publication. Its internal
   rollback is a geometry-local mechanism, not a recoverable timestep.
 - A two-layer trial uses the same Lie integration path, layer-specific
