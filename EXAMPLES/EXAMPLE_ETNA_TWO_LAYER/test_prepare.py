@@ -29,7 +29,12 @@ class EtnaTwoLayerPreparationTest(unittest.TestCase):
 
     def test_primitive_input_is_layer_specific(self):
         text = (HERE / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
-        self.assertIn("RESTART_FILES='./DEM/init_volume.asc','NONE'", text)
+        self.assertIn("&RESTART_L1_PARAMETERS", text)
+        self.assertIn("N_RESTART_FILES=1,", text)
+        self.assertIn("RESTART_FILES='./DEM/init_volume.asc',", text)
+        self.assertIn("&RESTART_L2_PARAMETERS", text)
+        self.assertIn("N_RESTART_FILES_L2=1,", text)
+        self.assertIn("RESTART_FILES_L2='NONE',", text)
         self.assertIn("&INITIAL_L1_PARAMETERS", text)
         self.assertIn("&INITIAL_L2_PARAMETERS", text)
         self.assertIn("T_INIT=373.D0", text)
