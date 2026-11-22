@@ -413,7 +413,7 @@ CONTAINS
     !>          momentum differences must cancel pairwise. This test bypasses
     !>          only the model-layout production gate, not the timestep code.
     SUBROUTINE check_integrated_coupled_lie_timestep(paired,q1,q2,p1,p2,dt_bound)
-        TYPE(domain_type), INTENT(IN) :: paired
+        TYPE(domain_type), INTENT(INOUT) :: paired
         REAL(wp), INTENT(IN) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
         REAL(wp), INTENT(IN) :: p1(n_vars,nx,ny),p2(n_vars,nx,ny),dt_bound
         TYPE(spatial_operator_type) :: operators(2)
@@ -422,6 +422,7 @@ CONTAINS
         TYPE(source_group_type) :: groups(4),external_groups(6)
         TYPE(layer_physics_type) :: physics(2)
         TYPE(state_type) :: coupled_state
+        LOGICAL, ALLOCATABLE :: initial_solve_mask(:,:)
         TYPE(stochastic_workspace_type) :: stochastic(2)
         TYPE(interlayer_momentum_exchange_config_type) :: old_drag
         TYPE(interlayer_mass_exchange_config_type) :: old_mass
@@ -533,6 +534,9 @@ CONTAINS
         interlayer_momentum_exchange%method='ANALYTIC'
         interlayer_momentum_exchange%group=5
 
+        ! The repeated fixture trials reuse a deliberately frozen union workset.
+        ! Restore its finalized membership before each independent Lie step.
+        initial_solve_mask=paired%solve_mask
         OPEN(NEWUNIT=integrated_unit,FILE='integrated_lie.bin',ACCESS='STREAM', &
             FORM='UNFORMATTED',STATUS='REPLACE')
         ! The original union workset safely covers each subset of wet cells.
@@ -566,6 +570,7 @@ CONTAINS
             interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
             coupled_state%q=before_q
             coupled_state%qp=before_qp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -574,6 +579,7 @@ CONTAINS
             interlayer_momentum_exchange%chezy_drag_coeff=0.05_wp
             coupled_state%q=before_q
             coupled_state%qp=before_qp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -626,6 +632,7 @@ CONTAINS
             interlayer_mass_exchange%elutriation_flag=.FALSE.
             coupled_state%q=before_q
             coupled_state%qp=before_qp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -642,6 +649,7 @@ CONTAINS
             CALL workspace%initialize(registry)
             coupled_state%q=before_q
             coupled_state%qp=before_qp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -759,6 +767,7 @@ CONTAINS
                 interlayer_momentum_exchange%chezy_drag_coeff=0.0_wp
                 coupled_state%q=before_q
                 coupled_state%qp=before_qp
+                paired%solve_mask=initial_solve_mask
                 CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                     pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                     pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -773,6 +782,7 @@ CONTAINS
                 IF (group_mode==2 .AND. scenario==1) interlayer_momentum_exchange%chezy_drag_coeff=0.05_wp
                 coupled_state%q=before_q
                 coupled_state%qp=before_qp
+                paired%solve_mask=initial_solve_mask
                 CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                     pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                     pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -902,6 +912,7 @@ CONTAINS
             coupled_state%q=before_q
             coupled_state%qp=before_qp
             coupled_state%deposit=0.0_wp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -918,6 +929,7 @@ CONTAINS
             coupled_state%q=before_q
             coupled_state%qp=before_qp
             coupled_state%deposit=0.0_wp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -1031,6 +1043,7 @@ CONTAINS
             coupled_state%qp=before_qp
             coupled_state%erodible=0.2_wp
             coupled_state%erosion=0.0_wp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -1048,6 +1061,7 @@ CONTAINS
             coupled_state%qp=before_qp
             coupled_state%erodible=0.2_wp
             coupled_state%erosion=0.0_wp
+            paired%solve_mask=initial_solve_mask
             CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -3202,6 +3216,7 @@ CONTAINS
         TYPE(source_registry_type) :: registry
         TYPE(source_group_type) :: groups(3)
         TYPE(state_type) :: state
+        LOGICAL, ALLOCATABLE :: saved_optional_mask(:,:)
         TYPE(layer_physics_type) :: physics(2)
         TYPE(stochastic_workspace_type) :: noise(2)
         TYPE(stochastic_config_type) :: old_stochastic_l1,old_stochastic_l2
@@ -3327,6 +3342,7 @@ CONTAINS
         CALL noise(1)%initialize(stochastic_l1,rheology_l1,layer=1)
         CALL noise(2)%initialize(stochastic_l2,rheology_l2,layer=2)
         CALL workspace%initialize(registry)
+        saved_optional_mask=paired%solve_mask
         CALL workspace%advance(state,0.0_wp,dt_step,noise,paired,operators, &
             pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
             pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -3384,6 +3400,7 @@ CONTAINS
         state%q(:,2,:,:)=q2
         state%qp(:,1,:,:)=p1
         state%qp(:,2,:,:)=p2
+        paired%solve_mask=saved_optional_mask
         CALL workspace%advance(state,0.0_wp,dt_step,noise,paired,operators, &
             pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
             pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
