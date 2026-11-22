@@ -15,6 +15,8 @@ and CI for the exact active commit remain the source of truth.
   conversion and regression contract.
 - [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md):
   accepted-step publication and fatal rejection policy.
+- [Active-domain OpenMP roadmap](ACTIVE_DOMAIN_OPENMP_ROADMAP.md): agreed
+  shared-mask expansion and global worklist compaction; not yet in production.
 - [Fortran style](FORTRAN_STYLE.md): mandatory formatting and Doxygen rules.
 - [Adding a rheology model](ADDING_A_RHEOLOGY_MODEL.md): extension guide
   with illustrative, **not registered**, physics.

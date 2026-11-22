@@ -51,6 +51,9 @@ assumptions. Do not introduce competing implementation plans.
   ownership and performance-validation contract.
 - [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md): authoritative
   trial/publication and fatal-error semantics.
+- [Active-domain OpenMP roadmap](ACTIVE_DOMAIN_OPENMP_ROADMAP.md): agreed
+  mask-update, two-ring expansion and global parallel worklist-compaction design;
+  implementation and solver validation are pending.
 - [NetCDF outputs](NETCDF_OUTPUT.md): visualization schema; binary checkpoint
   is the sole restart format.
 - [Fortran style](FORTRAN_STYLE.md): mandatory conventions.
