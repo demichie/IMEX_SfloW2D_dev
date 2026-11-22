@@ -1,6 +1,7 @@
 # Active-domain compaction experiment
 
-Standalone Fortran/OpenMP differential test and three-way microbenchmark; this directory does **not** change
+Standalone Fortran/OpenMP differential tests of compaction and two-ring ping-pong halo, plus a three-way
+compaction microbenchmark; this directory does **not** change
 `domain_2d`, `time_integration_2d`, physical formulas, timestep policy, or the production build.
 
 ## Algorithms
@@ -40,7 +41,7 @@ Set `FC` to change the Fortran compiler. The correctness-only command uses `-O0`
 `-Wall -Wextra -Werror`. The benchmark commands compile with `-O3` and repeat correctness
 checks before timing. All commands need a compiler supporting OpenMP and `omp_lib`.
 
-The correctness suite compares both parallel methods against exact serial index arrays and
+The correctness suite compares both parallel compaction methods against exact serial index arrays and
 reconstructed masks across 1, 2, 4 and 8 threads. It covers empty and full domains, 1-cell dimensions, edges,
 thin regions, islands, external activation, source-like exclusions and candidate block boundaries.
 The benchmark uses compact-square and corridor geometries on 500x500 or 2000x3000 grids with
@@ -55,3 +56,19 @@ include mask preparation, face/HP worksets, or Lie integration. Global/Sparse ra
 than one favor the sparse method; ratios less than one favor the global parallel method.
 Results are hardware-specific and are intended for algorithm selection, not production-speedup
 claims. Test kernels are intentionally independent of the production modules and are not yet wired into `make check` or GitHub Actions.
+
+## Production halo verification
+
+`test_domain_halo.f90` compares the original serial two-copy/two-dilation
+four-neighbor stencil against the two-mask OpenMP ping-pong result,
+with exclusions and row counting fused into the second pass. It checks
+exact final masks, row counts and prefix-sum ordered lists on grids
+including degenerate dimensions, empty/full masks, boundaries,
+source-like exclusions and nonuniform support, using 1/2/4/8 threads.
+The test is built in both the strict and optimized runner modes.
+
+The production incremental-versus-full-domain regression lives in
+`TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90` and is executed
+through the spatial group of `.github/workflows/physics-regressions.yml`.
+Run `bash TESTS/TEST_DOMAIN_COMPACTION/run_test.sh` locally; GitHub Actions
+uses the Bash runner explicitly because it relies on shell arrays.

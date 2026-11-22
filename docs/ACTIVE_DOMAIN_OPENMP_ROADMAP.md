@@ -1,6 +1,6 @@
 # Active-domain OpenMP roadmap
 
-**Status:** approved implementation design; **not yet integrated in production**.
+**Status:** implemented on `feature/two-layer`; **full solver CI and scientific acceptance pending**.
 **Branch:** `feature/two-layer`.
 **Goal:** remove redundant global work and memory transfers, then parallelize remaining loops.
 Preserve the physical model, numerical stencil, source scheduling and accepted Lie transaction.
@@ -18,8 +18,10 @@ accepted conservative mass is positive in at least one active layer.
 The final solve domain also includes the current source, boundary and halo rules.
 
 Reuse `domain%solve_mask_temp(:,:)` as the second ping-pong mask.
-No per-layer solve masks, per-thread cell lists, sparse merging, new
-persistent domain storage, atomic writes, sorting or duplicate removal.
+No per-layer solve masks, per-thread cell lists, sparse merging,
+atomic writes, sorting or duplicate removal. Two small scalars in
+`domain_type` track valid Lie wetness and the next deferred release:
+`committed_mask_ready` and `next_release_time`; neither duplicates flow state.
 
 The agreed sequence is:
 
@@ -63,10 +65,10 @@ time. Neither alone proves faster end-to-end simulations.
 | Face/HP/reconstruction lists | Existing passes | Unchanged initially | **No claimed gain** |
 
 **Do not conflate the baseline with an intermediate design.**
-The current production list scan already counts and emits cells
+The pre-refactor production list scan counted and emitted cells
 together; the fused `row_count(k)` saves a full-grid count pass
 **relative to the earlier proposed OpenMP count/emit scheme**, not
-relative to the current serial scan. The independent production
+relative to the current serial scan. The retained
 `COUNT(solve_mask)` consistency assertion is another full-grid read.
 
 The two eliminated full-mask copies are an actual memory-traffic
@@ -106,6 +108,18 @@ rereading real mass across the full grid. However, **this saving depends
 on proving complete activation of cells outside the previous list**.
 Keep the necessary state checks on exceptional paths if required.
 Do not duplicate persistent wetness or source-state representations.
+
+**Release scheduling:** `next_release_time` is initialized from the
+read-only `solve_mask_time` raster and refreshed when an event is crossed.
+Normal committed Lie steps reuse the previous worklist's wetness flags and
+check release eligibility there without a global mass scan. When an event
+is due, `check_solve` performs a complete positive-mass check to recover
+newly eligible cells anywhere on the grid. Without an accepted Lie
+publication (including direct tests and restart initialization), the
+current conservative state is scanned to reconstruct wetness.
+The outer perimeter keeps its original membership rules; Lie updates
+interior wetness only. These are correctness conditions, not parallel
+legacy implementations.
 
 ### C. First dilation: `solve_mask` -> `solve_mask_temp`
 
@@ -168,7 +182,7 @@ then increasing `j`, independent of thread scheduling.
 
 ### F. Faces, reconstruction and verification scan
 
-The current serial scan also marks `solve_mask_x` and
+The pre-refactor serial scan also marked `solve_mask_x` and
 `solve_mask_y` for adjacent faces. Placing those writes directly
 in the parallel cell emitter would be unsafe: neighboring cells
 can write the same face. Initially mark faces in a safe separate
@@ -176,12 +190,12 @@ pass over the compact global solve list, and measure that `O(M)` cost.
 Preserve the existing HP, face-list and reconstruction-list order
 and membership. Do not change the separate reconstruction halo.
 
-The current unconditional full-grid `COUNT(solve_mask)` assertion
-should remain initially. Any removal or movement of this runtime
+The existing unconditional full-grid `COUNT(solve_mask)` assertion
+remains in place. Any removal or movement of this runtime
 check is a separate review decision; the integrated `row_count`
 does not silently replace its independent consistency test.
 
-## 4. Implementation and acceptance plan
+## 4. Implementation and acceptance
 
 1. **Dependency audit:** all consumers of `solve_mask`, source/release
    schedule, restart/initialization, stochastic and diagnostics behavior,
@@ -203,10 +217,14 @@ does not silently replace its independent consistency test.
    Profile complete `check_solve` and the total timestep for
    1/4/8 threads with matched inputs and output settings.
 
-The existing
-[compaction benchmark](../TESTS/TEST_DOMAIN_COMPACTION/README.md)
-validates isolated list construction only: it does **not** verify the
-combined production Lie update, halo ping-pong, count fusion or sources.
+The [compaction and halo suite](../TESTS/TEST_DOMAIN_COMPACTION/README.md)
+now includes a strict OpenMP reference-versus-ping-pong halo test and
+exact ordered compaction checks. The production spatial integration suite
+also compares incremental and full domain refresh, including deferred
+releases, shared-layer wetness, sources, exclusions and dependent worksets.
+These checks are included in the manually dispatched
+`physics-regressions.yml` spatial job. They do **not** replace end-to-end
+optimized/debug simulation and performance verification.
 Do not claim production speedups until those measurements exist.
 
 **Completion criterion:** exactly one shared solve mask and one existing
