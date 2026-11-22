@@ -199,8 +199,17 @@ CONTAINS
         END DO
 
         DO i=1,SIZE(inventory)
-            IF (solid_erosion_rate(i)>0.0_wp) limiter=MIN(limiter,                                                     &
-                MAX(0.0_wp,inventory(i)/(dt*solid_erosion_rate(i))))
+            IF (solid_erosion_rate(i)>0.0_wp) THEN
+                withdrawal=dt*solid_erosion_rate(i)
+                limiter=MIN(limiter,MAX(0.0_wp,inventory(i)/withdrawal))
+                ! A fully depleted erodible species can round the limiting
+                ! quotient to 1.0 even though the fused substrate update is
+                ! slightly negative. Enter the existing rate safety margin,
+                ! without clipping the substrate or changing the erosion law.
+                IF (limiter==1.0_wp .AND. &
+                    inventory(i)<=withdrawal*(1.0_wp+64.0_wp*EPSILON(1.0_wp))) &
+                    limiter=NEAREST(limiter,-1.0_wp)
+            END IF
 
         END DO
 
@@ -229,8 +238,8 @@ CONTAINS
             IF (carrier_consumption>0.0_wp) limiter=MIN(limiter, &
                 MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
         END IF
-        ! When one or more species balances are saturated, reserve a small
-        ! relative buffer before the floating-point candidate check. A bound
+        ! When one or more mobile or substrate species balances are saturated,
+        ! reserve a small relative buffer before the floating-point candidate check. A bound
         ! with zero remaining species is susceptible to reassociation/FMA
         ! differences between this routine and the caller (observed in TAAL
         ! as -1.4293E-20 kg/m2 after the rate was reported admissible).

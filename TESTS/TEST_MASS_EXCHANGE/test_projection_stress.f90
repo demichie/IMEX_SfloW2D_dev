@@ -46,6 +46,7 @@ PROGRAM test_projection_stress
   CALL initialize_physics
   CALL check_contact_eligibility
   CALL check_limiter_representability
+  CALL check_erodible_representability
   CALL check_lava_energy_depletion
   CALL check_taal_saturated_species_budget
   CALL check_late_group_recipient_budget
@@ -127,6 +128,34 @@ CONTAINS
             ERROR STOP 'Deposition limiter left negative solid mass'
     END DO
   END SUBROUTINE check_limiter_representability
+
+  !> @brief Verify the LAHAR saturated-bed erosion bound on the actual Lie update.
+  !> @details Cell (188,98), group 4, t=196.4312 s formerly produced two
+  !>          negative substrate residues of order 1E-34 m on Apple Silicon.
+  SUBROUTINE check_erodible_representability
+    REAL(wp) :: reference(nq),rates(nq),inventory(ns),erosion_rates(ns),remaining(ns)
+    REAL(wp) :: scale,dt
+    LOGICAL :: valid
+
+    dt=7.0977076815961893E-01_wp
+    inventory=[6.8056786853308694E-17_wp,2.4073983433856908E-17_wp]
+    erosion_rates=[9.5885587159041100E-17_wp,3.3917969735889375E-17_wp]
+    reference=0.0_wp
+    rates=0.0_wp
+    reference(idx_totMassEqn)=1.0_wp
+    reference(idx_engyEqn)=1.0E+06_wp
+    reference(idx_solidEqn_first:idx_solidEqn_last)=0.1_wp
+    rates(idx_totMassEqn)=SUM(erosion_rates)*1000.0_wp
+    rates(idx_solidEqn_first:idx_solidEqn_last)=erosion_rates*1000.0_wp
+
+    CALL limit_explicit_source_rates(reference,inventory,dt,rates,erosion_rates,scale,valid)
+    IF (.NOT.valid) ERROR STOP 'LAHAR saturated-bed erosion rate rejected'
+    IF (scale>=1.0_wp) ERROR STOP 'LAHAR saturated-bed erosion did not reserve rounding margin'
+    remaining=inventory-dt*(scale*erosion_rates)
+    IF (ANY(remaining<0.0_wp)) ERROR STOP 'LAHAR saturated-bed erosion left negative inventory'
+    IF (ANY(remaining>8192.0_wp*EPSILON(1.0_wp)*inventory)) &
+        ERROR STOP 'LAHAR saturated-bed erosion limiter over-reduced the physical transfer'
+  END SUBROUTINE check_erodible_representability
 
   ! Etna lava group 4, cell (791,494), t=4440.8249 s:
   ! the original mass budget is nonnegative but energy rounds to zero
