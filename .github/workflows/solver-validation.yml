@@ -158,10 +158,12 @@ jobs:
           autoreconf -fi
           ./configure --with-netcdf=/usr --enable-strict-debug
           make -j4
-      - name: Stage the single shared DEM ZIP for the standalone example
+      - name: Extract the canonical Etna DEM for the standalone example
         run: |
           set -euo pipefail
-          cp EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/DEM/
+          dem_dir=EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/DEM
+          unzip -q -o -j EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip -d "$dem_dir"
+          test -s "$dem_dir/Etna2014_crop.asc"
       - name: Run short controlled Etna two-layer simulation
         if: ${{ inputs.two_layer_smoke }}
         working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
