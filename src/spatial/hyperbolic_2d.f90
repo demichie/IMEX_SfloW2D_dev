@@ -782,9 +782,13 @@ CONTAINS
         CALL GET_ENVIRONMENT_VARIABLE('IMEX_FRONT_MASS_DIAGNOSTICS',diagnostic_flag,STATUS=diagnostic_status)
         front_trace_enabled=diagnostic_status==0 .AND. diagnostic_flag=='1'
 
+        ! X- and Y-face kernels write disjoint oriented arrays. Keep one
+        ! OpenMP team and let workers begin Y faces as soon as X work ends.
+        !$OMP PARALLEL IF(comp_cells_x>1 .OR. comp_cells_y>1) &
+        !$OMP& PRIVATE(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right,trace_front_face)
         IF ( comp_cells_x .GT. 1 ) THEN
 
-            !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right,trace_front_face)
+            !$OMP DO
             DO l = 1, solve_interfaces_x
 
                 j = j_stag_x(l)
@@ -883,13 +887,13 @@ CONTAINS
                 END IF
 
             END DO
-            !$OMP END PARALLEL DO
+            !$OMP END DO NOWAIT
 
         END IF
 
         IF ( comp_cells_y .GT. 1 ) THEN
 
-            !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right)
+            !$OMP DO
             DO l = 1, solve_interfaces_y
 
                 j = j_stag_y(l)
@@ -965,9 +969,10 @@ CONTAINS
                 END IF
 
             END DO
-            !$OMP END PARALLEL DO
+            !$OMP END DO
 
         END IF
+        !$OMP END PARALLEL
 
         ! Optional stage-level boundary budget for source-mass CI diagnostics.
         ! The oriented mass contributions are measured on the interior side of

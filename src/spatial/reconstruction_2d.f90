@@ -1429,7 +1429,11 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
         END IF
 
-        !$OMP PARALLEL DO PRIVATE(l,j,k)
+        ! The eta pass must complete before boundary/radial correction, and
+        ! selected depths must wait for those corrections. Reuse one team
+        ! across the two independent HP-cell passes and the serial middle phase.
+        !$OMP PARALLEL PRIVATE(l,j,k)
+        !$OMP DO
         DO l=1,this%hp_eta_cells
             j=this%hp_eta_j(l)
             k=this%hp_eta_k(l)
@@ -1471,8 +1475,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             END IF
 
         END DO
-        !$OMP END PARALLEL DO
+        !$OMP END DO
 
+        !$OMP SINGLE
         DO k=1,comp_cells_y
             this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
             this%qp_adv_interfaceR(:,comp_interfaces_x,k)=                                                             &
@@ -1539,7 +1544,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
         ! composition normalization and discharge-to-velocity conversion.
         ! Select final depths after eta and radial boundary corrections.
         ! Keep the direct h_x candidate available for characteristic speed bounds.
-        !$OMP PARALLEL DO PRIVATE(l,j,k)
+        !$OMP END SINGLE
+
+        !$OMP DO
         DO l=1,this%hp_eta_cells
             j=this%hp_eta_j(l)
             k=this%hp_eta_k(l)
@@ -1617,7 +1624,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
             END IF
         END DO
-        !$OMP END PARALLEL DO
+        !$OMP END DO
+        !$OMP END PARALLEL
 
         ! Apply prescribed boundary discharge to the final HP transport depths.
         ! This is intentionally after h_selected is finalized and before ghost copies.

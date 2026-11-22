@@ -23,3 +23,25 @@ In schematic form the semi-discrete balance is `dQ_{j,k}/dt = -(F_{j+1/2,k}-F_{j
 - Respect [the project Fortran style](../../docs/FORTRAN_STYLE.md) and the official Codee configuration.
 - Preserve physics, conservative/primitive ownership and REAL/COMPLEX behavior when modifying any implementation.
 - Validate affected optimized/debug builds, source or spatial regression tests and OpenMP behavior as appropriate.
+
+## OpenMP face-stage execution
+
+The x- and y-oriented PCCU flux passes share one OpenMP team. The x loop has
+`NOWAIT` because each face orientation writes separate flux arrays; an
+implicit barrier at the end of the y loop and the parallel region completes
+both before any boundary-budget diagnostics or residual assembly.
+Each orientation still uses the same workset order, formulas and boundary
+one-way conditions. A collapsed spatial axis bypasses its respective loop.
+
+The two HP free-surface reconstruction passes also share one team. The first
+worksharing loop completes before a single worker applies boundary and radial
+source corrections; its `SINGLE` barrier completes before the second pass.
+The external boundary-discharge and ghost-trace publication remain outside
+the parallel region. These barriers are needed for correctness and are not
+eliminated.
+
+This change removes repeated OpenMP team entry/exit, not numerical work.
+Its end-to-end benefit must be established with repeatable LAHAR
+`T_END=1800` 1/2/4-thread benchmarks. The spatial regression compares exact
+1/4-thread binary results in strict and optimized builds, including degenerate
+one-axis grids and wet/dry boundary cases.
