@@ -20,13 +20,28 @@ class ExtendedEtnaValidationTest(unittest.TestCase):
             root = Path(directory)
             set_input(root, 0.01, 0.005, restart_binary=True)
             contents = (root / "IMEX_SfloW2D.inp").read_text()
+            self.assertIn("&RESTART_L1_PARAMETERS", contents)
             self.assertIn("N_RESTART_FILES=1,", contents)
             self.assertIn("RESTART_FILES='restart.bin',", contents)
+            self.assertNotIn("&RESTART_L2_PARAMETERS", contents)
+            self.assertNotIn("RESTART_FILES_L2=", contents)
+            self.assertNotIn("N_RESTART_FILES_L2=", contents)
             self.assertNotIn("RESTART_FILES='OUTPUT/", contents)
             self.assertNotIn("OUTPUT_OVERWRITE=T", contents)
             self.assertNotIn("etna_L2_0000.q_2d", contents)
             self.assertIn("N_LAYERS = 2", contents)
             self.assertIn("OUTPUT_RUNOUT_FLAG=F,", contents)
+
+    def test_text_initialization_keeps_both_layer_restart_groups(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            set_input(root, 0.01, 0.005)
+            contents = (root / "IMEX_SfloW2D.inp").read_text()
+            self.assertIn("&RESTART_L1_PARAMETERS", contents)
+            self.assertIn("RESTART_FILES='./DEM/init_volume.asc',", contents)
+            self.assertIn("&RESTART_L2_PARAMETERS", contents)
+            self.assertIn("RESTART_FILES_L2='NONE',", contents)
+            self.assertNotIn("RESTART_FILES='restart.bin',", contents)
 
     def test_three_budget_records_are_consistent(self):
         with tempfile.TemporaryDirectory() as directory:

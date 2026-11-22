@@ -48,6 +48,15 @@ def set_input(root, end_time, output_interval, restart_binary=False):
         text, count = original.subn(" RESTART_FILES=" + checkpoint, text)
         if count != 1:
             raise ValueError("Expected exactly one RESTART_FILES assignment")
+        # A binary checkpoint owns the complete L1/L2 state. L2 text
+        # initialization is neither used nor permitted for this path.
+        l2_group = re.compile(
+            r"(?ims)^[ \t]*&RESTART_L2_PARAMETERS[ \t]*\r?\n"
+            r".*?^[ \t]*/[ \t]*(?:\r?\n|$)"
+        )
+        text, count = l2_group.subn("", text)
+        if count != 1:
+            raise ValueError("Expected exactly one RESTART_L2_PARAMETERS group")
     (root / "IMEX_SfloW2D.inp").write_text(text, encoding="utf-8")
 
 
