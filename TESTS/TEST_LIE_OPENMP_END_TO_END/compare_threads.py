@@ -129,6 +129,8 @@ def run_case(solver, fixture, root, case, threads, evidence):
     env = os.environ.copy()
     env.update(OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
                OPENBLAS_NUM_THREADS="1")
+    if case == "EXAMPLE_2D":
+        env["IMEX_PROFILE_LIE"] = "1"
     if case == "EXAMPLE_2D_NEWTON":
         env["IMEX_NEWTON_WITNESS"] = "1"
     if case == "EXAMPLE_2D_TOPO":
@@ -152,6 +154,11 @@ def run_case(solver, fixture, root, case, threads, evidence):
     if actual != threads:
         raise AssertionError(f"{case}/{threads}: actual OpenMP team {actual} "
                              f"!= requested {threads}; log={log_path}; tail:\\n{tail}")
+    if case == "EXAMPLE_2D":
+        balance = re.search(r"LIE_SOURCE_DETAIL cell_balance_efficiency=\s*([0-9.Ee+-]+)",
+                            result.stdout)
+        if balance is None or not 0.0 <= float(balance.group(1)) <= 1.0 + 1e-12:
+            raise AssertionError(f"{case}/{threads}: invalid Lie cell balance metric; log={log_path}")
     if case == "EXAMPLE_2D_NEWTON":
         witnesses = re.findall(
             r"D20_NEWTON_WITNESS group=([0-9]+) solved_cells=([0-9]+) total_iterations=([0-9]+)",

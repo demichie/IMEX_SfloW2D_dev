@@ -79,7 +79,8 @@ MODULE lie_source_executor_2d
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
     REAL(wp), SAVE :: profile_cell_sweep=0.0_wp,profile_final_commit=0.0_wp
-    REAL(wp), SAVE :: profile_thread_cell=0.0_wp
+    ! Optional per-cell timers also characterize the slowest worker on each sweep.
+    REAL(wp), SAVE :: profile_thread_cell=0.0_wp,profile_cell_balance_capacity=0.0_wp
 
 CONTAINS
 
@@ -479,7 +480,10 @@ CONTAINS
         !$OMP& REDUCTION(MIN:first_failure)
         tid=1
         !$ tid=omp_get_thread_num()+1
-        !$OMP DO
+        ! Wet and dry cells have very different costs, clustered along the
+        ! spatially ordered worklist. Small dynamic chunks balance that work
+        ! without changing the source order or ownership of any cell.
+        !$OMP DO SCHEDULE(DYNAMIC,16)
         cell_loop: DO cell=1,domain%solve_cells
             IF (profiling_enabled) CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
             cell_error=0
@@ -965,6 +969,7 @@ CONTAINS
                     SUM(thread_evaluations(group_index,:))
             END DO
             profile_thread_cell=profile_thread_cell+SUM(thread_cell)
+            profile_cell_balance_capacity=profile_cell_balance_capacity+REAL(nthreads,wp)*MAXVAL(thread_cell)
             DEALLOCATE(thread_group,thread_physics,thread_evaluations,thread_cell)
         END IF
         IF (profiling_enabled) THEN
@@ -1168,8 +1173,11 @@ CONTAINS
 
     !> @brief Report cell-major sweep wall time and per-group summed thread times.
     !> @details Group times are summed thread CPU-like times, not wall-clock durations.
+    !>          The balance metric uses instrumented cell times, excluding early-skipped
+    !>          cells, team launch and barriers; it is not end-to-end OpenMP efficiency.
     SUBROUTINE report_lie_source_profile()
         INTEGER :: n
+        REAL(wp) :: balance_efficiency
         IF (.NOT.profiling_initialized) RETURN
         IF (.NOT.profiling_enabled) RETURN
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_BEGIN'
@@ -1188,6 +1196,10 @@ CONTAINS
                 ' overhead_thread_seconds=',MAX(0.0_wp,group_profile(n)%elapsed-group_profile(n)%physical)
         END DO
         WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL cell_thread_seconds=',profile_thread_cell
+        balance_efficiency=0.0_wp
+        IF (profile_cell_balance_capacity>0.0_wp) &
+            balance_efficiency=profile_thread_cell/profile_cell_balance_capacity
+        WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL cell_balance_efficiency=',balance_efficiency
         WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL outside_groups_thread_seconds=',                                  &
             MAX(0.0_wp,profile_thread_cell-SUM(group_profile%elapsed))
         WRITE(*,'(A)') 'LIE_SOURCE_DETAIL_END'

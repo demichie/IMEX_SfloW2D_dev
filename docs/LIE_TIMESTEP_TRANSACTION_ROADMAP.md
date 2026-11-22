@@ -42,6 +42,33 @@ full-domain fluid states.
    transaction and verifies it end-to-end.
 6. Preserve the single-layer numerical path and its evaluation order.
 
+## Lie/OpenMP workload balance
+
+The accepted source-group transaction is cell-major: each worklist cell
+owns its local trial state, and the physical groups execute sequentially
+inside that cell. Worklist indices are spatially ordered, but the physics
+cost is heterogeneous (dry cells, settling, erosion and rheology).
+The Lie cell loop therefore uses `SCHEDULE(DYNAMIC,16)` to distribute small,
+contiguous chunks while preserving each cell's physical evaluation order.
+No cell is processed more than once. Failure selection still uses the
+smallest worklist index, and the existing synchronized substrate witness
+remains deterministic. Per-worker scratch continues to be indexed by
+the executing OpenMP worker.
+
+The opt-in `IMEX_PROFILE_LIE=1` diagnostic reports
+`LIE_SOURCE_DETAIL cell_balance_efficiency`, computed as the sum of all
+instrumented per-cell worker times divided by the sum of
+`team_size * max(worker_cell_time)` over timesteps. It is an approximate
+cell-compute balance indicator, not a measurement of barrier time or
+whole-simulation parallel efficiency: early-skipped cells, team creation,
+setup and final synchronization are not included.
+
+The change is motivated by the LAHAR `T_END=1800` baseline on macOS ARM64
+(72.796 s / 48.395 s / 36.729 s wall time at 1/2/4 threads). These are
+single-run times with the previous scheduling, not a verified prediction
+for the new schedule. Repeat that exact benchmark and compare 1/2/4
+thread reproducibility before claiming a speedup.
+
 ## Current verification
 
 - `TEST_SPATIAL_OPERATOR` exercises the coupled Lie trial, wet/dry
