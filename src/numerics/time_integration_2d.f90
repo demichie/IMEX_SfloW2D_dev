@@ -100,7 +100,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: t,dt
         TYPE(stochastic_workspace_type), INTENT(INOUT) :: stochastic(:)
         PROCEDURE(stochastic_stage_observer), OPTIONAL :: stochastic_prepared_hook
-        CLASS(domain_type), INTENT(IN) :: domain
+        CLASS(domain_type), INTENT(INOUT) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operators(:)
         TYPE(layer_physics_type), INTENT(IN) :: layer_physics(:)
         TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_caches(:)
@@ -368,8 +368,12 @@ CONTAINS
             k=domain%k_cent(l)
             state%q(:,:,j,k)=this%q_trial(:,:,j,k)
             state%qp(:,:,j,k)=this%qp_trial(:,:,j,k)
+            ! The fixed outer boundary is not reset by check_solve.
+            IF (j>1 .AND. j<comp_cells_x .AND. k>1 .AND. k<comp_cells_y) &
+                domain%solve_mask(j,k)=ANY(this%q_trial(idx_totMassEqn,1:n_layers,j,k)>0.0_wp)
         END DO
         !$OMP END PARALLEL DO
+        domain%committed_mask_ready=.TRUE.
         IF (front_j>0) THEN
             WRITE(*,'(A,ES24.16)') 'FRONT_MASS published L1=', &
                 state%q(idx_totMassEqn,1,front_j,front_k)

@@ -34,6 +34,10 @@ MODULE domain_2d
     TYPE, PUBLIC :: domain_type
 
         REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
+        !> Next pending initialization release; refreshed only when its time is reached.
+        REAL(wp) :: next_release_time = HUGE(0.0_wp)
+        !> Accepted Lie published wetness for the previous solve worklist.
+        LOGICAL :: committed_mask_ready = .FALSE.
 
         LOGICAL, ALLOCATABLE :: solve_mask(:,:)
         LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
@@ -85,6 +89,8 @@ CONTAINS
         ALLOCATE( this%solve_mask_y(comp_cells_x,comp_interfaces_y) )
 
         this%solve_mask_time = 0.0_wp
+        this%next_release_time = HUGE(0.0_wp)
+        this%committed_mask_ready = .FALSE.
 
         this%solve_mask = .FALSE.
         this%solve_mask_temp = .FALSE.
@@ -170,7 +176,12 @@ CONTAINS
         LOGICAL, INTENT(IN) :: solve_all
         REAL(wp), INTENT(IN), OPTIONAL :: q_other(:,:,:)
 
-        INTEGER :: i,j,k
+        INTEGER :: i,j,k,n
+        INTEGER :: row_count(comp_cells_y),row_offset(comp_cells_y+1)
+        LOGICAL :: active,rebuild_from_state,release_due
+
+        rebuild_from_state=.NOT.this%committed_mask_ready
+        release_due=this%next_release_time<=t
 
         IF (PRESENT(q_other)) THEN
             IF (SIZE(q_other,1)<idx_totMassEqn .OR. &
@@ -178,157 +189,173 @@ CONTAINS
                 CALL fatal_error('Coupled workset: invalid second-layer state shape')
         END IF
 
-        !$OMP PARALLEL
+        ! On a normal step, accepted Lie publication has already written wetness
+        ! for the old worklist. The full-state path is needed only without that
+        ! publication (initialization, restart, and direct callers), or when a
+        ! deferred initial release reaches its activation time.
+        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k,n,active)
 
-        IF ( solve_all ) THEN
+        IF (solve_all) THEN
 
             !$OMP WORKSHARE
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1)=.TRUE.
+            !$OMP END WORKSHARE
+
+        ELSEIF (rebuild_from_state) THEN
+
+            !$OMP WORKSHARE
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1)=.FALSE.
             !$OMP END WORKSHARE
 
         ELSE
 
-            !$OMP WORKSHARE
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .FALSE.
-            !$OMP END WORKSHARE
-
-        END IF
-        !$OMP BARRIER
-
-        !$OMP WORKSHARE
-        WHERE ( ( q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.                              &
-            ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )                                       &
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
-        !$OMP END WORKSHARE
-
-        ! Include cells wet in either layer before the existing halo and face
-        ! construction. The independent single-layer path is untouched.
-        IF (PRESENT(q_other)) THEN
-            !$OMP WORKSHARE
-            WHERE ((q_other(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1)>0.0_wp) .AND. &
-                (this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1)<=t)) &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1)=.TRUE.
-            !$OMP END WORKSHARE
-        END IF
-
-        !$OMP BARRIER
-
-        IF ( bottom_radial_source_flag .OR. bottom_fissural_source_flag ) THEN
-
-            !$OMP WORKSHARE
-            WHERE ( cell_source_fractions .GT. 0.0_wp ) this%solve_mask = .TRUE.
-            !$OMP END WORKSHARE
-
-            !$OMP BARRIER
-
-        END IF
-
-        IF ( radial_source_flag ) THEN
-
-            !$OMP DO private(j,k)
-
-            DO k = 2,comp_cells_y-1
-
-                DO j = 2,comp_cells_x-1
-
-                    IF ( source_cell(j,k) .EQ. 2 ) THEN
-
-                        this%solve_mask(j,k) = .TRUE.
-
-                    END IF
-
-                END DO
-
+            ! A halo cell processed by Lie may still contain delayed mass.
+            ! Apply the current time gate to the previous compact worklist.
+            !$OMP DO SCHEDULE(STATIC)
+            DO i=1,this%solve_cells
+                j=this%j_cent(i)
+                k=this%k_cent(i)
+                IF (j<=1 .OR. j>=comp_cells_x .OR. k<=1 .OR. k>=comp_cells_y) CYCLE
+                IF (this%solve_mask_time(j,k)>t) this%solve_mask(j,k)=.FALSE.
             END DO
-
             !$OMP END DO
 
         END IF
 
-        !$OMP BARRIER
-        !$OMP MASTER
+        ! Mass scans are skipped in ordinary Lie-to-Lie steps. When a release
+        ! time is reached, recover any newly eligible wet cells outside the
+        ! previous worklist. The release-time map is set at initialization.
+        IF (.NOT.solve_all .AND. (rebuild_from_state .OR. release_due)) THEN
 
-        DO i = 1,active_halo_layers
+            !$OMP WORKSHARE
+            WHERE ((q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1)>0.0_wp) .AND. &
+                (this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1)<=t)) &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1)=.TRUE.
+            !$OMP END WORKSHARE
 
-            this%solve_mask_temp = this%solve_mask
+            IF (PRESENT(q_other)) THEN
 
-            ! solution domain is extended to neighbours of positive-mass cells
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
-                this%solve_mask_temp(1:comp_cells_x-2,2:comp_cells_y-1)
+                !$OMP WORKSHARE
+                WHERE ((q_other(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1)>0.0_wp) .AND. &
+                    (this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1)<=t)) &
+                    this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1)=.TRUE.
+                !$OMP END WORKSHARE
 
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
-                this%solve_mask_temp(3:comp_cells_x,2:comp_cells_y-1)
+            END IF
 
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
-                this%solve_mask_temp(2:comp_cells_x-1,1:comp_cells_y-2)
+        END IF
 
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                                                       &
-                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                                                &
-                this%solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y)
+        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
 
-        END DO
+            !$OMP WORKSHARE
+            WHERE (cell_source_fractions>0.0_wp) this%solve_mask=.TRUE.
+            !$OMP END WORKSHARE
 
-        !$OMP END MASTER
-        !$OMP BARRIER
+        END IF
 
-        !$OMP DO private(j,k)
+        IF (radial_source_flag) THEN
 
-        DO k = 1,comp_cells_y
-
-            DO j = 1,comp_cells_x
-
-                IF ( radial_source_flag ) THEN
-
-                    IF ( source_cell(j,k) .EQ. 1 ) this%solve_mask(j,k) = .FALSE.
-
-                END IF
-
+            !$OMP DO SCHEDULE(STATIC)
+            DO k=2,comp_cells_y-1
+                DO j=2,comp_cells_x-1
+                    IF (source_cell(j,k)==2) this%solve_mask(j,k)=.TRUE.
+                END DO
             END DO
+            !$OMP END DO
 
+        END IF
+
+        ! Ping-pong dilation: preserve the unmodified perimeter once, then
+        ! write all interior destinations into the existing temporary mask.
+        !$OMP SINGLE
+        this%solve_mask_temp(1,:)=this%solve_mask(1,:)
+        this%solve_mask_temp(comp_cells_x,:)=this%solve_mask(comp_cells_x,:)
+        this%solve_mask_temp(:,1)=this%solve_mask(:,1)
+        this%solve_mask_temp(:,comp_cells_y)=this%solve_mask(:,comp_cells_y)
+        !$OMP END SINGLE
+
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=2,comp_cells_y-1
+            DO j=2,comp_cells_x-1
+                this%solve_mask_temp(j,k)=this%solve_mask(j,k) .OR. &
+                    this%solve_mask(j-1,k) .OR. this%solve_mask(j+1,k) .OR. &
+                    this%solve_mask(j,k-1) .OR. this%solve_mask(j,k+1)
+            END DO
         END DO
-
         !$OMP END DO
+
+        ! Second dilation reads only the completed temporary mask. Apply the
+        ! radial exclusion after the halo, and count each entire finalized row.
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            n=0
+            DO j=1,comp_cells_x
+                IF (j==1 .OR. j==comp_cells_x .OR. k==1 .OR. k==comp_cells_y) THEN
+                    active=this%solve_mask_temp(j,k)
+                ELSE
+                    active=this%solve_mask_temp(j,k) .OR. &
+                        this%solve_mask_temp(j-1,k) .OR. this%solve_mask_temp(j+1,k) .OR. &
+                        this%solve_mask_temp(j,k-1) .OR. this%solve_mask_temp(j,k+1)
+                END IF
+                IF (radial_source_flag) THEN
+                    IF (source_cell(j,k)==1) active=.FALSE.
+                END IF
+                this%solve_mask(j,k)=active
+                IF (active) n=n+1
+            END DO
+            row_count(k)=n
+        END DO
+        !$OMP END DO
+
         !$OMP WORKSHARE
-
-        this%solve_mask_x(1:comp_interfaces_x,1:comp_cells_y) = .FALSE.
-        this%solve_mask_y(1:comp_cells_x,1:comp_interfaces_y) = .FALSE.
-
+        this%solve_mask_x=.FALSE.
+        this%solve_mask_y=.FALSE.
         !$OMP END WORKSHARE
 
         !$OMP END PARALLEL
 
-        !----- check for cells where computation is needed
-        i = 0
-
-        DO k = 1,comp_cells_y
-
-            DO j = 1,comp_cells_x
-
-                IF ( this%solve_mask(j,k) ) THEN
-
-                    i = i+1
-                    this%j_cent(i) = j
-                    this%k_cent(i) = k
-
-                    this%solve_mask_x(j,k) = .TRUE.
-                    this%solve_mask_x(j+1,k) = .TRUE.
-                    this%solve_mask_y(j,k) = .TRUE.
-                    this%solve_mask_y(j,k+1) = .TRUE.
-
-                END IF
-
-            END DO
-
+        ! The final mask is compacted by row. Each row owns a disjoint
+        ! output interval; the old lexicographic (k,j) ordering is preserved.
+        row_offset(1)=0
+        DO k=1,comp_cells_y
+            row_offset(k+1)=row_offset(k)+row_count(k)
         END DO
 
-        this%solve_cells = i
-        ! This compact worklist is built by a single scan of a logical mask:
-        ! no coordinate can be inserted twice. Assert the cardinality at refresh.
-        IF (this%solve_cells/=COUNT(this%solve_mask))                                                                  &
+        this%solve_cells=row_offset(comp_cells_y+1)
+
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k,j,n) SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            n=row_offset(k)
+            DO j=1,comp_cells_x
+                IF (.NOT.this%solve_mask(j,k)) CYCLE
+                n=n+1
+                this%j_cent(n)=j
+                this%k_cent(n)=k
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+
+        ! Adjacent solve cells share faces. Keep face writes out of the
+        ! parallel emitter to avoid overlapping OpenMP writes.
+        DO i=1,this%solve_cells
+            j=this%j_cent(i)
+            k=this%k_cent(i)
+            this%solve_mask_x(j,k)=.TRUE.
+            this%solve_mask_x(j+1,k)=.TRUE.
+            this%solve_mask_y(j,k)=.TRUE.
+            this%solve_mask_y(j,k+1)=.TRUE.
+        END DO
+
+        IF (this%solve_cells/=COUNT(this%solve_mask)) &
             CALL fatal_error('Lie OpenMP: inconsistent unique solve worklist')
+
+        ! A later refresh without new Lie publication must rebuild wetness
+        ! from the caller's current conservative state, not from halo values.
+        this%committed_mask_ready=.FALSE.
+        IF (solve_all .OR. rebuild_from_state .OR. release_due) THEN
+            this%next_release_time=MINVAL(this%solve_mask_time, &
+                MASK=this%solve_mask_time>t)
+        END IF
 
         ! Preserve the former HP workset order: active cells, then neighbours.
         DO i = 1, this%hp_eta_cells
