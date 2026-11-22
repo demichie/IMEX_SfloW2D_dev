@@ -1,187 +1,217 @@
 # Active-domain OpenMP roadmap
 
-**Status:** approved design, **not yet implemented in the production solver**.
+**Status:** approved implementation design; **not yet integrated in production**.
 **Branch:** `feature/two-layer`.
-**Goal:** improve active-domain management with minimal changes and unchanged numerics.
+**Goal:** remove redundant global work and memory transfers, then parallelize remaining loops.
+Preserve the physical model, numerical stencil, source scheduling and accepted Lie transaction.
 
-This document covers only domain worksets. The
-[two-layer roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md) remains authoritative
-for physics; the [Lie transaction roadmap](LIE_TIMESTEP_TRANSACTION_ROADMAP.md)
-governs accepted-state publication and fatal failure handling.
+The [two-layer roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md) owns layer physics;
+the [Lie transaction roadmap](LIE_TIMESTEP_TRANSACTION_ROADMAP.md) owns accepted-state
+publication and fatal failure semantics. This document specifies only active-domain management.
 
-## 1. Agreed strategy
+## 1. Final strategy and data ownership
 
-There is **one shared** `domain%solve_mask(j,k)` for all layers and
-**one global ordered solve list**, stored in the existing
-`domain%j_cent(:)`, `domain%k_cent(:)`, and `domain%solve_cells`.
-A cell is wet when the accepted conservative total mass is positive
-in **at least one** active layer. The final solve mask additionally
-contains required source cells, boundaries and stencil halos.
+There is **one** shared `domain%solve_mask(j,k)` for all active layers and
+**one** global ordered solve list in the existing `domain%j_cent(:)`,
+`domain%k_cent(:)`, and `domain%solve_cells`. A cell is wet if total
+accepted conservative mass is positive in at least one active layer.
+The final solve domain also includes the current source, boundary and halo rules.
 
-The changes relative to the current implementation are limited to:
+Reuse `domain%solve_mask_temp(:,:)` as the second ping-pong mask.
+No per-layer solve masks, per-thread cell lists, sparse merging, new
+persistent domain storage, atomic writes, sorting or duplicate removal.
 
-1. **Lie wet/dry update:** evaluate wetness in the existing final OpenMP
-   Lie publication loop, only for old solve-list cells, and update
-   `solve_mask` there. Today `check_solve` scans the full state.
-2. **Parallel halo:** retain both existing snapshot-based, four-neighbor
-   `.OR.` dilations, but replace the serial `!$OMP MASTER` work with
-   an OpenMP loop that owns disjoint destination cells.
-3. **Parallel global compaction:** replace the serial full-grid scan that
-   builds `j_cent/k_cent` by OpenMP row counts, a small prefix sum and
-   parallel output to the existing global list.
+The agreed sequence is:
 
-Keep the existing `solve_mask_temp(:,:)` as the read-only dilation
-snapshot. Do **not** add per-layer masks, persistent linear-index copies,
-thread-local cell lists, sparse merge, duplicate-removal passes or tiles.
+1. **Accepted Lie loop:** update wet/dry membership for old worklist cells
+   while publishing `q/qp`, without an extra global state scan.
+2. **Start of next timestep:** `check_solve` completes the seed mask from
+   existing source, time-gating, boundary, initialization and restart rules.
+3. **First OpenMP dilation:** read `solve_mask` and write the first halo
+   to `solve_mask_temp`, copying only the perimeter to preserve boundaries.
+4. **Second OpenMP dilation:** read `solve_mask_temp`, write `solve_mask`,
+   apply radial exclusions *after* dilation, and count final cells per row.
+5. **Prefix sum and OpenMP compaction:** write the existing `j_cent/k_cent`
+   list directly from the finalized logical mask.
+6. **Dependent worksets:** preserve safe face, HP and reconstruction
+   ownership and their current geometrical and ordering contracts.
 
-The [standalone compaction tests](../TESTS/TEST_DOMAIN_COMPACTION/README.md)
-compare serial scanning, OpenMP global scanning and sparse merging.
-**Global OpenMP scanning is selected** for simplicity and generally
-favorable measured performance, subject to end-to-end solver profiling.
+Retain **two** four-neighbor/Manhattan halo layers
+(`active_halo_layers=2`). The separate two-cell reconstruction-read halo
+does not enlarge the evolved solve domain.
 
-## 2. Timestep algorithm
+## 2. Cost comparison: production now versus the selected design
 
-### A. Final accepted Lie loop: update the mask
+Let `N=Nx*Ny`, `M` be the old number of solve cells, and `Ny` the number
+of grid rows. **Less work** means fewer operations or memory passes;
+**OpenMP** means similar work in parallel, potentially reducing elapsed
+time. Neither alone proves faster end-to-end simulations.
 
-Keep the existing `!$OMP PARALLEL DO` over the **old** global
-`j_cent/k_cent` list. After all Lie source groups have succeeded:
+| Operation | Current production code | Target | Benefit type |
+| --- | --- | --- | --- |
+| Wet/dry mass checks | OpenMP on `N` cells | Lie OpenMP on `M` cells | **Less work** if `M << N` |
+| Reset interior mask | Full-grid reset | Lie clears old dry cells | **Potential saving**; audit needed |
+| Source/release activation | Global checks | Preserve coverage | **No guaranteed saving** |
+| Halo mask copies | Two full `O(N)` copies | Border-only `O(Nx+Ny)` copy | **Less work / traffic** |
+| Two halo OR passes | Two serial stencil scans | Two OpenMP stencil scans | **OpenMP wall time** |
+| Radial exclusions | Separate global scan | Fuse into second halo | **Less work / traffic** |
+| Count cells by row | No separate row counts | Count inside second halo | Avoid **new** global count scan |
+| Global list scan | Serial `O(N)` | OpenMP `O(N)` | **OpenMP wall time** |
+| Prefix sum | Absent | Serial `O(Ny)` | **New small cost** |
+| Mark face masks | In serial list scan | Separate safe `O(M)` pass | **Possible new cost** |
+| Worklist `COUNT` assertion | Full-grid count | Retain initially | **No saving** |
+| Face/HP/reconstruction lists | Existing passes | Unchanged initially | **No claimed gain** |
 
-1. Publish the accepted `state%q` and `state%qp` for the cell.
-2. Check final conservative total mass (`idx_totMassEqn`), using
-   an OR across the active layers (L1 only in single-layer runs).
-3. Set the corresponding **single shared** `solve_mask(j,k)` to the
-   resulting wet/dry flag. Do not expand the halo or build lists here.
+**Do not conflate the baseline with an intermediate design.**
+The current production list scan already counts and emits cells
+together; the fused `row_count(k)` saves a full-grid count pass
+**relative to the earlier proposed OpenMP count/emit scheme**, not
+relative to the current serial scan. The independent production
+`COUNT(solve_mask)` consistency assertion is another full-grid read.
 
-Each worklist cell is visited exactly once, so updates are
-race-free without atomics. Preserve source-group ordering, the accepted
-transaction, geometry handling, and failure behavior.
+The two eliminated full-mask copies are an actual memory-traffic
+reduction. Parallelizing the two halo OR passes does **not** remove
+their neighbor tests. Thread startup/barriers, memory bandwidth,
+additional face marking and deferred releases can offset speedups.
+The decisive metric is the complete timestep, not kernel timing alone.
 
-**Important:** after Lie, `solve_mask` is provisional: it describes
-wetness of the old worklist, not the new finalized solve domain.
-The old list must remain valid until `check_solve` finishes.
-Audit stochastic, diagnostics, output and restart accesses between
-Lie and `check_solve`; no consumer may incorrectly rely on the
-provisional mask as if it were the previous finalized workset.
+## 3. Algorithm and concurrency details
 
-### B. Next `check_solve`: complete the seed mask
+### A. Accepted Lie publication
 
-Keep `check_solve` responsible for all non-Lie activations and their
-current rules at the **new** simulation time:
+Use the existing OpenMP loop over the **old** unique solve worklist.
+After every Lie source group has succeeded, publish `state%q/qp` and
+assign the wet/dry value of the one shared `solve_mask(j,k)` from
+positive conservative mass of either active layer. For single-layer
+runs only L1 participates. Do not change the wetness threshold to
+primitive depth or alter trial/publication ordering.
 
-- Enforce `solve_mask_time(j,k) <= t` as currently required.
-- Restore the outer boundary membership maintained by the current code.
-- Insert bottom radial/fissural seeds from `cell_source_fractions > 0`
-  and radial seeds from `source_cell == 2`, when enabled.
-- Recover wet cells newly eligible through delayed releases or changed
-  external sources, even **outside the old solve list**.
-  Use existing source/timing information and read their committed
-  masses where needed; do not lose such cells by trusting the Lie
-  worklist alone.
-- Keep initialization, restart and `solve_all=.TRUE.` paths correct
-  even when there was no preceding accepted Lie step.
+Each old worklist coordinate has one owner, requiring no atomic write.
+The resulting mask is **provisional** until the next `check_solve`.
+The old list remains available until the new list is complete.
+Audit consumers between these points: stochastic updates, diagnostics,
+output, checkpoint/restart and any other mask readers must not
+misinterpret this provisional mask as the finalized old workset.
 
-Ordinary cells processed by Lie reuse its logical wetness result;
-`check_solve` should not scan their real-valued state globally again.
-A full-grid physical-state scan may still be required on exceptional
-release/restart paths unless complete event enumeration is proven.
-Do not duplicate source configuration or invent persistent activation
-structures just to remove this scan.
+### B. Seed completion at the new timestep
 
-The result is a **seed mask**. Do not interpret halo membership as
-wetness after the next phase.
+Preserve the current `solve_mask_time(j,k)<=t` activation rule;
+boundary values; source rules for `cell_source_fractions>0` and
+`source_cell==2`; initialization, restart, and `solve_all=.TRUE.`.
+Recover delayed releases or newly activated source cells **outside**
+the old list. Do not treat previously active dry halo cells as wet.
 
-### C. Two OpenMP halo expansions, reusing `solve_mask_temp`
+The normal path should reuse Lie's logical wetness updates rather than
+rereading real mass across the full grid. However, **this saving depends
+on proving complete activation of cells outside the previous list**.
+Keep the necessary state checks on exceptional paths if required.
+Do not duplicate persistent wetness or source-state representations.
 
-Keep `active_halo_layers=2` and the same four orthogonal neighbors,
-interior-only destinations and boundary handling as today.
+### C. First dilation: `solve_mask` -> `solve_mask_temp`
 
-For each of the two expansion passes:
-
-1. Copy `solve_mask` to the existing `solve_mask_temp`.
-2. Parallelize the destination grid rows with OpenMP.
-3. Read **only** `solve_mask_temp` and write to the thread-owned
-   destination in `solve_mask`.
-4. Synchronize before the next snapshot and expansion.
-
-For interior destinations, the operation is:
+Copy **only** the perimeter values from `solve_mask` into
+`solve_mask_temp`. The current numerical halo modifies interior
+destinations only. In an OpenMP loop with exclusive destination
+ownership, calculate the interior first halo:
 
 ```fortran
-solve_mask(j,k) = solve_mask_temp(j,k) .OR. &
-                  solve_mask_temp(j-1,k) .OR. &
-                  solve_mask_temp(j+1,k) .OR. &
-                  solve_mask_temp(j,k-1) .OR. &
-                  solve_mask_temp(j,k+1)
+solve_mask_temp(j,k) = solve_mask(j,k) .OR. &
+                       solve_mask(j-1,k) .OR. &
+                       solve_mask(j+1,k) .OR. &
+                       solve_mask(j,k-1) .OR. &
+                       solve_mask(j,k+1)
 ```
 
-The snapshot prevents propagation chains within one pass. Each
-destination has a unique writer: **no atomic operations or thread
-masks are required**. The result preserves the current
-Manhattan-distance-two solution halo.
+Synchronize all threads before starting the second dilation.
+The preserved perimeter is required because cells next to the
+boundary read its values in the second pass. Degenerate grids
+with no interior must not read nonexistent neighbors.
 
-After both passes, apply the existing radial exclusion
-(`source_cell == 1`) before building the solve worklist.
-Do not reduce the halo width or alter boundary/source ordering.
+### D. Second dilation: exclusions plus per-row counts
 
-### D. OpenMP global solve-list compaction
+For interior cells read **only** `solve_mask_temp`:
 
-The final mask is now authoritative. Work only on this **logical**
-array; do not read `q` or `qp` during compaction.
+```fortran
+active = solve_mask_temp(j,k) .OR. &
+         solve_mask_temp(j-1,k) .OR. &
+         solve_mask_temp(j+1,k) .OR. &
+         solve_mask_temp(j,k-1) .OR. &
+         solve_mask_temp(j,k+1)
+```
 
-1. **OpenMP count:** `row_count(k)=COUNT(solve_mask(:,k))`
-   independently for each `k=1..Ny`.
-2. **Prefix sum:** `row_offset(1)=0`, followed by
-   `row_offset(k+1)=row_offset(k)+row_count(k)`.
-3. **OpenMP emit:** loop over rows, then increasing `j=1..Nx`,
-   writing active cells directly to `j_cent(l)` and `k_cent(l)`,
-   starting after `row_offset(k)`.
-4. Set `solve_cells=row_offset(Ny+1)`.
+Perimeter destinations retain the previous `solve_mask(j,k)`.
+**After** obtaining the two-ring halo, apply the current exclusion
+`source_cell(j,k)==1` when `radial_source_flag` is active;
+then assign the final `solve_mask(j,k)`. The exclusion must not
+remove a seed **before** it contributes to the second dilation.
 
-Only temporary `O(Ny)` counts and offsets are needed. Each row
-writes to a disjoint output segment: no atomics, per-thread lists,
-duplicate removal, sorting or merging. Indices are ordered by
-increasing `k`, then `j`, independent of scheduling/thread count.
-Verify `solve_cells == COUNT(solve_mask)` and exact index order.
+Assign each complete `k` row to one OpenMP iteration and increment
+a row-private counter for each final `.TRUE.` cell, including border
+cells and accounting for their exclusions. Write `row_count(k)`
+once per row. Each thread owns different destinations and counts;
+all stencil reads come from the immutable temporary mask.
+No atomics, no intermediate activation chains and no separate
+global exclusion or counting pass.
 
-### E. Keep dependent worksets consistent
+### E. Prefix sum and parallel ordered worklist
 
-Preserve current face masks/lists, HP and reconstruction worksets,
-including their membership and ordering. The reconstruction halo
-extends **two additional read-only cells** around solve cells;
-it does not enlarge the evolved solve domain.
+Compute `row_offset(1)=0` and, for increasing `k`,
+`row_offset(k+1)=row_offset(k)+row_count(k)`.
+Set `solve_cells=row_offset(Ny+1)`.
 
-Do not blindly move cell-driven updates of `solve_mask_x/y` into
-the parallel compaction loop: adjacent cells can write the same
-face location. Retain the current safe path initially, or
-separately validate a face-owned parallel pass.
+In an OpenMP loop over rows, visit `j` in increasing order and write
+the existing `j_cent/k_cent` arrays only in that row's interval
+`(row_offset(k),row_offset(k+1)]`. This is a single global logical-mask
+scan, with no `q/qp` accesses, sorting, duplicates or atomic writes.
+Its ordering exactly matches the current serial scan: increasing `k`,
+then increasing `j`, independent of thread scheduling.
 
-## 3. Implementation and verification
+### F. Faces, reconstruction and verification scan
 
-1. **Audit:** `check_solve` callers, wet/dry uses of `solve_mask`,
-   time-dependent sources, deferred releases, restart, initialization,
-   boundary rules, and stochastic/diagnostic consumers.
-2. **Modify Lie:** add only the shared wet/dry mask assignment to
-   accepted-state publication; check single-/two-layer behavior and
-   safe timing of provisional membership.
-3. **Parallelize the existing halo:** reuse `solve_mask_temp`
-   without changing the two passes or stencil geometry.
-4. **Parallelize list construction:** implement count / prefix sum /
-   emit into the existing `j_cent/k_cent` arrays.
-5. **Compare and profile:** check exact masks, ordered lists,
-   face/HP/reconstruction worksets, boundaries, source exclusions,
-   dry/wet transitions, delayed releases, empty/full domains and
-   restarts against the old implementation. Run strict/debug and
-   optimized builds, OpenMP 1/2/4/8, representative LAHAR cases,
-   physical invariants and relevant experimental two-layer tests.
+The current serial scan also marks `solve_mask_x` and
+`solve_mask_y` for adjacent faces. Placing those writes directly
+in the parallel cell emitter would be unsafe: neighboring cells
+can write the same face. Initially mark faces in a safe separate
+pass over the compact global solve list, and measure that `O(M)` cost.
+Preserve the existing HP, face-list and reconstruction-list order
+and membership. Do not change the separate reconstruction halo.
 
-The standalone
+The current unconditional full-grid `COUNT(solve_mask)` assertion
+should remain initially. Any removal or movement of this runtime
+check is a separate review decision; the integrated `row_count`
+does not silently replace its independent consistency test.
+
+## 4. Implementation and acceptance plan
+
+1. **Dependency audit:** all consumers of `solve_mask`, source/release
+   schedule, restart/initialization, stochastic and diagnostics behavior,
+   boundary rules and shared L1/L2 workset semantics.
+2. **Differential correctness:** compare old two-copy dilation with
+   ping-pong dilation and fused count, checking masks, row counts and
+   the **exact** ordered worklist for small/large, empty/full,
+   isolated, corridor and border cases, including source exclusions.
+3. **OpenMP correctness:** test 1/2/4/8 threads, disjoint writes,
+   phase barriers and identical deterministic output. Verify that
+   provisional masks cannot be read as finalized worksets.
+4. **Coherent production changes:** Lie wet/dry update, seed completion,
+   ping-pong halo, fused exclusion/count, prefix sum, ordered emission
+   and safe face-mask construction; no second production algorithm.
+5. **End-to-end verification:** strict/debug and optimized builds,
+   single-layer LAHAR examples, experimental two-layer configurations,
+   dry/wet transitions, delayed releases, restart, mass conservation,
+   stochastic behavior and face/HP/reconstruction workset equivalence.
+   Profile complete `check_solve` and the total timestep for
+   1/4/8 threads with matched inputs and output settings.
+
+The existing
 [compaction benchmark](../TESTS/TEST_DOMAIN_COMPACTION/README.md)
-validates only isolated list construction, **not** Lie mask updates,
-activation completeness, halo equivalence or full solver behavior.
+validates isolated list construction only: it does **not** verify the
+combined production Lie update, halo ping-pong, count fusion or sources.
+Do not claim production speedups until those measurements exist.
 
-**Completion criterion:** one shared mask and the existing ordered
-worklist remain consistent across all paths, with unchanged
-numerical results and verified OpenMP behavior.
+**Completion criterion:** exactly one shared solve mask and one existing
+ordered global list, unchanged numerical behavior, correct edge/source
+semantics and verified OpenMP performance.
 
-**Out of scope:** modifying physics, changing the two-ring solve
-halo, per-layer masks, MPI/GPU/tiles, sparse production backends
-and production activation of experimental two-layer physics.
+**Out of scope:** new physics, halo-width changes, per-layer solve masks,
+sparse production backends, tiles/MPI/GPU, or two-layer production approval.
