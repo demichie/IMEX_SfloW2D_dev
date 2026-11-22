@@ -109,6 +109,7 @@ EXTRA_DIST = state/inc/dry_thermodynamics.inc state/inc/mixture_heat_capacity.in
              physics/rheology_laws/rheology_quadratic_drag.inc \
              physics/rheology_laws/rheology_empirical_drag.inc \
              physics/rheology_laws/rheology_lahar_drag.inc \
+             physics/rheology_laws/rheology_lahar_viscosity.inc \
              physics/rheology_laws/rheology_newmodel_linear.inc \
              physics/thermal_laws/thermal_cooling_rate.inc
 
@@ -601,7 +602,8 @@ physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): physics/rheology_laws/rhe
 
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): physics/rheology_laws/rheology_empirical_drag.inc
 
-physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc
+physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc \
+    physics/rheology_laws/rheology_lahar_viscosity.inc
 
 # Blocco 1: include dependencies used by source kernels.
 physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): physics/rheology_laws/rheology_newmodel_linear.inc

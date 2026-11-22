@@ -84,6 +84,12 @@ PROGRAM test_source_modules
              complex_derivative,finite_difference_derivative
         ERROR STOP 1
      END IF
+     complex_actual=eval_lahar_fluid_viscosity(config, &
+          CMPLX(temperature_points(i),0.0_wp,wp), &
+          CMPLX(0.3_wp,temperature_perturbation,wp))
+     complex_derivative=AIMAG(complex_actual)/temperature_perturbation
+     CALL assert_close(complex_derivative,config%beta1*expected_viscosity, &
+          'lahar complex-step concentration derivative')
   END DO
   config%rheology_model='none'
   CALL eval_settling_fluid_properties(config, 293.15_wp,           &

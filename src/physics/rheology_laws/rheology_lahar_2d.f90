@@ -209,54 +209,36 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE eval_rheology_lahar_analytic
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the lahar carrier-fluid viscosity.
-    !> \details Apply the piecewise temperature correlation and the exponential
-    !> solid-concentration
-    !> factor; the complex overload preserves complex-step derivatives.
-    FUNCTION eval_lahar_fluid_viscosity_real(config,T, alphas_tot)                                                     &
-            RESULT(fluid_viscosity)
-
+    !> @brief Evaluate the REAL lahar carrier-fluid viscosity.
+    !> @details Instantiates the shared piecewise temperature-concentration law
+    !> using only REAL intermediates; no COMPLEX arithmetic is performed.
+    !> @param[in] config Layer-specific rheology coefficients.
+    !> @param[in] T Carrier temperature [K].
+    !> @param[in] alphas_tot Total solid volume fraction.
+    !> @return Dynamic carrier viscosity [Pa s].
+    FUNCTION eval_lahar_fluid_viscosity_real(config,T,alphas_tot) RESULT(fluid_viscosity)
         TYPE(rheology_config_type), INTENT(IN) :: config
-        REAL(wp), INTENT(IN) :: T, alphas_tot
+        REAL(wp), INTENT(IN) :: T,alphas_tot
         REAL(wp) :: fluid_viscosity
-        COMPLEX(wp) :: complex_viscosity
+        REAL(wp) :: temperature_celsius,exponent_a,exponent_b,alpha1
 
-        complex_viscosity = eval_lahar_fluid_viscosity_complex(config,                                                 &
-                    CMPLX(T,0.0_wp,wp),CMPLX(alphas_tot,0.0_wp,wp))
-        fluid_viscosity = REAL(complex_viscosity,wp)
+        INCLUDE 'rheology_lahar_viscosity.inc'
     END FUNCTION eval_lahar_fluid_viscosity_real
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the lahar carrier-fluid viscosity.
-    !> \details Apply the piecewise temperature correlation and the exponential
-    !> solid-concentration
-    !> factor; the complex overload preserves complex-step derivatives.
-    FUNCTION eval_lahar_fluid_viscosity_complex(config,T, alphas_tot)                                                  &
-            RESULT(fluid_viscosity)
-
+    !> @brief Evaluate the COMPLEX lahar carrier-fluid viscosity.
+    !> @details Uses the same correlation as the REAL overload and retains
+    !> imaginary perturbations for complex-step derivatives.
+    !> @param[in] config Layer-specific rheology coefficients.
+    !> @param[in] T Complex carrier temperature [K].
+    !> @param[in] alphas_tot Complex total solid volume fraction.
+    !> @return Complex dynamic carrier viscosity [Pa s].
+    FUNCTION eval_lahar_fluid_viscosity_complex(config,T,alphas_tot) RESULT(fluid_viscosity)
         TYPE(rheology_config_type), INTENT(IN) :: config
-        COMPLEX(wp), INTENT(IN) :: T, alphas_tot
+        COMPLEX(wp), INTENT(IN) :: T,alphas_tot
         COMPLEX(wp) :: fluid_viscosity
-        COMPLEX(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1
+        COMPLEX(wp) :: temperature_celsius,exponent_a,exponent_b,alpha1
 
-        temperature_celsius = T - 273.15_wp
-
-        IF (REAL(temperature_celsius, wp) .LT. 20.0_wp) THEN
-            exponent_a = 1301.0_wp / (998.333_wp + 8.1855_wp *                                                         &
-                        (temperature_celsius - 20.0_wp) + 0.00585_wp *                                                 &
-                        (temperature_celsius - 20.0_wp)**2) - 1.30223_wp
-            alpha1 = config%alpha1_coeff * 1.0E-3_wp * 10.0_wp**exponent_a
-
-        ELSE
-            exponent_b = (1.3272_wp * (20.0_wp - temperature_celsius)                                                  &
-                        - 0.001053_wp * (temperature_celsius - 20.0_wp)**2)                                            &
-                        / (temperature_celsius + 105.0_wp)
-            alpha1 = config%alpha1_coeff * 1.002E-3_wp * 10.0_wp**exponent_b
-
-        END IF
-
-        fluid_viscosity = alpha1 * EXP(config%beta1 * alphas_tot)
+        INCLUDE 'rheology_lahar_viscosity.inc'
     END FUNCTION eval_lahar_fluid_viscosity_complex
 
 END MODULE rheology_lahar_2d

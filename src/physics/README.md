@@ -183,6 +183,7 @@ rotation of momentum by a dissipative substep.
 The directory also contains
 `rheology_empirical_drag.inc`,
 `rheology_lahar_drag.inc`,
+`rheology_lahar_viscosity.inc`,
 `rheology_lava_viscous.inc`,
 `rheology_newmodel_linear.inc`,
 `rheology_plastic_yield.inc`,
