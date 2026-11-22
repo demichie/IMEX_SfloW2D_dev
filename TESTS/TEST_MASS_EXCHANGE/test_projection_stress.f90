@@ -54,6 +54,7 @@ PROGRAM test_projection_stress
   CALL check_preexisting_settling_budget
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
+  CALL check_settling_activation
   CALL check_complete_physical_state
   DO dimension=1,2
      DO level=0,2
@@ -477,8 +478,8 @@ CONTAINS
   SUBROUTINE check_settling_newton_roots
     USE mass_exchange_deposition_2d, ONLY : settling_velocity
     REAL(wp), PARAMETER :: diam=1.0E-4_wp, solid_density=2000.0_wp, carrier_density=1.2_wp
-    REAL(wp), PARAMETER :: reference_re(*)=[1.0E-5_wp,1.0E-2_wp,1.0_wp,10.0_wp, &
-         100.0_wp,500.0_wp,999.0_wp,1000.0_wp,1100.0_wp,3000.0_wp]
+    REAL(wp), PARAMETER :: reference_re(*)=[1.0E-5_wp,1.0E-2_wp,1.0_wp,9.2_wp, &
+         9.3_wp,9.4_wp,10.0_wp,100.0_wp,500.0_wp,999.0_wp,1000.0_wp,1100.0_wp,3000.0_wp]
     REAL(wp) :: cd_transition, cd, reference, inv_visc, speed, actual_re, k
     INTEGER :: mode,i
 
@@ -510,6 +511,38 @@ CONTAINS
     END DO
     mass_exchange_l1%deposition%collective_settling_flag=.FALSE.
   END SUBROUTINE check_settling_newton_roots
+
+  !> @brief Verify disabled settling and explicit interlayer-style activation.
+  !> @details The override must take precedence in both directions without changing
+  !> the state of the layer's own settling configuration.
+  SUBROUTINE check_settling_activation
+    USE mass_exchange_deposition_2d, ONLY : eval_deposition_volume_kernel
+    TYPE(rheology_config_type) :: config
+    REAL(wp) :: deposition(ns)
+
+    config=rheology_l1
+    config%rheology_model='lahar'
+    config%alpha1_coeff=1.0_wp
+    config%beta1=2.0_wp
+    mass_exchange_l1%deposition%settling_flag=.FALSE.
+
+    CALL eval_deposition_volume_kernel(config,mass_exchange_l1,2.0_wp,293.15_wp, &
+         [0.1_wp,0.05_wp],0.15_wp,1400.0_wp,1000.0_wp,1.0_wp,deposition)
+    IF (ANY(deposition/=0.0_wp)) ERROR STOP 'Disabled settling produced deposition'
+
+    CALL eval_deposition_volume_kernel(config,mass_exchange_l1,2.0_wp,293.15_wp, &
+         [0.1_wp,0.05_wp],0.15_wp,1400.0_wp,1000.0_wp,1.0_wp,deposition, &
+         enable_settling=.TRUE.)
+    IF (.NOT.ALL(deposition>0.0_wp)) ERROR STOP 'Settling override did not activate deposition'
+
+    mass_exchange_l1%deposition%settling_flag=.TRUE.
+    CALL eval_deposition_volume_kernel(config,mass_exchange_l1,2.0_wp,293.15_wp, &
+         [0.1_wp,0.05_wp],0.15_wp,1400.0_wp,1000.0_wp,1.0_wp,deposition, &
+         enable_settling=.FALSE.)
+    IF (ANY(deposition/=0.0_wp)) ERROR STOP 'Settling override did not disable deposition'
+
+    mass_exchange_l1%deposition%settling_flag=.FALSE.
+  END SUBROUTINE check_settling_activation
 
   !> \brief Verify that cached real and complex physical properties are complete.
   SUBROUTINE check_complete_physical_state

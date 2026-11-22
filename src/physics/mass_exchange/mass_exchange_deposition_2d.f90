@@ -153,6 +153,7 @@ CONTAINS
             deposition_rate = 0.0_wp
             enabled=mass_config%deposition%settling_flag
             IF (PRESENT(enable_settling)) enabled=enable_settling
+            IF (.NOT.enabled) RETURN
 
             ! For the gas carrier, use temperature-dependent viscosity and ideal-gas density.
             IF ( gas_flag .AND. sutherland_flag ) THEN
@@ -210,6 +211,7 @@ CONTAINS
             REAL(wp), INTENT(IN) :: particle_diameter, solid_density, carrier_density, inverse_kinematic_viscosity
             REAL(wp), PARAMETER :: transition_re=1000.0_wp
             REAL(wp), PARAMETER :: solver_tolerance=1.0E-11_wp
+            REAL(wp), PARAMETER :: stokes_inertial_crossover=(24.0_wp/3.6_wp)**(1.0_wp/0.687_wp)
             REAL(wp) :: drag_transition, initial_re, initial_re_squared
             REAL(wp) :: const_part, reynolds, lower_re, upper_re
             REAL(wp) :: residual, derivative, candidate, reynolds_squared
@@ -250,11 +252,15 @@ CONTAINS
             lower_re=0.0_wp
             upper_re=transition_re
 
-            ! The Stokes and inertial asymptotes give a cheap starting point.
-            ! Safeguarding below guarantees the root stays bracketed even if
-            ! this estimate is inaccurate for collective settling.
-            reynolds=MIN(transition_re,initial_re_squared/24.0_wp,                                                     &
-                (initial_re_squared/3.6_wp)**(1.0_wp/1.687_wp))
+            ! The Stokes estimate is the smaller asymptote below their analytic
+            ! crossover. Only evaluate the fractional power above that point.
+            ! Safeguarding below still brackets the root for collective drag.
+            reynolds=MIN(transition_re,initial_re_squared/24.0_wp)
+
+            IF (reynolds>stokes_inertial_crossover) THEN
+                reynolds=MIN(reynolds,(initial_re_squared/3.6_wp)**(1.0_wp/1.687_wp))
+            END IF
+
             reynolds=MAX(reynolds,TINY(reynolds))
 
             ! Safeguarded Newton: use the exact derivative of Re^2*C_D(Re),
