@@ -176,7 +176,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: solve_all
         REAL(wp), INTENT(IN), OPTIONAL :: q_other(:,:,:)
 
-        INTEGER :: i,j,k,n
+        INTEGER :: i,j,k,n,km,kp
         INTEGER :: row_count(comp_cells_y),row_offset(comp_cells_y+1)
         LOGICAL :: active,rebuild_from_state,release_due
 
@@ -193,7 +193,7 @@ CONTAINS
         ! for the old worklist. The full-state path is needed only without that
         ! publication (initialization, restart, and direct callers), or when a
         ! deferred initial release reaches its activation time.
-        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k,n,active)
+        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k,n,active,km,kp)
 
         IF (solve_all) THEN
 
@@ -289,20 +289,43 @@ CONTAINS
         !$OMP DO SCHEDULE(STATIC)
         DO k=1,comp_cells_y
             n=0
-            DO j=1,comp_cells_x
-                IF (j==1 .OR. j==comp_cells_x .OR. k==1 .OR. k==comp_cells_y) THEN
+            IF (k==1 .OR. k==comp_cells_y .OR. comp_cells_x<=2) THEN
+                DO j=1,comp_cells_x
                     active=this%solve_mask_temp(j,k)
-                ELSE
+                    IF (radial_source_flag) THEN
+                        IF (source_cell(j,k)==1) active=.FALSE.
+                    END IF
+                    this%solve_mask(j,k)=active
+                    IF (active) n=n+1
+                END DO
+            ELSE
+                km=k-1
+                kp=k+1
+                active=this%solve_mask_temp(1,k)
+                IF (radial_source_flag) THEN
+                    IF (source_cell(1,k)==1) active=.FALSE.
+                END IF
+                this%solve_mask(1,k)=active
+                IF (active) n=n+1
+
+                DO j=2,comp_cells_x-1
                     active=this%solve_mask_temp(j,k) .OR. &
                         this%solve_mask_temp(j-1,k) .OR. this%solve_mask_temp(j+1,k) .OR. &
-                        this%solve_mask_temp(j,k-1) .OR. this%solve_mask_temp(j,k+1)
-                END IF
+                        this%solve_mask_temp(j,km) .OR. this%solve_mask_temp(j,kp)
+                    IF (radial_source_flag) THEN
+                        IF (source_cell(j,k)==1) active=.FALSE.
+                    END IF
+                    this%solve_mask(j,k)=active
+                    IF (active) n=n+1
+                END DO
+
+                active=this%solve_mask_temp(comp_cells_x,k)
                 IF (radial_source_flag) THEN
-                    IF (source_cell(j,k)==1) active=.FALSE.
+                    IF (source_cell(comp_cells_x,k)==1) active=.FALSE.
                 END IF
-                this%solve_mask(j,k)=active
+                this%solve_mask(comp_cells_x,k)=active
                 IF (active) n=n+1
-            END DO
+            END IF
             row_count(k)=n
         END DO
         !$OMP END DO
