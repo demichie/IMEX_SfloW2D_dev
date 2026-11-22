@@ -89,7 +89,7 @@ CONTAINS
     !> @param[in,out] stochastic Independent OU workspace for each active layer.
     !> @param[in] pre_spatial_primitives_ready Reuse CFL-prepared primitive traces when true.
     !> @param[in] stochastic_prepared_hook Optional observer after OU preparation.
-    !> @param[in] domain Active and reconstruction cell worklists.
+    !> @param[in,out] domain Shared worklists and wetness mask updated on accepted publication.
     !> @param[in,out] spatial_operators Per-layer HP-PCCU workspaces; both slots execute for L1/L2.
     !> @param[in] layer_physics Canonical per-layer physical descriptors.
     !> @param[in] pore_caches Derived Pascal coefficients for active layers.

@@ -412,6 +412,12 @@ CONTAINS
     !>          the same mass, solids and thermal energy per layer; their
     !>          momentum differences must cancel pairwise. This test bypasses
     !>          only the model-layout production gate, not the timestep code.
+    !> @param[in,out] paired Shared domain workset; Lie publishes provisional wetness.
+    !> @param[in] q1 Lower-layer conservative reference state.
+    !> @param[in] q2 Upper-layer conservative reference state.
+    !> @param[in] p1 Lower-layer primitive reference state.
+    !> @param[in] p2 Upper-layer primitive reference state.
+    !> @param[in] dt_bound Allowed coupled timestep bound [s].
     SUBROUTINE check_integrated_coupled_lie_timestep(paired,q1,q2,p1,p2,dt_bound)
         TYPE(domain_type), INTENT(INOUT) :: paired
         REAL(wp), INTENT(IN) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
