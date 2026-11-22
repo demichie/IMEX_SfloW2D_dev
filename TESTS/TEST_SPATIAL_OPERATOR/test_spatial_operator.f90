@@ -110,6 +110,7 @@ PROGRAM test_spatial_operator
   CLOSE(input_unit)
   q0=q
   CALL refresh_topography_geometry
+  CALL check_incremental_domain_refresh
   CALL check_dry_upper_dambreak_reduction
   CALL check_interlayer_face_residual
   CALL check_interlayer_cell_assembly
@@ -3329,6 +3330,15 @@ CONTAINS
         CALL workspace%advance(state,0.0_wp,dt_step,noise,paired,operators, &
             pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
             pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+        IF (.NOT.paired%committed_mask_ready) ERROR STOP 'Accepted Lie wetness publication missing'
+        DO l=1,paired%solve_cells
+            j=paired%j_cent(l)
+            k=paired%k_cent(l)
+            IF (j<=1 .OR. j>=nx .OR. k<=1 .OR. k>=ny) CYCLE
+            IF (paired%solve_mask(j,k) .NEQV. &
+                (state%q(idx_totMassEqn,1,j,k)>0.0_wp .OR. state%q(idx_totMassEqn,2,j,k)>0.0_wp)) &
+                ERROR STOP 'Accepted Lie shared wetness differs'
+        END DO
 
         found_pore=.FALSE.
         found_ou=.FALSE.
@@ -3871,4 +3881,111 @@ CONTAINS
        ERROR STOP 1
     END IF
   END SUBROUTINE same_bits
+  !> @brief Verify incremental domain refresh against a full-state rebuild.
+  !> @details Exercise both layer slots, delayed releases, sources, exclusions
+  !>          and exact ordered auxiliary workset membership.
+  SUBROUTINE check_incremental_domain_refresh
+    TYPE(domain_type) :: inc,ref
+    REAL(wp) :: q1(n_vars,nx,ny),q2(n_vars,nx,ny)
+    INTEGER :: l,j,k,rj,rk,sj,sk,ej,ek,saved_source,saved_exclusion
+    LOGICAL :: saved_radial
+
+    IF (nx<8 .OR. ny<8) RETURN
+    q1=0.0_wp
+    q2=0.0_wp
+    q1(idx_totMassEqn,3,3)=1.0_wp
+    q2(idx_totMassEqn,nx-2,ny-2)=1.0_wp
+    rj=nx/2
+    rk=ny/2
+    q1(idx_totMassEqn,rj,rk)=1.0_wp
+
+    sj=2; sk=ny/2
+    ej=nx-3; ek=ny/2
+    saved_radial=radial_source_flag
+    saved_source=source_cell(sj,sk)
+    saved_exclusion=source_cell(ej,ek)
+    radial_source_flag=.TRUE.
+    source_cell(sj,sk)=2
+    source_cell(ej,ek)=1
+
+    CALL inc%initialize
+    CALL ref%initialize
+    inc%solve_mask_time(rj,rk)=0.75_wp
+    ref%solve_mask_time(rj,rk)=0.75_wp
+    CALL inc%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+    CALL ref%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
+    CALL assert_same_domain_worksets(inc,ref)
+    IF (inc%next_release_time/=0.75_wp) ERROR STOP 'Deferred release event not scheduled'
+
+    ! A committed Lie step clears dry cells while publishing the state.
+    q1(idx_totMassEqn,3,3)=0.0_wp
+    DO l=1,inc%solve_cells
+        j=inc%j_cent(l); k=inc%k_cent(l)
+        IF (j<=1 .OR. j>=nx .OR. k<=1 .OR. k>=ny) CYCLE
+        inc%solve_mask(j,k)=(q1(idx_totMassEqn,j,k)>0.0_wp) .OR. &
+            (q2(idx_totMassEqn,j,k)>0.0_wp)
+    END DO
+    inc%committed_mask_ready=.TRUE.
+    CALL inc%check_solve(q1,0.25_wp,.FALSE.,q_other=q2)
+    CALL ref%check_solve(q1,0.25_wp,.FALSE.,q_other=q2)
+    CALL assert_same_domain_worksets(inc,ref)
+    IF (inc%next_release_time/=0.75_wp) ERROR STOP 'Release event changed before its time'
+
+    ! The deferred wet state must appear once its release time is crossed.
+    q2(idx_totMassEqn,nx-2,ny-2)=0.0_wp
+    DO l=1,inc%solve_cells
+        j=inc%j_cent(l); k=inc%k_cent(l)
+        IF (j<=1 .OR. j>=nx .OR. k<=1 .OR. k>=ny) CYCLE
+        inc%solve_mask(j,k)=(q1(idx_totMassEqn,j,k)>0.0_wp) .OR. &
+            (q2(idx_totMassEqn,j,k)>0.0_wp)
+    END DO
+    inc%committed_mask_ready=.TRUE.
+    CALL inc%check_solve(q1,1.0_wp,.FALSE.,q_other=q2)
+    CALL ref%check_solve(q1,1.0_wp,.FALSE.,q_other=q2)
+    CALL assert_same_domain_worksets(inc,ref)
+    IF (.NOT.inc%solve_mask(rj,rk)) ERROR STOP 'Deferred wet cell not recovered'
+
+    CALL inc%finalize
+    CALL ref%finalize
+    radial_source_flag=saved_radial
+    source_cell(sj,sk)=saved_source
+    source_cell(ej,ek)=saved_exclusion
+    WRITE(*,*) 'PASS: incremental domain masks, releases and worksets'
+  END SUBROUTINE check_incremental_domain_refresh
+
+  !> @brief Assert exact membership and ordering of two domain worksets.
+  !> @param[in] a Optimized incremental domain.
+  !> @param[in] b Full-state reference domain.
+  SUBROUTINE assert_same_domain_worksets(a,b)
+    TYPE(domain_type), INTENT(IN) :: a,b
+    IF (ANY(a%solve_mask.NEQV.b%solve_mask)) ERROR STOP 'Solve mask changed'
+    IF (a%solve_cells/=b%solve_cells) ERROR STOP 'Solve list length changed'
+    IF (ANY(a%j_cent(1:a%solve_cells)/=b%j_cent(1:b%solve_cells))) ERROR STOP 'Solve j-list changed'
+    IF (ANY(a%k_cent(1:a%solve_cells)/=b%k_cent(1:b%solve_cells))) ERROR STOP 'Solve k-list changed'
+    IF (ANY(a%solve_mask_x.NEQV.b%solve_mask_x)) ERROR STOP 'X face mask changed'
+    IF (ANY(a%solve_mask_y.NEQV.b%solve_mask_y)) ERROR STOP 'Y face mask changed'
+    IF (a%solve_interfaces_x/=b%solve_interfaces_x) ERROR STOP 'X face count changed'
+    IF (a%solve_interfaces_y/=b%solve_interfaces_y) ERROR STOP 'Y face count changed'
+    IF (ANY(a%j_stag_x(1:a%solve_interfaces_x)/=b%j_stag_x(1:b%solve_interfaces_x))) &
+        ERROR STOP 'X face j-list changed'
+    IF (ANY(a%k_stag_x(1:a%solve_interfaces_x)/=b%k_stag_x(1:b%solve_interfaces_x))) &
+        ERROR STOP 'X face k-list changed'
+    IF (ANY(a%j_stag_y(1:a%solve_interfaces_y)/=b%j_stag_y(1:b%solve_interfaces_y))) &
+        ERROR STOP 'Y face j-list changed'
+    IF (ANY(a%k_stag_y(1:a%solve_interfaces_y)/=b%k_stag_y(1:b%solve_interfaces_y))) &
+        ERROR STOP 'Y face k-list changed'
+    IF (ANY(a%hp_eta_mask.NEQV.b%hp_eta_mask)) ERROR STOP 'HP mask changed'
+    IF (a%hp_eta_cells/=b%hp_eta_cells) ERROR STOP 'HP count changed'
+    IF (ANY(a%hp_eta_j(1:a%hp_eta_cells)/=b%hp_eta_j(1:b%hp_eta_cells))) &
+        ERROR STOP 'HP j-list changed'
+    IF (ANY(a%hp_eta_k(1:a%hp_eta_cells)/=b%hp_eta_k(1:b%hp_eta_cells))) &
+        ERROR STOP 'HP k-list changed'
+    IF (ANY(a%reconstruction_mask.NEQV.b%reconstruction_mask)) ERROR STOP 'Reconstruction mask changed'
+    IF (a%reconstruction_cells/=b%reconstruction_cells) ERROR STOP 'Reconstruction count changed'
+    IF (ANY(a%j_reconstruction(1:a%reconstruction_cells)/=b%j_reconstruction(1:b%reconstruction_cells))) &
+        ERROR STOP 'Reconstruction j-list changed'
+    IF (ANY(a%k_reconstruction(1:a%reconstruction_cells)/=b%k_reconstruction(1:b%reconstruction_cells))) &
+        ERROR STOP 'Reconstruction k-list changed'
+  END SUBROUTINE assert_same_domain_worksets
+
 END PROGRAM test_spatial_operator

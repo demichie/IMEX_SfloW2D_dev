@@ -41,7 +41,7 @@ jobs:
               suites="TEST_SOURCE_REGISTRY TEST_MASS_EXCHANGE TEST_CURVATURE_SOURCE TEST_RHEOLOGY_FROUDE TEST_RHEOLOGY_CELL_LOCAL TEST_STOCHASTIC_EVOLUTION"
               ;;
             spatial)
-              suites="TEST_SPATIAL_OPERATOR TEST_PCCU TEST_HP_RECONSTRUCTION"
+              suites="TEST_DOMAIN_COMPACTION TEST_SPATIAL_OPERATOR TEST_PCCU TEST_HP_RECONSTRUCTION"
               ;;
           esac
           for suite in $suites; do
