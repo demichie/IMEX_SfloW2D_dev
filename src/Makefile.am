@@ -118,6 +118,12 @@ spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 numerics/nonlinear_solver_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 # Explicit source cell kernels hold only bounded per-cell scratch, never grids.
 physics/source_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Keep runtime-sized cell composition scratch on the OpenMP worker stack.
+state/state_conversions.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+physics/equation_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Reconstruction and nonconservative path scratch is bounded by state/path sizes.
+spatial/reconstruction_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+spatial/nonconservative_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 
 # F5: physical source consumers must wait for the canonical .mod producers,
 # including under parallel make (Fortran modules are not inferred by automake).
