@@ -1,4 +1,5 @@
-! Standalone test kernels: no dependency on the IMEX-SfloW2D solver modules.
+!> @brief Standalone kernels for differential testing of sparse domain compaction.
+!> @details Independent of all IMEX-SfloW2D production modules; thread-safe for disjoint blocks.
 MODULE domain_compaction_test_kernels
     USE omp_lib, ONLY: omp_get_max_threads
     USE iso_fortran_env, ONLY: int64
@@ -9,7 +10,9 @@ MODULE domain_compaction_test_kernels
 
 CONTAINS
 
-    ! Reference: globally scan the logical mask in the existing (k,j) order.
+    !> @brief Convert a complete logical mask to a sorted linear-index list by global scan.
+    !> @param[in] mask Active cells, indexed as (x,y).
+    !> @param[out] indices Allocated sorted and unique one-based linear cell indices.
     SUBROUTINE compact_reference(mask, indices)
         LOGICAL, INTENT(IN) :: mask(:,:)
         INTEGER, ALLOCATABLE, INTENT(OUT) :: indices(:)
@@ -28,9 +31,13 @@ CONTAINS
         END DO
     END SUBROUTINE compact_reference
 
-    ! Sparse, deterministic compaction. Neither a global scan nor per-thread output lists.
-    ! old_indices and external_seeds are sorted and contain no duplicates internally.
-    ! All true mask entries must be inside the one-cell halo of their union.
+    !> @brief Compact a sparse mask in parallel without thread-local output lists.
+    !> @details Both input lists must be sorted and unique. The true mask entries must lie in
+    !> the one-cell halo of their union. Two deterministic OpenMP passes count and emit results.
+    !> @param[in] old_indices Previous active-cell indices in increasing order.
+    !> @param[in] external_seeds Newly eligible source/release/boundary seeds in increasing order.
+    !> @param[in] mask Updated active-cell membership, indexed as (x,y).
+    !> @param[out] indices Allocated sorted and unique one-based linear cell indices.
     SUBROUTINE compact_sparse_parallel(old_indices,external_seeds,mask,indices)
         INTEGER, INTENT(IN) :: old_indices(:),external_seeds(:)
         LOGICAL, INTENT(IN) :: mask(:,:)
@@ -69,6 +76,12 @@ CONTAINS
         !$OMP END PARALLEL DO
     END SUBROUTINE compact_sparse_parallel
 
+    !> @brief Calculate the nonoverlapping destination-index range of a compaction block.
+    !> @param[in] total Number of cells in the complete domain.
+    !> @param[in] blocks Number of equally sized destination-index ranges.
+    !> @param[in] b One-based index of the requested block.
+    !> @param[out] lo First linear destination index (inclusive).
+    !> @param[out] hi Last linear destination index (inclusive).
     SUBROUTINE block_limits(total,blocks,b,lo,hi)
         INTEGER, INTENT(IN) :: total,blocks,b
         INTEGER, INTENT(OUT) :: lo,hi
@@ -77,8 +90,17 @@ CONTAINS
         hi=INT(INT(total,int64)*INT(b,int64)/INT(blocks,int64))
     END SUBROUTINE block_limits
 
-    ! Merge five shifted views of each input, filtered by a destination-index interval.
-    ! The shifted views are virtual: no candidate arrays or duplicates are stored.
+    !> @brief Merge two sets of virtual shifted streams within one output-index interval.
+    !> @details Duplicates are suppressed during traversal. An optional second pass emits the
+    !> same indices into a block-owned output segment without atomics or shared cursor state.
+    !> @param[in] old_indices Sorted old solve-list indices.
+    !> @param[in] external_seeds Sorted external activation seeds.
+    !> @param[in] mask Updated active membership, indexed as (x,y).
+    !> @param[in] lo First destination index of the interval.
+    !> @param[in] hi Last destination index of the interval.
+    !> @param[out] nfound Number of active destination indices found.
+    !> @param[in,out] indices Optional global output list, written only in the owned segment.
+    !> @param[in] offset Optional zero-based starting offset in indices.
     SUBROUTINE merge_interval(old_indices,external_seeds,mask,lo,hi,nfound,indices,offset)
         INTEGER, INTENT(IN) :: old_indices(:),external_seeds(:),lo,hi
         LOGICAL, INTENT(IN) :: mask(:,:)
@@ -137,7 +159,10 @@ CONTAINS
         END DO
     END SUBROUTINE merge_interval
 
-    ! First position whose source index is >= value, or SIZE(indices)+1.
+    !> @brief Find the first sorted-array position whose value is not smaller than a key.
+    !> @param[in] indices Monotonically increasing one-based linear indices.
+    !> @param[in] value Sought lower-bound key, potentially outside the source domain.
+    !> @return First admissible one-based array position, or SIZE(indices)+1.
     INTEGER FUNCTION lower_bound(indices,value) RESULT(pos)
         INTEGER, INTENT(IN) :: indices(:),value
         INTEGER :: left,right,middle
@@ -155,7 +180,17 @@ CONTAINS
         pos=left
     END FUNCTION lower_bound
 
-    ! Skip out-of-domain or row-wrapping offsets; each stream remains sorted.
+    !> @brief Advance a virtual shifted input stream to its next valid candidate.
+    !> @details Reject out-of-domain and row-wrapping indices without changing sorted order.
+    !> @param[in] base Sorted source indices.
+    !> @param[in] delta Linear offset of the current virtual stream.
+    !> @param[in] direction Direction code identifying row-boundary restrictions.
+    !> @param[in] nx Number of x-cells.
+    !> @param[in] ny Number of y-cells.
+    !> @param[in] lo First allowed destination index.
+    !> @param[in] hi Last allowed destination index.
+    !> @param[in,out] cursor One-based source position, advanced past invalid cells.
+    !> @param[out] candidate Next allowed index or HUGE(candidate) if no candidate remains.
     SUBROUTINE next_candidate(base,delta,direction,nx,ny,lo,hi,cursor,candidate)
         INTEGER, INTENT(IN) :: base(:),delta,direction,nx,ny,lo,hi
         INTEGER, INTENT(INOUT) :: cursor

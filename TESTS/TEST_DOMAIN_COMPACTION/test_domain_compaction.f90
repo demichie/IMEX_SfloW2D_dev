@@ -1,4 +1,4 @@
-! Standalone differential and performance tests for parallel active-domain compaction.
+!> @brief Differential correctness checks and performance experiments for sparse compaction.
 PROGRAM test_domain_compaction
     USE omp_lib, ONLY: omp_set_dynamic,omp_set_num_threads,omp_get_wtime
     USE domain_compaction_test_kernels, ONLY: compact_reference,compact_sparse_parallel
@@ -26,6 +26,7 @@ PROGRAM test_domain_compaction
 
 CONTAINS
 
+    !> @brief Compare exact sorted outputs over geometry, topology and thread-count cases.
     SUBROUTINE run_correctness
         INTEGER, PARAMETER :: sizes(2,9)=RESHAPE([ &
             1,1, 1,7, 7,1, 2,2, 3,4, 7,13, 19,9, 64,32, 129,81 ],[2,9])
@@ -52,8 +53,14 @@ CONTAINS
         WRITE(*,'(A)') '  Empty/full/edge/strip/islands/dense/sparse/external/exclusion cases, 1/2/4/8 threads.'
     END SUBROUTINE run_correctness
 
-    ! Build an old solve set, post-Lie wet state and externally activated seeds.
-    ! Build the target mask independently by explicit grid-cell halo expansion.
+    !> @brief Generate an old workset, external seeds, and an independent target mask.
+    !> @details Uses direct grid-cell halo expansion, independent of the tested merge.
+    !> @param[in] nx Number of x-cells.
+    !> @param[in] ny Number of y-cells.
+    !> @param[in] kind Geometry and activation case selector.
+    !> @param[out] old Allocated sorted previous workset.
+    !> @param[out] external Allocated sorted newly activated seeds.
+    !> @param[out] mask Allocated reference mask after dilation and optional exclusions.
     SUBROUTINE make_case(nx,ny,kind,old,external,mask)
         INTEGER, INTENT(IN) :: nx,ny,kind
         INTEGER, ALLOCATABLE, INTENT(OUT) :: old(:),external(:)
@@ -135,6 +142,10 @@ CONTAINS
         IF (kind==10) mask(cx,:)=.FALSE.
     END SUBROUTINE make_case
 
+    !> @brief Activate a cell and its four orthogonal neighbours in a logical mask.
+    !> @param[in,out] mask Target logical mask, indexed as (x,y).
+    !> @param[in] j One-based x-cell index.
+    !> @param[in] k One-based y-cell index.
     SUBROUTINE activate_halo(mask,j,k)
         LOGICAL, INTENT(INOUT) :: mask(:,:)
         INTEGER, INTENT(IN) :: j,k
@@ -149,6 +160,14 @@ CONTAINS
         IF (k<ny) mask(j,k+1)=.TRUE.
     END SUBROUTINE activate_halo
 
+    !> @brief Assert exact equality, strict ordering, validity and mask reconstruction.
+    !> @param[in] expected Serial reference indices.
+    !> @param[in] actual Parallel compaction indices.
+    !> @param[in] mask Ground-truth active cell membership.
+    !> @param[in] nx Number of x-cells.
+    !> @param[in] ny Number of y-cells.
+    !> @param[in] kind Test geometry identifier, used for diagnostic errors.
+    !> @param[in] nthreads OpenMP thread count, used for diagnostic errors.
     SUBROUTINE compare_results(expected,actual,mask,nx,ny,kind,nthreads)
         INTEGER, INTENT(IN) :: expected(:),actual(:),nx,ny,kind,nthreads
         LOGICAL, INTENT(IN) :: mask(:,:)
@@ -178,6 +197,9 @@ CONTAINS
         IF (.NOT.ALL(reconstructed .EQV. mask)) ERROR STOP 'List/mask inconsistency'
     END SUBROUTINE compare_results
 
+    !> @brief Time full-grid serial and sparse parallel compaction on representative geometries.
+    !> @param[in] nx Number of x-cells used in the performance experiment.
+    !> @param[in] ny Number of y-cells used in the performance experiment.
     SUBROUTINE run_benchmarks(nx,ny)
         INTEGER, INTENT(IN) :: nx,ny
         REAL(KIND=8), PARAMETER :: fractions(4)=[0.001D0,0.01D0,0.1D0,1.0D0]
@@ -248,6 +270,8 @@ CONTAINS
         END DO
     END SUBROUTINE run_benchmarks
 
+    !> @brief Sort three measured durations in ascending order to select the median.
+    !> @param[in,out] values Three elapsed durations in seconds.
     SUBROUTINE sort_three(values)
         REAL(KIND=8), INTENT(INOUT) :: values(3)
         REAL(KIND=8) :: tmp
