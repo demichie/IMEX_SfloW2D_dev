@@ -1,7 +1,7 @@
-!> @brief Differential correctness checks and performance experiments for sparse compaction.
+!> @brief Differential tests and performance experiments for serial and OpenMP compaction.
 PROGRAM test_domain_compaction
     USE omp_lib, ONLY: omp_set_dynamic,omp_set_num_threads,omp_get_wtime
-    USE domain_compaction_test_kernels, ONLY: compact_reference,compact_sparse_parallel
+    USE domain_compaction_test_kernels, ONLY: compact_reference,compact_global_parallel,compact_sparse_parallel
     IMPLICIT NONE
     INTEGER, PARAMETER :: nthreads(4)=[1,2,4,8]
     INTEGER :: arg_count,i
@@ -43,6 +43,9 @@ CONTAINS
                 CALL compact_reference(mask,expected)
                 DO t=1,SIZE(nthreads)
                     CALL omp_set_num_threads(nthreads(t))
+                    CALL compact_global_parallel(mask,actual)
+                    CALL compare_results(expected,actual,mask,nx,ny,kind,nthreads(t))
+                    checked=checked+1
                     CALL compact_sparse_parallel(old,external,mask,actual)
                     CALL compare_results(expected,actual,mask,nx,ny,kind,nthreads(t))
                     checked=checked+1
@@ -50,7 +53,8 @@ CONTAINS
             END DO
         END DO
         WRITE(*,'(A,I0,A)') 'PASS: ',checked,' exact differential compaction cases'
-        WRITE(*,'(A)') '  Empty/full/edge/strip/islands/dense/sparse/external/exclusion cases, 1/2/4/8 threads.'
+        WRITE(*,'(2A)') '  Global/sparse OpenMP: empty/full/edge/strip/islands/', &
+            'external/exclusions, 1/2/4/8 threads.'
     END SUBROUTINE run_correctness
 
     !> @brief Generate an old workset, external seeds, and an independent target mask.
@@ -197,24 +201,28 @@ CONTAINS
         IF (.NOT.ALL(reconstructed .EQV. mask)) ERROR STOP 'List/mask inconsistency'
     END SUBROUTINE compare_results
 
-    !> @brief Time full-grid serial and sparse parallel compaction on representative geometries.
+    !> @brief Compare serial, global OpenMP, and sparse OpenMP compaction on two geometries.
+    !> @details All three timed routines allocate their output list. Tests and mask setup are
+    !> excluded from timings; each median is over seven repetitions after a warmup.
     !> @param[in] nx Number of x-cells used in the performance experiment.
     !> @param[in] ny Number of y-cells used in the performance experiment.
     SUBROUTINE run_benchmarks(nx,ny)
         INTEGER, INTENT(IN) :: nx,ny
         REAL(KIND=8), PARAMETER :: fractions(4)=[0.001D0,0.01D0,0.1D0,1.0D0]
-        INTEGER :: t,f,nrep,r,j,k,cx,cy,half_x,half_y,kind
-        REAL(KIND=8) :: t0,reference_time,reference_times(3),parallel_times(3),median_parallel
+        INTEGER, PARAMETER :: nrep=7
+        INTEGER :: t,f,r,j,k,cx,cy,half_x,half_y,kind
+        REAL(KIND=8) :: t0,serial_ms,global_ms,sparse_ms
+        REAL(KIND=8) :: serial_times(nrep),global_times(nrep),sparse_times(nrep)
         INTEGER, ALLOCATABLE :: old(:),external(:),expected(:),actual(:)
         LOGICAL, ALLOCATABLE :: old_mask(:,:),mask(:,:)
 
-        nrep=3
-        ALLOCATE(old_mask(nx,ny),mask(nx,ny))
-        ALLOCATE(external(0))
+        ALLOCATE(old_mask(nx,ny),mask(nx,ny),external(0))
         cx=(nx+1)/2
         cy=(ny+1)/2
         WRITE(*,'(A,I0,A,I0)') 'BENCHMARK grid: ',nx,' x ',ny
-        WRITE(*,'(A)') '  Shape   Wet fraction   Threads   Old cells   New cells   Scan(s)   Sparse(s)   Scan/Sparse'
+        WRITE(*,'(2A)') ' Shape    Fraction Threads    Old cells   New cells', &
+            '  Serial ms  Global ms  Sparse ms  Global/Sparse'
+
         DO kind=1,2
             DO f=1,SIZE(fractions)
                 old_mask=.FALSE.
@@ -229,6 +237,7 @@ CONTAINS
                     half_y=MAX(0,INT(0.5D0*DBLE(ny)*fractions(f)))
                     old_mask(:,MAX(1,cy-half_y):MIN(ny,cy+half_y))=.TRUE.
                 END SELECT
+
                 CALL compact_reference(old_mask,old)
                 mask=.FALSE.
                 DO k=1,ny
@@ -240,51 +249,59 @@ CONTAINS
                 END DO
                 CALL omp_set_num_threads(1)
                 CALL compact_reference(mask,expected)
+                CALL compact_reference(mask,actual)
+                CALL compare_results(expected,actual,mask,nx,ny,kind,1)
                 DO r=1,nrep
                     t0=omp_get_wtime()
                     CALL compact_reference(mask,actual)
-                    reference_times(r)=omp_get_wtime()-t0
+                    serial_times(r)=1000.0D0*(omp_get_wtime()-t0)
                 END DO
-                CALL sort_three(reference_times)
-                reference_time=reference_times(2)
-                CALL compare_results(expected,actual,mask,nx,ny,kind,1)
+                CALL sort_times(serial_times)
+                serial_ms=serial_times((nrep+1)/2)
 
                 DO t=1,SIZE(nthreads)
                     CALL omp_set_num_threads(nthreads(t))
+                    CALL compact_global_parallel(mask,actual)
+                    CALL compare_results(expected,actual,mask,nx,ny,kind,nthreads(t))
                     CALL compact_sparse_parallel(old,external,mask,actual)
-                    CALL compare_results(expected,actual,mask,nx,ny,kind,0)
+                    CALL compare_results(expected,actual,mask,nx,ny,kind,nthreads(t))
                     DO r=1,nrep
                         t0=omp_get_wtime()
+                        CALL compact_global_parallel(mask,actual)
+                        global_times(r)=1000.0D0*(omp_get_wtime()-t0)
+                        t0=omp_get_wtime()
                         CALL compact_sparse_parallel(old,external,mask,actual)
-                        parallel_times(r)=omp_get_wtime()-t0
+                        sparse_times(r)=1000.0D0*(omp_get_wtime()-t0)
                     END DO
-                    CALL sort_three(parallel_times)
-                    median_parallel=parallel_times(2)
-                    WRITE(*,'(A8,1X,F10.4,1X,I7,1X,I11,1X,I11,1X,F9.5,1X,F10.5,1X,F11.3)') &
-                        MERGE('compact ','corridor',kind==1),fractions(f), &
-                        nthreads(t),SIZE(old),SIZE(expected), &
-                        reference_time,median_parallel,reference_time/MAX(median_parallel,TINY(1.0D0))
+                    CALL sort_times(global_times)
+                    CALL sort_times(sparse_times)
+                    global_ms=global_times((nrep+1)/2)
+                    sparse_ms=sparse_times((nrep+1)/2)
+                    WRITE(*,'(A8,1X,F8.4,1X,I7,1X,I12,1X,I11,3(1X,F10.4),1X,F13.3)') &
+                        MERGE('compact ','corridor',kind==1),fractions(f),nthreads(t), &
+                        SIZE(old),SIZE(expected),serial_ms,global_ms,sparse_ms, &
+                        global_ms/MAX(sparse_ms,TINY(1.0D0))
                 END DO
                 DEALLOCATE(old,expected,actual)
             END DO
         END DO
     END SUBROUTINE run_benchmarks
 
-    !> @brief Sort three measured durations in ascending order to select the median.
-    !> @param[in,out] values Three elapsed durations in seconds.
-    SUBROUTINE sort_three(values)
-        REAL(KIND=8), INTENT(INOUT) :: values(3)
+    !> @brief Sort elapsed durations to allow selection of their robust median.
+    !> @param[in,out] values Elapsed durations in milliseconds.
+    SUBROUTINE sort_times(values)
+        REAL(KIND=8), INTENT(INOUT) :: values(:)
         REAL(KIND=8) :: tmp
         INTEGER :: i,j
 
-        DO i=1,2
-            DO j=i+1,3
+        DO i=1,SIZE(values)-1
+            DO j=i+1,SIZE(values)
                 IF (values(i)<=values(j)) CYCLE
                 tmp=values(i)
                 values(i)=values(j)
                 values(j)=tmp
             END DO
         END DO
-    END SUBROUTINE sort_three
+    END SUBROUTINE sort_times
 
 END PROGRAM test_domain_compaction

@@ -1,12 +1,15 @@
 # Active-domain compaction experiment
 
-Standalone Fortran/OpenMP differential test and microbenchmark; this directory does **not** change
+Standalone Fortran/OpenMP differential test and three-way microbenchmark; this directory does **not** change
 `domain_2d`, `time_integration_2d`, physical formulas, timestep policy, or the production build.
 
 ## Algorithms
 
 - **Reference:** scan `solve_mask(nx,ny)` in `(k,j)` order, producing sorted linear indices
   `p = j + (k-1)*nx`.
+- **Global parallel candidate:** count active cells per Fortran-contiguous row with OpenMP,
+  compute row offsets using a short serial prefix sum, then use OpenMP again to emit the
+  sorted indices into disjoint row-owned output segments. The entire mask is visited twice.
 - **Sparse parallel candidate:** take sorted, unique `old_indices` and `external_seeds`.
   Merge virtual offset streams `(0,-1,+1,-nx,+nx)` from both inputs, restricted to disjoint
   destination-index blocks. Each block counts its selected mask entries; an exclusive prefix
@@ -37,15 +40,18 @@ Set `FC` to change the Fortran compiler. The correctness-only command uses `-O0`
 `-Wall -Wextra -Werror`. The benchmark commands compile with `-O3` and repeat correctness
 checks before timing. All commands need a compiler supporting OpenMP and `omp_lib`.
 
-The correctness suite compares exact index arrays and reconstructed masks across 1, 2, 4 and
-8 threads. It covers empty and full domains, 1-cell dimensions, edges, thin regions, islands,
-external activation, source-like exclusions and candidate block boundaries. The benchmark
-uses compact-square and corridor geometries on 500x500 or 2000x3000 grids with nominal active
-fractions of 0.1%, 1%, 10% and 100%. It reports median elapsed times of three repetitions;
-mask preparation, reconstruction worksets and solver execution are excluded. The percentages
+The correctness suite compares both parallel methods against exact serial index arrays and
+reconstructed masks across 1, 2, 4 and 8 threads. It covers empty and full domains, 1-cell dimensions, edges,
+thin regions, islands, external activation, source-like exclusions and candidate block boundaries.
+The benchmark uses compact-square and corridor geometries on 500x500 or 2000x3000 grids with
+nominal active fractions of 0.1%, 1%, 10% and 100%. It reports median elapsed times of seven
+repetitions after a warmup; mask preparation, reconstruction worksets and solver execution are
+excluded. The percentages
 are geometry-generation targets, not necessarily exact old-list occupancies.
 
-The reference is a serial scan; benchmark results **must not** be interpreted as a comparison
-against an optimized parallel full-grid scan. Results are hardware-specific and are intended
-for algorithm selection, not production-speedup claims. Test kernels are intentionally kept
-independent of the production modules and are not yet wired into `make check` or GitHub Actions.
+The reference is a serial scan, while both candidates are OpenMP-parallel. All timings include
+allocation of the output list, row/block counts, prefix sum, and writing the list; they do not
+include mask preparation, face/HP worksets, or Lie integration. Global/Sparse ratios greater
+than one favor the sparse method; ratios less than one favor the global parallel method.
+Results are hardware-specific and are intended for algorithm selection, not production-speedup
+claims. Test kernels are intentionally independent of the production modules and are not yet wired into `make check` or GitHub Actions.

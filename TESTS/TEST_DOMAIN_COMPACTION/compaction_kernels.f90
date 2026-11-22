@@ -1,4 +1,4 @@
-!> @brief Standalone kernels for differential testing of sparse domain compaction.
+!> @brief Standalone kernels for serial, global OpenMP and sparse domain compaction testing.
 !> @details Independent of all IMEX-SfloW2D production modules; thread-safe for disjoint blocks.
 MODULE domain_compaction_test_kernels
     USE omp_lib, ONLY: omp_get_max_threads
@@ -6,7 +6,7 @@ MODULE domain_compaction_test_kernels
     IMPLICIT NONE
     PRIVATE
 
-    PUBLIC :: compact_reference, compact_sparse_parallel
+    PUBLIC :: compact_reference, compact_global_parallel, compact_sparse_parallel
 
 CONTAINS
 
@@ -30,6 +30,45 @@ CONTAINS
             END DO
         END DO
     END SUBROUTINE compact_reference
+
+    !> @brief Build a sorted global cell list by parallel row counting and emission.
+    !> @details Every row owns a disjoint output interval from an exclusive prefix sum.
+    !> The mask is read twice; no atomics, duplicate candidates, or thread-local lists.
+    !> @param[in] mask Active cells, indexed as (x,y).
+    !> @param[out] indices Allocated sorted and unique one-based linear cell indices.
+    SUBROUTINE compact_global_parallel(mask,indices)
+        LOGICAL, INTENT(IN) :: mask(:,:)
+        INTEGER, ALLOCATABLE, INTENT(OUT) :: indices(:)
+        INTEGER, ALLOCATABLE :: row_counts(:),row_offsets(:)
+        INTEGER :: j,k,n,nx,ny
+
+        nx=SIZE(mask,1)
+        ny=SIZE(mask,2)
+        ALLOCATE(row_counts(ny),row_offsets(ny+1))
+
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k) SCHEDULE(STATIC)
+        DO k=1,ny
+            row_counts(k)=COUNT(mask(:,k))
+        END DO
+        !$OMP END PARALLEL DO
+
+        row_offsets(1)=0
+        DO k=1,ny
+            row_offsets(k+1)=row_offsets(k)+row_counts(k)
+        END DO
+        ALLOCATE(indices(row_offsets(ny+1)))
+
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k,j,n) SCHEDULE(STATIC)
+        DO k=1,ny
+            n=row_offsets(k)
+            DO j=1,nx
+                IF (.NOT.mask(j,k)) CYCLE
+                n=n+1
+                indices(n)=j+(k-1)*nx
+            END DO
+        END DO
+        !$OMP END PARALLEL DO
+    END SUBROUTINE compact_global_parallel
 
     !> @brief Compact a sparse mask in parallel without thread-local output lists.
     !> @details Both input lists must be sorted and unique. The true mask entries must lie in
