@@ -117,6 +117,7 @@ PROGRAM test_spatial_operator
   CALL check_two_layer_union_workset
   CALL check_dry_dirichlet_inlet
   CALL domain%check_solve(q,0.0_wp,.FALSE.)
+  CALL assert_reference_domain_worksets(domain)
   CALL check_coupled_cfl_policy
   IF (domain%solve_cells<=0 .OR. domain%reconstruction_cells<domain%solve_cells) &
        ERROR STOP 'invalid production worksets'
@@ -1881,6 +1882,7 @@ CONTAINS
         CALL lower%check_solve(lower_q,0.0_wp,.FALSE.)
         CALL upper%check_solve(upper_q,0.0_wp,.FALSE.)
         CALL coupled%check_solve(lower_q,0.0_wp,.FALSE.,q_other=upper_q)
+        CALL assert_reference_domain_worksets(coupled)
 
         IF (ANY(coupled%solve_mask .NEQV. (lower%solve_mask .OR. upper%solve_mask))) &
             ERROR STOP 'Coupled active cells differ from layer union'
@@ -3077,6 +3079,7 @@ CONTAINS
 
         CALL test_domain%initialize
         CALL test_domain%check_solve(conservative,0.0_wp,.TRUE.)
+        CALL assert_reference_domain_worksets(test_domain)
         CALL test_reconstruction%initialize(layer)
         CALL test_reconstruction%prepare_hp_workset( &
             test_domain%hp_eta_cells,test_domain%hp_eta_j,test_domain%hp_eta_k)
@@ -3938,6 +3941,7 @@ CONTAINS
     CALL inc%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
     CALL ref%check_solve(q1,0.0_wp,.FALSE.,q_other=q2)
     CALL assert_same_domain_worksets(inc,ref)
+    CALL assert_reference_domain_worksets(inc)
     IF (inc%next_release_time/=0.75_wp) ERROR STOP 'Deferred release event not scheduled'
 
     ! A committed Lie step clears dry cells while publishing the state.
@@ -3952,6 +3956,7 @@ CONTAINS
     CALL inc%check_solve(q1,0.25_wp,.FALSE.,q_other=q2)
     CALL ref%check_solve(q1,0.25_wp,.FALSE.,q_other=q2)
     CALL assert_same_domain_worksets(inc,ref)
+    CALL assert_reference_domain_worksets(inc)
     IF (inc%next_release_time/=0.75_wp) ERROR STOP 'Release event changed before its time'
 
     ! The deferred wet state must appear once its release time is crossed.
@@ -3966,6 +3971,7 @@ CONTAINS
     CALL inc%check_solve(q1,1.0_wp,.FALSE.,q_other=q2)
     CALL ref%check_solve(q1,1.0_wp,.FALSE.,q_other=q2)
     CALL assert_same_domain_worksets(inc,ref)
+    CALL assert_reference_domain_worksets(inc)
     IF (.NOT.inc%solve_mask(rj,rk)) ERROR STOP 'Deferred wet cell not recovered'
 
     CALL inc%finalize
@@ -3975,6 +3981,141 @@ CONTAINS
     source_cell(ej,ek)=saved_exclusion
     WRITE(*,*) 'PASS: incremental domain masks, releases and worksets'
   END SUBROUTINE check_incremental_domain_refresh
+
+  !> @brief Compare all dependent masks and ordered indices against serial reference construction.
+  !> @details The reference uses the pre-optimization HP insertion order, two-copy
+  !>          reconstruction halo, and face marking by the ordered solve list.
+  !>          It also checks repeated domain refreshes and shared two-layer masks.
+  !> @param[in] a Production active-domain worksets to verify.
+  SUBROUTINE assert_reference_domain_worksets(a)
+    TYPE(domain_type), INTENT(IN) :: a
+    LOGICAL :: hp_mask(nx,ny),recon_mask(nx,ny),snapshot(nx,ny)
+    LOGICAL :: x_mask(nx+1,ny),y_mask(nx,ny+1)
+    INTEGER :: hp_j(nx*ny),hp_k(nx*ny),nhp,i,j,k,l
+
+    i=0
+    DO k=1,ny
+      DO j=1,nx
+        IF (.NOT.a%solve_mask(j,k)) CYCLE
+        i=i+1
+        IF (i>a%solve_cells) ERROR STOP 'Reference solve worklist overflow'
+        IF (a%j_cent(i)/=j .OR. a%k_cent(i)/=k) &
+          ERROR STOP 'Production solve list differs from serial order'
+      END DO
+    END DO
+    IF (i/=a%solve_cells) ERROR STOP 'Production solve count differs from serial mask'
+
+    hp_mask=.FALSE.
+    nhp=0
+    DO i=1,a%solve_cells
+      j=a%j_cent(i)
+      k=a%k_cent(i)
+      nhp=nhp+1
+      hp_j(nhp)=j
+      hp_k(nhp)=k
+      hp_mask(j,k)=.TRUE.
+    END DO
+    DO i=1,a%solve_cells
+      j=a%j_cent(i)
+      k=a%k_cent(i)
+      IF (j>1) THEN
+        IF (.NOT.hp_mask(j-1,k)) THEN
+          nhp=nhp+1
+          hp_j(nhp)=j-1
+          hp_k(nhp)=k
+          hp_mask(j-1,k)=.TRUE.
+        END IF
+      END IF
+      IF (j<nx) THEN
+        IF (.NOT.hp_mask(j+1,k)) THEN
+          nhp=nhp+1
+          hp_j(nhp)=j+1
+          hp_k(nhp)=k
+          hp_mask(j+1,k)=.TRUE.
+        END IF
+      END IF
+      IF (k>1) THEN
+        IF (.NOT.hp_mask(j,k-1)) THEN
+          nhp=nhp+1
+          hp_j(nhp)=j
+          hp_k(nhp)=k-1
+          hp_mask(j,k-1)=.TRUE.
+        END IF
+      END IF
+      IF (k<ny) THEN
+        IF (.NOT.hp_mask(j,k+1)) THEN
+          nhp=nhp+1
+          hp_j(nhp)=j
+          hp_k(nhp)=k+1
+          hp_mask(j,k+1)=.TRUE.
+        END IF
+      END IF
+    END DO
+    IF (nhp/=a%hp_eta_cells) ERROR STOP 'HP neighbour count differs from serial reference'
+    IF (ANY(hp_mask.NEQV.a%hp_eta_mask)) ERROR STOP 'HP neighbour mask differs from serial reference'
+    IF (ANY(hp_j(1:nhp)/=a%hp_eta_j(1:nhp)) .OR. &
+        ANY(hp_k(1:nhp)/=a%hp_eta_k(1:nhp))) &
+      ERROR STOP 'HP neighbour order differs from serial reference'
+
+    recon_mask=a%solve_mask
+    DO l=1,2
+      snapshot=recon_mask
+      IF (nx>1) THEN
+        recon_mask(2:nx,:)=recon_mask(2:nx,:) .OR. snapshot(1:nx-1,:)
+        recon_mask(1:nx-1,:)=recon_mask(1:nx-1,:) .OR. snapshot(2:nx,:)
+      END IF
+      IF (ny>1) THEN
+        recon_mask(:,2:ny)=recon_mask(:,2:ny) .OR. snapshot(:,1:ny-1)
+        recon_mask(:,1:ny-1)=recon_mask(:,1:ny-1) .OR. snapshot(:,2:ny)
+      END IF
+    END DO
+    IF (ANY(recon_mask.NEQV.a%reconstruction_mask)) &
+      ERROR STOP 'Reconstruction halo differs from two-copy serial reference'
+    i=0
+    DO k=1,ny
+      DO j=1,nx
+        IF (.NOT.recon_mask(j,k)) CYCLE
+        i=i+1
+        IF (i>a%reconstruction_cells) ERROR STOP 'Reconstruction worklist overflow'
+        IF (a%j_reconstruction(i)/=j .OR. a%k_reconstruction(i)/=k) &
+          ERROR STOP 'Reconstruction index order differs from serial reference'
+      END DO
+    END DO
+    IF (i/=a%reconstruction_cells) ERROR STOP 'Reconstruction count differs from reference'
+
+    x_mask=.FALSE.
+    y_mask=.FALSE.
+    DO i=1,a%solve_cells
+      j=a%j_cent(i)
+      k=a%k_cent(i)
+      x_mask(j,k)=.TRUE.
+      x_mask(j+1,k)=.TRUE.
+      y_mask(j,k)=.TRUE.
+      y_mask(j,k+1)=.TRUE.
+    END DO
+    IF (ANY(x_mask.NEQV.a%solve_mask_x) .OR. ANY(y_mask.NEQV.a%solve_mask_y)) &
+      ERROR STOP 'Face masks differ from serial reference'
+    i=0
+    DO k=1,ny
+      DO j=1,nx+1
+        IF (.NOT.x_mask(j,k)) CYCLE
+        i=i+1
+        IF (i>a%solve_interfaces_x) ERROR STOP 'X-face worklist overflow'
+        IF (a%j_stag_x(i)/=j .OR. a%k_stag_x(i)/=k) ERROR STOP 'X-face list reordered'
+      END DO
+    END DO
+    IF (i/=a%solve_interfaces_x) ERROR STOP 'X-face count differs from reference'
+    i=0
+    DO k=1,ny+1
+      DO j=1,nx
+        IF (.NOT.y_mask(j,k)) CYCLE
+        i=i+1
+        IF (i>a%solve_interfaces_y) ERROR STOP 'Y-face worklist overflow'
+        IF (a%j_stag_y(i)/=j .OR. a%k_stag_y(i)/=k) ERROR STOP 'Y-face list reordered'
+      END DO
+    END DO
+    IF (i/=a%solve_interfaces_y) ERROR STOP 'Y-face count differs from reference'
+  END SUBROUTINE assert_reference_domain_worksets
 
   !> @brief Assert exact membership and ordering of two domain worksets.
   !> @param[in] a Optimized incremental domain.

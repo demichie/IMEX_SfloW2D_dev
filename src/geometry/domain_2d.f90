@@ -176,8 +176,11 @@ CONTAINS
         LOGICAL, INTENT(IN) :: solve_all
         REAL(wp), INTENT(IN), OPTIONAL :: q_other(:,:,:)
 
-        INTEGER :: i,j,k,n,km,kp
+        INTEGER :: i,j,k,n,km,kp,direction,j_neighbor,k_neighbor
         INTEGER :: row_count(comp_cells_y),row_offset(comp_cells_y+1)
+        INTEGER :: hp_row_offset(comp_cells_y+1)
+        INTEGER :: row_count_x(comp_cells_y),row_offset_x(comp_cells_y+1)
+        INTEGER :: row_count_y(comp_interfaces_y),row_offset_y(comp_interfaces_y+1)
         LOGICAL :: active,rebuild_from_state,release_due
 
         rebuild_from_state=.NOT.this%committed_mask_ready
@@ -330,11 +333,6 @@ CONTAINS
         END DO
         !$OMP END DO
 
-        !$OMP WORKSHARE
-        this%solve_mask_x=.FALSE.
-        this%solve_mask_y=.FALSE.
-        !$OMP END WORKSHARE
-
         !$OMP END PARALLEL
 
         ! The final mask is compacted by row. Each row owns a disjoint
@@ -346,7 +344,11 @@ CONTAINS
 
         this%solve_cells=row_offset(comp_cells_y+1)
 
-        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k,j,n) SCHEDULE(STATIC)
+        ! Build dependent worksets in one OpenMP team. Each source-row owns
+        ! disjoint output intervals; serial prefix sums preserve (k,j) order.
+        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,k,n,active,direction,j_neighbor,k_neighbor)
+
+        !$OMP DO SCHEDULE(STATIC)
         DO k=1,comp_cells_y
             n=row_offset(k)
             DO j=1,comp_cells_x
@@ -355,159 +357,260 @@ CONTAINS
                 this%j_cent(n)=j
                 this%k_cent(n)=k
             END DO
+            IF (n/=row_offset(k+1)) CALL fatal_error('Lie OpenMP: inconsistent solve worklist')
         END DO
-        !$OMP END PARALLEL DO
+        !$OMP END DO
 
-        ! Adjacent solve cells share faces. Keep face writes out of the
-        ! parallel emitter to avoid overlapping OpenMP writes.
+        ! The previous HP list contains unique cells, so its old membership
+        ! flags can be cleared independently before the new list is emitted.
+        !$OMP DO SCHEDULE(STATIC)
+        DO i=1,this%hp_eta_cells
+            this%hp_eta_mask(this%hp_eta_j(i),this%hp_eta_k(i))=.FALSE.
+        END DO
+        !$OMP END DO
+
+        ! Preserve the exact HP list prefix: every solve cell in (k,j) order.
+        !$OMP DO SCHEDULE(STATIC)
         DO i=1,this%solve_cells
             j=this%j_cent(i)
             k=this%k_cent(i)
-            this%solve_mask_x(j,k)=.TRUE.
-            this%solve_mask_x(j+1,k)=.TRUE.
-            this%solve_mask_y(j,k)=.TRUE.
-            this%solve_mask_y(j,k+1)=.TRUE.
+            this%hp_eta_j(i)=j
+            this%hp_eta_k(i)=k
+            this%hp_eta_mask(j,k)=.TRUE.
         END DO
+        !$OMP END DO
 
-        IF (this%solve_cells/=COUNT(this%solve_mask)) &
-            CALL fatal_error('Lie OpenMP: inconsistent unique solve worklist')
+        ! The first adjacent solve cell in (k,j) order owns each non-solve HP
+        ! neighbour. Counts and offsets allow deterministic emission without
+        ! races, atomics or temporary per-thread lists.
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            n=0
+            DO i=row_offset(k)+1,row_offset(k+1)
+                j=this%j_cent(i)
+                DO direction=1,4
+                    IF (first_hp_neighbor(j,k,direction)) n=n+1
+                END DO
+            END DO
+            row_count(k)=n
+        END DO
+        !$OMP END DO
 
-        ! A later refresh without new Lie publication must rebuild wetness
-        ! from the caller's current conservative state, not from halo values.
+        !$OMP SINGLE
+        hp_row_offset(1)=0
+        DO k=1,comp_cells_y
+            hp_row_offset(k+1)=hp_row_offset(k)+row_count(k)
+        END DO
+        this%hp_eta_cells=this%solve_cells+hp_row_offset(comp_cells_y+1)
+        IF (this%hp_eta_cells>SIZE(this%hp_eta_j)) &
+            CALL fatal_error('Lie OpenMP: HP worklist exceeds domain capacity')
+        !$OMP END SINGLE
+
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            n=this%solve_cells+hp_row_offset(k)
+            DO i=row_offset(k)+1,row_offset(k+1)
+                j=this%j_cent(i)
+                DO direction=1,4
+                    IF (.NOT.first_hp_neighbor(j,k,direction)) CYCLE
+                    j_neighbor=j
+                    k_neighbor=k
+                    SELECT CASE(direction)
+                    CASE(1)
+                        j_neighbor=j-1
+                    CASE(2)
+                        j_neighbor=j+1
+                    CASE(3)
+                        k_neighbor=k-1
+                    CASE(4)
+                        k_neighbor=k+1
+                    END SELECT
+                    n=n+1
+                    this%hp_eta_j(n)=j_neighbor
+                    this%hp_eta_k(n)=k_neighbor
+                    this%hp_eta_mask(j_neighbor,k_neighbor)=.TRUE.
+                END DO
+            END DO
+            IF (n/=this%solve_cells+hp_row_offset(k+1)) &
+                CALL fatal_error('Lie OpenMP: inconsistent HP worklist')
+        END DO
+        !$OMP END DO
+
+        ! Face membership is the union of its adjacent solve cells. Computing
+        ! each destination exactly once avoids the overlapping serial writes
+        ! previously used to mark faces from the compact solve list. Fuse the
+        ! first reconstruction halo with the face-mask scans and row counts.
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_interfaces_y
+            IF (k<=comp_cells_y) THEN
+                n=0
+                DO j=1,comp_interfaces_x
+                    active=.FALSE.
+                    IF (j>1) active=this%solve_mask(j-1,k)
+                    IF (j<=comp_cells_x) active=active .OR. this%solve_mask(j,k)
+                    this%solve_mask_x(j,k)=active
+                    IF (active) n=n+1
+                END DO
+                row_count_x(k)=n
+
+                DO j=1,comp_cells_x
+                    active=this%solve_mask(j,k)
+                    IF (j>1) active=active .OR. this%solve_mask(j-1,k)
+                    IF (j<comp_cells_x) active=active .OR. this%solve_mask(j+1,k)
+                    IF (k>1) active=active .OR. this%solve_mask(j,k-1)
+                    IF (k<comp_cells_y) active=active .OR. this%solve_mask(j,k+1)
+                    this%reconstruction_mask(j,k)=active
+                END DO
+            END IF
+
+            n=0
+            DO j=1,comp_cells_x
+                active=.FALSE.
+                IF (k>1) active=this%solve_mask(j,k-1)
+                IF (k<=comp_cells_y) active=active .OR. this%solve_mask(j,k)
+                this%solve_mask_y(j,k)=active
+                IF (active) n=n+1
+            END DO
+            row_count_y(k)=n
+        END DO
+        !$OMP END DO
+
+        ! The read-only reconstruction halo has exactly two four-neighbour
+        ! rings. Reuse the existing temporary mask as the second destination,
+        ! rather than copying the entire reconstruction mask twice.
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            DO j=1,comp_cells_x
+                active=this%reconstruction_mask(j,k)
+                IF (j>1) active=active .OR. this%reconstruction_mask(j-1,k)
+                IF (j<comp_cells_x) active=active .OR. this%reconstruction_mask(j+1,k)
+                IF (k>1) active=active .OR. this%reconstruction_mask(j,k-1)
+                IF (k<comp_cells_y) active=active .OR. this%reconstruction_mask(j,k+1)
+                this%solve_mask_temp(j,k)=active
+            END DO
+        END DO
+        !$OMP END DO
+
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_cells_y
+            n=0
+            DO j=1,comp_cells_x
+                active=this%solve_mask_temp(j,k)
+                this%reconstruction_mask(j,k)=active
+                IF (active) n=n+1
+            END DO
+            row_count(k)=n
+        END DO
+        !$OMP END DO
+
+        !$OMP SINGLE
+        row_offset(1)=0
+        row_offset_x(1)=0
+        row_offset_y(1)=0
+        DO k=1,comp_cells_y
+            row_offset(k+1)=row_offset(k)+row_count(k)
+            row_offset_x(k+1)=row_offset_x(k)+row_count_x(k)
+            row_offset_y(k+1)=row_offset_y(k)+row_count_y(k)
+        END DO
+        row_offset_y(comp_interfaces_y+1)=row_offset_y(comp_cells_y+1)+row_count_y(comp_interfaces_y)
+        this%reconstruction_cells=row_offset(comp_cells_y+1)
+        this%solve_interfaces_x=row_offset_x(comp_cells_y+1)
+        this%solve_interfaces_y=row_offset_y(comp_interfaces_y+1)
+        !$OMP END SINGLE
+
+        !$OMP DO SCHEDULE(STATIC)
+        DO k=1,comp_interfaces_y
+            IF (k<=comp_cells_y) THEN
+                n=row_offset(k)
+                DO j=1,comp_cells_x
+                    IF (.NOT.this%reconstruction_mask(j,k)) CYCLE
+                    n=n+1
+                    this%j_reconstruction(n)=j
+                    this%k_reconstruction(n)=k
+                END DO
+                IF (n/=row_offset(k+1)) CALL fatal_error('Lie OpenMP: inconsistent reconstruction worklist')
+
+                n=row_offset_x(k)
+                DO j=1,comp_interfaces_x
+                    IF (.NOT.this%solve_mask_x(j,k)) CYCLE
+                    n=n+1
+                    this%j_stag_x(n)=j
+                    this%k_stag_x(n)=k
+                END DO
+                IF (n/=row_offset_x(k+1)) CALL fatal_error('Lie OpenMP: inconsistent x-face worklist')
+            END IF
+
+            n=row_offset_y(k)
+            DO j=1,comp_cells_x
+                IF (.NOT.this%solve_mask_y(j,k)) CYCLE
+                n=n+1
+                this%j_stag_y(n)=j
+                this%k_stag_y(n)=k
+            END DO
+            IF (n/=row_offset_y(k+1)) CALL fatal_error('Lie OpenMP: inconsistent y-face worklist')
+        END DO
+        !$OMP END DO
+
+        !$OMP END PARALLEL
+
+        ! Accepted Lie publication is consumed; future direct calls must
+        ! rebuild wetness from the caller's conservative states.
         this%committed_mask_ready=.FALSE.
         IF (solve_all .OR. rebuild_from_state .OR. release_due) THEN
             this%next_release_time=MINVAL(this%solve_mask_time, &
                 MASK=this%solve_mask_time>t)
         END IF
 
-        ! Preserve the former HP workset order: active cells, then neighbours.
-        DO i = 1, this%hp_eta_cells
-            this%hp_eta_mask(this%hp_eta_j(i),this%hp_eta_k(i)) = .FALSE.
-
-        END DO
-
-        this%hp_eta_cells = 0
-
-        DO i = 1, this%solve_cells
-            CALL append_hp_cell(this%j_cent(i),this%k_cent(i))
-
-        END DO
-
-        DO i = 1, this%solve_cells
-            j = this%j_cent(i)
-            k = this%k_cent(i)
-            IF (j .GT. 1) CALL append_hp_cell(j-1,k)
-            IF (j .LT. comp_cells_x) CALL append_hp_cell(j+1,k)
-            IF (k .GT. 1) CALL append_hp_cell(j,k-1)
-            IF (k .LT. comp_cells_y) CALL append_hp_cell(j,k+1)
-
-        END DO
-
-        ! HP reconstruction reads a two-cell stencil around every evolved cell.
-        ! Keep this read-only halo separate from solve_mask so no additional cells
-        ! are advanced by the time integrator.
-        this%reconstruction_mask = this%solve_mask
-
-        DO i = 1,2
-            this%solve_mask_temp = this%reconstruction_mask
-
-            IF ( comp_cells_x .GT. 1 ) THEN
-                this%reconstruction_mask(2:comp_cells_x,:) =                                                           &
-                    this%reconstruction_mask(2:comp_cells_x,:) .OR.                                                    &
-                    this%solve_mask_temp(1:comp_cells_x-1,:)
-                this%reconstruction_mask(1:comp_cells_x-1,:) =                                                         &
-                    this%reconstruction_mask(1:comp_cells_x-1,:) .OR.                                                  &
-                    this%solve_mask_temp(2:comp_cells_x,:)
-
-            END IF
-
-            IF ( comp_cells_y .GT. 1 ) THEN
-                this%reconstruction_mask(:,2:comp_cells_y) =                                                           &
-                    this%reconstruction_mask(:,2:comp_cells_y) .OR.                                                    &
-                    this%solve_mask_temp(:,1:comp_cells_y-1)
-                this%reconstruction_mask(:,1:comp_cells_y-1) =                                                         &
-                    this%reconstruction_mask(:,1:comp_cells_y-1) .OR.                                                  &
-                    this%solve_mask_temp(:,2:comp_cells_y)
-
-            END IF
-
-        END DO
-
-        i = 0
-
-        DO k = 1,comp_cells_y
-
-            DO j = 1,comp_cells_x
-
-                IF ( this%reconstruction_mask(j,k) ) THEN
-                    i = i+1
-                    this%j_reconstruction(i) = j
-                    this%k_reconstruction(i) = k
-
-                END IF
-
-            END DO
-
-        END DO
-
-        this%reconstruction_cells = i
-        IF (this%reconstruction_cells/=COUNT(this%reconstruction_mask))                                                &
-            CALL fatal_error('Lie OpenMP: inconsistent unique reconstruction worklist')
-
-        !----- check for y-interfaces where computation is needed
-        i = 0
-
-        DO k = 1,comp_cells_y
-
-            DO j = 1,comp_interfaces_x
-
-                IF ( this%solve_mask_x(j,k) ) THEN
-
-                    i = i+1
-                    this%j_stag_x(i) = j
-                    this%k_stag_x(i) = k
-
-                END IF
-
-            END DO
-
-        END DO
-
-        this%solve_interfaces_x = i
-
-        !----- check for y-interfaces where computation is needed
-
-        i = 0
-
-        DO k = 1,comp_interfaces_y
-
-            DO j = 1,comp_cells_x
-
-                IF ( this%solve_mask_y(j,k) ) THEN
-
-                    i = i+1
-                    this%j_stag_y(i) = j
-                    this%k_stag_y(i) = k
-
-                END IF
-
-            END DO
-
-        END DO
-
-        this%solve_interfaces_y = i
-
-        RETURN
-
     CONTAINS
-    SUBROUTINE append_hp_cell(j_cell,k_cell)
-        INTEGER, INTENT(IN) :: j_cell,k_cell
-        IF (this%hp_eta_mask(j_cell,k_cell)) RETURN
-        this%hp_eta_mask(j_cell,k_cell) = .TRUE.
-        this%hp_eta_cells = this%hp_eta_cells + 1
-        this%hp_eta_j(this%hp_eta_cells) = j_cell
-        this%hp_eta_k(this%hp_eta_cells) = k_cell
-    END SUBROUTINE append_hp_cell
+
+        !> @brief Decide which solve cell first contributes a particular HP neighbour.
+        !> @details Source cells are ordered by (k,j), with neighbours W,E,S,N.
+        !>          Every non-solve neighbour is emitted by its earliest adjacent
+        !>          source, preserving the historical HP list without duplicates.
+        !> @param[in] j Source x index.
+        !> @param[in] k Source y index.
+        !> @param[in] direction Neighbour order: 1=W, 2=E, 3=S, 4=N.
+        !> @return True only for the first source that reaches this neighbour.
+        PURE LOGICAL FUNCTION first_hp_neighbor(j,k,direction) RESULT(first)
+            INTEGER, INTENT(IN) :: j,k,direction
+
+            first=.FALSE.
+            SELECT CASE(direction)
+            CASE(1)
+                IF (j<=1) RETURN
+                IF (this%solve_mask(j-1,k)) RETURN
+                IF (k>1) THEN
+                    IF (this%solve_mask(j-1,k-1)) RETURN
+                END IF
+                IF (j>2) THEN
+                    IF (this%solve_mask(j-2,k)) RETURN
+                END IF
+            CASE(2)
+                IF (j>=comp_cells_x) RETURN
+                IF (this%solve_mask(j+1,k)) RETURN
+                IF (k>1) THEN
+                    IF (this%solve_mask(j+1,k-1)) RETURN
+                END IF
+            CASE(3)
+                IF (k<=1) RETURN
+                IF (this%solve_mask(j,k-1)) RETURN
+                IF (k>2) THEN
+                    IF (this%solve_mask(j,k-2)) RETURN
+                END IF
+                IF (j>1) THEN
+                    IF (this%solve_mask(j-1,k-1)) RETURN
+                END IF
+                IF (j<comp_cells_x) THEN
+                    IF (this%solve_mask(j+1,k-1)) RETURN
+                END IF
+            CASE(4)
+                IF (k>=comp_cells_y) RETURN
+                IF (this%solve_mask(j,k+1)) RETURN
+            CASE DEFAULT
+                RETURN
+            END SELECT
+            first=.TRUE.
+        END FUNCTION first_hp_neighbor
     END SUBROUTINE check_solve
 
 END MODULE domain_2d

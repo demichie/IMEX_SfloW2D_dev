@@ -77,6 +77,33 @@ their neighbor tests. Thread startup/barriers, memory bandwidth,
 additional face marking and deferred releases can offset speedups.
 The decisive metric is the complete timestep, not kernel timing alone.
 
+## 2a. Dependent workset optimization
+
+The solve halo and ordered solve list remain the only authoritative active
+domain representation. After row-wise solve compaction, `check_solve` now builds
+the dependent worksets within one additional OpenMP team:
+
+- Face masks are computed directly from the OR of their adjacent solve cells.
+  Every face is written by exactly one thread, eliminating serial overlapping
+  writes from the solve list and full-mask clearing.
+- The reconstruction read halo is expanded twice with the existing
+  `reconstruction_mask` and `solve_mask_temp`, without two full-grid copies.
+- Each HP cell belongs to the first adjacent solve cell in the original
+  `(k,j)` traversal. Per-row counts and prefixes preserve the historical HP
+  ordering (solve cells first, then unique W/E/S/N neighbours) while emitting
+  in parallel. No per-thread lists, atomics or sorting are introduced.
+- Reconstruction and face index arrays are emitted in parallel into disjoint
+  row-owned segments, preserving the exact lexicographic order.
+- Existing full-grid validation scans are replaced by per-row compacted-count
+  checks. Small local row counts/offsets are scratch, not persistent state.
+
+The production spatial test independently reconstructs HP neighbours, both
+reconstruction dilation rings and face lists using the former serial
+algorithms, then compares the exact masks, counts and ordered indices for
+initial, deferred-release, incremental, full-domain and shared-layer cases.
+OpenMP numerical regression and end-to-end performance must be measured on
+the actual solver before claiming a speedup.
+
 ## 3. Algorithm and concurrency details
 
 ### A. Accepted Lie publication
