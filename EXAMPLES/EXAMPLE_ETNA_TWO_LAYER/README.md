@@ -81,13 +81,25 @@ A shorter exploratory run can set `T_END=10.0` and `DT_OUTPUT=1.0`
 but neither time horizon establishes scientific validation. Outputs are
 written to `OUTPUT/exampleEtna_two_layer/`.
 
-L1 reproduces the original Etna dense avalanche (Voellmy `mu=0.3`,
-`xi=300`). L2 begins strictly dry, and L1→L2 elutriation may create
-it dynamically after shear develops. The exploratory `LINEAR_USTAR`
-coefficients are lifted solid fraction `0.15`, efficiency `0.01`,
-Rouse threshold `100`. L2 settling and Chezy drag are disabled in this
-example to isolate formation of the upper current; those processes remain
-available in the two-layer implementation.
+L1 models the dense granular avalanche with Voellmy friction (`mu=0.3`,
+`xi=300`). L2 uses the quadratic rheology with the layer-specific basal
+`RHEOLOGY_L2%FRICTION_FACTOR=0.02` and Newton treatment (Lie group 1).
+This is the same quadratic-friction coefficient used in `EXAMPLE_TAAL`.
+
+L2 begins strictly dry and can form as L1→L2 elutriation develops. The
+`LINEAR_USTAR` elutriation settings are lifted solid volume fraction
+`0.15`, efficiency `0.01`, and critical Rouse number `100`
+(explicit Lie group 4). Settling and independent substrate mass exchange
+in L2 are disabled.
+
+Interlayer momentum drag is enabled using the Chézy slip-velocity law,
+with dimensionless `CHEZY_DRAG_COEFF=0.03` and a separate analytic Lie
+group 5. This coefficient is an exploratory choice used in the
+interlayer-drag numerical tests, **not** a calibration for Etna.
+The Chézy drag acts only where both layers are thicker than 1 mm; it
+exchanges opposite momentum impulses, conserving the pair's total momentum.
+Its coefficient is **independent** of L2's quadratic basal
+`FRICTION_FACTOR`.
 
 ## 4. Optional checks — commands from this directory
 
