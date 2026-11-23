@@ -43,6 +43,10 @@ MODULE spatial_operator_2d
         PROCEDURE, PUBLIC :: diagnose_positivity => diagnose_spatial_positivity
         PROCEDURE, PUBLIC :: front_mass_flux => spatial_front_mass_flux
         PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
+        PROCEDURE, PUBLIC :: prepare_traces => prepare_spatial_traces
+        PROCEDURE, PUBLIC :: accumulate_cfl_cell => spatial_accumulate_cfl_cell
+        PROCEDURE, PUBLIC :: limit_from_speeds => spatial_timestep_from_speeds
+        PROCEDURE, PUBLIC :: report_cfl_face => report_spatial_cfl_face
         PROCEDURE, PUBLIC :: compute_coupled_timestep => compute_coupled_spatial_timestep
         PROCEDURE, PUBLIC :: prepare_hp_workset => prepare_spatial_hp_workset
     END TYPE spatial_operator_type
@@ -369,7 +373,7 @@ CONTAINS
     !> @param[out] term1,term2 Coupled spatial residuals, on active cells.
     !> @param[in] time Explicit stage time [s].
     !> @param[in] domain Shared OR cell, face and HP reconstruction workset.
-    !> @param[out] dt Preliminary shared CFL timestep [s].
+    !> @param[out] dt Optional preliminary shared CFL timestep [s].
     SUBROUTINE evaluate_coupled_spatial_operator(this,upper,qp1,qp2,term1,term2,time,domain,dt)
         CLASS(spatial_operator_type), INTENT(INOUT) :: this,upper
         REAL(wp), INTENT(IN) :: qp1(n_vars,comp_cells_x,comp_cells_y)
@@ -378,7 +382,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: term2(n_eqns,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time
         CLASS(domain_type), INTENT(IN) :: domain
-        REAL(wp), INTENT(OUT) :: dt
+        REAL(wp), INTENT(OUT), OPTIONAL :: dt
         INTEGER :: l,j,k
 
         IF (this%reconstruction%layer/=1 .OR. upper%reconstruction%layer/=2) &
@@ -406,9 +410,17 @@ CONTAINS
             upper%hp_pccu%a_interface_yPos(j,k)=this%hp_pccu%a_interface_yPos(j,k)
         END DO
 
-        CALL this%compute_coupled_timestep(domain, &
-            this%hp_pccu%a_interface_xNeg,this%hp_pccu%a_interface_xPos, &
-            this%hp_pccu%a_interface_yNeg,this%hp_pccu%a_interface_yPos,dt)
+        IF (PRESENT(dt)) THEN
+            CALL this%compute_coupled_timestep(domain, &
+                this%hp_pccu%a_interface_xNeg,this%hp_pccu%a_interface_xPos, &
+                this%hp_pccu%a_interface_yNeg,this%hp_pccu%a_interface_yPos,dt)
+        ELSEIF (cfl/=-1.0_wp) THEN
+            ! The production timestep now reduces CFL after the residual,
+            ! but retains the original coupled-speed validation before fluxes.
+            CALL validate_coupled_speed_bounds(domain, &
+                this%hp_pccu%a_interface_xNeg,this%hp_pccu%a_interface_xPos, &
+                this%hp_pccu%a_interface_yNeg,this%hp_pccu%a_interface_yPos)
+        END IF
 
         ! Use the two previously prepared reconstructions, without rebuilding
         ! the faces and undoing the common characteristic bounds.
@@ -424,65 +436,29 @@ CONTAINS
             this%hp_pccu%a_interface_yNeg,this%hp_pccu%a_interface_yPos)
     END SUBROUTINE evaluate_coupled_spatial_operator
 
-    !******************************************************************************
-    !> \brief Refresh the reconstruction states and compute the face-speed CFL timestep.
-    !>
-    !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
-    !> \param[in] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
-    !> \param[in,out] qp Physical state cache refreshed from q on the reconstruction workset.
-    !> \param[in] time Current simulation time [s].
-    !> \param[out] dt Returned CFL-limited timestep, bounded by max_dt [s].
-    !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
-    !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL
-    !> evaluation.
-    !> @param[out] max_speed_x Optional maximum x-face characteristic speed for diagnostics [m/s].
-    !> @param[out] max_speed_y Optional maximum y-face characteristic speed for diagnostics [m/s].
-    !> @param[in] diagnose_max_x_face Print the CFL-limiting x-face and its input states when requested.
-    !> @param[in] lower_operator Optional prepared L1 spatial operator; L2 reconstruction only.
-    !> @param[in] h_lower Optional lower-layer thickness, paired with lower_operator.
-    !> @note The returned CFL still uses isolated-layer characteristic bounds;
-    !>       it is not a validated coupled two-layer stability bound.
-    !******************************************************************************
 
-    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled, &
-        lower_operator, h_lower, max_speed_x, max_speed_y, diagnose_max_x_face )
-
+    !> @brief Prepare primitive halos, HP traces and face speeds without selecting dt.
+    !> @details All downstream spatial kernels reuse the finalized traces and bounds.
+    !> @param[in,out] this Owns the canonical reconstruction and face-speed workspace.
+    !> @param[in] q Cell-centered conservative state.
+    !> @param[in,out] qp Refreshed primitive state and reconstruction halo.
+    !> @param[in] time Beginning of the spatial stage [s].
+    !> @param[in] domain Shared active cell and face workset.
+    !> @param[in] boundary_source_enabled Optional source-side trace switch.
+    !> @param[in] lower_operator Optional prepared lower layer for L2 reconstruction.
+    !> @param[in] h_lower Optional L1 cell depth paired with lower_operator.
+    SUBROUTINE prepare_spatial_traces(this,q,qp,time,domain,boundary_source_enabled,lower_operator,h_lower)
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time
-        REAL(wp), INTENT(OUT) :: dt
         CLASS(domain_type), INTENT(IN) :: domain
         LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
         CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower_operator
         REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
-        REAL(wp), INTENT(OUT), OPTIONAL :: max_speed_x,max_speed_y
-        LOGICAL, INTENT(IN), OPTIONAL :: diagnose_max_x_face
-
-        INTEGER :: j, k, l, face_j, face_k
-        REAL(wp) :: face_speed
-        REAL(wp) :: qp_face_l(n_vars),qp_face_r(n_vars)
-        REAL(wp) :: max_a_x, max_a_y
+        INTEGER :: j,k,l
         REAL(wp) :: dynamic_pressure
-        INTEGER :: tick,tock,tick_rate
         LOGICAL :: conversion_ok,conversion_failed
-        IF (this%profile_enabled) THEN
-            CALL SYSTEM_CLOCK(tick,tick_rate)
-            this%profile_cfl_calls=this%profile_cfl_calls+1
-        END IF
-
-        dt = max_dt
-        IF (PRESENT(max_speed_x)) max_speed_x=0.0_wp
-        IF (PRESENT(max_speed_y)) max_speed_y=0.0_wp
-
-        ! The sentinel selects the prescribed max_dt without evaluating face speeds.
-        IF ( cfl .EQ. -1.0_wp ) THEN
-            IF (this%profile_enabled) THEN
-                CALL SYSTEM_CLOCK(tock)
-                this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
-            END IF
-            RETURN
-        END IF
 
         ! Refresh wet cells and the dry halo: the HP stencil reads beyond solve_cells.
         ! The end-of-loop barrier makes every cache entry available to reconstruction.
@@ -533,24 +509,102 @@ CONTAINS
             domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                                               &
             domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
 
-        max_a_x = 0.0_wp
-        max_a_y = 0.0_wp
+    END SUBROUTINE prepare_spatial_traces
 
-        ! Each active cell contributes all of its faces; a global maximum gives
-        ! one timestep valid for every participating OpenMP thread.
-        !$OMP PARALLEL DO PRIVATE(j,k) REDUCTION(MAX:max_a_x,max_a_y)
-        DO l = 1, domain%solve_cells
-            j = domain%j_cent(l)
-            k = domain%k_cent(l)
+    !> @brief Accumulate the unchanged four-face characteristic maxima for one cell.
+    !> @param[in] this Owns the reconstructed face-speed arrays.
+    !> @param[in] j,k Active cell indices.
+    !> @param[in,out] max_a_x,max_a_y Directional maximum characteristic speeds [m/s].
+    !> @param[in] paired_bounds Skip collapsed axes for the shared coupled envelope.
+    SUBROUTINE spatial_accumulate_cfl_cell(this,j,k,max_a_x,max_a_y,paired_bounds)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        INTEGER, INTENT(IN) :: j,k
+        REAL(wp), INTENT(INOUT) :: max_a_x,max_a_y
+        LOGICAL, INTENT(IN), OPTIONAL :: paired_bounds
 
-            CALL accumulate_directional_face_speeds(this%hp_pccu,j,k, max_a_x,max_a_y)
+        IF (PRESENT(paired_bounds)) THEN
+            IF (paired_bounds) THEN
+                IF (comp_cells_x>1) THEN
+                    max_a_x=MAX(max_a_x,this%hp_pccu%a_interface_xPos(j,k), &
+                        -this%hp_pccu%a_interface_xNeg(j,k), &
+                        this%hp_pccu%a_interface_xPos(j+1,k),-this%hp_pccu%a_interface_xNeg(j+1,k))
+                END IF
+                IF (comp_cells_y>1) THEN
+                    max_a_y=MAX(max_a_y,this%hp_pccu%a_interface_yPos(j,k), &
+                        -this%hp_pccu%a_interface_yNeg(j,k), &
+                        this%hp_pccu%a_interface_yPos(j,k+1),-this%hp_pccu%a_interface_yNeg(j,k+1))
+                END IF
+                RETURN
+            END IF
+        END IF
+        CALL accumulate_directional_face_speeds(this%hp_pccu,j,k,max_a_x,max_a_y)
+    END SUBROUTINE spatial_accumulate_cfl_cell
 
+    !> @brief Validate the coupled face-speed envelopes without reducing CFL.
+    !> @param[in] domain Shared active face workset.
+    !> @param[in] axneg Nonpositive x-normal characteristic bounds [m/s].
+    !> @param[in] axpos Nonnegative x-normal characteristic bounds [m/s].
+    !> @param[in] ayneg Nonpositive y-normal characteristic bounds [m/s].
+    !> @param[in] aypos Nonnegative y-normal characteristic bounds [m/s].
+    SUBROUTINE validate_coupled_speed_bounds(domain,axneg,axpos,ayneg,aypos)
+        CLASS(domain_type), INTENT(IN) :: domain
+        REAL(wp), INTENT(IN) :: axneg(comp_interfaces_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: axpos(comp_interfaces_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: ayneg(comp_cells_x,comp_interfaces_y)
+        REAL(wp), INTENT(IN) :: aypos(comp_cells_x,comp_interfaces_y)
+        INTEGER :: l,j,k
+
+        ! Validate each actual face once; inactive array entries are irrelevant.
+        DO l=1,domain%solve_interfaces_x
+            j=domain%j_stag_x(l)
+            k=domain%k_stag_x(l)
+            IF (.NOT.ieee_is_finite(axneg(j,k)) .OR. .NOT.ieee_is_finite(axpos(j,k))) &
+                CALL fatal_error('Nonfinite coupled x-face wave bound')
+            IF (axneg(j,k)>0.0_wp .OR. axpos(j,k)<0.0_wp) &
+                CALL fatal_error('Coupled x-face wave bounds have invalid signs')
         END DO
-        !$OMP END PARALLEL DO
 
-        CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
-        IF (PRESENT(max_speed_x)) max_speed_x=max_a_x
-        IF (PRESENT(max_speed_y)) max_speed_y=max_a_y
+        DO l=1,domain%solve_interfaces_y
+            j=domain%j_stag_y(l)
+            k=domain%k_stag_y(l)
+            IF (.NOT.ieee_is_finite(ayneg(j,k)) .OR. .NOT.ieee_is_finite(aypos(j,k))) &
+                CALL fatal_error('Nonfinite coupled y-face wave bound')
+            IF (ayneg(j,k)>0.0_wp .OR. aypos(j,k)<0.0_wp) &
+                CALL fatal_error('Coupled y-face wave bounds have invalid signs')
+        END DO
+
+
+    END SUBROUTINE validate_coupled_speed_bounds
+
+    !> @brief Convert reduced characteristic maxima to the existing CFL policy bound.
+    !> @param[in] this Operator whose CFL policy is applied.
+    !> @param[in] max_a_x,max_a_y Maximum characteristic speeds [m/s].
+    !> @param[out] dt Resulting spatial CFL bound [s].
+    SUBROUTINE spatial_timestep_from_speeds(this,max_a_x,max_a_y,dt)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        REAL(wp), INTENT(IN) :: max_a_x,max_a_y
+        REAL(wp), INTENT(OUT) :: dt
+        dt=max_dt
+        IF (cfl/=-1.0_wp) CALL limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
+    END SUBROUTINE spatial_timestep_from_speeds
+
+    !> @brief Preserve the existing sampled limiting-face diagnostic.
+    !> @param[in] this Layer-specific HP reconstruction and speed caches.
+    !> @param[in] q Published conservative field.
+    !> @param[in] qp Published primitive field.
+    !> @param[in] domain Active face workset.
+    !> @param[in] max_a_x Maximum x characteristic speed [m/s].
+    !> @param[in] diagnose_max_x_face Optional sampled diagnostic switch.
+    SUBROUTINE report_spatial_cfl_face(this,q,qp,domain,max_a_x,diagnose_max_x_face)
+        CLASS(spatial_operator_type), INTENT(IN) :: this
+        REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp(n_vars,comp_cells_x,comp_cells_y)
+        CLASS(domain_type), INTENT(IN) :: domain
+        REAL(wp), INTENT(IN) :: max_a_x
+        LOGICAL, INTENT(IN), OPTIONAL :: diagnose_max_x_face
+        INTEGER :: l,j,k,face_j,face_k
+        REAL(wp) :: face_speed,qp_face_l(n_vars),qp_face_r(n_vars)
+
         ! Run this serial diagnostic only after all OpenMP speed reductions
         ! have completed. Reuse the exact selected traces and cached bounds.
         IF (PRESENT(diagnose_max_x_face)) THEN
@@ -600,6 +654,86 @@ CONTAINS
             END IF
         END IF
 
+    END SUBROUTINE report_spatial_cfl_face
+
+    !******************************************************************************
+    !> \brief Refresh the reconstruction states and compute the face-speed CFL timestep.
+    !>
+    !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
+    !> \param[in] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
+    !> \param[in,out] qp Physical state cache refreshed from q on the reconstruction workset.
+    !> \param[in] time Current simulation time [s].
+    !> \param[out] dt Returned CFL-limited timestep, bounded by max_dt [s].
+    !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+    !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL
+    !> evaluation.
+    !> @param[out] max_speed_x Optional maximum x-face characteristic speed for diagnostics [m/s].
+    !> @param[out] max_speed_y Optional maximum y-face characteristic speed for diagnostics [m/s].
+    !> @param[in] diagnose_max_x_face Print the CFL-limiting x-face and its input states when requested.
+    !> @param[in] lower_operator Optional prepared L1 spatial operator; L2 reconstruction only.
+    !> @param[in] h_lower Optional lower-layer thickness, paired with lower_operator.
+    !> @note The returned CFL still uses isolated-layer characteristic bounds;
+    !>       it is not a validated coupled two-layer stability bound.
+    !******************************************************************************
+
+    SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain, boundary_source_enabled, &
+        lower_operator, h_lower, max_speed_x, max_speed_y, diagnose_max_x_face )
+
+        CLASS(spatial_operator_type), INTENT(INOUT) :: this
+        REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: time
+        REAL(wp), INTENT(OUT) :: dt
+        CLASS(domain_type), INTENT(IN) :: domain
+        LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
+        CLASS(spatial_operator_type), INTENT(IN), OPTIONAL :: lower_operator
+        REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
+        REAL(wp), INTENT(OUT), OPTIONAL :: max_speed_x,max_speed_y
+        LOGICAL, INTENT(IN), OPTIONAL :: diagnose_max_x_face
+
+        INTEGER :: j, k, l
+        REAL(wp) :: max_a_x, max_a_y
+        INTEGER :: tick,tock,tick_rate
+        IF (this%profile_enabled) THEN
+            CALL SYSTEM_CLOCK(tick,tick_rate)
+            this%profile_cfl_calls=this%profile_cfl_calls+1
+        END IF
+
+        dt = max_dt
+        IF (PRESENT(max_speed_x)) max_speed_x=0.0_wp
+        IF (PRESENT(max_speed_y)) max_speed_y=0.0_wp
+
+        ! The sentinel selects the prescribed max_dt without evaluating face speeds.
+        IF ( cfl .EQ. -1.0_wp ) THEN
+            IF (this%profile_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
+            END IF
+            RETURN
+        END IF
+
+        CALL this%prepare_traces(q,qp,time,domain,boundary_source_enabled,lower_operator,h_lower)
+
+        max_a_x = 0.0_wp
+        max_a_y = 0.0_wp
+
+        ! Each active cell contributes all of its faces; a global maximum gives
+        ! one timestep valid for every participating OpenMP thread.
+        !$OMP PARALLEL DO PRIVATE(j,k) REDUCTION(MAX:max_a_x,max_a_y)
+        DO l = 1, domain%solve_cells
+            j = domain%j_cent(l)
+            k = domain%k_cent(l)
+
+            CALL accumulate_directional_face_speeds(this%hp_pccu,j,k, max_a_x,max_a_y)
+
+        END DO
+        !$OMP END PARALLEL DO
+
+        CALL this%limit_from_speeds(max_a_x,max_a_y,dt)
+        IF (PRESENT(max_speed_x)) max_speed_x=max_a_x
+        IF (PRESENT(max_speed_y)) max_speed_y=max_a_y
+        CALL this%report_cfl_face(q,qp,domain,max_a_x,diagnose_max_x_face)
+
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_cfl_seconds=this%profile_cfl_seconds+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -630,24 +764,7 @@ CONTAINS
         dt=max_dt
         IF (cfl==-1.0_wp) RETURN
 
-        ! Validate each actual face once; inactive array entries are irrelevant.
-        DO l=1,domain%solve_interfaces_x
-            j=domain%j_stag_x(l)
-            k=domain%k_stag_x(l)
-            IF (.NOT.ieee_is_finite(axneg(j,k)) .OR. .NOT.ieee_is_finite(axpos(j,k))) &
-                CALL fatal_error('Nonfinite coupled x-face wave bound')
-            IF (axneg(j,k)>0.0_wp .OR. axpos(j,k)<0.0_wp) &
-                CALL fatal_error('Coupled x-face wave bounds have invalid signs')
-        END DO
-
-        DO l=1,domain%solve_interfaces_y
-            j=domain%j_stag_y(l)
-            k=domain%k_stag_y(l)
-            IF (.NOT.ieee_is_finite(ayneg(j,k)) .OR. .NOT.ieee_is_finite(aypos(j,k))) &
-                CALL fatal_error('Nonfinite coupled y-face wave bound')
-            IF (ayneg(j,k)>0.0_wp .OR. aypos(j,k)<0.0_wp) &
-                CALL fatal_error('Coupled y-face wave bounds have invalid signs')
-        END DO
+        CALL validate_coupled_speed_bounds(domain,axneg,axpos,ayneg,aypos)
 
         max_a_x=0.0_wp
         max_a_y=0.0_wp

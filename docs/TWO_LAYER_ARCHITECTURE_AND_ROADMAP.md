@@ -537,3 +537,20 @@ reusing the canonical single-layer mixture formulas. No auxiliary
 single-layer solver run or intermediate initial `.q_2d` files are required.
 Conservative/binary restart paths remain available. Runtime acceptance
 requires fresh regression evidence on the updated branch.
+
+**TL13b -- mass-positivity timestep preparation (23 November 2026):**
+The driver prepares the canonical spatial residual once, before the Lie
+source windows and state update. The primitive/HP reconstruction and face
+characteristic bounds still precede the PCCU fluxes. A final active-cell
+OpenMP reduction combines the existing directional CFL maxima with a
+mass-only forward-Euler positivity bound, using the published conservative
+mass and the precomputed mass residual for both layers. The accepted step
+remains subject to output and growth caps; no mass clipping, recoverable
+rollback or timestep retry is introduced. The coupled face-speed validity
+checks and isolated L1/L2 CFL bounds remain mandatory. The residual belongs
+to the Lie integrator; no second driver-side residual storage is needed.
+Validation requires optimized/strict builds, the existing spatial and
+single-layer operator gates, two-layer wet/dry and source-boundary cases,
+OpenMP equivalence and an end-to-end performance comparison. This is a
+numerical implementation contract, **not** evidence that TL13b is closed.
+

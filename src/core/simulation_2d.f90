@@ -161,11 +161,14 @@ CONTAINS
     !> \details Preserves the fractional-step ordering: source-window averages,
     !>          OU preparation, full Lie spatial/source advancement, then one clock advance.
     !> \param[in,out] this Initialized simulation context.
-    !> \param[in] observer Optional test hook called after each completed phase.
-    SUBROUTINE advance_simulation_timestep(this,observer,pre_spatial_primitives_ready)
+    !> @param[in,out] this Simulation and shared numerical workspaces.
+    !> @param[in] observer Optional test hook called after each completed phase.
+    !> @param[in] pre_spatial_primitives_ready Optional primitive cache readiness.
+    !> @param[in] spatial_residual_ready The pre-step residual is ready for the Lie update.
+    SUBROUTINE advance_simulation_timestep(this,observer,pre_spatial_primitives_ready,spatial_residual_ready)
         CLASS(simulation_context_type), INTENT(INOUT) :: this
         PROCEDURE(timestep_event_observer), OPTIONAL :: observer
-        LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
+        LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready,spatial_residual_ready
         REAL(wp) :: step_start,step_length
 
         step_start=this%runtime%t
@@ -180,6 +183,7 @@ CONTAINS
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
                 this%stochastic,this%domain,this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
+                spatial_residual_ready=spatial_residual_ready, &
                 stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
                 layer_physics=this%layer_physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
@@ -187,6 +191,7 @@ CONTAINS
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
                 this%stochastic,this%domain,this%spatial_operators,                                              &
                 pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
+                spatial_residual_ready=spatial_residual_ready, &
                 layer_physics=this%layer_physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
         END IF

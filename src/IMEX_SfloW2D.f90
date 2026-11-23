@@ -85,7 +85,7 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : n_vars,n_layers
     USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
     USE parameters_2d, ONLY : radial_source_flag
-    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, cfl
+    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag
     USE parameters_2d, ONLY : collapsing_volume_flag
     USE parameters_2d, ONLY : serial_flag
 
@@ -133,8 +133,7 @@ PROGRAM IMEX_SfloW2D
     LOGICAL :: runout_exists, mass_exists
     LOGICAL :: timestep_diagnostics_enabled
     INTEGER :: timestep_count
-    REAL(wp) :: cfl_dt,cfl_max_a_x,cfl_max_a_y,coupled_cfl_dt,upper_cfl_dt
-    REAL(wp), ALLOCATABLE :: coupled_term_l1(:,:,:),coupled_term_l2(:,:,:)
+    REAL(wp) :: cfl_dt,dt_pos,cfl_max_a_x,cfl_max_a_y
     CHARACTER(LEN=8) :: timestep_diagnostics_setting
 
     WRITE(*,*) '---------------------'
@@ -185,11 +184,6 @@ PROGRAM IMEX_SfloW2D
     CALL init_grid
 
     CALL simulation%initialize
-
-    IF (n_layers==2) THEN
-        ALLOCATE(coupled_term_l1(n_vars,SIZE(simulation%state%q,3),SIZE(simulation%state%q,4)))
-        ALLOCATE(coupled_term_l2(n_vars,SIZE(simulation%state%q,3),SIZE(simulation%state%q,4)))
-    END IF
 
     lie_source_groups=simulation%source_registry%groups()
     boundary_source_enabled=.FALSE.
@@ -469,35 +463,16 @@ PROGRAM IMEX_SfloW2D
         END IF
 
         CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
+        IF (n_layers==2) CALL simulation%spatial_operators(2)%prepare_hp_workset(simulation%domain)
 
-        CALL simulation%spatial_operators(1)%compute_timestep( &
-                simulation%state%q(:,1,:,:), simulation%state%qp(:,1,:,:), simulation%runtime%t, &
-                simulation%runtime%dt, simulation%domain, &
-                boundary_source_enabled=boundary_source_enabled, &
-                max_speed_x=cfl_max_a_x,max_speed_y=cfl_max_a_y, &
-                diagnose_max_x_face=timestep_diagnostics_enabled .AND. &
-                    (timestep_count<20 .OR. MOD(timestep_count+1,100)==0))
-        IF (n_layers==2) THEN
-            CALL simulation%spatial_operators(2)%prepare_hp_workset(simulation%domain)
-            CALL simulation%spatial_operators(2)%compute_timestep( &
-                simulation%state%q(:,2,:,:),simulation%state%qp(:,2,:,:),simulation%runtime%t, &
-                upper_cfl_dt,simulation%domain, &
-                boundary_source_enabled=boundary_source_enabled, &
-                lower_operator=simulation%spatial_operators(1), &
-                h_lower=simulation%state%qp(idx_h,1,:,:))
-
-            ! Reuse the production coupled spatial kernel to obtain the
-            ! actual paired-face bound before accepting a timestep. Its
-            ! preliminary residuals are discarded; advance recomputes them
-            ! from the same prepared conservative state.
-            CALL simulation%spatial_operators(1)%evaluate_coupled( &
-                simulation%spatial_operators(2), &
-                simulation%state%qp(:,1,:,:),simulation%state%qp(:,2,:,:), &
-                coupled_term_l1,coupled_term_l2,simulation%runtime%t, &
-                simulation%domain,coupled_cfl_dt)
-            simulation%runtime%dt=MIN(simulation%runtime%dt,upper_cfl_dt,coupled_cfl_dt)
-        END IF
-        cfl_dt=simulation%runtime%dt
+        ! Assemble the spatial residual once, then reduce CFL and mixture-mass
+        ! positivity on the active cells before applying any timestep sources.
+        CALL simulation%time_integration%prepare_spatial(simulation%state,simulation%runtime%t, &
+            simulation%domain,simulation%spatial_operators,cfl_dt,dt_pos,cfl_max_a_x,cfl_max_a_y, &
+            boundary_source_enabled=boundary_source_enabled, &
+            diagnose_max_x_face=timestep_diagnostics_enabled .AND. &
+                (timestep_count<20 .OR. MOD(timestep_count+1,100)==0))
+        simulation%runtime%dt=MIN(cfl_dt,dt_pos)
 
         IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                                                         &
             simulation%runtime%t_output = t_end
@@ -538,6 +513,7 @@ PROGRAM IMEX_SfloW2D
                 ' t=',simulation%runtime%t,' cfl_dt=',cfl_dt, &
                 ' accepted_dt=',simulation%runtime%dt, &
                 ' max_a_x=',cfl_max_a_x,' max_a_y=',cfl_max_a_y
+            WRITE(*,'(A,I0,A,ES24.16)') 'DT_POS_DIAG step=',timestep_count,' dt_pos=',dt_pos
         END IF
         IF (.NOT.ieee_is_finite(simulation%runtime%dt) .OR. &
             simulation%runtime%dt<=0.0_wp .OR. &
@@ -545,23 +521,16 @@ PROGRAM IMEX_SfloW2D
             WRITE(*,'(A,3(A,ES24.16))') 'INVALID_TIMESTEP', &
                 ' t=',simulation%runtime%t,' cfl_dt=',cfl_dt, &
                 ' accepted_dt=',simulation%runtime%dt
+            WRITE(*,'(A,ES24.16)') 'INVALID_TIMESTEP dt_pos=',dt_pos
             CALL fatal_error('Selected timestep does not advance simulation time')
         END IF
         simulation%runtime%dt_old_old = simulation%runtime%dt_old
         simulation%runtime%dt_old = simulation%runtime%dt
 
-        ! CFL already prepared the unchanged conservative state, its numerical
-        ! primitives, HP traces and characteristic speeds. Radial, circular
-        ! and fissural sources run AFTER the spatial operator and do not
-        ! change its reconstruction inputs between these two passes.
-        ! OU now runs AFTER spatial transport, on its unpublished candidate.
-        ! No stochastic state is changed between CFL and spatial, including
-        ! when the stochastic scalar is conservatively transported.
-        ! Keep the fallback for disabled CFL and lateral boundary injection:
-        ! the explicit CFL boundary-source override can differ from the
-        ! fallback used by a fresh spatial reconstruction.
-        CALL simulation%advance_timestep(pre_spatial_primitives_ready=                                              &
-            cfl/=-1.0_wp .AND. .NOT.lateral_source_flag)
+        ! The unique pre-step spatial residual remains unchanged until Lie
+        ! consumes it. All time-dependent source averages use the final dt.
+        CALL simulation%advance_timestep(pre_spatial_primitives_ready=.TRUE., &
+            spatial_residual_ready=.TRUE.)
 
         ! advance_lie has already published a synchronized q/qp pair.
         ! Only the diagnostic dynamic pressure is needed; never reconvert qp.
@@ -701,7 +670,6 @@ PROGRAM IMEX_SfloW2D
 
     END DO
 
-    IF (ALLOCATED(coupled_term_l1)) DEALLOCATE(coupled_term_l1,coupled_term_l2)
     CALL simulation%finalize
 
     IF ( output_netcdf_flag ) CALL close_netcdf

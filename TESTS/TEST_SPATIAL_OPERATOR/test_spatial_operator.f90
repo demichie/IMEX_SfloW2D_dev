@@ -442,6 +442,8 @@ CONTAINS
         REAL(wp) :: before_qp(n_vars,2,nx,ny)
         REAL(wp) :: pt1(n_vars,nx,ny),pt2(n_vars,nx,ny)
         REAL(wp) :: bound1,bound2,dt_step,momentum_difference,drag_difference,scale
+        REAL(wp) :: prepared_cfl,prepared_pos,prepared_ax,prepared_ay,reference_cfl
+        REAL(wp) :: reference_rate_l1(n_eqns,nx,ny),reference_rate_l2(n_eqns,nx,ny)
         REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
         REAL(wp) :: curvature_rate(n_eqns),curvature_effect,solid_budget,expected_deposition
         INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status
@@ -578,9 +580,48 @@ CONTAINS
             coupled_state%q=before_q
             coupled_state%qp=before_qp
             paired%solve_mask=initial_solve_mask
-            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
-                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
-                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+
+            IF (scenario==1) THEN
+                ! Compare one precomputed, reused residual with an independent
+                ! direct Lie evaluation from exactly the same conservative state.
+                CALL workspace%prepare_spatial(coupled_state,0.0_wp,paired,operators, &
+                    prepared_cfl,prepared_pos,prepared_ax,prepared_ay)
+                CALL operators(1)%evaluate_coupled(operators(2), &
+                    coupled_state%qp(:,1,:,:),coupled_state%qp(:,2,:,:), &
+                    reference_rate_l1,reference_rate_l2,0.0_wp,paired,reference_cfl)
+                CALL same_bits('prepared CFL preserves isolated/coupled bounds', &
+                    [prepared_cfl],[MIN(bound1,bound2,reference_cfl)])
+                IF (prepared_pos<dt_step .OR. .NOT.ieee_is_finite(prepared_pos)) &
+                    ERROR STOP 'Prepared mass-positivity bound rejects the existing short step'
+                DO l=1,paired%solve_cells
+                    j=paired%j_cent(l)
+                    k=paired%k_cent(l)
+                    CALL same_bits('prepared L1 residual is canonical', &
+                        workspace%spatial_rate(:,1,j,k),reference_rate_l1(:,j,k))
+                    CALL same_bits('prepared L2 residual is canonical', &
+                        workspace%spatial_rate(:,2,j,k),reference_rate_l2(:,j,k))
+                END DO
+                CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                    pre_spatial_primitives_ready=.TRUE.,spatial_residual_ready=.TRUE., &
+                    layer_physics=physics,pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+                base_q=coupled_state%q
+                base_qp=coupled_state%qp
+
+                coupled_state%q=before_q
+                coupled_state%qp=before_qp
+                paired%solve_mask=initial_solve_mask
+                CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                    pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                    pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+                CALL same_bits('precomputed Lie conservative state', &
+                    RESHAPE(coupled_state%q,[SIZE(coupled_state%q)]),RESHAPE(base_q,[SIZE(base_q)]))
+                CALL same_bits('precomputed Lie primitive state', &
+                    RESHAPE(coupled_state%qp,[SIZE(coupled_state%qp)]),RESHAPE(base_qp,[SIZE(base_qp)]))
+            ELSE
+                CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                    pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                    pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            END IF
             base_q=coupled_state%q
 
             interlayer_momentum_exchange%chezy_drag_coeff=0.05_wp
