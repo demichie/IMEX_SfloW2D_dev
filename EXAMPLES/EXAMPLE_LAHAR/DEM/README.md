@@ -10,9 +10,8 @@ This directory contains the three cropped ESRI ASCII rasters required by
 | `VESUVIO_001_001_erodible.zip` | `VESUVIO_001_001_erodible.asc` | Erodible-bed thickness |
 | `masked_init_vol_thick_001_001.zip` | `masked_init_vol_thick_001_001.asc` | Initial LAHAR thickness |
 
-**The ZIP files will be uploaded separately; they are not present in the
-first commit of this example.** Each archive must contain its named
-`.asc` file at the archive root, without an additional `DEM/` directory.
+Each ZIP archive contains its corresponding `.asc` raster at the archive
+root, without an additional `DEM/` directory.
 
 From `EXAMPLES/EXAMPLE_LAHAR`, test and extract the archives:
 

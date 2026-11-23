@@ -9,7 +9,7 @@ distributed thickness raster and contains **six solid grain-size classes**
 suspended in a liquid carrier. The model accounts for momentum resistance,
 sediment erosion and deposition, and loss of the liquid carrier.
 
-The simulation covers **600 s** of physical time. The computational domain
+The simulation covers **3600 s** of physical time. The computational domain
 is a grid-aligned portion of the original terrain, chosen to encompass the
 flow while avoiding unnecessary calculation outside the area of interest.
 
@@ -24,9 +24,10 @@ flow while avoiding unnecessary calculation outside the area of interest.
 | Initial velocity | `u=v=0 m/s` |
 | Initial mixture temperature | `373 K` |
 | Initial solid volume fraction | `51%` in total, distributed among six classes |
-| Simulation interval | `0–600 s` |
+| Simulation interval | `0–3600 s` |
 | Output interval | `600 s` |
 | CFL and maximum timestep | `0.24` and `5 s` |
+| KT trace reconstruction | `h_x` (flow-depth gradients) |
 
 All four sides use the homogeneous boundary values specified in
 `IMEX_SfloW2D.inp`. The initial flow geometry is given by a raster rather
@@ -125,7 +126,7 @@ in the supplied input file, the principal files are:
 | `metadata/output_manifest.csv` | Output snapshot indices and their physical times. |
 
 `OUTPUT_NETCDF_FLAG=T` enables the NetCDF output, with
-`DT_OUTPUT=600 s`. The current configuration has
+`DT_OUTPUT=600 s` over the simulated interval `0–3600 s`. The current configuration has
 `OUTPUT_CONS_FLAG=F`, `OUTPUT_ESRI_FLAG=F` and
 `OUTPUT_RUNOUT_FLAG=F`, so it does **not** write separate conservative
 `.q_2d` snapshots, ESRI field rasters, or runout CSV files.
