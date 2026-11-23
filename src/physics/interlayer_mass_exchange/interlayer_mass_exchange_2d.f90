@@ -40,7 +40,9 @@ CONTAINS
     !>          Gross withdrawals never spend same-substep receipts; final
     !>          packing accounts for both gross processes and carrier streams.
     !>          LIMIT_SOLIDS preserves the parcel solid fraction; ALLOW_CONCENTRATED
-    !>          may reduce co-lift independently. Downward carrier is the minimum
+    !>          may reduce co-lift independently. With the default -1 fraction,
+    !>          the lifted parcel takes its solid fraction from the current L1
+    !>          donor inventory. Downward carrier is the minimum
     !>          required to keep L1 admissible after both solid fluxes and co-lift.
     !> @param[in] solid_l1 Existing L1 per-class solid volume inventories [m].
     !> @param[in] solid_l2 Existing L2 per-class solid volume inventories [m].
@@ -113,8 +115,19 @@ CONTAINS
         available_down=carrier_l2/(dt*down_to_l2)
         IF (.NOT.config%settling_flag .AND. ANY(settling>0.0_wp)) RETURN
         IF (.NOT.config%elutriation_flag .AND. ANY(elutriation>0.0_wp)) RETURN
+        s1=SUM(solid_l1)
+        s2=SUM(solid_l2)
+        c1=carrier_l1
+        c2=carrier_l2
         IF (config%elutriation_flag) THEN
             alpha_lift=config%elutriation_solid_volume_fraction
+            IF (alpha_lift==-1.0_wp) THEN
+                ! An omitted fraction uses the current L1 donor inventory,
+                ! not the pre-spatial state used to evaluate the solid rate.
+                ! With no donor solids, no solid co-lift is possible.
+                alpha_lift=1.0_wp
+                IF (s1>0.0_wp) alpha_lift=s1/(s1+c1)
+            END IF
             IF (.NOT.ieee_is_finite(alpha_lift)) RETURN
             IF (alpha_lift<=0.0_wp .OR. alpha_lift>1.0_wp) RETURN
             SELECT CASE(TRIM(config%elutriation_carrier_mode))
@@ -127,10 +140,6 @@ CONTAINS
         END IF
 
         beta=(1.0_wp-packing)/packing
-        s1=SUM(solid_l1)
-        s2=SUM(solid_l2)
-        c1=carrier_l1
-        c2=carrier_l2
         IF (s1>packing*(s1+c1)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s1+c1)) RETURN
         IF (s2>packing*(s2+c2)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)) RETURN
 

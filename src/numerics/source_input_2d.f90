@@ -289,9 +289,10 @@ CONTAINS
                 error='Invalid ELUTRIATION_SOLID_VOLUME_FRACTION'
                 RETURN
             END IF
-            IF (config%elutriation_solid_volume_fraction<=0.0_wp .OR. &
-                config%elutriation_solid_volume_fraction>1.0_wp) THEN
-                error='ELUTRIATION_SOLID_VOLUME_FRACTION must be in (0,1]'
+            IF (config%elutriation_solid_volume_fraction/=-1.0_wp .AND. &
+                (config%elutriation_solid_volume_fraction<=0.0_wp .OR. &
+                config%elutriation_solid_volume_fraction>1.0_wp)) THEN
+                error='ELUTRIATION_SOLID_VOLUME_FRACTION must be -1 (local L1) or in (0,1]'
                 RETURN
             END IF
         END IF

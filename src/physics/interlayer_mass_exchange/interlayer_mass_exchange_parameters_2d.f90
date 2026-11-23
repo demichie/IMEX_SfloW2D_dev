@@ -9,7 +9,7 @@ MODULE interlayer_mass_exchange_parameters_2d
     TYPE :: interlayer_mass_exchange_config_type
         LOGICAL :: settling_flag=.FALSE.                 !< Transfer solids from L2 to L1.
         LOGICAL :: elutriation_flag=.FALSE.              !< Transfer solids from L1 to L2.
-        REAL(wp) :: elutriation_solid_volume_fraction=-1.0_wp !< Solid fraction in lifted parcel.
+        REAL(wp) :: elutriation_solid_volume_fraction=-1.0_wp !< -1: local L1 fraction; >0: prescribed lift.
         CHARACTER(LEN=24) :: elutriation_carrier_mode='LIMIT_SOLIDS'
         CHARACTER(LEN=24) :: elutriation_law='LINEAR_USTAR'
         REAL(wp) :: elutriation_efficiency=1.0E-2_wp

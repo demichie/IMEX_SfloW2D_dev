@@ -124,13 +124,21 @@ opposti nei due layer; momento ed energia termica sono trasferiti
 secondo le velocita' e temperature fisiche dei rispettivi processi.
 
 **Elutriazione:** il parametro di input
-`elutriation_solid_volume_fraction`, con `0 < alpha_lift <= 1`, indica
-la frazione volumetrica solida **della corrente trasferita**, non
-la concentrazione finale di L2. Dato un volume solido proposto
-`dV_s`, il volume di carrier richiesto e'
+`elutriation_solid_volume_fraction`, se esplicitamente positivo
+(`0 < alpha_lift <= 1`), indica la frazione volumetrica solida
+**della corrente trasferita**, non la concentrazione finale di L2.
+Se omesso (valore canonico `-1`), `alpha_lift` viene calcolato
+**in ogni cella e ad ogni scambio** dagli inventari correnti del
+donatore L1 dopo il passo spaziale:
+`alpha_lift = sum(V_s,L1) / (sum(V_s,L1) + V_c,L1)`.
+Questo valore puo' differire dalla concentrazione dello stato
+pre-spaziale su cui viene valutata la legge di elutriazione.
+Se L1 non contiene solidi, l'elutriazione accettata e' nulla
+e non viene richiesto carrier aggiuntivo. Dato un volume solido
+trasferito `dV_s`, il volume di carrier richiesto e'
 `dV_c_req = (1-alpha_lift)/alpha_lift * dV_s`; `alpha_lift=1`
-corrisponde a nessun carrier associato. Non fissare ancora un
-default numerico per `alpha_lift` senza giustificazione.
+corrisponde a nessun carrier associato. Il valore positivo prescritto
+rimane invariato e la coppia e' comunque limitata dai budget esistenti.
 
 Il secondo input `elutriation_carrier_mode` seleziona:
 
@@ -421,8 +429,9 @@ del solo test di un kernel.
   Non introdurre soglie, viscosita' o forze correttive per
   mascherare problemi fisici.
 
-**Da definire scientificamente prima dell'implementazione:**
-default numerico di `elutriation_solid_volume_fraction`,
+**Da definire o validare scientificamente:**
+validazione scientifica della modalita' dinamica di
+`elutriation_solid_volume_fraction` e della miscela sollevata,
 possibile utilizzo di apporti simultanei nei budget lordi,
 chiusura dei volumi di carrier comprimibile, parametri effettivi
 di settling/elutriazione, soglie e dissipazione del drag,

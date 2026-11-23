@@ -92,6 +92,12 @@ L2 begins strictly dry and can form as L1→L2 elutriation develops. The
 (explicit Lie group 4). Settling and independent substrate mass exchange
 in L2 are disabled.
 
+The explicit `ELUTRIATION_SOLID_VOLUME_FRACTION=0.15` keeps the lifted
+parcel composition prescribed. Omitting this field instead selects the
+current local L1 solid volume fraction after the spatial update, and its
+gas/solid co-lift ratio varies from cell to cell. This is an alternative
+physical assumption, not a calibration of the Etna case.
+
 Interlayer momentum drag is enabled using the Chézy slip-velocity law,
 with dimensionless `CHEZY_DRAG_COEFF=0.03` and a separate analytic Lie
 group 5. This coefficient is an exploratory choice used in the

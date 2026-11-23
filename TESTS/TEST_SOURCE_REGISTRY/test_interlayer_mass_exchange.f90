@@ -44,8 +44,29 @@ PROGRAM test_interlayer_mass_exchange
     CALL close(up,9.0_wp*SUM(accepted_e),'prescribed elutriated parcel composition')
     CALL close(down,0.0_wp,'no need for downward carrier on elutriation')
 
+    ! An omitted lifted fraction takes the current donor concentration.
+    ! Test successive L1 inventories without changing the physical solid rate.
+    config%elutriation_solid_volume_fraction=-1.0_wp
+    s1=[0.12_wp,0.08_wp]; carrier1=0.8_wp
+    CALL execute(.TRUE.)
+    CALL require(SUM(accepted_e)>0.0_wp,'dynamic L1 lift remains active')
+    CALL close(up,4.0_wp*SUM(accepted_e),'dynamic 20 percent L1 co-lift')
+    carrier1=1.8_wp
+    CALL execute(.TRUE.)
+    CALL close(up,9.0_wp*SUM(accepted_e),'dynamic 10 percent L1 co-lift')
+    ! A carrier-only or fully dry L1 cannot lift solids or create gas.
+    s1=0.0_wp; carrier1=0.5_wp
+    CALL execute(.TRUE.)
+    CALL require(ALL(accepted_e==0.0_wp) .AND. up==0.0_wp, &
+        'dynamic co-lift with no donor solids is a no-op')
+    s1=0.0_wp; carrier1=0.0_wp
+    elut=0.0_wp
+    CALL execute(.TRUE.)
+    CALL require(up==0.0_wp,'dynamic fully dry donor is a no-op')
+
     ! At limited carrier inventory, LIMIT_SOLIDS preserves parcel composition
     ! and also preserves the donor packing constraint.
+    config%elutriation_solid_volume_fraction=0.1_wp
     s1=[0.2_wp,0.0_wp]; carrier1=0.8_wp
     s2=0.0_wp; carrier2=0.0_wp
     settle=0.0_wp; elut=[0.2_wp,0.0_wp]
@@ -81,6 +102,10 @@ PROGRAM test_interlayer_mass_exchange
         .AND. down==0.0_wp .AND. up==0.0_wp,'fully dry column is stable')
 
     ! Invalid parameters fail closed, and no previously accepted rate survives.
+    config%elutriation_solid_volume_fraction=-0.5_wp
+    CALL execute(.FALSE.)
+    config%elutriation_solid_volume_fraction=1.1_wp
+    CALL execute(.FALSE.)
     config%elutriation_solid_volume_fraction=0.0_wp
     CALL execute(.FALSE.)
     CALL require(ALL(accepted_s==0.0_wp) .AND. ALL(accepted_e==0.0_wp), &
@@ -106,6 +131,29 @@ PROGRAM test_interlayer_mass_exchange
     CALL require(interlayer_mass_exchange%elutriation_carrier_mode=='ALLOW_CONCENTRATED', &
         'read and normalize carrier mode')
     CLOSE(unit)
+
+    ! NAMELIST omission retains the canonical -1 sentinel for local L1 co-lift.
+    interlayer_mass_exchange=interlayer_mass_exchange_config_type()
+    OPEN(NEWUNIT=unit,STATUS='scratch',FORM='formatted')
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS'
+    WRITE(unit,'(A)') ' interlayer_mass_exchange%elutriation_flag = T'
+    WRITE(unit,'(A)') '/'
+    CALL read_interlayer_parameters(unit,error)
+    CALL require(LEN_TRIM(error)==0,'omitted co-lift fraction is accepted: '//TRIM(error))
+    CALL close(interlayer_mass_exchange%elutriation_solid_volume_fraction,-1.0_wp, &
+        'omitted co-lift fraction selects local L1 state')
+    CLOSE(unit)
+
+    ! An arbitrary negative value must not be interpreted as the sentinel.
+    OPEN(NEWUNIT=unit,STATUS='scratch',FORM='formatted')
+    WRITE(unit,'(A)') '&INTERLAYER_PARAMETERS'
+    WRITE(unit,'(A)') ' interlayer_mass_exchange%elutriation_solid_volume_fraction = -0.5'
+    WRITE(unit,'(A)') '/'
+    CALL read_interlayer_parameters(unit,error)
+    CALL require(INDEX(error,'ELUTRIATION_SOLID_VOLUME_FRACTION')>0, &
+        'reject negative non-sentinel co-lift input')
+    CLOSE(unit)
+    interlayer_mass_exchange=interlayer_mass_exchange_config_type()
 
     ! The canonical pair-wide NAMELIST schedules mass and momentum separately.
     OPEN(NEWUNIT=unit,STATUS='scratch',FORM='formatted')
@@ -370,7 +418,7 @@ CONTAINS
 
     !> @brief Exercise physics and antisymmetric paired mass, momentum and energy.
     SUBROUTINE test_physical_sources()
-        TYPE(physical_state_real) :: l1,l2
+        TYPE(physical_state_real) :: l1,l2,l1_recipient
         TYPE(interlayer_mass_exchange_config_type) :: phys_config
         TYPE(mass_exchange_config_type) :: mass_l2
         TYPE(rheology_config_type) :: rheology_l2
@@ -391,6 +439,7 @@ CONTAINS
         diam_s=[2.0E-5_wp,5.0E-5_wp]
         CALL initialize_physical_state_real(l1)
         CALL initialize_physical_state_real(l2)
+        CALL initialize_physical_state_real(l1_recipient)
         l1%h=1.0_wp; l1%alphas=[0.15_wp,0.05_wp]
         l1%rho_c=1.0_wp; l1%rho_m=455.8_wp
         l1%xs=rho_s*l1%alphas/l1%rho_m
@@ -416,6 +465,28 @@ CONTAINS
         CALL require(source1(idx_solidEqn_first)<0.0_wp .AND. &
             source2(idx_solidEqn_first)>0.0_wp,'elutriation solid donor and recipient')
         CALL require(source1(1)<0.0_wp .AND. source2(1)>0.0_wp,'elutriation gas included')
+
+        ! The physical assembly derives co-lift from the donor L1 composition
+        ! when the input fraction is omitted, retaining pairwise conservation.
+        phys_config%elutriation_solid_volume_fraction=-1.0_wp
+        CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt,source1,source2,valid)
+        CALL require(valid,'dynamic cold-start L2 paired physical transfer accepted')
+        CALL close(source2(1)-SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)), &
+            4.0_wp*SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)/rho_s), &
+            'physical donor L1 gas-to-solid volume ratio')
+
+        ! Group-zero physical rates may use pre-spatial L1, but the co-lift
+        ! composition must use the current post-spatial donor inventory.
+        l1_recipient=l1
+        l1_recipient%alphas=[0.08_wp,0.02_wp]
+        CALL eval_interlayer_mass_exchange_explicit(phys_config,rheology_l2,mass_l2, &
+            l1,l2,l1_recipient,l2,dt,source1,source2,valid)
+        CALL require(valid,'post-spatial donor composition accepted')
+        CALL close(source2(1)-SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)), &
+            9.0_wp*SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)/rho_s), &
+            'dynamic co-lift uses recipient not pre-spatial donor')
+        phys_config%elutriation_solid_volume_fraction=0.1_wp
 
         DO i=1,6
             CALL close(source1(i)+source2(i),0.0_wp,'elutriation antisymmetric conservative rate')
