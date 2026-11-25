@@ -318,8 +318,18 @@ def main():
                     run = subprocess.run([str(args.executable), str(threads)], cwd=directory,
                                          env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=90)
                 if run.returncode:
-                    raise AssertionError(f"{tag}, threads={threads}: exit {run.returncode}\n"
-                                         +(directory/"solver.log").read_text())
+                    log_path = directory/"solver.log"
+                    lines = log_path.read_text().splitlines()
+                    witnesses = [line for line in lines
+                                 if "TL07_INTERLAYER_REJECT" in line
+                                 or "TL07_INTERLAYER_FIRST_FAILURE" in line]
+                    detail = "\n".join(witnesses)
+                    tail = "\n".join(lines[-90:])
+                    raise AssertionError(
+                        f"{tag}, threads={threads}: exit {run.returncode}; full log: {log_path}\n"
+                        f"INTERLAYER FAILURE WITNESS:\n{detail or '(no TL07 witness found)'}\n"
+                        f"LAST 90 LOG LINES:\n{tail}"
+                    )
                 paths.append(directory/"result.bin")
                 record = compare(read_payload(paths[-1]), q, vertices, bed, params, name)
                 policy_steps=np.fromfile(directory/"cfl_policies.bin",dtype=np.float64)
