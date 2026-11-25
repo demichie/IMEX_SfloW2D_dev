@@ -107,7 +107,11 @@ limiter also checks both final layer packings.
 **Scientific question C2:** validate the rule assigning additional
 carrier to settling solids, especially for a concentrated/dilute pair,
 and study simultaneous sedimentation and elutriation rather than
-assuming that their net solid flux is sufficient.
+assuming that their net solid flux is sufficient. The new physical
+source-budget test includes an L1 donor close to the packing limit:
+the downward gas stream must remain positive while both solid
+processes and upward gas transfer are active. This is a source
+regression, **not yet experimental validation** of the closure.
 
 ## 5. Compressible carrier and thermal exchange
 
@@ -127,6 +131,17 @@ source integration, consistency between ideal-gas density and mixture
 conversion, and the physical interpretation of transferred volumes
 at fixed prescribed pressure. Source antisymmetry alone does not
 establish correct compressible-flow thermodynamics.
+
+The new `test_bidirectional_physical_budget` reconstructs the
+expected source rates independently for total mass, each solid
+species, additional gas, both momentum components and sensible
+thermal energy. It compares the assembled source against these rates
+with donor gas densities of 1.5 and 0.8 kg/m3, checks the resulting
+packing and nonnegative inventories and explicitly verifies that the
+two carrier-volume changes reflect different density conversions.
+Both the local-L1 and prescribed lifted parcel fractions and both
+carrier policies are exercised. This does **not** establish a
+thermodynamically closed compressible-gas model.
 
 ## 6. Drag: momentum conservation and mechanical dissipation
 
@@ -180,17 +195,28 @@ conservation over complete timesteps with deposition and entrainment.
 Do not change group ordering without an explicit numerical and
 scientific decision.
 
+The added `test_external_and_interlayer_budget` exercises the
+current group-4 order on a wet two-layer column: L1 basal
+deposition, L2 ambient entrainment and then dynamic bidirectional
+interlayer mass exchange on the updated conservative recipients.
+It verifies, per conservative equation, that the net two-layer
+source equals only the two external rates. Separate checks close
+mobile-plus-deposited solid mass, carrier mass including atmosphere,
+total mobile mass and sensible thermal energy. This is a
+**cell-local source-sequence** test, not yet a spatial/time-refinement
+study or a full production-run budget.
+
 ## 8. Verification matrix and acceptance criteria
 
 | Case | Existing evidence or new targeted coverage | Still required |
 | --- | --- | --- |
 | Prescribed composition, dry/wet pair | Cell-local and paired Lie regressions | Fresh strict/optimized execution on current revision. |
 | Dynamic composition, L1 donor inventory | Cell-local 10%/20% cases and post-spatial donor fixture | Compare physical output with prescribed mode. |
-| Opposite gross solid/carrier flows, unequal densities | `test_interlayer_mass_exchange` now also covers dynamic mode for both carrier policies | Check physical closure validity over representative parameter ranges. |
+| Opposite gross solid/carrier flows, unequal densities | Dynamic and prescribed co-lift, both carrier policies, positive upward/downward gas and solids, reconstructed momentum/thermal/gas-species rates | Execute strict/optimized and check physical parameter sensitivity. |
 | Dynamic, simultaneous settling/elutriation | `test_interlayer_lie_transaction` now includes full two-layer conservative/primitive update | Run both build profiles and a sustained representative scenario. |
 | Source-level mass/species/momentum/thermal antisymmetry | Cell-local tests with distinct donor densities, cp and temperatures | Integrated budget over multiple Lie groups and timesteps. |
 | Chézy momentum and kinetic dissipation | Exact analytic unit test | Retain the accepted no-heating limitation; verify momentum conservation, kinetic-energy decrease and unchanged sensible thermal energy. |
-| L1 deposition + L2 atmosphere + interlayer co-lift | Etna input and example documentation | Integrated layer/bed/atmosphere budget and refinement study. |
+| L1 deposition + L2 atmosphere + interlayer co-lift | Etna input and new cell-local source-sequence conservation regression | Execute strict/optimized, then extend to full solver grid and time-refinement study. |
 
 **Technical exit:** strict/debug and optimized source regressions,
 paired Lie admissibility, finite conserved-source budgets, cold-start
@@ -207,5 +233,7 @@ positivity and does **not** authorize removing
 `IMEX_TWO_LAYER_VALIDATION=1`.
 
 The last verified solver-integration Action currently predates the
-dynamic co-lift change; the new test extensions have not yet been
-compiled or executed. No claim of scientific acceptance is made.
+dynamic co-lift change. The new C2/C3/C5 regression extensions have
+passed only source-level static checks; they have **not** yet been
+compiled or executed in strict or optimized modes. No claim of
+scientific acceptance is made.

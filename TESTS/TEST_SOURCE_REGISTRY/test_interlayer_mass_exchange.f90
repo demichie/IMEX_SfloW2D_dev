@@ -3,9 +3,11 @@ PROGRAM test_interlayer_mass_exchange
     USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : n_stoch_vars,n_pore_vars,gas_flag,sutherland_flag
     USE parameters_2d, ONLY : configure_canonical_state_indices,idx_solidEqn_first
+    USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn,idx_addGasEqn_first
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_mass_exchange
     USE interlayer_mass_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_mass_exchange_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
+    USE interlayer_settling_2d, ONLY : eval_interlayer_settling_explicit
     USE state_types, ONLY : physical_state_real,initialize_physical_state_real
     USE solid_transport_parameters_2d, ONLY : rho_s,sp_heat_s,diam_s,maximum_solid_packing
     USE rheology_parameters_2d, ONLY : rheology_config_type
@@ -200,6 +202,7 @@ PROGRAM test_interlayer_mass_exchange
     CALL test_independent_process_limits()
     CALL test_concentrated_carrier_limit()
     CALL test_physical_sources()
+    CALL test_bidirectional_physical_budget()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
 
@@ -594,6 +597,152 @@ CONTAINS
             END DO
         END BLOCK
     END SUBROUTINE test_physical_sources
+
+    !> @brief Verify full physical source budgets for simultaneous opposed streams.
+    !> @details Independent law and limiter evaluations provide expected phase
+    !>          fluxes. Two different donor gas densities and heat capacities
+    !>          must produce conservative mass, momentum, energy and species
+    !>          rates without requiring carrier-volume conservation.
+    SUBROUTINE test_bidirectional_physical_budget()
+        TYPE(physical_state_real) :: l1,l2
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        TYPE(mass_exchange_config_type) :: mass_l2
+        TYPE(rheology_config_type) :: rheology_l2
+        REAL(wp) :: source1(7),source2(7),expected(7)
+        REAL(wp) :: proposed_down(2),proposed_up(2),accepted_down(2),accepted_up(2)
+        REAL(wp) :: solid1(2),solid2(2),carrier1,carrier2
+        REAL(wp) :: down,up,down_mass,up_mass,dt_local,alpha_lift
+        REAL(wp) :: chi,interface_u,interface_v,carrier1_after,carrier2_after
+        REAL(wp) :: solid1_after(2),solid2_after(2),volume_change
+        LOGICAL :: valid
+        INTEGER :: fraction_mode,carrier_mode,i
+
+        ! The preceding physical tests allocate both shared solid species and
+        ! the one optional gas species. Rebuild fresh cell-local states.
+        n_layers=2
+        n_solid=2
+        n_add_gas=1
+        n_vars=7
+        n_eqns=7
+        CALL configure_canonical_state_indices()
+        CALL initialize_physical_state_real(l1)
+        CALL initialize_physical_state_real(l2)
+        l1%h=0.01_wp
+        l1%alphas=[0.35_wp,0.24_wp]
+        l1%rho_c=1.5_wp
+        l1%rho_m=SUM(rho_s*l1%alphas)+l1%rho_c*(1.0_wp-SUM(l1%alphas))
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        l1%xg=[0.0001_wp]
+        l1%cp_c=900.0_wp
+        l1%T=410.0_wp
+        l1%u=8.0_wp
+        l1%v=0.5_wp
+        l2%h=1.0_wp
+        l2%alphas=[0.11_wp,0.07_wp]
+        l2%rho_c=0.8_wp
+        l2%rho_m=SUM(rho_s*l2%alphas)+l2%rho_c*(1.0_wp-SUM(l2%alphas))
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l2%xg=[0.0002_wp]
+        l2%cp_c=1100.0_wp
+        l2%T=290.0_wp
+        l2%u=-2.0_wp
+        l2%v=-0.25_wp
+        pair%settling_flag=.TRUE.
+        pair%elutriation_flag=.TRUE.
+        pair%rouse_critical=100.0_wp
+        dt_local=0.5_wp
+        solid1=l1%h*l1%alphas
+        solid2=l2%h*l2%alphas
+        carrier1=l1%h*(1.0_wp-SUM(l1%alphas))
+        carrier2=l2%h*(1.0_wp-SUM(l2%alphas))
+        CALL eval_interlayer_settling_explicit(pair,rheology_l2,mass_l2,l2,dt_local,proposed_down)
+        CALL eval_interlayer_elutriation_explicit(pair,mass_l2,l1,l2,dt_local,proposed_up)
+        CALL require(ALL(proposed_down>0.0_wp) .AND. ALL(proposed_up>0.0_wp), &
+            'both physical solid laws propose positive rates')
+
+        DO fraction_mode=1,2
+            IF (fraction_mode==1) THEN
+                alpha_lift=0.15_wp
+                pair%elutriation_solid_volume_fraction=alpha_lift
+            ELSE
+                alpha_lift=SUM(solid1)/(SUM(solid1)+carrier1)
+                pair%elutriation_solid_volume_fraction=-1.0_wp
+            END IF
+            DO carrier_mode=1,2
+                IF (carrier_mode==1) THEN
+                    pair%elutriation_carrier_mode='LIMIT_SOLIDS'
+                ELSE
+                    pair%elutriation_carrier_mode='ALLOW_CONCENTRATED'
+                END IF
+                CALL limit_interlayer_mass_transfer(solid1,solid2,carrier1,carrier2, &
+                    proposed_down,proposed_up,dt_local,maximum_solid_packing,pair, &
+                    accepted_down,accepted_up,down,up,valid, &
+                    rho_carrier_l1=l1%rho_c,rho_carrier_l2=l2%rho_c, &
+                    candidate_rho_l1=l1%rho_c,candidate_rho_l2=l2%rho_c)
+                CALL require(valid,'bidirectional donor budgets accepted')
+                CALL require(ALL(accepted_down>0.0_wp) .AND. ALL(accepted_up>0.0_wp), &
+                    'both accepted solid rates remain positive')
+                CALL require(down>0.0_wp .AND. up>0.0_wp, &
+                    'both gross carrier streams remain positive')
+                IF (carrier_mode==1) CALL close(up, &
+                    (1.0_wp-alpha_lift)/alpha_lift*SUM(accepted_up), &
+                    'strict carrier-to-solid lift ratio')
+
+                CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+                    l1,l2,l1,l2,dt_local,source1,source2,valid)
+                CALL require(valid,'physical bidirectional source accepted')
+                down_mass=l2%rho_c*down
+                up_mass=l1%rho_c*up
+                chi=pair%settling_velocity_weight+ &
+                    (1.0_wp-pair%settling_velocity_weight)* &
+                    pair%settling_plug_thickness/(l2%h+pair%settling_plug_thickness)
+                interface_u=l1%u+chi*(l2%u-l1%u)
+                interface_v=l1%v+chi*(l2%v-l1%v)
+                expected=0.0_wp
+                expected(idx_solidEqn_first:idx_solidEqn_first+1)= &
+                    rho_s*(accepted_down-accepted_up)
+                expected(idx_totMassEqn)=SUM(expected(idx_solidEqn_first:idx_solidEqn_first+1))+ &
+                    down_mass-up_mass
+                expected(idx_uEqn)=SUM(rho_s*accepted_down)*interface_u- &
+                    SUM(rho_s*accepted_up)*l1%u+down_mass*l2%u-up_mass*l1%u
+                expected(idx_vEqn)=SUM(rho_s*accepted_down)*interface_v- &
+                    SUM(rho_s*accepted_up)*l1%v+down_mass*l2%v-up_mass*l1%v
+                expected(idx_engyEqn)=SUM(rho_s*sp_heat_s*accepted_down)*l2%T- &
+                    SUM(rho_s*sp_heat_s*accepted_up)*l1%T+ &
+                    down_mass*l2%cp_c*l2%T-up_mass*l1%cp_c*l1%T
+                expected(idx_addGasEqn_first)=down_mass*l2%xg(1)/(1.0_wp-SUM(l2%xs))- &
+                    up_mass*l1%xg(1)/(1.0_wp-SUM(l1%xs))
+                DO i=1,n_eqns
+                    CALL close(source1(i),expected(i), &
+                        'resolved physical source by conservative component')
+                    CALL close(source1(i)+source2(i),0.0_wp, &
+                        'opposed physical streams preserve pair budget')
+                END DO
+
+                solid1_after=solid1+dt_local*(accepted_down-accepted_up)
+                solid2_after=solid2+dt_local*(accepted_up-accepted_down)
+                carrier1_after=carrier1+dt_local*(down_mass-up_mass)/l1%rho_c
+                carrier2_after=carrier2-dt_local*(down_mass-up_mass)/l2%rho_c
+                CALL require(ALL(solid1_after>=0.0_wp) .AND. ALL(solid2_after>=0.0_wp), &
+                    'solid species remain nonnegative')
+                CALL require(carrier1_after>=0.0_wp .AND. carrier2_after>=0.0_wp, &
+                    'gas inventories remain nonnegative')
+                CALL require(SUM(solid1_after)<=maximum_solid_packing* &
+                    (SUM(solid1_after)+carrier1_after)+1.0E-12_wp, &
+                    'L1 packing after bidirectional source')
+                CALL require(SUM(solid2_after)<=maximum_solid_packing* &
+                    (SUM(solid2_after)+carrier2_after)+1.0E-12_wp, &
+                    'L2 packing after bidirectional source')
+                CALL close(l1%rho_c*(carrier1_after-carrier1)+ &
+                    l2%rho_c*(carrier2_after-carrier2),0.0_wp, &
+                    'two-temperature carrier mass conservation')
+                volume_change=carrier1_after+carrier2_after-carrier1-carrier2
+                CALL close(volume_change,dt_local*(down_mass-up_mass)* &
+                    (1.0_wp/l1%rho_c-1.0_wp/l2%rho_c), &
+                    'unequal carrier densities map mass into different volumes')
+            END DO
+        END DO
+    END SUBROUTINE test_bidirectional_physical_budget
 
     SUBROUTINE execute(expected_valid)
         LOGICAL, INTENT(IN) :: expected_valid

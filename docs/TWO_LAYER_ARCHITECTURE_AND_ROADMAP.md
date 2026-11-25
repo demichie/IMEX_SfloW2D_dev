@@ -445,6 +445,16 @@ termiche. Nessuna modifica alla legge Chézy e' autorizzata.
 Queste verifiche non chiudono TL13b-C; le nuove regressioni richiedono
 build strict/optimized ed esecuzione integrata sulla stessa revisione.
 
+**TL13b-C — regressioni di bilancio (25 novembre 2026):**
+i test fisici sono ampliati con verifica per componente di massa,
+specie solide e gas aggiuntivo, momento e contenuto termico per
+trasferimenti simultanei, elutriazione dinamica/prescritta e densita'
+carrier diverse. Un secondo test riproduce la sequenza deposizione L1,
+entrainment L2 e scambio interlayer e controlla i bilanci combinati
+per massa mobile, massa depositata, carrier ed energia termica.
+Non cambiano leggi, coefficienti, integratore o flag di produzione.
+Build strict/optimized e regressioni end-to-end restano da eseguire.
+
 **Da definire o validare scientificamente:**
 validazione scientifica della modalita' dinamica di
 `elutriation_solid_volume_fraction` e della miscela sollevata,

@@ -3,15 +3,18 @@ PROGRAM test_interlayer_lie_transaction
     USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns,n_stoch_vars,n_pore_vars
     USE parameters_2d, ONLY : gas_flag,sutherland_flag,configure_canonical_state_indices,idx_h,idx_T,idx_u,idx_v
     USE parameters_2d, ONLY : idx_solid_first,idx_solid_last,idx_stoch,idx_pore
+    USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
+    USE parameters_2d, ONLY : idx_solidEqn_first,idx_solidEqn_last
     USE constitutive_parameters_2d, ONLY : sp_heat_a,sp_gas_const_a,sp_heat_g,sp_gas_const_g
     USE constitutive_parameters_2d, ONLY : pres,inv_pres,T_ambient,grav,kin_visc_c,rho_a_amb,vonK
     USE solid_transport_parameters_2d, ONLY : rho_s,inv_rho_s,sp_heat_s,diam_s,maximum_solid_packing
     USE state_types, ONLY : physical_state_real,initialize_physical_state_real
     USE state_physical, ONLY : build_physical_state_from_qp
-    USE state_conversions, ONLY : primitive_to_conservative
+    USE state_conversions, ONLY : primitive_to_conservative,conservative_to_primitive
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
     USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_ENTRAINMENT
     USE parameters_2d, ONLY : mass_exchange_rates_type
     USE interlayer_momentum_exchange_2d, ONLY : apply_interlayer_momentum_exchange_analytic, &
         interlayer_momentum_exchange_config_type
@@ -211,6 +214,8 @@ PROGRAM test_interlayer_lie_transaction
     CALL require(slip_after<=slip_before,'drag relaxes relative velocity after mass transfer')
     CALL check_admissibility(qp)
 
+    CALL test_external_and_interlayer_budget()
+
     ! Optional transported scalars belong to their configured layer even
     ! when the interlayer transaction changes mass and recomputes primitives.
     ! No stochastic/Darcy state is silently transferred with solid or carrier.
@@ -262,6 +267,111 @@ PROGRAM test_interlayer_lie_transaction
     PRINT *, 'PASS paired Lie transaction four wet/dry cases, group-zero snapshot, conservation, atomic rejection'
 
 CONTAINS
+
+    !> @brief Close mass, species, momentum and thermal budgets across Lie group-4 sources.
+    !> @details Reproduces the existing L1 deposition, L2 air entrainment,
+    !>          then dynamic two-way interlayer sequence using independent
+    !>          conservative candidates. Internal transfers must cancel.
+    SUBROUTINE test_external_and_interlayer_budget()
+        TYPE(mass_exchange_config_type) :: basal,atmospheric
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        TYPE(mass_exchange_rates_type) :: bed_rates,air_rates
+        REAL(wp) :: mobile(6,2),primitive(6,2),initial(6,2),after_external(6,2)
+        REAL(wp) :: source_bed(6),source_air(6),snapshot(6,2)
+        REAL(wp) :: bed_mass,bed_solids,air_mass,before_gas,after_gas,external_gas
+        REAL(wp) :: residual,scale
+        LOGICAL :: accepted
+        INTEGER :: component,status
+
+        CALL make_column(1.0_wp,1.0_wp,20.0_wp,2.0_wp,mobile,primitive)
+        initial=mobile
+        snapshot=primitive
+        basal%deposition%settling_flag=.TRUE.
+        atmospheric%entrainment%flag=.TRUE.
+        pair%settling_flag=.TRUE.
+        pair%elutriation_flag=.TRUE.
+        pair%elutriation_solid_volume_fraction=-1.0_wp
+        pair%rouse_critical=100.0_wp
+
+        CALL build_physical_state_from_qp(primitive(:,1),check1,accepted=accepted)
+        CALL require(accepted,'L1 deposition donor state')
+        CALL eval_mass_exchange_explicit(rheology_l2,basal,check1,0,[0.0_wp,0.0_wp],dt, &
+            IBSET(0,SOURCE_ID_EXCHANGE_DEPOSITION-1),bed_rates,source_bed, &
+            transport_stochastic=.FALSE.,pore_enabled=.FALSE.,terrain_exposed=.TRUE., &
+            atmosphere_exposed=.FALSE.,static_deposition_allowed=.TRUE.)
+        CALL require(ANY(bed_rates%solid_deposition_rate>0.0_wp), &
+            'active basal solid deposition before interlayer exchange')
+        mobile(:,1)=mobile(:,1)+dt*source_bed
+        CALL conservative_to_primitive(mobile(:,1),primitive(:,1),accepted=accepted)
+        CALL require(accepted,'L1 after substrate deposition')
+
+        CALL build_physical_state_from_qp(primitive(:,2),check2,accepted=accepted)
+        CALL require(accepted,'L2 entrainment donor state')
+        ! Select a positive-Ri, finite-speed physical fixture to exercise
+        ! atmospheric entrainment without changing the production law.
+        check2%Ri=1.0_wp
+        check2%mod_vel2=4.0_wp
+        CALL eval_mass_exchange_explicit(rheology_l2,atmospheric,check2,0,[0.0_wp,0.0_wp],dt, &
+            IBSET(0,SOURCE_ID_EXCHANGE_ENTRAINMENT-1),air_rates,source_air, &
+            transport_stochastic=.FALSE.,pore_enabled=.FALSE.,terrain_exposed=.FALSE., &
+            atmosphere_exposed=.TRUE.,static_deposition_allowed=.FALSE.)
+        CALL require(source_air(idx_totMassEqn)>0.0_wp,'ambient air adds mass')
+        CALL require(ALL(source_air(idx_solidEqn_first:idx_solidEqn_last)==0.0_wp), &
+            'air entrainment carries no solid species')
+        CALL require(source_air(idx_uEqn)==0.0_wp .AND. source_air(idx_vEqn)==0.0_wp, &
+            'air entrainment carries no horizontal momentum')
+        mobile(:,2)=mobile(:,2)+dt*source_air
+        CALL conservative_to_primitive(mobile(:,2),primitive(:,2),accepted=accepted)
+        CALL require(accepted,'L2 after atmospheric entrainment')
+
+        after_external=mobile
+        CALL apply_interlayer_lie_group(pair,rheology_l2,atmospheric,snapshot,.FALSE., &
+            dt,mobile,primitive,scratch,status)
+        CALL require(status==0,'interlayer source accepts external recipients')
+        CALL require(ANY(mobile(:,1)/=after_external(:,1)), &
+            'both-way interlayer source updates L1')
+        CALL check_conservation(after_external,mobile,'mass exchange after external sources')
+        CALL check_admissibility(primitive)
+
+        ! Each component in the combined mobile layers must change only by
+        ! the independently calculated terrain and atmospheric sources.
+        DO component=1,n_eqns
+            residual=SUM(mobile(component,:))-SUM(initial(component,:))- &
+                dt*(source_bed(component)+source_air(component))
+            scale=MAX(1.0_wp,ABS(SUM(initial(component,:))), &
+                ABS(dt*(source_bed(component)+source_air(component))))
+            CALL require(ABS(residual)<=1.0E-10_wp*scale, &
+                'combined external-only conservative source budget')
+        END DO
+
+        bed_mass=-dt*source_bed(idx_totMassEqn)
+        bed_solids=dt*SUM(rho_s*bed_rates%solid_deposition_rate)
+        air_mass=dt*source_air(idx_totMassEqn)
+        CALL require(bed_mass>0.0_wp .AND. bed_solids>0.0_wp .AND. air_mass>0.0_wp, &
+            'terrain and atmospheric mass sources both active')
+        residual=SUM(initial(idx_solidEqn_first:idx_solidEqn_last,:))- &
+            SUM(mobile(idx_solidEqn_first:idx_solidEqn_last,:))-bed_solids
+        CALL require(ABS(residual)<=1.0E-10_wp*MAX(1.0_wp,bed_solids), &
+            'mobile and deposited substrate solid mass closure')
+        residual=SUM(mobile(idx_totMassEqn,:))-SUM(initial(idx_totMassEqn,:))+ &
+            bed_mass-air_mass
+        CALL require(ABS(residual)<=1.0E-10_wp*MAX(1.0_wp,bed_mass,air_mass), &
+            'total mass balance with terrain and atmosphere')
+
+        before_gas=SUM(initial(idx_totMassEqn,:))- &
+            SUM(initial(idx_solidEqn_first:idx_solidEqn_last,:))
+        after_gas=SUM(mobile(idx_totMassEqn,:))- &
+            SUM(mobile(idx_solidEqn_first:idx_solidEqn_last,:))
+        external_gas=dt*(source_bed(idx_totMassEqn)- &
+            SUM(source_bed(idx_solidEqn_first:idx_solidEqn_last))+source_air(idx_totMassEqn))
+        CALL require(ABS(after_gas-before_gas-external_gas)<= &
+            1.0E-10_wp*MAX(1.0_wp,ABS(external_gas)), &
+            'carrier mass changes only through external sources')
+        CALL require(ABS(SUM(mobile(idx_engyEqn,:))-SUM(initial(idx_engyEqn,:))- &
+            dt*(source_bed(idx_engyEqn)+source_air(idx_engyEqn)))<= &
+            1.0E-10_wp*MAX(1.0_wp,ABS(SUM(initial(idx_engyEqn,:)))), &
+            'sensible thermal budget closes after source sequence')
+    END SUBROUTINE test_external_and_interlayer_budget
 
     !> @brief Build consistent conservative and primitive layer states for a column.
     SUBROUTINE make_column(h1,h2,u1,u2,conservative,primitive)
