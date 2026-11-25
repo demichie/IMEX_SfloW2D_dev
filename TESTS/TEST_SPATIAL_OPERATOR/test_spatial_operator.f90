@@ -1064,6 +1064,9 @@ CONTAINS
         coupled_state%deposit=0.0_wp
         coupled_state%deposit_tot=0.0_wp
         paired%solve_mask=initial_solve_mask
+        ! A new independent initial state has replaced the preceding test
+        ! scenario. Rebuild from both layers, not from its committed wetness.
+        paired%committed_mask_ready=.FALSE.
         initial_mass=SUM(coupled_state%q(idx_totMassEqn,:,:,:))
         initial_solid=SUM(coupled_state%q(idx_solidEqn_first,:,:,:))
         previous_deposition=0.0_wp
