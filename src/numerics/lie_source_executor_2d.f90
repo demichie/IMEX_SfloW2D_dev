@@ -1012,6 +1012,10 @@ CONTAINS
                 failure_reason='TL07: paired interlayer physical transfer rejected'
             CASE(20)
                 failure_reason='TL07: paired interlayer conservative state inadmissible'
+                j=domain%j_cent(first_failure)
+                k=domain%k_cent(first_failure)
+                WRITE(error_unit,'(A,2(I0,1X),A,ES24.16,A,ES24.16)') &
+                    'TL07_INTERLAYER_FIRST_FAILURE cell=',j,k,' t=',source_time,' dt=',time_step
             CASE(21)
                 failure_reason='TL07: paired interlayer primitive conversion failed'
             CASE(2)
