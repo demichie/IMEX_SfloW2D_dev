@@ -61,6 +61,10 @@ CONTAINS
     END SUBROUTINE eval_rheology_newmodel_implicit
 
     !> REAL implicit rate sharing the exact Newton law.
+    !> @brief eval rheology newmodel implicit real operation.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_newmodel_implicit_real(state,rate_x,rate_y)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate_x,rate_y

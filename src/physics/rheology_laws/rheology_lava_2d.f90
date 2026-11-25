@@ -35,6 +35,10 @@ MODULE rheology_lava_2d
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> @brief eval rheology lava explicit operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_rheology_lava_explicit(config, state, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -49,6 +53,11 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_explicit
 
 
+    !> @brief eval rheology lava semi implicit operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_lava_semi_implicit(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -64,6 +73,11 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_semi_implicit
 
 
+    !> @brief eval rheology lava implicit operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_lava_implicit(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_complex), INTENT(IN) :: state
@@ -75,6 +89,11 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
+    !> @brief eval rheology lava implicit real operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_lava_implicit_real(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -86,6 +105,12 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit_real
 
 
+    !> @brief eval rheology lava analytic operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] dt dt argument for eval_rheology_lava_analytic.
+    !> @param[in] state Local physical state.
+    !> @param[in] speed_ratio speed ratio argument for eval_rheology_lava_analytic.
+    !> @param[out] velocity_after velocity after argument for eval_rheology_lava_analytic.
     SUBROUTINE eval_rheology_lava_analytic(config, dt, state, speed_ratio, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -119,6 +144,8 @@ CONTAINS
 
     !> \brief Kinematic viscosity shared by lava rheology and deposition.
     !> \return Kinematic viscosity [m2/s].
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] t Local temperature or simulation time.
     PURE REAL(wp) FUNCTION lava_kinematic_viscosity(config,T) RESULT(nu)
 
         TYPE(rheology_config_type), INTENT(IN) :: config

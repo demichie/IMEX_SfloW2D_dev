@@ -25,6 +25,11 @@ CONTAINS
     !> Thermal-only Newton groups use the same cooling formula without a
     !> heavyweight physical state. Full-state interfaces remain supported.
     !> @param[in] thermal Immutable layer thermal configuration.
+    !> @brief eval thermal implicit temperature real operation.
+    !> @param[in] model_id Selected thermal source model.
+    !> @param[in] t Local temperature or simulation time.
+    !> @param[in] ambient Ambient temperature.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_thermal_implicit_temperature_real(model_id,T,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         REAL(wp), INTENT(IN) :: T,ambient
@@ -41,6 +46,10 @@ CONTAINS
 
     !> @brief Evaluate COMPLEX thermal-only Newton rate without building a full state.
     !> @param[in] thermal Immutable layer thermal configuration.
+    !> @param[in] model_id Selected thermal source model.
+    !> @param[in] t Local temperature or simulation time.
+    !> @param[in] ambient Ambient temperature.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_thermal_implicit_temperature_complex(model_id,T,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         COMPLEX(wp), INTENT(IN) :: T
@@ -151,6 +160,10 @@ CONTAINS
     !> REAL implicit source for Newton residual evaluation.
     !> @brief Dispatch REAL implicit thermal rates for Newton residuals.
     !> @param[in] thermal Immutable layer thermal configuration.
+    !> @param[in] model_id Selected thermal source model.
+    !> @param[in] state Local physical state.
+    !> @param[in] ambient Ambient temperature.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_thermal_implicit_real(model_id,state,thermal,ambient,rate)
         INTEGER, INTENT(IN) :: model_id
         TYPE(physical_state_real), INTENT(IN) :: state

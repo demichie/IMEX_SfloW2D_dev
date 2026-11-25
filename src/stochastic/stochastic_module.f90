@@ -283,6 +283,9 @@ CONTAINS
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] dt Time increment [s].
 
+    !> @param[in] trial_q Trial conservative state.
+    !> @param[in] trial_qp Trial primitive state.
+    !> @param[in] domain Computational domain.
     SUBROUTINE update_stochastic_variable(this, state, dt, trial_q, trial_qp, domain)
         ! OU evolution is a fractional step distinct from conservative transport.
     IMPLICIT NONE
@@ -365,6 +368,9 @@ CONTAINS
     !> \param[in] dt Time increment [s].
     !> \param[in] transport_enabled Selected layer stochastic transport activation.
 
+    !> @param[in,out] trial_q Trial conservative state.
+    !> @param[in,out] trial_qp Trial primitive state.
+    !> @param[in] domain Computational domain.
     SUBROUTINE prepare_stochastic_timestep(this,state,dt,transport_enabled,trial_q,trial_qp,domain)
         ! In the production Lie path, evolve OU after the spatial transport,
         ! using post-spatial candidates without publishing the fluid state.

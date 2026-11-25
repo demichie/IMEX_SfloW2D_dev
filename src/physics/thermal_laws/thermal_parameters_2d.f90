@@ -25,12 +25,16 @@ MODULE thermal_parameters_2d
     TYPE(thermal_config_type), TARGET :: thermal_l2
 CONTAINS
     !> \brief Reproduce the radiative coefficient without a cached global copy.
+    !> @param[in] config Model parameter configuration.
+    !> @return Evaluated physical coefficient.
     PURE REAL(wp) FUNCTION thermal_radiative_coefficient(config) RESULT(coefficient)
         TYPE(thermal_config_type), INTENT(IN) :: config
         coefficient=SBconst*config%emissivity*config%exp_area_fract
     END FUNCTION thermal_radiative_coefficient
 
     !> \brief Reproduce the convective coefficient without a cached global copy.
+    !> @param[in] config Model parameter configuration.
+    !> @return Evaluated physical coefficient.
     PURE REAL(wp) FUNCTION thermal_convective_coefficient(config) RESULT(coefficient)
         TYPE(thermal_config_type), INTENT(IN) :: config
         coefficient=config%atm_heat_transf_coeff*config%exp_area_fract

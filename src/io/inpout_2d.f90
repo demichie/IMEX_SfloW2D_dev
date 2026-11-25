@@ -8021,6 +8021,8 @@
     END SUBROUTINE init_netcdf_output
 
     !> @brief Check one existing dimension before appending new time records.
+    !> @param[in] dimid NetCDF dimension identifier.
+    !> @param[in] expected Expected dimension size.
     SUBROUTINE verify_netcdf_dimension(dimid,expected)
         USE netcdf
         INTEGER, INTENT(IN) :: dimid,expected
@@ -8030,6 +8032,10 @@
     END SUBROUTINE verify_netcdf_dimension
 
     !> @brief Define a shared, layer-independent grid field.
+    !> @param[in] name Output variable name.
+    !> @param[in] description Variable description.
+    !> @param[in] unit_name Variable physical unit.
+    !> @param[out] varid NetCDF variable identifier.
     SUBROUTINE define_shared_output(name,description,unit_name,varid)
         USE netcdf
         CHARACTER(*), INTENT(IN) :: name,description,unit_name
@@ -8214,6 +8220,8 @@
     !> @brief Write a physical cell field with duplicated visualization rows/columns
     !>        when a computational dimension contains only one cell.
     !> @details The authoritative state arrays retain their original dimensions.
+    !> @param[in] varid NetCDF variable identifier.
+    !> @param[in] values Field values to output.
     SUBROUTINE write_netcdf_visual_field(varid,values)
         USE netcdf
         USE geometry_2d, ONLY : comp_cells_x,comp_cells_y

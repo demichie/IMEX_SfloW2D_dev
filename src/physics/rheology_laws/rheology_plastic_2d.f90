@@ -34,8 +34,6 @@ CONTAINS
     !> using
     !> the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y
     !> momentum source rates.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] moving True for a moving local state.
     !> \param[out] rate Two-component conservative momentum source.
     !> \param[in] config Read-only rheology configuration for the evaluated layer.
     SUBROUTINE eval_rheology_plastic_explicit(config, state, rate)
@@ -73,8 +71,6 @@ CONTAINS
     !> \brief Evaluate the implicit plastic contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation
     !> supplies a zero source when the model has no term in this treatment.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] moving True for a moving local state.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
     !> \param[in] config Read-only rheology configuration for the evaluated layer.
@@ -88,6 +84,10 @@ CONTAINS
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
     !> \param[in] config Read-only rheology configuration for the evaluated layer.
+    !> @brief eval rheology plastic implicit real operation.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_plastic_implicit_real(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state

@@ -45,14 +45,12 @@ CONTAINS
     !> resistance
     !> law, using the treatment-specific velocity and effective-stress inputs. Outputs are
     !> conservative x/y momentum source rates.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
-    !> \param[in] moving True for a moving local state.
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_voellmy_explicit(config, state, grav_coeff, use_pore_pressure, use_stochastic,            &
             stochastic_value, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -73,11 +71,11 @@ CONTAINS
     !> \details Return the contribution assigned to the semi-implicit treatment. This
     !> implementation
     !> supplies a zero source when the model has no term in this treatment.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_voellmy_semi_implicit(config, state, grav_coeff, use_pore_pressure, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -114,13 +112,11 @@ CONTAINS
     !> \brief Evaluate the implicit voellmy contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation
     !> supplies a zero source when the model has no term in this treatment.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
-    !> \param[in] moving True for a moving local state.
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_voellmy_implicit(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         LOGICAL, INTENT(IN) :: use_stochastic_xi
@@ -135,6 +131,13 @@ CONTAINS
     END SUBROUTINE eval_rheology_voellmy_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
+    !> @brief eval rheology voellmy implicit real operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[in] use_stochastic_xi Enable stochastic friction coefficient.
+    !> @param[in] stochastic_value Local stochastic field value.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_voellmy_implicit_real(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -162,6 +165,7 @@ CONTAINS
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_voellmy_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,      &
             use_pore_pressure, use_stochastic_xi, stochastic_xi_value, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config

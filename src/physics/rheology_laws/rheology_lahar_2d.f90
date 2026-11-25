@@ -59,10 +59,8 @@ CONTAINS
     !> \details Assemble the real-valued momentum source from the model's supported physical
     !> treatment contributions; unused model inputs are retained for the shared dispatch
     !> interface.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate Conservative horizontal momentum source vector.
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_lahar_explicit(config, state, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -82,10 +80,9 @@ CONTAINS
     !> resistance and a concentration-dependent yield stress assigned to this treatment. The
     !> returned rates act on the conservative horizontal momenta; zero-valued implementations
     !> intentionally provide no contribution.
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_lahar_semi_implicit(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -126,11 +123,9 @@ CONTAINS
     !> arguments retain complex-step sensitivities where implemented; zero-valued
     !> implementations
     !> intentionally contribute no term.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_lahar_implicit(config, state,rate_x,rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_complex), INTENT(IN) :: state
@@ -142,6 +137,11 @@ CONTAINS
     END SUBROUTINE eval_rheology_lahar_implicit
 
     !> Evaluate the shared implicit-law formula in REAL for explicit assembly.
+    !> @brief eval rheology lahar implicit real operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_lahar_implicit_real(config, state,rate_x,rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -164,6 +164,7 @@ CONTAINS
     !> s^-1].
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
+    !> @param[in] config Model parameter configuration.
     SUBROUTINE eval_rheology_lahar_analytic(config, dt, state, speed_ratio, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
