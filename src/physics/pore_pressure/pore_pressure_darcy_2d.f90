@@ -1,3 +1,4 @@
+!> @brief Darcy pore-pressure source evaluation.
 !> Darcy pore-pressure diffusion and optional interstitial carrier-gas loss.
 !> The analytic operator integrates the frozen-state coupled mass-pressure system
 !> and returns a complete conservative average rate.
