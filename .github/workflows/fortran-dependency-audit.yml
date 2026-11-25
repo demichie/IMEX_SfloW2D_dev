@@ -13,6 +13,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Compile Python audit scripts to catch syntax errors
+        run: |
+          python3 -m py_compile \
+            .github/scripts/check_fortran_dependencies.py \
+            tools/docs/check_fortran_style.py \
+            TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py
       - name: Verify source dependencies and module boundaries
         run: python3 .github/scripts/check_fortran_dependencies.py
       - name: Verify mandatory Fortran formatting and Doxygen contracts

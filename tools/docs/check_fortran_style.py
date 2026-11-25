@@ -119,7 +119,8 @@ def main():
     parser.add_argument("--line-width-report", action="store_true",
                         help="report Fortran and Doxygen line-width exceptions")
     parser.add_argument("--module-scope-report", action="store_true",
-                        help="report exact module-level USE and procedure-boundary indentation")\n    parser.add_argument("--structural-report", action="store_true",
+                        help="report exact module-level USE and procedure-boundary indentation")
+    parser.add_argument("--structural-report", action="store_true",
                         help="print conservative block-nesting warnings (non-failing)")
     args = parser.parse_args()
     errors = []
