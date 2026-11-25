@@ -34,6 +34,7 @@ jobs:
             TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py \
             TESTS/ACCEPTANCE/test_d17_physical_interfaces.py \
             TESTS/ACCEPTANCE/test_d17_state_finalization.py \
+            TESTS/ACCEPTANCE/test_plan_inventory.py \
             TESTS/ACCEPTANCE/test_state_index_contract.py \
             TESTS/TEST_STATE/check_legacy_boundary.py \
             tools/d17/check_canonical_indices.py
@@ -43,5 +44,6 @@ jobs:
           run_check python3 TESTS/ACCEPTANCE/test_state_index_contract.py
           run_check python3 tools/d17/check_canonical_indices.py
           run_check python3 TESTS/ACCEPTANCE/test_d17_state_finalization.py
+          run_check python3 TESTS/ACCEPTANCE/test_plan_inventory.py
           run_check python3 TESTS/TEST_STATE/check_legacy_boundary.py
           exit "$failed"

@@ -1,5 +1,17 @@
 # N7 equilibrium and one dimensional regression tests
 
+> **Current status (25 November 2026):** This package documents a historical
+> N7 observer tied to the removed IMEX-stage interfaces. Its obsolete shell
+> driver was removed rather than silently replacing the original numerical
+> oracle with a weaker test. The contracts and archived results remain
+> available for scientific reference. Current production regressions use
+> `TEST_SPATIAL_OPERATOR`, `TEST_PCCU`, `TEST_STATE_CONVERSION` and the
+> other runnable suites in `TESTS/ACCEPTANCE/acceptance_plan.json`.
+> **Those tests do not automatically reproduce this package's original
+> numerical coverage.** The affected N7 criteria remain pending current-code
+> revalidation.
+
+
 This package implements the bounded N7-A inventory: finite-time smooth
 transport, a wet/dry Ritter dam break, fully wet parabolic lakes, inclined
 one-cell excavation and the complete 1D/2D lake flag matrix. It uses the

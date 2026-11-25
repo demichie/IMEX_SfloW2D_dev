@@ -28,14 +28,12 @@ from the active workflow catalogue. Their relevant contemporary
 coverage is either handled above or intentionally omitted because
 it depended on retired implementation paths.
 
-The standalone test source files under `TESTS/`, the historical
-scientific reports under `docs/`, and prior GitHub Actions run history
-are **not** deleted by this cleanup. Some historic comparison scripts
-may still exist but are no longer scheduled by the active workflows.
-
-Use `TESTS/TEST_STATE_EQUIVALENCE` only as historical material: its
-runner references the removed `state_conversion_2d.f90` backend and
-must not be added back to active CI without redesign.
+Unreferenced D17 programs, the obsolete state-equivalence executable and
+shell drivers requiring the removed IMEX-stage observer have been removed.
+Historical N7 contracts, checkers, reports and completed evidence are retained
+for inspection; they are not counted as executable coverage of the current
+source tree. The active acceptance inventory is validated by
+`TESTS/ACCEPTANCE/test_plan_inventory.py`.
 
 Workflows have deliberately narrow permissions: publication workflows
 receive the write permissions necessary for their destinations;

@@ -1,51 +1,374 @@
 {
   "schema_version": 1,
   "closure_plan": "n7_n8_closure_plan.json",
-  "scope": "N7/N8/N9 evidence audit, not automatic scientific sign-off",
+  "scope": "Current runnable N7/N8/N9 test inventory; historical N7 raw-stage evidence requires separate revalidation and is not automatic scientific sign-off",
   "profiles": {
     "strict_debug": "-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow",
     "historical_optimized": "-Ofast -funroll-all-loops"
   },
   "unit_tests": [
-    "TEST_STATE_CONVERSION", "TEST_TOPOGRAPHY_FACES", "TEST_HP_RECONSTRUCTION",
-    "TEST_PCCU", "TEST_HYDROSTATIC_PATH", "TEST_CURVATURE_SOURCE",
-    "TEST_NONCONSERVATIVE_PATH", "TEST_STOCHASTIC_RANDOM", "TEST_STOCHASTIC_EVOLUTION",
-    "TEST_RHEOLOGY_FROUDE", "TEST_MASS_EXCHANGE", "TEST_SPATIAL_OPERATOR", "TEST_IMEX_STAGES", "TEST_N7_EQUILIBRIUM",
-    "TEST_HYDROSTATIC_ROUNDOFF",
-    "TEST_GEOMETRY_1D", "TEST_N7_COMPOSITION", "TEST_N7_GEOMETRY_DYNAMIC",
-    "TEST_MODEL_LAYOUT", "TEST_EQUATION_METADATA", "TEST_STATE_INITIALIZATION",
-    "TEST_WORKSPACE_LIFECYCLE", "TEST_DIAGNOSTICS", "TEST_LAPACK_INTERFACES",
-    "TEST_SOURCE_DOCUMENTATION"
+    "TEST_STATE_CONVERSION",
+    "TEST_TOPOGRAPHY_FACES",
+    "TEST_HP_RECONSTRUCTION",
+    "TEST_PCCU",
+    "TEST_HYDROSTATIC_PATH",
+    "TEST_CURVATURE_SOURCE",
+    "TEST_NONCONSERVATIVE_PATH",
+    "TEST_STOCHASTIC_RANDOM",
+    "TEST_STOCHASTIC_EVOLUTION",
+    "TEST_RHEOLOGY_FROUDE",
+    "TEST_MASS_EXCHANGE",
+    "TEST_SPATIAL_OPERATOR",
+    "TEST_GEOMETRY_1D",
+    "TEST_MODEL_LAYOUT",
+    "TEST_STATE_INITIALIZATION",
+    "TEST_WORKSPACE_LIFECYCLE",
+    "TEST_DIAGNOSTICS",
+    "TEST_LAPACK_INTERFACES",
+    "TEST_SOURCE_DOCUMENTATION",
+    "TEST_STATE",
+    "TEST_SOURCE_REGISTRY",
+    "TEST_LAYER_PHYSICS",
+    "TEST_RHEOLOGY_CELL_LOCAL"
   ],
   "solver_tests": [
-    {"name": "TEST_PCCU_LAKE_AT_REST", "threads": "embedded"},
-    {"name": "TEST_PCCU_INCLINED_EXCAVATION", "threads": "embedded"},
-    {"name": "TEST_PCCU_GATE_H", "threads": [1, 4]},
-    {"name": "TEST_CFL_POLICY", "threads": [1, 4]},
-    {"name": "TEST_BINARY_RESTART", "threads": [1, 4]},
-    {"name": "TEST_STOCHASTIC_RESTART", "threads": [1, 4]}
+    {
+      "name": "TEST_PCCU_LAKE_AT_REST",
+      "threads": "embedded"
+    },
+    {
+      "name": "TEST_PCCU_INCLINED_EXCAVATION",
+      "threads": "embedded"
+    },
+    {
+      "name": "TEST_PCCU_GATE_H",
+      "threads": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "TEST_CFL_POLICY",
+      "threads": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "TEST_BINARY_RESTART",
+      "threads": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "TEST_STOCHASTIC_RESTART",
+      "threads": [
+        1,
+        4
+      ]
+    }
   ],
   "criteria": [
-    {"id":"N7-01","requirement":"Fixed-bed lake at rest with slope/curvature combinations","tests":["TEST_SPATIAL_OPERATOR","TEST_PCCU_LAKE_AT_REST","TEST_HYDROSTATIC_PATH","TEST_CURVATURE_SOURCE","TEST_N7_EQUILIBRIUM"],"coverage":"test_defined","gap":"Satisfied in the named liquid fixtures: smooth, continuous one-cell and fully wet parabolic lakes in 1D/2D, all slope/curvature pairs and supported stage counts. Arbitrary boundaries and variable composition are not silently claimed.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-02","requirement":"No uphill leakage and refinement behavior","tests":["TEST_PCCU_INCLINED_EXCAVATION","TEST_PCCU_GATE_H","TEST_N7_EQUILIBRIUM"],"coverage":"test_defined","gap":"Satisfied: all Gate-H refinements retain original aggregate and zero-uphill limits and pass full h/eta fields at common IMEX times and approved historical SSPRK2 limits.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-03","requirement":"Reconstruction positivity, compatible mean momentum and velocity bounds","tests":["TEST_SPATIAL_OPERATOR","TEST_HP_RECONSTRUCTION","TEST_HYDROSTATIC_ROUNDOFF","TEST_N7_COMPOSITION","TEST_N7_GEOMETRY_DYNAMIC"],"coverage":"test_defined","gap":"Satisfied in the defined fixtures: stationary/moving-contact admissibility plus 138 finite-time geometry cases, raw stage/face positivity and compatible normal/tangential closure pass.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-04","requirement":"Smooth, rough and seeded random continuous Q1 beds in 1D and 2D","tests":["TEST_SPATIAL_OPERATOR","TEST_TOPOGRAPHY_FACES","TEST_PCCU_LAKE_AT_REST","TEST_N7_EQUILIBRIUM","TEST_N7_GEOMETRY_DYNAMIC"],"coverage":"test_defined","gap":"Satisfied: rough/inclined 2D fronts, oblique/axial ramps, quarter-turn covariance and circular refinement pass finite-time independent fields for N_RK=2,3,4.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-05","requirement":"Variable-composition transport and signed component conservation","tests":["TEST_STATE_CONVERSION","TEST_HYDROSTATIC_ROUNDOFF","TEST_N7_COMPOSITION"],"coverage":"test_defined","gap":"Satisfied in the defined 90-equilibrium/72-contact matrix per profile: independent conservative/thermal fields, analytic refinement, both signed directions/axes and every raw-stage component/carrier budget pass; original numerical limits are unchanged.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-06","requirement":"Production semidiscrete residual, CFL and time integration against clean reference","tests":["TEST_IMEX_STAGES","TEST_SPATIAL_OPERATOR","TEST_PCCU","TEST_HYDROSTATIC_PATH","TEST_PCCU_GATE_H","TEST_N7_EQUILIBRIUM","TEST_N7_GEOMETRY_DYNAMIC","TEST_CFL_POLICY"],"coverage":"test_defined","gap":"Satisfied in the authorized contract: retained default fields/checkpoints and proposed/accepted times are bitwise unchanged; combined matches the clean spatial bound, x/y/point grids and all stage/policy/sentinel/event/growth tests pass with actual 1/4 teams in both profiles. Universal autonomous roundoff equality and N9 scientific approval are not claimed.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-07","requirement":"Mass conservation and symmetry","tests":["TEST_PCCU_GATE_H","TEST_SPATIAL_OPERATOR","TEST_IMEX_STAGES","TEST_HYDROSTATIC_ROUNDOFF","TEST_N7_COMPOSITION","TEST_N7_GEOMETRY_DYNAMIC"],"coverage":"test_defined","gap":"Satisfied in the defined fixtures: raw/final mass budgets, quarter-turn covariance, approved evolution-induced fourth-harmonic refinement and retained absolute bound pass. General inlet budgets remain in N9.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-08","requirement":"Real one/four-thread equivalence","tests":["TEST_SPATIAL_OPERATOR","TEST_PCCU_LAKE_AT_REST","TEST_PCCU_INCLINED_EXCAVATION","TEST_PCCU_GATE_H","TEST_BINARY_RESTART","TEST_STOCHASTIC_RESTART","TEST_IMEX_STAGES","TEST_MASS_EXCHANGE","TEST_N7_EQUILIBRIUM","TEST_N7_GEOMETRY_DYNAMIC"],"coverage":"test_defined","gap":"Satisfied: all original-duration restart and full Gate-H thread pairs plus every dynamic trajectory and stage-face payload are bitwise equal across actual one/four-thread teams.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N7-09","requirement":"Exact deterministic and stochastic continuation","tests":["TEST_BINARY_RESTART","TEST_STOCHASTIC_RESTART","TEST_RHEOLOGY_FROUDE"],"coverage":"test_defined","gap":"Satisfied: original-duration deterministic and stochastic restart trajectories pass in both profiles and with actual one/four-thread teams. Do not replace these regressions with shortened runs.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N8-01","requirement":"Solid availability, substrate inventory and source-mask limits before nodal averaging","tests":["TEST_MASS_EXCHANGE","TEST_STATE_CONVERSION","TEST_BINARY_RESTART"],"coverage":"test_defined","gap":"Satisfied: flat single/four-vertex identity, solid/liquid and gas-carrier caps, exhausted reserves, signed gas inflow, conservative/thermal/pore-pressure transactions, cutoff and full/partial source masks pass. Exhaustive rheology/vaporization/entrainment characterization is outside this closure.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N8-02","requirement":"Mass-lumped global bed-volume identity including dry cells and boundaries","tests":["TEST_MASS_EXCHANGE","TEST_TOPOGRAPHY_FACES"],"coverage":"test_defined","gap":"Satisfied: production uniform-grid volume balance passes across all refinements and seeded updates, including dry contributors/boundaries. User accepts the separately verified unequal-area algebra test; nonuniform production meshes remain unsupported.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N8-03","requirement":"Exact B_vertex restart with bed evolution","tests":["TEST_MASS_EXCHANGE","TEST_BINARY_RESTART"],"coverage":"test_defined","gap":"Satisfied: exact B_vertex/inventory reload, poisoned-cache refresh, nonzero resumed exchange and full evolving-bed continuation pass. Additional physical-model characterization is not a new restart prerequisite.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N8-04","requirement":"Authoritative nodal bed and refreshed geometry after bed modifications","tests":["TEST_MASS_EXCHANGE","TEST_TOPOGRAPHY_FACES","TEST_BINARY_RESTART"],"coverage":"test_defined","gap":"Satisfied: independent Q1/LS/Hessian/G checks pass after every seeded 1D/2D update, including retained-state production transactions and all intermediate actual 1/4-thread payloads. The bounded 1D accumulation correction preserves coefficients and OpenMP.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N8-05","requirement":"Wet/dry local geometric mismatch is diagnosed","tests":["TEST_MASS_EXCHANGE","TEST_TOPOGRAPHY_FACES"],"coverage":"test_defined","gap":"Satisfied: three smooth/wet-dry refinements in both dimensions show decreasing area-L1 mismatch and front localization without dry flow injection. Signed/L1/Linf and rough-stress volume/finite-geometry assertions pass; rough rates have no convergence requirement.","closure_status":"satisfied","remaining_actions":[]},
-    {"id":"N9-01","requirement":"HP-PCCU is the sole production backend with canonical state/thermal conventions","tests":["TEST_STATE_CONVERSION","TEST_PCCU","TEST_PCCU_GATE_H"],"coverage":"approved_for_recorded_canonical_scope","gap":"State-conversion, thermal/component identities, Gate-H, and the closed N7/N8 numerical contracts have direct evidence. The scientific owner approved the canonical production scope represented by this acceptance plan and the pinned ETNA/ETNA_LAVA evidence; no broader universal model claim is made."},
-    {"id":"N9-02","requirement":"Pinned source, tools, compiler flags, inputs, outputs and reference checksums","tests":[],"coverage":"approved_checksum_based_retention","gap":"The historical N9 artifact pins toolchain, profiles, fixtures, source/reference hashes and pre-change outputs. The v5 matrix is versioned in docs/acceptance/results_n9_restart_v5_2026_10_11.json with source, executable, input, output and runner hashes; all 32 pinned production-source hashes and the runner hash match the repository. The scientific owner approved checksum/metadata retention; preserving bulky raw run payloads is not required."},
-    {"id":"N9-03","requirement":"Clean strict/debug and optimized validation","tests":["TEST_STOCHASTIC_RESTART","TEST_BINARY_RESTART","TEST_PCCU_GATE_H"],"coverage":"audit_artifact","gap":"The existing N7/N8 acceptance artifacts record full strict/debug and optimized builds and tests. The v5 ETNA/ETNA_LAVA matrix passes all 8 build/case/thread combinations using the retained clean profile executables; the official stochastic restart regression also passes v5 in both profiles and actual 1/4-thread teams. The v5 long-run matrix reuses those builds rather than rebuilding them. M12c build automation and portability are a separate roadmap milestone; no missing rerun of the entire historical matrix is implied by this criterion."},
-    {"id":"N9-04","requirement":"Explicit tolerances and comparator policy","tests":["TEST_PCCU_GATE_H","TEST_PCCU_LAKE_AT_REST"],"coverage":"approved_for_recorded_comparators_and_budget_scope","gap":"The scientific owner approved the recorded comparator and budget scope: same-build restart and 1/4-thread comparisons require exact equality; existing field/identity limits remain unchanged; ETNA is evaluated over its full 0–200 s run; the ETNA_LAVA mass budget is evaluated only through the last saved output before boundary contact (3180 s). The exact first-contact time is unknown because outputs are spaced by 60 s. No new threshold is inferred from the observed residuals and no solver tolerance was changed."},
-    {"id":"N9-05","requirement":"Long EXAMPLE_ETNA/EXAMPLE_ETNA_LAVA acceptance and regression ownership","tests":["TEST_BINARY_RESTART","TEST_STOCHASTIC_RESTART"],"coverage":"approved_for_recorded_scope","gap":"The v5 matrix passes 8/8 full/split comparisons for full-duration ETNA (200 s) and ETNA_LAVA (3600 s), in optimized and strict/debug profiles with actual 1/4-thread teams. Native fields, canonical checkpoint records, runout/mass-centre CSV histories and ESRI outputs match the corresponding uninterrupted and pre-change baselines; all four within-profile thread pairs pass. ETNA preprocessing rasters match the retained user data. The owner-approved lava mass budget ends at 3180 s, before the first saved output with boundary flow; full-field and restart checks still extend through 3600 s. Machine-readable evidence: docs/acceptance/results_n9_restart_v5_2026_10_11.json."},
-    {"id":"N9-06","requirement":"Scientific baseline sign-off","tests":[],"coverage":"approved","gap":"The scientific owner explicitly approved the canonical scope, recorded comparator and budget policy, and checksum-based evidence-retention policy for commit 3f7329c85d2e30e33cf68348721329f7726b01c1. The dated approval and its limits are recorded in docs/acceptance/results_n9_restart_v5_2026_10_11.json and docs/acceptance/N9_RESTART_V5_2026_10_11.md. This approval applies to the pinned scope and revision only."},
-    {"id":"N9-07","requirement":"Examples, source inputs, versioned restart and scientific output metadata match canonical semantics","tests":["TEST_STATE_CONVERSION","TEST_TOPOGRAPHY_FACES","TEST_BINARY_RESTART","TEST_STOCHASTIC_RESTART"],"coverage":"approved_for_v5_restart_scope","gap":"The v5 checkpoint restores runout origin/initial offsets, prior barycentre and steady-stop state; CSV continuation, missing/incompatible histories, v4 rejection, evolving-topography restart and official stochastic restart are directly tested. The stochastic regression passed with actual 1/4-thread teams after being corrected to disable serial mode and verify the effective team size. All 8 ETNA/ETNA_LAVA checkpoint/field/CSV/ESRI continuation comparisons pass. The existing native schema, thermal/component identities and dry-output convention are retained. The scientific owner approved the canonical output scope recorded in N9-06."}
+    {
+      "id": "N7-01",
+      "requirement": "Fixed-bed lake at rest with slope/curvature combinations",
+      "tests": [
+        "TEST_SPATIAL_OPERATOR",
+        "TEST_PCCU_LAKE_AT_REST",
+        "TEST_HYDROSTATIC_PATH",
+        "TEST_CURVATURE_SOURCE"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied in the named liquid fixtures: smooth, continuous one-cell and fully wet parabolic lakes in 1D/2D, all slope/curvature pairs and supported stage counts. Arbitrary boundaries and variable composition are not silently claimed. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_N7_EQUILIBRIUM"
+      ]
+    },
+    {
+      "id": "N7-02",
+      "requirement": "No uphill leakage and refinement behavior",
+      "tests": [
+        "TEST_PCCU_INCLINED_EXCAVATION",
+        "TEST_PCCU_GATE_H"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied: all Gate-H refinements retain original aggregate and zero-uphill limits and pass full h/eta fields at common IMEX times and approved historical SSPRK2 limits. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_N7_EQUILIBRIUM"
+      ]
+    },
+    {
+      "id": "N7-03",
+      "requirement": "Reconstruction positivity, compatible mean momentum and velocity bounds",
+      "tests": [
+        "TEST_SPATIAL_OPERATOR",
+        "TEST_HP_RECONSTRUCTION"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied in the defined fixtures: stationary/moving-contact admissibility plus 138 finite-time geometry cases, raw stage/face positivity and compatible normal/tangential closure pass. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_HYDROSTATIC_ROUNDOFF",
+        "TEST_N7_COMPOSITION",
+        "TEST_N7_GEOMETRY_DYNAMIC"
+      ]
+    },
+    {
+      "id": "N7-04",
+      "requirement": "Smooth, rough and seeded random continuous Q1 beds in 1D and 2D",
+      "tests": [
+        "TEST_SPATIAL_OPERATOR",
+        "TEST_TOPOGRAPHY_FACES",
+        "TEST_PCCU_LAKE_AT_REST"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied: rough/inclined 2D fronts, oblique/axial ramps, quarter-turn covariance and circular refinement pass finite-time independent fields for N_RK=2,3,4. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_N7_EQUILIBRIUM",
+        "TEST_N7_GEOMETRY_DYNAMIC"
+      ]
+    },
+    {
+      "id": "N7-05",
+      "requirement": "Variable-composition transport and signed component conservation",
+      "tests": [
+        "TEST_STATE_CONVERSION"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied in the defined 90-equilibrium/72-contact matrix per profile: independent conservative/thermal fields, analytic refinement, both signed directions/axes and every raw-stage component/carrier budget pass; original numerical limits are unchanged. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_HYDROSTATIC_ROUNDOFF",
+        "TEST_N7_COMPOSITION"
+      ]
+    },
+    {
+      "id": "N7-06",
+      "requirement": "Production semidiscrete residual, CFL and time integration against clean reference",
+      "tests": [
+        "TEST_SPATIAL_OPERATOR",
+        "TEST_PCCU",
+        "TEST_HYDROSTATIC_PATH",
+        "TEST_PCCU_GATE_H",
+        "TEST_CFL_POLICY"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied in the authorized contract: retained default fields/checkpoints and proposed/accepted times are bitwise unchanged; combined matches the clean spatial bound, x/y/point grids and all stage/policy/sentinel/event/growth tests pass with actual 1/4 teams in both profiles. Universal autonomous roundoff equality and N9 scientific approval are not claimed. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_IMEX_STAGES",
+        "TEST_N7_EQUILIBRIUM",
+        "TEST_N7_GEOMETRY_DYNAMIC"
+      ]
+    },
+    {
+      "id": "N7-07",
+      "requirement": "Mass conservation and symmetry",
+      "tests": [
+        "TEST_PCCU_GATE_H",
+        "TEST_SPATIAL_OPERATOR"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied in the defined fixtures: raw/final mass budgets, quarter-turn covariance, approved evolution-induced fourth-harmonic refinement and retained absolute bound pass. General inlet budgets remain in N9. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_IMEX_STAGES",
+        "TEST_HYDROSTATIC_ROUNDOFF",
+        "TEST_N7_COMPOSITION",
+        "TEST_N7_GEOMETRY_DYNAMIC"
+      ]
+    },
+    {
+      "id": "N7-08",
+      "requirement": "Real one/four-thread equivalence",
+      "tests": [
+        "TEST_SPATIAL_OPERATOR",
+        "TEST_PCCU_LAKE_AT_REST",
+        "TEST_PCCU_INCLINED_EXCAVATION",
+        "TEST_PCCU_GATE_H",
+        "TEST_BINARY_RESTART",
+        "TEST_STOCHASTIC_RESTART",
+        "TEST_MASS_EXCHANGE"
+      ],
+      "coverage": "historical_evidence_pending_current_revalidation",
+      "gap": "Satisfied: all original-duration restart and full Gate-H thread pairs plus every dynamic trajectory and stage-face payload are bitwise equal across actual one/four-thread teams. Historical raw-stage observer results are not reproduced by the current test inventory; passing the listed current tests does not re-establish the full original coverage.",
+      "closure_status": "historical_only_pending_current_revalidation",
+      "remaining_actions": [
+        "Revalidate the historical N7 numerical invariants with current production interfaces and equivalent quantitative checks."
+      ],
+      "historical_tests": [
+        "TEST_IMEX_STAGES",
+        "TEST_N7_EQUILIBRIUM",
+        "TEST_N7_GEOMETRY_DYNAMIC"
+      ]
+    },
+    {
+      "id": "N7-09",
+      "requirement": "Exact deterministic and stochastic continuation",
+      "tests": [
+        "TEST_BINARY_RESTART",
+        "TEST_STOCHASTIC_RESTART",
+        "TEST_RHEOLOGY_FROUDE"
+      ],
+      "coverage": "test_defined",
+      "gap": "Satisfied: original-duration deterministic and stochastic restart trajectories pass in both profiles and with actual one/four-thread teams. Do not replace these regressions with shortened runs.",
+      "closure_status": "satisfied",
+      "remaining_actions": []
+    },
+    {
+      "id": "N8-01",
+      "requirement": "Solid availability, substrate inventory and source-mask limits before nodal averaging",
+      "tests": [
+        "TEST_MASS_EXCHANGE",
+        "TEST_STATE_CONVERSION",
+        "TEST_BINARY_RESTART"
+      ],
+      "coverage": "test_defined",
+      "gap": "Satisfied: flat single/four-vertex identity, solid/liquid and gas-carrier caps, exhausted reserves, signed gas inflow, conservative/thermal/pore-pressure transactions, cutoff and full/partial source masks pass. Exhaustive rheology/vaporization/entrainment characterization is outside this closure.",
+      "closure_status": "satisfied",
+      "remaining_actions": []
+    },
+    {
+      "id": "N8-02",
+      "requirement": "Mass-lumped global bed-volume identity including dry cells and boundaries",
+      "tests": [
+        "TEST_MASS_EXCHANGE",
+        "TEST_TOPOGRAPHY_FACES"
+      ],
+      "coverage": "test_defined",
+      "gap": "Satisfied: production uniform-grid volume balance passes across all refinements and seeded updates, including dry contributors/boundaries. User accepts the separately verified unequal-area algebra test; nonuniform production meshes remain unsupported.",
+      "closure_status": "satisfied",
+      "remaining_actions": []
+    },
+    {
+      "id": "N8-03",
+      "requirement": "Exact B_vertex restart with bed evolution",
+      "tests": [
+        "TEST_MASS_EXCHANGE",
+        "TEST_BINARY_RESTART"
+      ],
+      "coverage": "test_defined",
+      "gap": "Satisfied: exact B_vertex/inventory reload, poisoned-cache refresh, nonzero resumed exchange and full evolving-bed continuation pass. Additional physical-model characterization is not a new restart prerequisite.",
+      "closure_status": "satisfied",
+      "remaining_actions": []
+    },
+    {
+      "id": "N8-04",
+      "requirement": "Authoritative nodal bed and refreshed geometry after bed modifications",
+      "tests": [
+        "TEST_MASS_EXCHANGE",
+        "TEST_TOPOGRAPHY_FACES",
+        "TEST_BINARY_RESTART"
+      ],
+      "coverage": "test_defined",
+      "gap": "Satisfied: independent Q1/LS/Hessian/G checks pass after every seeded 1D/2D update, including retained-state production transactions and all intermediate actual 1/4-thread payloads. The bounded 1D accumulation correction preserves coefficients and OpenMP.",
+      "closure_status": "satisfied",
+      "remaining_actions": []
+    },
+    {
+      "id": "N8-05",
+      "requirement": "Wet/dry local geometric mismatch is diagnosed",
+      "tests": [
+        "TEST_MASS_EXCHANGE",
+        "TEST_TOPOGRAPHY_FACES"
+      ],
+      "coverage": "test_defined",
+      "gap": "Satisfied: three smooth/wet-dry refinements in both dimensions show decreasing area-L1 mismatch and front localization without dry flow injection. Signed/L1/Linf and rough-stress volume/finite-geometry assertions pass; rough rates have no convergence requirement.",
+      "closure_status": "satisfied",
+      "remaining_actions": []
+    },
+    {
+      "id": "N9-01",
+      "requirement": "HP-PCCU is the sole production backend with canonical state/thermal conventions",
+      "tests": [
+        "TEST_STATE_CONVERSION",
+        "TEST_PCCU",
+        "TEST_PCCU_GATE_H"
+      ],
+      "coverage": "approved_for_recorded_canonical_scope",
+      "gap": "State-conversion, thermal/component identities, Gate-H, and the closed N7/N8 numerical contracts have direct evidence. The scientific owner approved the canonical production scope represented by this acceptance plan and the pinned ETNA/ETNA_LAVA evidence; no broader universal model claim is made."
+    },
+    {
+      "id": "N9-02",
+      "requirement": "Pinned source, tools, compiler flags, inputs, outputs and reference checksums",
+      "tests": [],
+      "coverage": "approved_checksum_based_retention",
+      "gap": "The historical N9 artifact pins toolchain, profiles, fixtures, source/reference hashes and pre-change outputs. The v5 matrix is versioned in docs/acceptance/results_n9_restart_v5_2026_10_11.json with source, executable, input, output and runner hashes; all 32 pinned production-source hashes and the runner hash match the repository. The scientific owner approved checksum/metadata retention; preserving bulky raw run payloads is not required."
+    },
+    {
+      "id": "N9-03",
+      "requirement": "Clean strict/debug and optimized validation",
+      "tests": [
+        "TEST_STOCHASTIC_RESTART",
+        "TEST_BINARY_RESTART",
+        "TEST_PCCU_GATE_H"
+      ],
+      "coverage": "audit_artifact",
+      "gap": "The existing N7/N8 acceptance artifacts record full strict/debug and optimized builds and tests. The v5 ETNA/ETNA_LAVA matrix passes all 8 build/case/thread combinations using the retained clean profile executables; the official stochastic restart regression also passes v5 in both profiles and actual 1/4-thread teams. The v5 long-run matrix reuses those builds rather than rebuilding them. M12c build automation and portability are a separate roadmap milestone; no missing rerun of the entire historical matrix is implied by this criterion."
+    },
+    {
+      "id": "N9-04",
+      "requirement": "Explicit tolerances and comparator policy",
+      "tests": [
+        "TEST_PCCU_GATE_H",
+        "TEST_PCCU_LAKE_AT_REST"
+      ],
+      "coverage": "approved_for_recorded_comparators_and_budget_scope",
+      "gap": "The scientific owner approved the recorded comparator and budget scope: same-build restart and 1/4-thread comparisons require exact equality; existing field/identity limits remain unchanged; ETNA is evaluated over its full 0–200 s run; the ETNA_LAVA mass budget is evaluated only through the last saved output before boundary contact (3180 s). The exact first-contact time is unknown because outputs are spaced by 60 s. No new threshold is inferred from the observed residuals and no solver tolerance was changed."
+    },
+    {
+      "id": "N9-05",
+      "requirement": "Long EXAMPLE_ETNA/EXAMPLE_ETNA_LAVA acceptance and regression ownership",
+      "tests": [
+        "TEST_BINARY_RESTART",
+        "TEST_STOCHASTIC_RESTART"
+      ],
+      "coverage": "approved_for_recorded_scope",
+      "gap": "The v5 matrix passes 8/8 full/split comparisons for full-duration ETNA (200 s) and ETNA_LAVA (3600 s), in optimized and strict/debug profiles with actual 1/4-thread teams. Native fields, canonical checkpoint records, runout/mass-centre CSV histories and ESRI outputs match the corresponding uninterrupted and pre-change baselines; all four within-profile thread pairs pass. ETNA preprocessing rasters match the retained user data. The owner-approved lava mass budget ends at 3180 s, before the first saved output with boundary flow; full-field and restart checks still extend through 3600 s. Machine-readable evidence: docs/acceptance/results_n9_restart_v5_2026_10_11.json."
+    },
+    {
+      "id": "N9-06",
+      "requirement": "Scientific baseline sign-off",
+      "tests": [],
+      "coverage": "approved",
+      "gap": "The scientific owner explicitly approved the canonical scope, recorded comparator and budget policy, and checksum-based evidence-retention policy for commit 3f7329c85d2e30e33cf68348721329f7726b01c1. The dated approval and its limits are recorded in docs/acceptance/results_n9_restart_v5_2026_10_11.json and docs/acceptance/N9_RESTART_V5_2026_10_11.md. This approval applies to the pinned scope and revision only."
+    },
+    {
+      "id": "N9-07",
+      "requirement": "Examples, source inputs, versioned restart and scientific output metadata match canonical semantics",
+      "tests": [
+        "TEST_STATE_CONVERSION",
+        "TEST_TOPOGRAPHY_FACES",
+        "TEST_BINARY_RESTART",
+        "TEST_STOCHASTIC_RESTART"
+      ],
+      "coverage": "approved_for_v5_restart_scope",
+      "gap": "The v5 checkpoint restores runout origin/initial offsets, prior barycentre and steady-stop state; CSV continuation, missing/incompatible histories, v4 rejection, evolving-topography restart and official stochastic restart are directly tested. The stochastic regression passed with actual 1/4-thread teams after being corrected to disable serial mode and verify the effective team size. All 8 ETNA/ETNA_LAVA checkpoint/field/CSV/ESRI continuation comparisons pass. The existing native schema, thermal/component identities and dry-output convention are retained. The scientific owner approved the canonical output scope recorded in N9-06."
+    }
   ]
 }

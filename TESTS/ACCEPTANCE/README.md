@@ -7,6 +7,18 @@ coverage gaps in `acceptance_plan.json` require separate tests and scientific
 sign-off. No production source, numerical formula or reference tolerance is
 changed by the audit.
 
+## Current runnable inventory (25 November 2026)
+
+`acceptance_plan.json` lists only suites with existing `run_test.sh`
+entry points on the current branch. The retired N7 stage-observer packages
+remain available as historical scientific evidence but are **not** run
+against the present Lie timestep architecture. Criteria depending on their
+unreproduced raw-stage measurements are marked
+`historical_only_pending_current_revalidation`; a passing surviving test
+is reported as `partial_current_coverage`, never full N7 revalidation.
+The live inventory is checked by `test_plan_inventory.py` in the static
+source/documentation workflow.
+
 ## Run the audit
 
 From the repository root, choose a new output directory outside the repository:

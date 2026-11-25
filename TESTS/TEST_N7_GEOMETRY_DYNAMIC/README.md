@@ -1,5 +1,17 @@
 # N7 dynamic geometry validation
 
+> **Current status (25 November 2026):** This package documents a historical
+> N7 observer tied to the removed IMEX-stage interfaces. Its obsolete shell
+> driver was removed rather than silently replacing the original numerical
+> oracle with a weaker test. The contracts and archived results remain
+> available for scientific reference. Current production regressions use
+> `TEST_SPATIAL_OPERATOR`, `TEST_PCCU`, `TEST_STATE_CONVERSION` and the
+> other runnable suites in `TESTS/ACCEPTANCE/acceptance_plan.json`.
+> **Those tests do not automatically reproduce this package's original
+> numerical coverage.** The affected N7 criteria remain pending current-code
+> revalidation.
+
+
 This test exercises finite-time HP-PCCU evolution on rough inclined beds,
 near-dry fronts, rotated one-cell ramps and mixed-curvature topography. It
 compares raw stages and every final conservative cell with an independently

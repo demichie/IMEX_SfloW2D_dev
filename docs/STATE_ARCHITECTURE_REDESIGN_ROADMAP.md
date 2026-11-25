@@ -49,7 +49,7 @@ and `src/physics/README.md` continue to work.
   in hot loops before optimizing. Prefer preallocated workspaces and
   read-only per-layer configuration, without adding duplicate caches.
 - Compare optimized and strict/debug builds, `TEST_STATE*`,
-  `TEST_STATE_EQUIVALENCE`, physical-source regressions, OpenMP
+  `TEST_STATE_CONVERSION`, physical-source regressions, OpenMP
   determinism and representative complete examples.
 - Measure performance with comparable builds/inputs before claiming a
   speedup. A compilation or lexical audit alone cannot certify numerical
