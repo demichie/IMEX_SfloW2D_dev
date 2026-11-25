@@ -447,7 +447,7 @@ CONTAINS
         REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
         REAL(wp) :: kinetic_reference,kinetic_drag,layer_mass
         REAL(wp) :: curvature_rate(n_eqns),curvature_effect,solid_budget,expected_deposition
-        REAL(wp) :: initial_mass,initial_solid,cumulative_mass,cumulative_solid,previous_deposition
+        REAL(wp) :: initial_mass,initial_solid,cumulative_mass,cumulative_solid,previous_deposition,elapsed_time
         INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status,step_id
         LOGICAL :: created_zone,created_arc,created_diam,created_erodible_fraction,accepted
         LOGICAL :: created_source_fraction,created_fissure_fraction,created_arc_normals
@@ -1067,20 +1067,22 @@ CONTAINS
         initial_mass=SUM(coupled_state%q(idx_totMassEqn,:,:,:))
         initial_solid=SUM(coupled_state%q(idx_solidEqn_first,:,:,:))
         previous_deposition=0.0_wp
+        elapsed_time=0.0_wp
         DO step_id=1,5
             ! Recompute the admissible coupled CFL on the evolving state.
             pt1=coupled_state%qp(:,1,:,:)
             pt2=coupled_state%qp(:,2,:,:)
-            CALL operators(1)%compute_timestep(coupled_state%q(:,1,:,:),pt1,0.0_wp,bound1,paired)
-            CALL operators(2)%compute_timestep(coupled_state%q(:,2,:,:),pt2,0.0_wp,bound2,paired, &
+            CALL operators(1)%compute_timestep(coupled_state%q(:,1,:,:),pt1,elapsed_time,bound1,paired)
+            CALL operators(2)%compute_timestep(coupled_state%q(:,2,:,:),pt2,elapsed_time,bound2,paired, &
                 lower_operator=operators(1),h_lower=pt1(idx_h,:,:))
             dt_step=MIN(1.0E-6_wp,0.01_wp*MIN(dt_bound,bound1,bound2))
             IF (dt_step<=0.0_wp) ERROR STOP 'Invalid multistep interlayer deposition timestep'
             coupled_state%qp(:,1,:,:)=pt1
             coupled_state%qp(:,2,:,:)=pt2
-            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+            CALL workspace%advance(coupled_state,elapsed_time,dt_step,stochastic,paired,operators, &
                 pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
                 pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            elapsed_time=elapsed_time+dt_step
             cumulative_mass=SUM(coupled_state%q(idx_totMassEqn,:,:,:)) &
                 +rho_s(1)*SUM(coupled_state%deposit(:,:,1))
             cumulative_solid=SUM(coupled_state%q(idx_solidEqn_first,:,:,:)) &
