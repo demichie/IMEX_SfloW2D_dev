@@ -12,7 +12,7 @@ REQUIRED_FIXTURES = (
     "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90",
     "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90",
 )
-FIXTURE_CALL = "CALL configure_canonical_state_indices()"
+FIXTURE_CALL = re.compile(r"\\bcall\\s+configure_canonical_state_indices\\s*(?:\\(\\s*\\))?", re.I)
 FIXED_INDEX = re.compile(r"\b(?:qc|qj)\s*\(\s*[1-4]\s*\)", re.I)
 
 
@@ -22,7 +22,7 @@ def main() -> int:
         path = ROOT / name
         if not path.is_file():
             issues.append(f"{name}: test fixture missing")
-        elif FIXTURE_CALL not in path.read_text(encoding="utf-8"):
+        elif not FIXTURE_CALL.search(path.read_text(encoding="utf-8")):
             issues.append(f"{name}: missing canonical fixture configuration")
 
     state_dir = ROOT / "src/state"
