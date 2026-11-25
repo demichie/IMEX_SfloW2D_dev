@@ -41,7 +41,7 @@ def main() -> int:
     assembly = compact(PHYSICS / "source_terms_2d.f90")
     integrator = compact(SRC / "numerics/time_integration_2d.f90")
     simulation = compact(SRC / "core/simulation_2d.f90")
-    state = compact(SRC / "state/state_2d.f90")
+    state = compact(SRC / "state/state_composition.f90")
     files = {path: compact(path) for path in PHYSICS.rglob("*.f90")}
     entries = re.findall(
         r"source_term_type\s*\(\s*'([^']+)'\s*,\s*"

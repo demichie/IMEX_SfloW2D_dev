@@ -33,7 +33,7 @@ def ordered(code, patterns):
 
 
 def check():
-    state = load("src/state/state_2d.f90")
+    state = load("src/state/state_composition.f90")
     time = body(load("src/numerics/time_integration_2d.f90"), "advance_lie")
     executor = body(load("src/numerics/lie_source_executor_2d.f90"),
                     "execute_lie_source_groups")
