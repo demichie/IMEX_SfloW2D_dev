@@ -204,6 +204,7 @@ CONTAINS
         !> @param[in] solid_density Solid particle density [kg/m3].
         !> @param[in] carrier_density Carrier density [kg/m3].
         !> @param[in] inverse_kinematic_viscosity Inverse carrier kinematic viscosity [s/m2].
+        !> @return Evaluated physical rate or coefficient.
         REAL(wp) FUNCTION settling_velocity(mass_config,particle_diameter, solid_density, carrier_density, &
             inverse_kinematic_viscosity)
 
@@ -298,7 +299,6 @@ CONTAINS
         END FUNCTION settling_velocity
 
         !> @brief Select carrier density and inverse kinematic viscosity for settling.
-        !> @param[in] model_name Canonical rheology closure identifier.
         !> @param[in] temperature Material temperature [K].
         !> @param[in] total_solid_fraction Total solid volume fraction.
         !> @param[in] mixture_density Mixture mass density [kg/m3].
@@ -307,6 +307,7 @@ CONTAINS
         !> @param[out] carrier_density Carrier density selected for the settling calculation
         !> [kg/m3].
         !> @param[out] inverse_kinematic_viscosity Inverse selected kinematic viscosity [s/m2].
+    !> @param[in] config Physical configuration.
     SUBROUTINE eval_settling_fluid_properties(config, temperature, total_solid_fraction, mixture_density,              &
             carrier_density_fallback, kinematic_viscosity_fallback, carrier_density, inverse_kinematic_viscosity)
             TYPE(rheology_config_type), INTENT(IN) :: config

@@ -38,6 +38,8 @@ CONTAINS
 
     !> Recompute material-only properties once per Lie sweep (also detects
     !> changed source parameters). Temporal windows and geometry remain dynamic.
+    !> @brief prepare injection materials operation.
+    !> @param[in,out] materials Injection material collection.
     SUBROUTINE prepare_injection_materials(materials)
         TYPE(injection_material_set_type), INTENT(INOUT) :: materials
         INTEGER :: i
@@ -57,6 +59,11 @@ CONTAINS
         END IF
     END SUBROUTINE prepare_injection_materials
 
+    !> @brief prepare material operation.
+    !> @param[in,out] material Material properties of injected fluid.
+    !> @param[in] t t argument for prepare_material.
+    !> @param[in] xs xs argument for prepare_material.
+    !> @param[in] xg xg argument for prepare_material.
     SUBROUTINE prepare_material(material,T,xs,xg)
         TYPE(injection_material_type), INTENT(INOUT) :: material
         REAL(wp), INTENT(IN) :: T,xs(n_solid),xg(n_add_gas)

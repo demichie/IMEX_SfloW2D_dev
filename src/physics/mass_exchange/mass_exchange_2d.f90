@@ -47,7 +47,6 @@ CONTAINS
         !> @param[in] B_zone Substrate zone selecting eligible processes.
         !> @param[in] erodible Available erodible solid thickness by class.
         !> @param[in] dt Positive source integration interval [s].
-        !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
         !> @param[in] transport_stochastic Selected layer stochastic transport.
@@ -55,6 +54,8 @@ CONTAINS
         !> @param[in] terrain_exposed True when this layer contacts the substrate.
         !> @param[in] atmosphere_exposed True when this layer contacts the atmosphere.
         !> @param[in] static_deposition_allowed True only for L1; independent of geometric contact.
+    !> @param[in] source_mask Bitmask of active mass-exchange processes.
+    !> @param[in,out] scratch Reusable local exchange workspace.
     SUBROUTINE eval_mass_exchange_explicit(config,mass_config,physical_state,B_zone,erodible,dt,source_mask, &
             total_rates,eqns_term, &
             scratch,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed,static_deposition_allowed)
@@ -240,12 +241,6 @@ CONTAINS
         !> @details A single gas or liquid carrier inventory is constrained before conservative
         !> assembly.
         !> Positive sources never cancel gross withdrawals in a shared inventory.
-        !> @param[in] qp Local primitive flow state; component order follows model configuration.
-        !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] erodible Available erodible solid inventory by species [m].
-        !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
-        !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
-        !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
 
 
         ! Limit simultaneous withdrawal demands from one physical inventory.
@@ -330,10 +325,9 @@ CONTAINS
         !> @brief Add one process contribution to conserved equations and diagnostic rate totals.
         !> @details Sink momentum is advected with the local horizontal velocity.
         !> @param[in] p Rates produced by one mass-exchange process.
-        !> @param[in] u Horizontal x velocity of the mobile material [m/s].
-        !> @param[in] v Horizontal y velocity of the mobile material [m/s].
         !> @param[in,out] total Accumulated mass-exchange rates for the cell.
         !> @param[in,out] eqns_term Conservative mass, momentum, energy and species source vector.
+    !> @param[in] state Local physical state.
     SUBROUTINE accumulate_process(p,state,total,eqns_term)
 
             TYPE(mass_exchange_rates_type), INTENT(IN) :: p

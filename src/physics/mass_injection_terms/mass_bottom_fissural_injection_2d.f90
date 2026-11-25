@@ -24,6 +24,7 @@ CONTAINS
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
     !> @param[in] pore_pressure_flag Selected layer activation of pore-pressure injection.
+    !> @param[in] materials Injection material collection.
     SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate, &
         materials,pore_pressure_flag)
     USE parameters_2d, ONLY : pore_pres_fract, bottom_fissural_source_flag, n_fissures,            &

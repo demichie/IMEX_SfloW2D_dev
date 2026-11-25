@@ -33,6 +33,7 @@ CONTAINS
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
     !> @param[in] pore_pressure_flag Activate pore-pressure injection for this layer.
+    !> @param[in] materials Injection material collection.
     SUBROUTINE eval_mass_injection_explicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
         lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate,materials,pore_pressure_flag)
         TYPE(physical_state_real), INTENT(IN) :: state

@@ -20,12 +20,11 @@ MODULE mass_exchange_lava_deposition_2d
 CONTAINS
 
         !> @brief Evaluate explicit immobilization of mobile lava.
-        !> @param[in] depth Mobile lava thickness [m].
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
         !> @param[in] config Layer lava rheology configuration.
         !> @param[in] mass_config Layer mass-exchange configuration.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_lava_deposition_explicit(config,mass_config,state,dt,r)
             TYPE(rheology_config_type), INTENT(IN) :: config
             TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
@@ -44,10 +43,9 @@ CONTAINS
 
         !> @brief Reject unsupported semi-implicit treatment for lava deposition.
         !> @details This entry point raises fatal_error; the rates are reset first.
-        !> @param[in] depth Mobile lava thickness [m].
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(state,dt,r)
 
             TYPE(physical_state_real), INTENT(IN) :: state
@@ -60,10 +58,9 @@ CONTAINS
 
         !> @brief Reject unsupported implicit treatment for immobilization of mobile lava.
         !> @details This entry point raises fatal_error; the rates are reset first.
-        !> @param[in] depth Mobile lava thickness [m].
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_lava_deposition_implicit(state,dt,r)
 
             TYPE(physical_state_complex), INTENT(IN) :: state
@@ -76,10 +73,9 @@ CONTAINS
 
         !> @brief Reject unsupported analytic treatment for immobilization of mobile lava.
         !> @details This entry point raises fatal_error; the rates are reset first.
-        !> @param[in] depth Mobile lava thickness [m].
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE solve_mass_exchange_lava_deposition_analytic(state,dt,r)
 
             TYPE(physical_state_real), INTENT(IN) :: state

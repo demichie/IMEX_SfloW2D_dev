@@ -29,7 +29,6 @@ CONTAINS
 
         !> @brief Evaluate explicit steam generation from deposited hot solids.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
         !> @param[in] mass_config Immutable layer vaporization configuration.
@@ -56,9 +55,9 @@ CONTAINS
         !> @brief Reject unsupported semi-implicit treatment for vaporization.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_vaporization_semi_implicit(state,B_zone,deposition,r)
 
             TYPE(physical_state_real), INTENT(IN) :: state
@@ -74,9 +73,9 @@ CONTAINS
         !> solids.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_vaporization_implicit(state,B_zone,deposition,r)
 
             TYPE(physical_state_complex), INTENT(IN) :: state
@@ -92,9 +91,9 @@ CONTAINS
         !> solids.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE solve_mass_exchange_vaporization_analytic(state,B_zone,deposition,r)
 
             TYPE(physical_state_real), INTENT(IN) :: state
@@ -106,6 +105,13 @@ CONTAINS
             CALL fatal_error('vaporization: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_vaporization_analytic
 
+!> @brief eval vaporization mass rate operation.
+!> @param[in] flow_temperature Temperature of flowing mixture.
+!> @param[in] solid_density Solid density.
+!> @param[in] solid_heat_capacity Specific heat capacity of solids.
+!> @param[in] deposition_rate Deposition rate from underlying surface.
+!> @param[in] steam_fraction Steam mass fraction.
+!> @return Evaluated physical rate or coefficient.
 PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,                                             &
             solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
 
@@ -125,6 +131,10 @@ PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,      
 
     END FUNCTION eval_vaporization_mass_rate
 
+!> @brief eval vaporization energy rate operation.
+!> @param[in] vapor_mass_rate Mass rate of vapor production.
+!> @param[in] gas_heat_capacity Specific heat capacity of gaseous phase.
+!> @return Evaluated physical rate or coefficient.
 PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,                                                           &
             gas_heat_capacity) RESULT(rate)
 

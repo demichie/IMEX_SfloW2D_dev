@@ -27,6 +27,7 @@ CONTAINS
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
     !> @param[in] pore_pressure_flag Selected layer activation of pore-pressure injection.
+    !> @param[in] material Material properties of injected fluid.
     SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, &
         lat_n_y_jk, cell_area_jk, rate,material,pore_pressure_flag)
         TYPE(physical_state_real), INTENT(IN) :: state

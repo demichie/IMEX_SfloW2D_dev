@@ -25,6 +25,7 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     !> @param[in] pore_pressure_flag Selected layer activation of pore-pressure injection.
+    !> @param[in] material Material properties of injected fluid.
     SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate,material,pore_pressure_flag)
     USE parameters_2d, ONLY : vel_source, T_source, time_param, bottom_radial_source_flag,         &
         pore_pres_fract, n_intervals, t_intervals, vel_intervals
