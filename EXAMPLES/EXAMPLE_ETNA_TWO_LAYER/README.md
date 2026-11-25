@@ -1,111 +1,255 @@
-# Etna two-layer — standalone experimental example
+# Etna two-layer — experimental granular collapse and upper dilute current
 
-Run every command from **EXAMPLES/EXAMPLE_ETNA_TWO_LAYER**. All scripts and
-inputs needed for preprocessing are inside this directory. The **only file**
-copied from `EXAMPLE_ETNA` is the shared DEM ZIP; it is not tracked twice.
+This example represents the collapse and downslope motion of a concentrated
+granular deposit (lower layer, L1), which feeds an initially dry upper
+particle-laden gas current (L2). The upper current can entrain ambient air;
+the lower current can deposit particles onto the substrate. Interlayer
+mass transfer and interlayer momentum drag are separate processes.
 
-This is an experimental TL13 two-layer example, **not a scientifically
-validated prediction**. Running `N_LAYERS=2` still requires
-`IMEX_TWO_LAYER_VALIDATION=1`.
+This is an experimental TL13 two-layer configuration, **not a scientifically
+validated prediction of an Etna event**. Its source-law coefficients and
+single-size particle population are exploratory. Running with
+`N_LAYERS=2` requires `IMEX_TWO_LAYER_VALIDATION=1`.
+
+Run every command from **EXAMPLES/EXAMPLE_ETNA_TWO_LAYER**. Preprocessing
+scripts and input files are local to this example. The only file shared
+with `EXAMPLE_ETNA` is the original DEM ZIP, which is not tracked twice.
 
 ## 1. Copy the shared DEM once
 
-After entering this directory from the repository root:
+From the repository root:
 
 ```bash
 cd EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
-cp ../EXAMPLE_ETNA/DEM/Etna2014_crop.zip DEM/\nunzip DEM/Etna2014_crop.zip -d DEM/
+cp ../EXAMPLE_ETNA/DEM/Etna2014_crop.zip DEM/
+unzip DEM/Etna2014_crop.zip -d DEM/
 ```
 
-Requirements for preprocessing: Python 3, NumPy and pandas.
-The compiled solver is expected at `../../src/IMEX_SfloW2D`.
+The DEM extraction is a manual prerequisite, not part of `prepare.py`.
+Check that `DEM/Etna2014_crop.asc` exists before proceeding.
 
-The DEM extraction is a manual prerequisite, not part of `prepare.py`.\nCheck that `DEM/Etna2014_crop.asc` exists before proceeding.\n\n## 2. Prepare only the topography and initial thickness
+Requirements for preprocessing: Python 3, NumPy and pandas. The compiled
+solver is expected at `../../src/IMEX_SfloW2D`.
+
+## 2. Prepare topography and initial thickness (no solver run)
 
 ```bash
 python3 prepare.py
 ```
 
-This **never starts the Fortran program**. It runs the local
-`create_input_ellipsoid.py` with parameters from `input_ellipsoid.py`
-and produces:
+`prepare.py` never starts the Fortran program. It uses the local
+`create_input_ellipsoid.py` and `input_ellipsoid.py` and produces:
 
-- `DEM/Etna2014_crop.asc`: original topography (extracted manually beforehand).
-- `DEM/new_dem.asc`: modified terrain.
+- `DEM/Etna2014_crop.asc`: manually extracted original DEM (input).
+- `DEM/new_dem.asc`: terrain modified by the excavation.
 - `DEM/init_volume.asc`: initial L1 thickness raster.
 - `DEM/ellipsoid.asc`: excavation geometry for inspection.
 
-The ellipsoid uses the original Etna center `(500430, 4177500)` and target
-volume `100000 m³`. If changing the DEM or excavation parameters, delete
-the generated rasters before rerunning preprocessing. No other example
-scripts or input files are used.
+The ellipsoid uses the Etna center `(500430, 4177500)` and a target
+volume of `100000 m³`. When changing the DEM or excavation parameters,
+delete generated rasters before rerunning preprocessing. No other
+example's preprocessing scripts are needed.
 
-## 3. Run the two-layer simulation
+## 3. Run and interpret the two-layer simulation
 
-No separate conservative-state initialization step is needed.
-The Fortran solver reads the primitive initial conditions directly from
-`IMEX_SfloW2D.inp` and converts them using its **existing** mixture and
-conservative-state conversion logic.
+The solver reads the *primitive* initial conditions directly from
+`IMEX_SfloW2D.inp` and uses its normal mixture and conservative-state
+conversions. A preliminary single-layer simulation or external
+conservative-state initialization is **not** needed.
 
 ```bash
 IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D
 ```
 
-The current Etna example starts with:
+### 3.1 Initial state and numerical setup
 
-| Primitive initial state | L1 | L2 |
-|---|---|---|
-| Thickness | `DEM/init_volume.asc` | `NONE` (dry) |
-| Temperature | 373 K | Unused while dry |
-| Horizontal velocity | 0 m/s | 0 m/s |
-| Solids by volume | 50% | 0% |
+| Property | Lower layer (L1) | Upper layer (L2) |
+| --- | --- | --- |
+| Interpretation | Concentrated granular avalanche | Particle-laden gas current forming during motion |
+| Initial thickness | `DEM/init_volume.asc` | `NONE` (initially dry) |
+| Initial solid volume fraction | 50% | 0% (dry) |
+| Initial temperature | 373 K | 373 K specified, but unused while dry |
+| Initial horizontal velocity | 0 m/s | 0 m/s |
+| Rheology | Voellmy: `MU=0.3`, `XI=300` | Quadratic resistance: `FRICTION_FACTOR=0.02` |
 
-The input uses independent `RESTART_L1_PARAMETERS` and
-`RESTART_L2_PARAMETERS` groups. Each layer has its own file list and count:
-`RESTART_FILES` belongs only to L1, while `RESTART_FILES_L2` belongs only
-to L2. Use an ESRI `.asc` thickness raster, or a sole `'NONE'` entry for
-a dry layer. Independent primitives are defined by `INITIAL_L1_PARAMETERS`
-and `INITIAL_L2_PARAMETERS`. To start only L2, set L1's `RESTART_FILES='NONE'`
-and L2's `RESTART_FILES_L2='./DEM/l2_thickness.asc'`. Both layers can also
-start wet. Only same-time initial rasters are supported in the coupled model;
-nonzero per-layer release times require future activation logic and are
-rejected explicitly. The percentages refer to the *common* solid species.
-See [restart input](../../docs/RESTART_INPUT.md) for the complete contract.
+The run uses `N_LAYERS=2`, `GAS_FLAG=T`, `LIQUID_FLAG=F`,
+`N_SOLID=1` and `N_ADD_GAS=0`. The single solid species has
+`RHO_S=2000 kg/m³` and `DIAM_S=1.0E-3 m` (1 mm). Thus L2 is
+*not* a calibrated fine-ash population; both layers share the same
+solid species. The source temperatures and ambient properties include
+`T_AMBIENT=300 K` and `PRES=101300 Pa`.
 
-These primitive inputs are for **new initial states**, not continuation
-from a previous run. Conservative `.q_2d` snapshots and binary restart
-files remain available via the existing restart mechanisms.
+The current input sets `T_END=50 s`, `DT_OUTPUT=2 s`, `DT0=0.01 s`,
+`MAX_DT=1 s` and `CFL=0.24`, with a `250 x 150` grid of
+10 m cells. `KT_TRACE_RECONSTRUCTION='froude_blend'` is selected.
+Results are written to `OUTPUT/exampleEtna_two_layer/`.
 
-The example requests `T_END=200 s`, `DT_OUTPUT=5 s`, and `CFL=0.24`.
-A shorter exploratory run can set `T_END=10.0` and `DT_OUTPUT=1.0`
-but neither time horizon establishes scientific validation. Outputs are
-written to `OUTPUT/exampleEtna_two_layer/`.
+The independent `RESTART_L1_PARAMETERS` and `RESTART_L2_PARAMETERS`
+groups define the initial thickness files, not a preliminary simulation:
+`RESTART_FILES` belongs only to L1 and `RESTART_FILES_L2` only to
+L2. `'NONE'` denotes an initially dry layer. The accompanying
+`INITIAL_L1_PARAMETERS` and `INITIAL_L2_PARAMETERS` specify the
+primitive composition, velocity and temperature. Both layers can
+alternatively start wet, but nonzero independent release times are not
+supported in the coupled model. See [restart input](../../docs/RESTART_INPUT.md).
+Continuation from a saved conservative state remains a separate restart
+mechanism.
 
-L1 models the dense granular avalanche with Voellmy friction (`mu=0.3`,
-`xi=300`). L2 uses the quadratic rheology with the layer-specific basal
-`RHEOLOGY_L2%FRICTION_FACTOR=0.02` and Newton treatment (Lie group 1).
-This is the same quadratic-friction coefficient used in `EXAMPLE_TAAL`.
+### 3.2 Active mass pathways
 
-L2 begins strictly dry and can form as L1→L2 elutriation develops. The
-`LINEAR_USTAR` elutriation settings are lifted solid volume fraction
-`0.15`, efficiency `0.01`, and critical Rouse number `100`
-(explicit Lie group 4). Settling and independent substrate mass exchange
-in L2 are disabled.
+The following table describes the **current input**, not every process
+supported by the solver.
 
-The explicit `ELUTRIATION_SOLID_VOLUME_FRACTION=0.15` keeps the lifted
-parcel composition prescribed. Omitting this field instead selects the
-current local L1 solid volume fraction after the spatial update, and its
-gas/solid co-lift ratio varies from cell to cell. This is an alternative
-physical assumption, not a calibration of the Etna case.
+| Pathway | Current setting | Physical and numerical effect |
+| --- | --- | --- |
+| **L1 -> substrate** | **ON**: `MASS_EXCHANGE_L1%DEPOSITION%SETTLING_FLAG=T` | Settling removes mobile L1 solids, adds to the substrate deposition inventory, and can withdraw associated carrier according to the deposition/porosity closure. |
+| Substrate -> L1 | OFF: `MASS_EXCHANGE_L1%EROSION%COEFFICIENT=0.0` | No prescribed substrate erosion replenishes the flow. |
+| Atmosphere -> L1 | OFF: `MASS_EXCHANGE_L1%ENTRAINMENT%FLAG=F` | The lower layer does not directly entrain ambient air. |
+| **L1 -> L2** | **ON**: `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T` | Shear-driven elutriation transfers solid mass *and gas already present in L1* to the upper layer. |
+| L2 -> L1 | OFF: `INTERLAYER_MASS_EXCHANGE%SETTLING_FLAG=F` | No particle settling back from L2 to L1 is applied. |
+| **Atmosphere -> L2** | **ON**: `MASS_EXCHANGE_L2%ENTRAINMENT%FLAG=T` | Ambient-air incorporation adds gas/mixture mass and sensible thermal energy to a wet L2, changing its dilution and thermodynamic state. |
+| L2 -> substrate | OFF: `MASS_EXCHANGE_L2%DEPOSITION%SETTLING_FLAG=F` | No direct basal deposition from the upper layer; interlayer settling, if enabled later, would first transfer solids to L1. |
+| Substrate -> L2 | OFF: `MASS_EXCHANGE_L2%EROSION%COEFFICIENT=0.0` | No substrate erosion source for L2. |
 
-Interlayer momentum drag is enabled using the Chézy slip-velocity law,
-with dimensionless `CHEZY_DRAG_COEFF=0.03` and a separate analytic Lie
-group 5. This coefficient is an exploratory choice used in the
-interlayer-drag numerical tests, **not** a calibration for Etna.
-The Chézy drag acts only where both layers are thicker than 1 mm; it
-exchanges opposite momentum impulses, conserving the pair's total momentum.
-Its coefficient is **independent** of L2's quadratic basal
-`FRICTION_FACTOR`.
+The contacts are determined per cell from the current layer thicknesses:
+L1 contacts the ground whenever wet; L2 is the atmospheric-facing layer
+when wet. When L2 is absent, L1 is exposed to the atmosphere, although
+its own entrainment flag is disabled here. The L2 air-entrainment law
+also requires positive thickness and positive mixture Richardson number.
+Enabling a source flag does not imply a nonzero rate in every cell.
+
+### 3.3 L1 deposition and fixed topography
+
+L1 deposition uses the shared particle-settling kernel and the current
+L1 composition, rheology, carrier properties and timestep. The removal
+is a source of **negative mobile solid mass**, paired with positive
+substrate deposition inventory. The carrier withdrawal, if any, follows
+the substrate-porosity closure; it is not the same process as transferring
+gas from L1 into L2. The mass-exchange coordinator applies inventory
+and packing constraints to the local source transaction.
+
+`SUBSTRATE%TOPO_CHANGE_FLAG=F` leaves the topographic surface used by
+the flow solver unchanged during the simulation. Deposition can still
+be tracked in the substrate inventories: a recorded deposit does not
+automatically imply an evolving terrain elevation in this example.
+The example does not activate terrain erosion.
+
+### 3.4 L1 -> L2 elutriation and dynamically associated gas
+
+L2 starts dry and is populated by the `LINEAR_USTAR` interlayer
+elutriation law. Its current settings are:
+
+```fortran
+INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T,
+INTERLAYER_MASS_EXCHANGE%ELUTRIATION_SOLID_VOLUME_FRACTION=-1,
+INTERLAYER_MASS_EXCHANGE%ELUTRIATION_CARRIER_MODE='LIMIT_SOLIDS',
+INTERLAYER_MASS_EXCHANGE%ELUTRIATION_LAW='LINEAR_USTAR',
+INTERLAYER_MASS_EXCHANGE%ELUTRIATION_EFFICIENCY=0.01,
+INTERLAYER_MASS_EXCHANGE%ROUSE_CRITICAL=100.0,
+INTERLAYER_MASS_EXCHANGE%SETTLING_FLAG=F,
+INTERLAYER_MASS_EXCHANGE%METHOD='EXPLICIT',
+INTERLAYER_MASS_EXCHANGE%GROUP=4,
+```
+
+The elutriation law proposes solid-volume fluxes using interfacial
+shear, solid availability and the Rouse filter. A critical Rouse
+number of `100` is intentionally permissive and requires scientific
+calibration; it is not a validated value for Etna.
+
+**`ELUTRIATION_SOLID_VOLUME_FRACTION=-1` is a mode selector, not a
+negative concentration.** It derives the transferred parcel's solid
+volume fraction from the *current local L1 donor inventories*, after
+spatial transport and any preceding Lie source updates:
+
+\[
+\alpha_{\mathrm{lift}}
+  =\frac{V_{s,1}}{V_{s,1}+V_{c,1}},\qquad
+E_c=\frac{1-\alpha_{\mathrm{lift}}}{\alpha_{\mathrm{lift}}}E_s.
+\]
+
+Here `V_{s,1}` and `V_{c,1}` are local L1 solid and carrier volumes
+per unit area; `E_s` is the accepted upward solid-volume rate and
+`E_c` is the associated upward carrier-volume rate. With
+`LIMIT_SOLIDS`, the requested parcel composition is preserved by
+limiting solid transfer when donor gas is insufficient. The paired
+limiter also enforces donor inventories and final solid packing.
+If L1 has no solids available, there is no upward co-lift.
+
+Specifying a positive fraction such as `0.15` would instead prescribe
+the lifted parcel composition at **15% solids and 85% gas by volume**,
+regardless of the mean local L1 composition. Omitting the field
+entirely is equivalent to `-1`.
+
+Solid and carrier transfers subtract mass from L1 and add the same
+mass to L2. They also carry donor-state horizontal momentum and
+sensible thermal energy. This **internal** transfer conserves the
+L1+L2 sums of solid species, carrier mass, momentum and thermal energy
+for the paired source operation; it does not create atmospheric gas.
+The resulting L2 concentration is *not* constrained to equal
+`alpha_lift`, because L2 also undergoes transport and air entrainment.
+
+### 3.5 Ambient-air entrainment into L2
+
+`MASS_EXCHANGE_L2%ENTRAINMENT%FLAG=T` activates an independent
+**external** source, with `METHOD='EXPLICIT'` and `GROUP=4`.
+For a wet, eligible L2 with positive Richardson number, the source
+adds ambient-air mass at ambient density and thermal energy using
+`T_AMBIENT=300 K`. It does **not** directly add solid mass or
+horizontal momentum. Consequently, it can dilute and cool L2 and
+alter its velocity through the changed mixture mass. This is distinct
+from the gas carried upward out of L1 by elutriation.
+
+`N_ADD_GAS=0` means no additional gas species is separately tracked
+in this setup. The gas carrier is represented through the mixture
+mass and solid-composition variables.
+
+### 3.6 Interlayer momentum drag and source scheduling
+
+The two layer rheologies are independent: L1 uses Voellmy friction
+and L2 uses quadratic resistance (`FRICTION_FACTOR=0.02`), both
+with Newton treatment in Lie group 1. Thermal sources use group 2.
+
+The **interlayer momentum** source is separately configured as
+`MODEL='CHEZY'`, `CHEZY_DRAG_COEFF=0.03`, `METHOD='ANALYTIC'`
+and `GROUP=5`. It acts only where both layers are thicker than
+1 mm, transferring equal and opposite momentum impulses according
+to their relative velocities. It does not transfer additional mass.
+The Chézy interlayer coefficient must not be confused with L2's
+quadratic rheological coefficient; neither is calibrated here.
+
+L1 substrate exchange, L2 atmospheric exchange and paired interlayer
+mass exchange all use **explicit Lie group 4**. They are distinct
+physical sources evaluated within the configured ordered Lie
+sequence; group 5 subsequently applies interlayer drag. Advecting
+solids and gas across the interface also transports momentum and
+energy, independently of this drag-only impulse.
+
+### 3.7 Mass budgets and interpretation of solver output
+
+For the currently enabled *mass sources*, the paired L1 -> L2
+elutriation cancels when summing both layers. Omitting boundary
+transport and any other optional mass-removal mechanism, the net
+external source for the combined moving flow is:
+
+\[
+\dot M_{\mathrm{mobile},1+2}
+  = \dot M_{\mathrm{air\ into\ L2}}
+    - \dot M_{\mathrm{L1\ deposited}}.
+\]
+
+The total mobile **solid** inventory decreases through L1
+deposition, while solid elutriation merely redistributes solids
+between the layers. Gas entrainment from the atmosphere increases
+mobile gas mass. Spatial fluxes through the domain boundaries and
+other enabled numerical/physical removal paths must be considered
+when auditing a full run.
+
+**Important:** the periodic terminal summary labeled `mass`,
+`solid mass`, `volume` and `area` currently reports **L1 only**
+(`src/IMEX_SfloW2D.f90`); these are *not* whole-column L1+L2
+totals. Use layer-resolved output to examine L2 formation and compute
+combined mass balances. In particular, falling L1 mass can reflect
+both external deposition and internal transfer to L2.
 
 ## 4. Optional checks — commands from this directory
 
@@ -155,7 +299,18 @@ provide optional regression evidence.
 The `.asc` rasters and `OUTPUT/` are generated and untracked. The
 only copied source data is `DEM/Etna2014_crop.zip`.
 
-## Positivity diagnosis of L2
+## Positivity and Lie-source diagnostics
+
+The timestep preparation computes a spatial mixture-mass positivity
+bound `dt_pos` for both layers and combines it with the CFL bound.
+It does not independently guarantee positivity of each solid/gas
+component or admissibility of explicit Lie mass-exchange sources.
+To investigate a rejected source update, enable
+`IMEX_LIE_DIAGNOSTICS=1`; timestep selection can be inspected with
+`IMEX_TIMESTEP_DIAGNOSTICS=1`. In particular,
+`TL07: paired interlayer physical transfer rejected` identifies
+a failure in the interlayer mass-source construction, not a direct
+failure of the spatial `dt_pos` calculation.
 
 On a rejected spatial update, the solver prints `KP_POSITIVITY` records
 after `LIE_SPATIAL_FAILURE` when `N_LAYERS=2`. They report the
