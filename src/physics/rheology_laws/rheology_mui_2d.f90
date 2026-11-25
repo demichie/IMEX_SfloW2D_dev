@@ -42,10 +42,10 @@ CONTAINS
     !> \details Compute the momentum source under the regularized mu(I) friction law, including
     !> effective stress and granular inertial-number dependence, using the treatment-specific
     !> velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate Two-component conservative momentum source.
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_mui_explicit(config, state, grav_coeff, use_pore_pressure, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -64,13 +64,12 @@ CONTAINS
     !> \details Compute the momentum source under the regularized mu(I) friction law, including
     !> effective stress and granular inertial-number dependence, using the treatment-specific
     !> velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
-    !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m
     !> s^-2].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_mui_semi_implicit(config, state, grav_coeff, use_pore_pressure, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -153,6 +152,7 @@ CONTAINS
     !> supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_mui_implicit(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -172,10 +172,10 @@ CONTAINS
     !> \param[in] dt Source integration interval [s].
     !> \param[in] speed_ratio Ratio of total to horizontal speed.
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
-    !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m
     !> s^-2].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_mui_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,          &
         use_pore_pressure, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config

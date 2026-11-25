@@ -38,12 +38,11 @@ CONTAINS
     !> \details Assemble the real-valued momentum source from the model's supported physical
     !> treatment contributions; unused model inputs are retained for the shared dispatch
     !> interface.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
     !> \param[in] grav_coeff Dimensionless gravity correction for local topography.
     !> \param[in] use_stochastic Whether stochastic rheology parameters are enabled.
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate Conservative horizontal momentum source vector.
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_lucas_explicit(config, state, grav_coeff, use_stochastic, stochastic_value, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -63,14 +62,12 @@ CONTAINS
     !> this treatment. The returned rates act on the conservative horizontal momenta;
     !> zero-valued
     !> implementations intentionally provide no contribution.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
     !> \param[in] grav_coeff Dimensionless gravity correction for local topography.
-    !> \param[in] curvature_term Whether topographic curvature enters the source.
     !> \param[in] stochastic Model-specific input or output as defined by the constitutive law.
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_lucas_semi_implicit(config, state, grav_coeff,                                            &
         stochastic, stochastic_value, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -128,6 +125,7 @@ CONTAINS
     !> implemented; zero-valued implementations intentionally contribute no term.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_lucas_implicit(config, state, rate_x, rate_y)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -148,11 +146,11 @@ CONTAINS
     !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
     !> s^-1].
     !> \param[in] grav_coeff Dimensionless gravity correction for local topography.
-    !> \param[in] curvature_term Whether topographic curvature enters the source.
     !> \param[in] stochastic Model-specific input or output as defined by the constitutive law.
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
+    !> @param[in] config Rheology parameters for the selected constitutive law.
     SUBROUTINE eval_rheology_lucas_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,    &
         stochastic_value, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
