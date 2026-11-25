@@ -136,16 +136,21 @@ verify a non-increasing kinetic energy and the exact quadratic
 relative-velocity decay. The drag source leaves the existing
 **sensible thermal energy** of each layer unchanged.
 
-Thus the decrease in resolved mechanical kinetic energy is **not**
-converted into a thermal source in the present implementation. This
-is an explicit model property, not a test failure. It must not be
-silently changed to enforce a purported total-energy balance.
+**Accepted model limitation C4 (25 November 2026):** mechanical energy
+dissipated by interlayer Chézy drag is **not converted to heat**. The
+resolved relative kinetic energy decreases, but the sensible thermal
+energy of L1 and L2 is unchanged by this drag-only source. The lost
+resolved mechanical energy is intentionally **not tracked as an internal
+energy increase**. Consequently, do not claim conservation of total
+mechanical-plus-thermal energy for this source.
 
-**Scientific question C4:** specify whether drag dissipation is
-unresolved (lost from the resolved mechanical system), is assigned
-to one or both thermal budgets, or requires a separate physical
-closure. Any change requires scientific approval and regression
-evidence.
+This is an explicitly accepted limitation of the current two-layer
+model, not a numerical defect or a pending choice of heating closure.
+Keep the existing implementation unchanged; do not add dissipation
+heating to either layer. Any future modification requires a new
+scientific decision. Verification must continue to establish momentum
+conservation, non-increasing kinetic energy and unchanged sensible
+thermal energy.
 
 ## 7. Lie ordering and external source accounting
 
@@ -184,7 +189,7 @@ scientific decision.
 | Opposite gross solid/carrier flows, unequal densities | `test_interlayer_mass_exchange` now also covers dynamic mode for both carrier policies | Check physical closure validity over representative parameter ranges. |
 | Dynamic, simultaneous settling/elutriation | `test_interlayer_lie_transaction` now includes full two-layer conservative/primitive update | Run both build profiles and a sustained representative scenario. |
 | Source-level mass/species/momentum/thermal antisymmetry | Cell-local tests with distinct donor densities, cp and temperatures | Integrated budget over multiple Lie groups and timesteps. |
-| Chézy momentum and kinetic dissipation | Exact analytic unit test | Scientific decision about unmodelled dissipation heating. |
+| Chézy momentum and kinetic dissipation | Exact analytic unit test | Retain the accepted no-heating limitation; verify momentum conservation, kinetic-energy decrease and unchanged sensible thermal energy. |
 | L1 deposition + L2 atmosphere + interlayer co-lift | Etna input and example documentation | Integrated layer/bed/atmosphere budget and refinement study. |
 
 **Technical exit:** strict/debug and optimized source regressions,
@@ -194,7 +199,8 @@ checks on the **same commit**. Run at least
 `sh TESTS/TEST_SOURCE_REGISTRY/run_test.sh` and the existing
 `solver-validation.yml` workflows.
 
-**Scientific exit:** resolve C1-C5, assess the empirical parameters
+**Scientific exit:** resolve C1-C3 and C5; C4 is an accepted, explicitly
+documented no-heating limitation. Assess the empirical parameters
 and compare with suitable analytical/benchmark/laboratory evidence.
 This is separate from TL13b-A hyperbolicity and TL13b-B spatial
 positivity and does **not** authorize removing

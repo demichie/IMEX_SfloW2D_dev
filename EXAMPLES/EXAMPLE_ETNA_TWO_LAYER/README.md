@@ -214,6 +214,12 @@ The **interlayer momentum** source is separately configured as
 and `GROUP=5`. It acts only where both layers are thicker than
 1 mm, transferring equal and opposite momentum impulses according
 to their relative velocities. It does not transfer additional mass.
+The drag dissipates resolved relative kinetic energy **without adding
+that lost mechanical energy to either layer's sensible heat**. This is
+an acknowledged, accepted limitation of the present physical model:
+the drag-only source conserves pair momentum but does not conserve
+combined kinetic-plus-thermal energy. No frictional-heating law is
+included or implied.
 The Chézy interlayer coefficient must not be confused with L2's
 quadratic rheological coefficient; neither is calibrated here.
 

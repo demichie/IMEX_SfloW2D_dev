@@ -414,8 +414,10 @@ del solo test di un kernel.
   creazione o distruzione di massa.
 - **Budget:** conservazione interlayer di massa totale, specie e
   carrier; momento e trasferimenti termici coerenti con ogni legge;
-  contabilizzare la dissipazione del drag, senza conversioni
-  termiche inventate. Test di rate, limiter e candidati distinti,
+  misurare la dissipazione del drag senza convertirla in calore.
+  Per scelta scientifica accettata, il drag conserva il momento e
+  lascia invariata l'energia termica, ma non conserva la somma di
+  energia cinetica e termica. Test di rate, limiter e candidati distinti,
   inclusa la semantica `q^n`/`q^*` del gruppo 0.
 - **Integrazione:** build optimized e strict/debug, consistenza
   REAL/COMPLEX dove richiesta, OpenMP 1/4 thread, CFL, geometrie
@@ -432,9 +434,14 @@ del solo test di un kernel.
 **TL13b-C — audit delle chiusure fisiche (25 novembre 2026):**
 la verifica dei trasferimenti interlayer e dei bilanci termodinamici e'
 iniziata in [TL13B_C_PHYSICAL_CLOSURES.md](TL13B_C_PHYSICAL_CLOSURES.md).
-L'audit identifica cinque questioni da validare (composizione elutriata,
+L'audit identifica cinque questioni (composizione elutriata,
 carrier nel settling, gas comprimibile, dissipazione del drag e ordine
 Lie) e amplia i test senza cambiare le leggi fisiche.
+**Decisione su C4 (25 novembre 2026):** l'energia meccanica dissipata
+dal drag interlayer non viene convertita in calore. Questa e' una
+limitazione esplicita e accettata del modello corrente, non un difetto
+da correggere; restano da verificare le invarianti meccaniche e
+termiche. Nessuna modifica alla legge Chézy e' autorizzata.
 Queste verifiche non chiudono TL13b-C; le nuove regressioni richiedono
 build strict/optimized ed esecuzione integrata sulla stessa revisione.
 
@@ -443,8 +450,9 @@ validazione scientifica della modalita' dinamica di
 `elutriation_solid_volume_fraction` e della miscela sollevata,
 possibile utilizzo di apporti simultanei nei budget lordi,
 chiusura dei volumi di carrier comprimibile, parametri effettivi
-di settling/elutriazione, soglie e dissipazione del drag,
-ordine definitivo dei gruppi e vincoli di eventuali metodi
+di settling/elutriazione, soglie del drag (la sua dissipazione senza
+riscaldamento e' una limitazione gia' accettata), ordine definitivo
+dei gruppi e vincoli di eventuali metodi
 impliciti. Resta da valutare la copertura Darcy L2,
 packing/consolidazione e carrier combinati. Fare riferimento
 alle formulazioni di `IMEX_v3.pdf` distinguendo equazioni
