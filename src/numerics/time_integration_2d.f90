@@ -28,6 +28,7 @@ MODULE time_integration_2d
     IMPLICIT NONE
     PRIVATE
     ABSTRACT INTERFACE
+        !> @brief stochastic stage observer operation.
         SUBROUTINE stochastic_stage_observer()
         END SUBROUTINE stochastic_stage_observer
     END INTERFACE
@@ -97,6 +98,8 @@ CONTAINS
     !> @param[out] max_speed_x,max_speed_y Isolated L1 directional speed maxima [m/s].
     !> @param[in] boundary_source_enabled Optional original CFL boundary source switch.
     !> @param[in] diagnose_max_x_face Optional sampled CFL-face diagnostic switch.
+    !> @param[out] max_speed_x max speed x argument of prepare_spatial_for_timestep.
+    !> @param[out] max_speed_y max speed y argument of prepare_spatial_for_timestep.
     SUBROUTINE prepare_spatial_for_timestep(this,state,t,domain,spatial_operators, &
         dt_cfl,dt_pos,max_speed_x,max_speed_y,boundary_source_enabled,diagnose_max_x_face)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
@@ -559,6 +562,14 @@ CONTAINS
     !> An invalid conservative candidate is rejected before sea removal, as in
     !> the original Lie stage. Status is 0 (accepted), 1 (inadmissible mass) or
     !> 2 (failed primitive conversion).
+    !> @param[in] q_before q before argument of update_spatial_cell.
+    !> @param[in] qp_before qp before argument of update_spatial_cell.
+    !> @param[in] rate rate argument of update_spatial_cell.
+    !> @param[in] dt Integration time increment.
+    !> @param[in] sea_cell sea cell argument of update_spatial_cell.
+    !> @param[out] q_candidate q candidate argument of update_spatial_cell.
+    !> @param[out] qp_candidate qp candidate argument of update_spatial_cell.
+    !> @param[out] status status argument of update_spatial_cell.
     SUBROUTINE update_spatial_cell(q_before,qp_before,rate,dt,sea_cell,q_candidate,qp_candidate,status)
         REAL(wp), INTENT(IN) :: q_before(n_vars),qp_before(n_vars),rate(n_eqns),dt
         LOGICAL, INTENT(IN) :: sea_cell

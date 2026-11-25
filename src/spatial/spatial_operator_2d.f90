@@ -75,6 +75,8 @@ CONTAINS
     !> @param[in] dt Rejected forward-Euler spatial timestep.
     !> @param[in] lower Optional lower-layer spatial operator for L2 base diagnostics.
     !> @param[in] lower_h_cell Lower-layer cell depth for the effective center base.
+    !> @param[in] j j argument of diagnose_spatial_positivity.
+    !> @param[in] k k argument of diagnose_spatial_positivity.
     SUBROUTINE diagnose_spatial_positivity(this,j,k,qp_cell,mass_cell,dt,lower,lower_h_cell)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k
@@ -254,6 +256,11 @@ CONTAINS
 
     !> @brief Read the mass flux facing each cell at a selected x-interface.
     !> @details Only used for opt-in diagnostics; never recomputes numerical fluxes.
+    !> @param[in] this Owning object.
+    !> @param[in] j j argument of spatial_front_mass_flux.
+    !> @param[in] k k argument of spatial_front_mass_flux.
+    !> @param[out] flux_left flux left argument of spatial_front_mass_flux.
+    !> @param[out] flux_right flux right argument of spatial_front_mass_flux.
     SUBROUTINE spatial_front_mass_flux(this,j,k,flux_left,flux_right)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k
@@ -326,6 +333,9 @@ CONTAINS
     !>       are already included through path terms.
     !******************************************************************************
 
+    !> @param[in] reuse_cfl_traces Flag allowing reuse of CFL reconstruction traces.
+    !> @param[in] lower_operator lower operator argument of evaluate_spatial_operator.
+    !> @param[in] h_lower Lower-layer depth.
     SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, boundary_source_enabled,               &
         reuse_cfl_traces, lower_operator, h_lower )
 
@@ -374,6 +384,10 @@ CONTAINS
     !> @param[in] time Explicit stage time [s].
     !> @param[in] domain Shared OR cell, face and HP reconstruction workset.
     !> @param[out] dt Optional preliminary shared CFL timestep [s].
+    !> @param[in] qp1 Layer-one primitive state.
+    !> @param[in] qp2 Layer-two primitive state.
+    !> @param[out] term1 Layer-one spatial terms.
+    !> @param[out] term2 Layer-two spatial terms.
     SUBROUTINE evaluate_coupled_spatial_operator(this,upper,qp1,qp2,term1,term2,time,domain,dt)
         CLASS(spatial_operator_type), INTENT(INOUT) :: this,upper
         REAL(wp), INTENT(IN) :: qp1(n_vars,comp_cells_x,comp_cells_y)
@@ -516,6 +530,10 @@ CONTAINS
     !> @param[in] j,k Active cell indices.
     !> @param[in,out] max_a_x,max_a_y Directional maximum characteristic speeds [m/s].
     !> @param[in] paired_bounds Skip collapsed axes for the shared coupled envelope.
+    !> @param[in] j j argument of spatial_accumulate_cfl_cell.
+    !> @param[in] k k argument of spatial_accumulate_cfl_cell.
+    !> @param[in,out] max_a_x Maximum x-direction propagation speed.
+    !> @param[in,out] max_a_y Maximum y-direction propagation speed.
     SUBROUTINE spatial_accumulate_cfl_cell(this,j,k,max_a_x,max_a_y,paired_bounds)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k
@@ -580,6 +598,8 @@ CONTAINS
     !> @param[in] this Operator whose CFL policy is applied.
     !> @param[in] max_a_x,max_a_y Maximum characteristic speeds [m/s].
     !> @param[out] dt Resulting spatial CFL bound [s].
+    !> @param[in] max_a_x Maximum x-direction propagation speed.
+    !> @param[in] max_a_y Maximum y-direction propagation speed.
     SUBROUTINE spatial_timestep_from_speeds(this,max_a_x,max_a_y,dt)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         REAL(wp), INTENT(IN) :: max_a_x,max_a_y
@@ -750,6 +770,10 @@ CONTAINS
     !> @param[in] axneg,axpos Coupled nonpositive/nonnegative x-face bounds.
     !> @param[in] ayneg,aypos Coupled nonpositive/nonnegative y-face bounds.
     !> @param[out] dt Shared CFL-limited timestep [s].
+    !> @param[in] axneg axneg argument of compute_coupled_spatial_timestep.
+    !> @param[in] axpos axpos argument of compute_coupled_spatial_timestep.
+    !> @param[in] ayneg ayneg argument of compute_coupled_spatial_timestep.
+    !> @param[in] aypos aypos argument of compute_coupled_spatial_timestep.
     SUBROUTINE compute_coupled_spatial_timestep(this,domain,axneg,axpos,ayneg,aypos,dt)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         CLASS(domain_type), INTENT(IN) :: domain
@@ -789,6 +813,8 @@ CONTAINS
     !> @details Keeps the legacy floating-point evaluation order and 1D branch.
     !> @param[in] max_a_x,max_a_y Maximum face speed magnitudes [m/s].
     !> @param[in,out] dt Existing maximum permitted timestep [s].
+    !> @param[in] max_a_x Maximum x-direction propagation speed.
+    !> @param[in] max_a_y Maximum y-direction propagation speed.
     SUBROUTINE limit_timestep_by_spatial_speeds(max_a_x,max_a_y,dt)
         REAL(wp), INTENT(IN) :: max_a_x,max_a_y
         REAL(wp), INTENT(INOUT) :: dt

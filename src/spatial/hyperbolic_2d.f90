@@ -78,6 +78,12 @@ CONTAINS
     !> @param[in] metric Large-slope gravity factor at the shared face.
     !> @param[in] normal Normal velocity index (idx_u or idx_v).
     !> @param[out] a_minus,a_plus Common preliminary wave bounds.
+    !> @param[in] q1_left q1 left argument of eval_total_depth_face_speed_bounds.
+    !> @param[in] q2_left q2 left argument of eval_total_depth_face_speed_bounds.
+    !> @param[in] q1_right q1 right argument of eval_total_depth_face_speed_bounds.
+    !> @param[in] q2_right q2 right argument of eval_total_depth_face_speed_bounds.
+    !> @param[out] a_minus a minus argument of eval_total_depth_face_speed_bounds.
+    !> @param[out] a_plus a plus argument of eval_total_depth_face_speed_bounds.
     SUBROUTINE eval_total_depth_face_speed_bounds(q1_left,q2_left,q1_right,q2_right, &
         metric,normal,a_minus,a_plus)
         USE equation_terms_2d, ONLY : eval_local_speeds_direction
@@ -133,6 +139,14 @@ CONTAINS
     !> @param[in] lower,upper Prepared reconstructed layer traces.
     !> @param[in] nxfaces,nyfaces Numbers of active x/y faces.
     !> @param[in] jx,kx,jy,ky Shared compact face indices.
+    !> @param[in] lower lower argument of eval_total_depth_speeds.
+    !> @param[in] upper upper argument of eval_total_depth_speeds.
+    !> @param[in] nxfaces nxfaces argument of eval_total_depth_speeds.
+    !> @param[in] jx jx argument of eval_total_depth_speeds.
+    !> @param[in] kx kx argument of eval_total_depth_speeds.
+    !> @param[in] nyfaces nyfaces argument of eval_total_depth_speeds.
+    !> @param[in] jy jy argument of eval_total_depth_speeds.
+    !> @param[in] ky ky argument of eval_total_depth_speeds.
     SUBROUTINE eval_total_depth_speeds(this,lower,upper,nxfaces,jx,kx,nyfaces,jy,ky)
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: lower,upper
@@ -197,6 +211,23 @@ CONTAINS
     !> @param[in] nx,ny Shared face counts by Cartesian direction.
     !> @param[in] jx,kx,jy,ky Shared compact face coordinates.
     !> @param[in] axn,axp,ayn,ayp Validated coupled face-speed bounds.
+    !> @param[in] l1 l1 argument of add_interlayer_terms.
+    !> @param[in] l2 l2 argument of add_interlayer_terms.
+    !> @param[in,out] r1 r1 argument of add_interlayer_terms.
+    !> @param[in,out] r2 r2 argument of add_interlayer_terms.
+    !> @param[in] nc nc argument of add_interlayer_terms.
+    !> @param[in] jc jc argument of add_interlayer_terms.
+    !> @param[in] kc kc argument of add_interlayer_terms.
+    !> @param[in] nx nx argument of add_interlayer_terms.
+    !> @param[in] jx jx argument of add_interlayer_terms.
+    !> @param[in] kx kx argument of add_interlayer_terms.
+    !> @param[in] ny ny argument of add_interlayer_terms.
+    !> @param[in] jy jy argument of add_interlayer_terms.
+    !> @param[in] ky ky argument of add_interlayer_terms.
+    !> @param[in] axn axn argument of add_interlayer_terms.
+    !> @param[in] axp axp argument of add_interlayer_terms.
+    !> @param[in] ayn ayn argument of add_interlayer_terms.
+    !> @param[in] ayp ayp argument of add_interlayer_terms.
     SUBROUTINE add_interlayer_terms(l1,l2,hp2,r1,r2,active,nc,jc,kc,qp2, &
         nx,jx,kx,ny,jy,ky,axn,axp,ayn,ayp)
         USE nonconservative_2d, ONLY : PATH_DIR_X,PATH_DIR_Y
@@ -465,6 +496,9 @@ CONTAINS
     !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
     !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
 
+    !> @param[in] reuse_cfl_traces Flag allowing reuse of CFL reconstruction traces.
+    !> @param[in] lower_recon Lower-layer reconstruction.
+    !> @param[in] h_lower Lower-layer depth.
     SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                                                            &
             divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,                                           &
             j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y,                                                &
@@ -633,6 +667,7 @@ CONTAINS
     !> \param[in] k Cell y index.
     !> \param[in] axis One for x momentum, two for y momentum.
     !> \param[in,out] residual Assembled normal-momentum spatial term.
+    !> @param[in] this Owning object.
     SUBROUTINE cancel_resting_roundoff(this,recon,j,k,axis,residual)
         CLASS(hyperbolic_workspace_type), INTENT(IN) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
@@ -702,6 +737,7 @@ CONTAINS
     !> @param[in] selected_h Depth at which cached_gamma was evaluated.
     !> @param[in] clamp_buoyant_pressure Apply the upper-layer nonnegative-pressure condition.
     !> @return Absolute pressure scale used only for stationary-roundoff cancellation.
+    !> @brief hydrostatic arithmetic scale operation.
     FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h,                          &
         clamp_buoyant_pressure) RESULT(scale)
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
@@ -744,17 +780,7 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Evaluate oriented PCCU numerical fluxes for active faces.
-    !> @param[in,out] this Hyperbolic workspace receiving face fluxes.
-    !> @param[in] recon Accepted reconstructed interface traces.
-    !> @param[in] qp_center Cell-centered physical state arrays.
-    !> @param[in] use_dry_donor Select dry-donor face treatment.
-    !> @param[in] t Physical evaluation time [s].
-    !> @param[in] solve_interfaces_x Number of active x faces.
-    !> @param[in] j_stag_x X indices of active x faces.
-    !> @param[in] k_stag_x Y indices of active x faces.
-    !> @param[in] solve_interfaces_y Number of active y faces.
-    !> @param[in] j_stag_y X indices of active y faces.
-    !> @param[in] k_stag_y Y indices of active y faces.
+    !> @param[in] lower_recon Lower-layer reconstruction.
     SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t, solve_interfaces_x, j_stag_x,                 &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y, lower_recon )
 
@@ -1058,10 +1084,6 @@ CONTAINS
     !> \param[in] bed_face Unique bed elevation shared by both states at this face.
     !> \param[in] qp_adv_left Physical face state, including advective velocities.
     !> \param[in] qp_adv_right Physical face state, including advective velocities.
-    !> \param[in] h_minmod_left Minmod-reconstructed depth on the negative side.
-    !> \param[in] h_minmod_right Minmod-reconstructed depth on the positive side.
-    !> \param[in] h_froude_left Froude-blend depth on the negative side.
-    !> \param[in] h_froude_right Froude-blend depth on the positive side.
     !> \param[in] grav_coeff Large-slope gravity factor at the interface.
     !> \param[in] a_minus Negative face speed bound.
     !> \param[in] a_plus Positive face speed bound.
@@ -1076,6 +1098,12 @@ CONTAINS
     !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
     !> @param[in] diagnose_front Enable opt-in diagnostic for a wet-to-dry x-face.
     !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
+    !> @param[in] h_selected_left h selected left argument of eval_pccu_interface.
+    !> @param[in] h_selected_right h selected right argument of eval_pccu_interface.
+    !> @param[in] gamma_left_cached gamma left cached argument of eval_pccu_interface.
+    !> @param[in] gamma_right_cached gamma right cached argument of eval_pccu_interface.
+    !> @param[in] bed_face_left bed face left argument of eval_pccu_interface.
+    !> @param[in] bed_face_right bed face right argument of eval_pccu_interface.
     SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face, h_selected_left,h_selected_right,                      &
             qp_adv_left,qp_adv_right,                                                                                  &
             grav_coeff,a_minus,a_plus,gamma_left_cached,gamma_right_cached,                                          &
@@ -1334,10 +1362,6 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Extend the wet-side hydrostatic coefficient across a dry interface.
-    !> @param[in] h_left Depth at the negative-side face state [m].
-    !> @param[in,out] gamma_left Hydrostatic coefficient at the negative-side face state.
-    !> @param[in] h_right Depth at the positive-side face state [m].
-    !> @param[in,out] gamma_right Hydrostatic coefficient at the positive-side face state.
     PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
         REAL(wp), INTENT(IN) :: h_left,h_right
         REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
@@ -1399,13 +1423,7 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Integrate within-cell nonconservative hydrostatic paths.
-    !> @param[in,out] this Hyperbolic workspace receiving path integrals.
-    !> @param[in] recon Prepared reconstruction state and traces.
-    !> @param[in] qp_expl Cell-centered primitive flow states.
-    !> @param[in] use_dry_donor Enable dry-state donor treatment.
-    !> @param[in] solve_cells Number of active cells.
-    !> @param[in] j_cent X indices of active cells.
-    !> @param[in] k_cent Y indices of active cells.
+    !> @param[in] lower_recon Lower-layer reconstruction.
     SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent, &
         lower_recon )
 
@@ -1509,6 +1527,8 @@ CONTAINS
     !> @param[in] selected_h_plus Final face depth of the positive side.
     !> @param[in] clamp_buoyant_pressure Suppress negative pressure at buoyant L2 endpoints.
     !> @param[out] gamma_minus_out,gamma_plus_out Optional resolved pressure coefficients.
+    !> @param[out] gamma_minus_out gamma minus out argument of eval_cell_hydrostatic_path.
+    !> @param[out] gamma_plus_out gamma plus out argument of eval_cell_hydrostatic_path.
     SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path, &
         cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus,clamp_buoyant_pressure, &
         gamma_minus_out,gamma_plus_out)
@@ -1601,14 +1621,6 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Compute characteristic wave-speed bounds at reconstructed faces.
-    !> @param[in,out] this Hyperbolic workspace receiving speed bounds.
-    !> @param[in] recon Reconstructed left and right states.
-    !> @param[in] solve_interfaces_x Number of active x-oriented interfaces.
-    !> @param[in] j_stag_x X indices of active x interfaces.
-    !> @param[in] k_stag_x Y indices of active x interfaces.
-    !> @param[in] solve_interfaces_y Number of active y-oriented interfaces.
-    !> @param[in] j_stag_y X indices of active y interfaces.
-    !> @param[in] k_stag_y Y indices of active y interfaces.
     SUBROUTINE eval_speeds( this, recon, solve_interfaces_x, j_stag_x,                                                 &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
@@ -1719,12 +1731,6 @@ CONTAINS
 
 
     !> @brief Combine endpoint characteristic bounds for one oriented interface.
-    !> @param[in] qp_minus Primitive state on the negative side.
-    !> @param[in] qp_plus Primitive state on the positive side.
-    !> @param[in] grav_coeff Effective gravitational coefficient.
-    !> @param[in] normal_velocity_index Primitive normal-velocity component index.
-    !> @param[out] speed_minus Lower characteristic bound.
-    !> @param[out] speed_plus Upper characteristic bound.
     !> @param[out] gamma_minus Hydrostatic coefficient of the negative trace.
     !> @param[out] gamma_plus Hydrostatic coefficient of the positive trace.
     !> @param[in] clamp_buoyant_pressure Suppress negative L2 hydrostatic coefficients.

@@ -754,6 +754,8 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !>          initializes all cells, including inactive and dry cells, to zero.
     !******************************************************************************
     !> Assign an already time-integrated bed and refresh its derived geometry.
+    !> @param[in] bed_candidate Candidate bed elevation.
+    !> @param[out] accepted True if the proposed update was accepted.
     SUBROUTINE assign_topography_vertices(bed_candidate,accepted)
         REAL(wp), INTENT(IN) :: bed_candidate(:,:)
         LOGICAL, INTENT(OUT) :: accepted
@@ -802,6 +804,8 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     END SUBROUTINE assign_topography_vertices
 
     !> Validate every geometry field used by subsequent Lie groups.
+    !> @brief topography geometry is finite operation.
+    !> @return Result computed by topography_geometry_is_finite.
     LOGICAL FUNCTION topography_geometry_is_finite()
         topography_geometry_is_finite=.FALSE.
         IF (.NOT.ALL(ieee_is_finite(B_vertex))) RETURN
@@ -1461,6 +1465,13 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !> Apply a sparse cell-centred bed rate without rebuilding the entire grid.
     !> The caller owns the Lie geometry transaction and restores it on failure.
     !> The changed-cell box is expanded by the Q1 and five-point LS stencils.
+    !> @param[in] cell_rate Cell-local bed evolution rate.
+    !> @param[in] dt Integration time increment.
+    !> @param[in] jmin jmin argument of apply_local_bed_rate.
+    !> @param[in] jmax jmax argument of apply_local_bed_rate.
+    !> @param[in] kmin kmin argument of apply_local_bed_rate.
+    !> @param[in] kmax kmax argument of apply_local_bed_rate.
+    !> @param[out] accepted True if the proposed update was accepted.
     SUBROUTINE apply_local_bed_rate(cell_rate,dt,jmin,jmax,kmin,kmax,accepted)
         USE parameters_2d, ONLY : slope_correction_flag
         REAL(wp), INTENT(IN) :: cell_rate(comp_cells_x,comp_cells_y),dt
@@ -1632,6 +1643,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
             ALL(ieee_is_finite(grav_coeff_stag_y(dj0:dj1,dk0:MIN(comp_interfaces_y,dk1+1))))
     END SUBROUTINE apply_local_bed_rate
 
+    !> @brief derive topography from vertices operation.
     SUBROUTINE derive_topography_from_vertices
 
     IMPLICIT NONE
@@ -1702,6 +1714,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     !******************************************************************************
 
     !> Snapshot authoritative topography and derived geometry before a transaction.
+    !> @param[in] sparse sparse argument of begin_geometry_transaction.
     SUBROUTINE begin_geometry_transaction(sparse)
         LOGICAL, OPTIONAL, INTENT(IN) :: sparse
         IF (geometry_transaction_active)                                                                               &
@@ -1732,6 +1745,19 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
 
     !> Preserve only the fields potentially changed by the local Q1/LS update.
     !> Fields are captured before the first write, once per Lie transaction.
+    !> @brief capture local geometry operation.
+    !> @param[in] j0 j0 argument of capture_local_geometry.
+    !> @param[in] j1 j1 argument of capture_local_geometry.
+    !> @param[in] k0 k0 argument of capture_local_geometry.
+    !> @param[in] k1 k1 argument of capture_local_geometry.
+    !> @param[in] cj0 cj0 argument of capture_local_geometry.
+    !> @param[in] cj1 cj1 argument of capture_local_geometry.
+    !> @param[in] ck0 ck0 argument of capture_local_geometry.
+    !> @param[in] ck1 ck1 argument of capture_local_geometry.
+    !> @param[in] dj0 dj0 argument of capture_local_geometry.
+    !> @param[in] dj1 dj1 argument of capture_local_geometry.
+    !> @param[in] dk0 dk0 argument of capture_local_geometry.
+    !> @param[in] dk1 dk1 argument of capture_local_geometry.
     SUBROUTINE capture_local_geometry(j0,j1,k0,k1,cj0,cj1,ck0,ck1,dj0,dj1,dk0,dk1)
         INTEGER, INTENT(IN) :: j0,j1,k0,k1,cj0,cj1,ck0,ck1,dj0,dj1,dk0,dk1
         IF (geometry_sparse_patch_saved) ERROR STOP 'nested local geometry update'
@@ -1754,6 +1780,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     END SUBROUTINE capture_local_geometry
 
     !> Accept geometric changes and discard the pre-transaction snapshot.
+    !> @brief commit geometry transaction operation.
     SUBROUTINE commit_geometry_transaction
         IF (.NOT.geometry_transaction_active)                                                                          &
             ERROR STOP 'no geometry transaction to commit'
@@ -1761,6 +1788,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     END SUBROUTINE commit_geometry_transaction
 
     !> Restore the original bed and derived geometric fields on rejection.
+    !> @brief rollback geometry transaction operation.
     SUBROUTINE rollback_geometry_transaction
         IF (.NOT.geometry_transaction_active) RETURN
         IF (geometry_transaction_sparse) THEN
@@ -1799,6 +1827,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         CALL clear_geometry_transaction
     END SUBROUTINE rollback_geometry_transaction
 
+    !> @brief clear geometry transaction operation.
     SUBROUTINE clear_geometry_transaction
         IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
         IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
@@ -1817,6 +1846,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         geometry_sparse_patch_saved=.FALSE.
     END SUBROUTINE clear_geometry_transaction
 
+    !> @brief refresh topography geometry operation.
     SUBROUTINE refresh_topography_geometry
 
     IMPLICIT NONE

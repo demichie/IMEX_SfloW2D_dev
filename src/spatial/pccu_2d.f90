@@ -94,6 +94,14 @@ CONTAINS
     !>             operator uses eta2=B+h1+h2, its -G*L*dh1 term is already present;
     !>             only this metric component can be added without double counting.
     !>             This decomposition assumes a common straight path in (h1,L,G).
+    !> @param[in] h1_left h1 left argument of eval_interlayer_pressure_path.
+    !> @param[in] load_left load left argument of eval_interlayer_pressure_path.
+    !> @param[in] metric_left metric left argument of eval_interlayer_pressure_path.
+    !> @param[in] h1_right h1 right argument of eval_interlayer_pressure_path.
+    !> @param[in] load_right load right argument of eval_interlayer_pressure_path.
+    !> @param[in] metric_right metric right argument of eval_interlayer_pressure_path.
+    !> @param[out] path_l1 path l1 argument of eval_interlayer_pressure_path.
+    !> @param[out] path_l2 path l2 argument of eval_interlayer_pressure_path.
     SUBROUTINE eval_interlayer_pressure_path(direction,h1_left,load_left,metric_left, &
         h1_right,load_right,metric_right,path_l1,path_l2,path_l2_metric)
         INTEGER, INTENT(IN) :: direction
@@ -151,6 +159,16 @@ CONTAINS
     !> @param[in] metric_left,metric_right Shared large-slope factors.
     !> @param[out] path_l1 Full L1 interlayer contribution.
     !> @param[out] correction_l2 L2 contribution not already in hydrostatic path.
+    !> @param[in] h1_left h1 left argument of eval_interlayer_pressure_correction.
+    !> @param[in] h2_left h2 left argument of eval_interlayer_pressure_correction.
+    !> @param[in] gamma_left gamma left argument of eval_interlayer_pressure_correction.
+    !> @param[in] eta2_left eta2 left argument of eval_interlayer_pressure_correction.
+    !> @param[in] metric_left metric left argument of eval_interlayer_pressure_correction.
+    !> @param[in] h1_right h1 right argument of eval_interlayer_pressure_correction.
+    !> @param[in] h2_right h2 right argument of eval_interlayer_pressure_correction.
+    !> @param[in] gamma_right gamma right argument of eval_interlayer_pressure_correction.
+    !> @param[in] eta2_right eta2 right argument of eval_interlayer_pressure_correction.
+    !> @param[in] metric_right metric right argument of eval_interlayer_pressure_correction.
     SUBROUTINE eval_interlayer_pressure_correction(direction, &
         h1_left,h2_left,gamma_left,eta2_left,metric_left, &
         h1_right,h2_right,gamma_right,eta2_right,metric_right, &
@@ -188,6 +206,20 @@ CONTAINS
     !> @param[in] a_minus,a_plus Validated coupled characteristic bounds.
     !> @param[out] left_l1,right_l1 Oriented lower-layer pressure contributions.
     !> @param[out] left_l2,right_l2 Oriented upper-layer correction contributions.
+    !> @param[in] h1_left h1 left argument of eval_interlayer_oriented_face.
+    !> @param[in] h2_left h2 left argument of eval_interlayer_oriented_face.
+    !> @param[in] gamma_left gamma left argument of eval_interlayer_oriented_face.
+    !> @param[in] eta2_left eta2 left argument of eval_interlayer_oriented_face.
+    !> @param[in] h1_right h1 right argument of eval_interlayer_oriented_face.
+    !> @param[in] h2_right h2 right argument of eval_interlayer_oriented_face.
+    !> @param[in] gamma_right gamma right argument of eval_interlayer_oriented_face.
+    !> @param[in] eta2_right eta2 right argument of eval_interlayer_oriented_face.
+    !> @param[in] a_minus a minus argument of eval_interlayer_oriented_face.
+    !> @param[in] a_plus a plus argument of eval_interlayer_oriented_face.
+    !> @param[out] left_l1 left l1 argument of eval_interlayer_oriented_face.
+    !> @param[out] right_l1 right l1 argument of eval_interlayer_oriented_face.
+    !> @param[out] left_l2 left l2 argument of eval_interlayer_oriented_face.
+    !> @param[out] right_l2 right l2 argument of eval_interlayer_oriented_face.
     SUBROUTINE eval_interlayer_oriented_face(direction, &
         h1_left,h2_left,gamma_left,eta2_left, &
         h1_right,h2_right,gamma_right,eta2_right,metric, &
@@ -250,6 +282,10 @@ CONTAINS
     END SUBROUTINE eval_interlayer_oriented_face
 
     !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
+    !> @param[in] direction direction argument of interlayer_pressure_integrand.
+    !> @param[in] path_state path state argument of interlayer_pressure_integrand.
+    !> @param[in] dstate_ds dstate ds argument of interlayer_pressure_integrand.
+    !> @param[out] integrand integrand argument of interlayer_pressure_integrand.
     SUBROUTINE interlayer_pressure_integrand(direction,path_state,dstate_ds,integrand)
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(IN) :: path_state(:),dstate_ds(:)
@@ -354,6 +390,15 @@ CONTAINS
     !> @brief Compute factored PCCU transport, preserving one-sided upwind limits.
     !> @details This is the transport expression used by the production HP-PCCU
     !>          interface before component and dry-donor flux guards.
+    !> @param[in] a_minus a minus argument of eval_pccu_advective_flux.
+    !> @param[in] a_plus a plus argument of eval_pccu_advective_flux.
+    !> @param[in] u_left u left argument of eval_pccu_advective_flux.
+    !> @param[in] u_right u right argument of eval_pccu_advective_flux.
+    !> @param[in] q_left q left argument of eval_pccu_advective_flux.
+    !> @param[in] q_right q right argument of eval_pccu_advective_flux.
+    !> @param[in] flux_left flux left argument of eval_pccu_advective_flux.
+    !> @param[in] flux_right flux right argument of eval_pccu_advective_flux.
+    !> @param[out] flux flux argument of eval_pccu_advective_flux.
     SUBROUTINE eval_pccu_advective_flux(a_minus,a_plus,u_left,u_right, &
             q_left,q_right,flux_left,flux_right,flux)
         REAL(wp), INTENT(IN) :: a_minus,a_plus,u_left,u_right

@@ -100,6 +100,10 @@ CONTAINS
     !> @param[in] h_lower Nonnegative cell-centered lower-layer thickness [m].
     !> @param[out] bed_center Effective upper-layer cell-center base [m].
     !> @param[out] bed_w,bed_e,bed_s,bed_n Cell-owned effective face bases [m].
+    !> @param[out] bed_w bed w argument of prepare_upper_layer_bed.
+    !> @param[out] bed_e bed e argument of prepare_upper_layer_bed.
+    !> @param[out] bed_s bed s argument of prepare_upper_layer_bed.
+    !> @param[out] bed_n bed n argument of prepare_upper_layer_bed.
     SUBROUTINE prepare_upper_layer_bed(this,h_lower,bed_center,bed_w,bed_e,bed_s,bed_n)
         CLASS(reconstruction_workspace_type), INTENT(IN) :: this
         ! Assumed shape accepts the noncontiguous qp(idx_h,:,:) view without
@@ -784,8 +788,6 @@ CONTAINS
     !> @brief Reconstruct free-surface elevation and transport-depth candidates for one cell.
     !> @details Reconstructs local slopes using configured limiter and topography;
     !>          preserves KT and Froude transport-depth candidates for face selection.
-    !> @param[in,out] this Reconstruction workspace containing reconstructed traces.
-    !> @param[in] qp_expl Cell-centered primitive states including stencil halo.
     !> @param[in] j X index of the workset cell.
     !> @param[in] k Y index of the workset cell.
     !> @param[in] lower_recon Optional L1 HP traces; provided only for L2.
@@ -1700,8 +1702,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
         !> \brief Compute positivity-constrained free-surface traces for one parent-workset cell.
         !>
-        !> \param[in] jc X index of the current cell in the parent reconstruction.
-        !> \param[in] kc Y index of the current cell in the parent reconstruction.
         !>
         !> \note Reads the host qp_center and shared face bed; writes only this cell eta candidates
         !> in
@@ -1721,6 +1721,11 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !>          cell-based eta, minmod and Froude candidates are then dry,
     !>          but the external face must use its prescribed wet depth.
     !>          Neumann/outflow and source boundaries are left unchanged.
+    !> @param[in] depth_bc depth bc argument of preserve_dirichlet_hp_depth.
+    !> @param[in] bed bed argument of preserve_dirichlet_hp_depth.
+    !> @param[in,out] eta eta argument of preserve_dirichlet_hp_depth.
+    !> @param[in,out] h_minmod h minmod argument of preserve_dirichlet_hp_depth.
+    !> @param[in,out] h_froude h froude argument of preserve_dirichlet_hp_depth.
     SUBROUTINE preserve_dirichlet_hp_depth(depth_bc,trace,bed,eta,h_minmod,h_froude)
         TYPE(bc), INTENT(IN) :: depth_bc
         REAL(wp), INTENT(INOUT) :: trace(n_vars),eta,h_minmod,h_froude
@@ -1737,6 +1742,18 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !> Convert an imposed discharge (Dirichlet or Neumann) into a primitive
     !> velocity boundary value, using the reconstructed first-pass depth.
+    !> @brief discharge bc to velocity operation.
+    !> @param[in] discharge_bc discharge bc argument of discharge_bc_to_velocity.
+    !> @param[in] hc hc argument of discharge_bc_to_velocity.
+    !> @param[in] uc uc argument of discharge_bc_to_velocity.
+    !> @param[in] hn hn argument of discharge_bc_to_velocity.
+    !> @param[in] un un argument of discharge_bc_to_velocity.
+    !> @param[in] hface hface argument of discharge_bc_to_velocity.
+    !> @param[in] half half argument of discharge_bc_to_velocity.
+    !> @param[in] inv_dx inv dx argument of discharge_bc_to_velocity.
+    !> @param[in] side side argument of discharge_bc_to_velocity.
+    !> @param[in] normal normal argument of discharge_bc_to_velocity.
+    !> @param[out] velocity_bc velocity bc argument of discharge_bc_to_velocity.
     SUBROUTINE discharge_bc_to_velocity(discharge_bc,hc,uc,hn,un,hface,half,inv_dx,side,normal,velocity_bc)
         TYPE(bc), INTENT(IN) :: discharge_bc
         REAL(wp), INTENT(IN) :: hc,uc,hn,un,hface,half,inv_dx
@@ -1759,6 +1776,15 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     END SUBROUTINE discharge_bc_to_velocity
 
     !> Evaluate the boundary discharge in the original physical input units.
+    !> @brief boundary discharge value operation.
+    !> @param[in] discharge_bc discharge bc argument of boundary_discharge_value.
+    !> @param[in] qc qc argument of boundary_discharge_value.
+    !> @param[in] qn qn argument of boundary_discharge_value.
+    !> @param[in] half half argument of boundary_discharge_value.
+    !> @param[in] inv_dx inv dx argument of boundary_discharge_value.
+    !> @param[in] side side argument of boundary_discharge_value.
+    !> @param[in] normal normal argument of boundary_discharge_value.
+    !> @param[out] discharge discharge argument of boundary_discharge_value.
     SUBROUTINE boundary_discharge_value(discharge_bc,qc,qn,half,inv_dx,side,normal,discharge)
         TYPE(bc), INTENT(IN) :: discharge_bc
         REAL(wp), INTENT(IN) :: qc,qn,half,inv_dx
@@ -1789,6 +1815,17 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !> Enforce prescribed hu/hv after HP depth selection, preserving the
     !> original physical meaning of HU_BC/HV_BC (including Neumann gradients).
+    !> @brief enforce boundary discharge operation.
+    !> @param[in,out] trace trace argument of enforce_boundary_discharge.
+    !> @param[in] hselected hselected argument of enforce_boundary_discharge.
+    !> @param[in] qcenter qcenter argument of enforce_boundary_discharge.
+    !> @param[in] qneighbor qneighbor argument of enforce_boundary_discharge.
+    !> @param[in] discharge_bc discharge bc argument of enforce_boundary_discharge.
+    !> @param[in] half half argument of enforce_boundary_discharge.
+    !> @param[in] inv_dx inv dx argument of enforce_boundary_discharge.
+    !> @param[in] side side argument of enforce_boundary_discharge.
+    !> @param[in] normal normal argument of enforce_boundary_discharge.
+    !> @param[in] idx idx argument of enforce_boundary_discharge.
     SUBROUTINE enforce_boundary_discharge(trace,hselected,qcenter,qneighbor,discharge_bc,half,inv_dx,side,normal,idx)
         REAL(wp), INTENT(INOUT) :: trace(n_vars)
         REAL(wp), INTENT(IN) :: hselected,qcenter(n_vars),qneighbor(n_vars),half,inv_dx
