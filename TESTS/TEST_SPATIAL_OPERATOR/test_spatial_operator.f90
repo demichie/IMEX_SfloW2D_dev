@@ -1069,6 +1069,13 @@ CONTAINS
         previous_deposition=0.0_wp
         elapsed_time=0.0_wp
         DO step_id=1,5
+            ! The preceding Lie step publishes the updated wetness into the
+            ! shared domain mask. Rebuild its solve and HP worksets before
+            ! the next spatial evaluation, as in the production time loop.
+            CALL paired%check_solve(coupled_state%q(:,1,:,:),elapsed_time,.FALSE., &
+                q_other=coupled_state%q(:,2,:,:))
+            CALL operators(1)%prepare_hp_workset(paired)
+            CALL operators(2)%prepare_hp_workset(paired)
             ! Recompute the admissible coupled CFL on the evolving state.
             pt1=coupled_state%qp(:,1,:,:)
             pt2=coupled_state%qp(:,2,:,:)
