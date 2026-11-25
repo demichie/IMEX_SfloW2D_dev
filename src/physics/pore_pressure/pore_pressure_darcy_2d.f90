@@ -31,9 +31,9 @@ CONTAINS
 
     !> @brief Reject the unsupported explicit Darcy pressure treatment.
     !> @param[in] config Layer Darcy configuration (unused by this unsupported method).
-  !> @param[in] state Local real physical cell state.
-  !> @param[out] rate Conservative source rate, unused before failure.
-  !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
+    !> @param[in] state Local real physical cell state.
+    !> @param[out] rate Conservative source rate, unused before failure.
+    !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
     SUBROUTINE eval_pore_pressure_darcy_explicit(config,state,rate,include_gas_loss)
         TYPE(pore_pressure_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -44,10 +44,10 @@ CONTAINS
 
     !> @brief Reject the unsupported semi-implicit Darcy treatment.
     !> @param[in] config Layer Darcy configuration (unused by this unsupported method).
-  !> @param[in] state Local real physical cell state.
-  !> @param[out] rate Conservative source rate, unused before failure.
-  !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
-  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(config,state,rate,include_gas_loss)
+    !> @param[in] state Local real physical cell state.
+    !> @param[out] rate Conservative source rate, unused before failure.
+    !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
+    SUBROUTINE eval_pore_pressure_darcy_semi_implicit(config,state,rate,include_gas_loss)
         TYPE(pore_pressure_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -57,10 +57,10 @@ CONTAINS
 
     !> @brief Reject the unsupported Newton Darcy treatment.
     !> @param[in] config Layer Darcy configuration (unused by this unsupported method).
-  !> @param[in] state Local complex physical cell state.
-  !> @param[out] rate Complex conservative rate, unused before failure.
-  !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
-  SUBROUTINE eval_pore_pressure_darcy_implicit(config,state,rate,include_gas_loss)
+    !> @param[in] state Local complex physical cell state.
+    !> @param[out] rate Complex conservative rate, unused before failure.
+    !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
+    SUBROUTINE eval_pore_pressure_darcy_implicit(config,state,rate,include_gas_loss)
         TYPE(pore_pressure_config_type), INTENT(IN) :: config
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)

@@ -1,6 +1,6 @@
 !******************************************************************************
-!	Written for 'complexify.py 1.3'
-!	J.R.R.A.Martins 1999
+!       Written for 'complexify.py 1.3'
+!       J.R.R.A.Martins 1999
 !       21-Apr-00  Fixed tan, sinh, cosh
 !                  sign now returns complex
 !                  added log10 and nint

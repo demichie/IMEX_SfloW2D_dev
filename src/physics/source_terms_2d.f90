@@ -136,7 +136,7 @@ CONTAINS
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
                 group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready,rheology, &
                 mass_config,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed, &
-                 group%scope==SOURCE_SCOPE_L1)
+                group%scope==SOURCE_SCOPE_L1)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
