@@ -347,8 +347,8 @@ MODULE parameters_2d
     TYPE(bc), ALLOCATABLE :: bcN(:,:)
 
 CONTAINS
-    !> Configure canonical physical and conservative indices for a complete state.
-    !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
+    !> @brief Assign canonical primitive and conservative component indices.
+    !> @details Reject inconsistent solid, gas and optional-field counts before indexing.
     SUBROUTINE configure_canonical_state_indices()
         INTEGER :: next_index
         IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0)                                         &
@@ -385,6 +385,9 @@ CONTAINS
         idx_u=2; idx_v=3
     END SUBROUTINE configure_canonical_state_indices
 
+    !> @brief Reinitialize mass-exchange rate workspace for the configured species counts.
+    !> @details Resize allocated species arrays when the layout changes and zero all rate fields.
+    !> @param[in,out] r Rate workspace, preserving valid allocations where possible.
     SUBROUTINE reset_mass_exchange_rates(r)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

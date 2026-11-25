@@ -89,6 +89,11 @@ CONTAINS
     END SUBROUTINE apply_interlayer_momentum_exchange_analytic
     !> @brief Reject unsupported explicit treatment for interlayer momentum exchange.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide drag model and coefficient.
+    !> @param[in] dt Proposed drag-only Lie duration [s].
+    !> @param[in,out] q Conservative L1/L2 candidates, unchanged on fatal failure.
+    !> @param[in,out] qp Primitive L1/L2 candidates, unchanged on fatal failure.
+    !> @param[out] accepted False because the requested source method is unavailable.
     SUBROUTINE apply_interlayer_momentum_exchange_explicit(config,dt,q,qp,accepted)
         TYPE(interlayer_momentum_exchange_config_type), INTENT(IN) :: config
         REAL(wp), INTENT(IN) :: dt
@@ -101,6 +106,11 @@ CONTAINS
 
     !> @brief Reject unsupported semi-implicit treatment for interlayer momentum exchange.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide drag model and coefficient.
+    !> @param[in] dt Proposed drag-only Lie duration [s].
+    !> @param[in,out] q Conservative L1/L2 candidates, unchanged on fatal failure.
+    !> @param[in,out] qp Primitive L1/L2 candidates, unchanged on fatal failure.
+    !> @param[out] accepted False because the requested source method is unavailable.
     SUBROUTINE apply_interlayer_momentum_exchange_semi_implicit(config,dt,q,qp,accepted)
         TYPE(interlayer_momentum_exchange_config_type), INTENT(IN) :: config
         REAL(wp), INTENT(IN) :: dt
@@ -113,6 +123,11 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for interlayer momentum exchange.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide drag model and coefficient.
+    !> @param[in] dt Proposed drag-only Lie duration [s].
+    !> @param[in,out] q Conservative L1/L2 candidates, unchanged on fatal failure.
+    !> @param[in,out] qp Primitive L1/L2 candidates, unchanged on fatal failure.
+    !> @param[out] accepted False because the requested source method is unavailable.
     SUBROUTINE apply_interlayer_momentum_exchange_implicit(config,dt,q,qp,accepted)
         TYPE(interlayer_momentum_exchange_config_type), INTENT(IN) :: config
         REAL(wp), INTENT(IN) :: dt

@@ -94,6 +94,12 @@ CONTAINS
     END SUBROUTINE eval_interlayer_elutriation_explicit
     !> @brief Reject unsupported semi-implicit treatment for interlayer elutriation.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide activation, shear and Rouse elutriation coefficients.
+    !> @param[in] mass_l2 L2 particle-drag settings for the settling-velocity estimate.
+    !> @param[in] state_l1 Lower-layer physical donor state for proposed solid flux.
+    !> @param[in] state_l2 Upper-layer physical state used by the interfacial shear law.
+    !> @param[in] dt Proposed Lie source duration [s].
+    !> @param[out] elutriation Zeroed per-class upward solid volume rates before failure.
     SUBROUTINE eval_interlayer_elutriation_semi_implicit(config,mass_l2,state_l1,state_l2,dt,elutriation)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
@@ -107,6 +113,12 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for interlayer elutriation.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide activation, shear and Rouse elutriation coefficients.
+    !> @param[in] mass_l2 L2 particle-drag settings for the settling-velocity estimate.
+    !> @param[in] state_l1 Lower-layer physical donor state for proposed solid flux.
+    !> @param[in] state_l2 Upper-layer physical state used by the interfacial shear law.
+    !> @param[in] dt Proposed Lie source duration [s].
+    !> @param[out] elutriation Zeroed per-class upward solid volume rates before failure.
     SUBROUTINE eval_interlayer_elutriation_implicit(config,mass_l2,state_l1,state_l2,dt,elutriation)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
@@ -120,6 +132,12 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for interlayer elutriation.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide activation, shear and Rouse elutriation coefficients.
+    !> @param[in] mass_l2 L2 particle-drag settings for the settling-velocity estimate.
+    !> @param[in] state_l1 Lower-layer physical donor state for proposed solid flux.
+    !> @param[in] state_l2 Upper-layer physical state used by the interfacial shear law.
+    !> @param[in] dt Proposed Lie source duration [s].
+    !> @param[out] elutriation Zeroed per-class upward solid volume rates before failure.
     SUBROUTINE solve_interlayer_elutriation_analytic(config,mass_l2,state_l1,state_l2,dt,elutriation)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2

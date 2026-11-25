@@ -1,3 +1,6 @@
+!> @file rheology_lahar_drag.inc
+!> @brief Shared lahar viscous and turbulent momentum-resistance source.
+!> @details Combines the configured viscosity with Manning-like turbulent resistance and depth regularization.
 ! Viscous and turbulent lahar drag, with frozen state, in either arithmetic kind.
 rate_x=0.0_wp
 rate_y=0.0_wp

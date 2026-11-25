@@ -63,6 +63,15 @@ CONTAINS
     END SUBROUTINE evaluate_interlayer_drag_chezy_analytic
     !> @brief Reject unsupported explicit treatment for interlayer drag chezy.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] mass_l1 Lower-layer mixture mass per horizontal area [kg/m2].
+    !> @param[in] mass_l2 Upper-layer mixture mass per horizontal area [kg/m2].
+    !> @param[in] rho_l2 Upper-layer mixture density [kg/m3].
+    !> @param[in] velocity_l1 Lower-layer horizontal velocity vector [m/s].
+    !> @param[in] velocity_l2 Upper-layer horizontal velocity vector [m/s].
+    !> @param[in] coefficient Nonnegative Chézy interfacial drag coefficient.
+    !> @param[in] dt Proposed drag-only Lie duration [s].
+    !> @param[out] impulse Zeroed lower-layer momentum impulse before failure.
+    !> @param[out] accepted False because this drag treatment is unsupported.
     SUBROUTINE evaluate_interlayer_drag_chezy_explicit(mass_l1,mass_l2,rho_l2,velocity_l1,velocity_l2, &
         coefficient,dt,impulse,accepted)
         REAL(wp), INTENT(IN) :: mass_l1,mass_l2,rho_l2,coefficient,dt
@@ -77,6 +86,15 @@ CONTAINS
 
     !> @brief Reject unsupported semi-implicit treatment for interlayer drag chezy.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] mass_l1 Lower-layer mixture mass per horizontal area [kg/m2].
+    !> @param[in] mass_l2 Upper-layer mixture mass per horizontal area [kg/m2].
+    !> @param[in] rho_l2 Upper-layer mixture density [kg/m3].
+    !> @param[in] velocity_l1 Lower-layer horizontal velocity vector [m/s].
+    !> @param[in] velocity_l2 Upper-layer horizontal velocity vector [m/s].
+    !> @param[in] coefficient Nonnegative Chézy interfacial drag coefficient.
+    !> @param[in] dt Proposed drag-only Lie duration [s].
+    !> @param[out] impulse Zeroed lower-layer momentum impulse before failure.
+    !> @param[out] accepted False because this drag treatment is unsupported.
     SUBROUTINE evaluate_interlayer_drag_chezy_semi_implicit(mass_l1,mass_l2,rho_l2,velocity_l1,velocity_l2, &
         coefficient,dt,impulse,accepted)
         REAL(wp), INTENT(IN) :: mass_l1,mass_l2,rho_l2,coefficient,dt
@@ -91,6 +109,15 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for interlayer drag chezy.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] mass_l1 Lower-layer mixture mass per horizontal area [kg/m2].
+    !> @param[in] mass_l2 Upper-layer mixture mass per horizontal area [kg/m2].
+    !> @param[in] rho_l2 Upper-layer mixture density [kg/m3].
+    !> @param[in] velocity_l1 Lower-layer horizontal velocity vector [m/s].
+    !> @param[in] velocity_l2 Upper-layer horizontal velocity vector [m/s].
+    !> @param[in] coefficient Nonnegative Chézy interfacial drag coefficient.
+    !> @param[in] dt Proposed drag-only Lie duration [s].
+    !> @param[out] impulse Zeroed lower-layer momentum impulse before failure.
+    !> @param[out] accepted False because this drag treatment is unsupported.
     SUBROUTINE evaluate_interlayer_drag_chezy_implicit(mass_l1,mass_l2,rho_l2,velocity_l1,velocity_l2, &
         coefficient,dt,impulse,accepted)
         REAL(wp), INTENT(IN) :: mass_l1,mass_l2,rho_l2,coefficient,dt

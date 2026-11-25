@@ -43,6 +43,12 @@ CONTAINS
     END SUBROUTINE eval_interlayer_settling_explicit
     !> @brief Reject unsupported semi-implicit treatment for interlayer settling.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide settling activation and transfer configuration.
+    !> @param[in] rheology_l2 Upper-layer rheology for the shared particle-settling law.
+    !> @param[in] mass_l2 Upper-layer particle drag and carrier configuration.
+    !> @param[in] state_l2 Local upper-layer physical donor state.
+    !> @param[in] dt Proposed Lie source duration [s].
+    !> @param[out] settling Zeroed per-class downward solid volume rates before failure.
     SUBROUTINE eval_interlayer_settling_semi_implicit(config,rheology_l2,mass_l2,state_l2,dt,settling)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
@@ -57,6 +63,12 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for interlayer settling.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide settling activation and transfer configuration.
+    !> @param[in] rheology_l2 Upper-layer rheology for the shared particle-settling law.
+    !> @param[in] mass_l2 Upper-layer particle drag and carrier configuration.
+    !> @param[in] state_l2 Local upper-layer physical donor state.
+    !> @param[in] dt Proposed Lie source duration [s].
+    !> @param[out] settling Zeroed per-class downward solid volume rates before failure.
     SUBROUTINE eval_interlayer_settling_implicit(config,rheology_l2,mass_l2,state_l2,dt,settling)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
@@ -71,6 +83,12 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for interlayer settling.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide settling activation and transfer configuration.
+    !> @param[in] rheology_l2 Upper-layer rheology for the shared particle-settling law.
+    !> @param[in] mass_l2 Upper-layer particle drag and carrier configuration.
+    !> @param[in] state_l2 Local upper-layer physical donor state.
+    !> @param[in] dt Proposed Lie source duration [s].
+    !> @param[out] settling Zeroed per-class downward solid volume rates before failure.
     SUBROUTINE solve_interlayer_settling_analytic(config,rheology_l2,mass_l2,state_l2,dt,settling)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2

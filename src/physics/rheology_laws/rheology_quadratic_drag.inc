@@ -1,3 +1,6 @@
+!> @file rheology_quadratic_drag.inc
+!> @brief Shared quadratic horizontal momentum drag.
+!> @details Uses the squared total velocity and configured friction factor; returns zero for a resting state.
 ! Single expression for the quadratic implicit contribution in both kinds.
 rate_x=0.0_wp
 rate_y=0.0_wp

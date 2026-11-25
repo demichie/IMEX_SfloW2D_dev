@@ -1,3 +1,6 @@
+!> @file rheology_lahar_viscosity.inc
+!> @brief Shared temperature- and solids-dependent lahar dynamic viscosity.
+!> @details Uses the configured alpha1 and beta1 coefficients and the water viscosity correlation.
 !> Shared REAL/COMPLEX lahar carrier viscosity correlation.
 !> The caller declares T, alphas_tot, fluid_viscosity, temperature_celsius, exponent_a, exponent_b and alpha1
 !> using the same REAL or COMPLEX kind, with the layer-specific config in scope.

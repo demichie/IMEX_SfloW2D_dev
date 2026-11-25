@@ -92,6 +92,8 @@ CONTAINS
         this%initialized=.TRUE.
     END SUBROUTINE initialize_layer_physics
 
+    !> @brief Clear the layer descriptor without deallocating canonical configurations.
+    !> @param[in,out] this Layer descriptor to detach and mark uninitialized.
     SUBROUTINE finalize_layer_physics(this)
         CLASS(layer_physics_type), INTENT(INOUT) :: this
         NULLIFY(this%rheology)
@@ -103,18 +105,26 @@ CONTAINS
         this%initialized=.FALSE.
     END SUBROUTINE finalize_layer_physics
 
+    !> @brief Check whether canonical configuration references are bound to this layer.
+    !> @param[in] this Layer descriptor to examine.
+    !> @return True when initialization completed successfully.
     PURE LOGICAL FUNCTION layer_physics_initialized(this)
         CLASS(layer_physics_type), INTENT(IN) :: this
         layer_physics_initialized=this%initialized
     END FUNCTION layer_physics_initialized
 
+    !> @brief Return the canonical name of the selected per-layer rheology source.
+    !> @param[in] this Initialized layer descriptor.
+    !> @return Registered source name, empty when rheology is disabled.
     PURE FUNCTION layer_physics_rheology(this) RESULT(name)
         CLASS(layer_physics_type), INTENT(IN) :: this
         CHARACTER(LEN=64) :: name
         name=this%rheology_source
     END FUNCTION layer_physics_rheology
 
-    ! Return a value view; callers cannot modify the canonical configuration through this query.
+    !> @brief Read the rheology configuration without exposing the canonical pointer.
+    !> @param[in] this Layer descriptor with a bound rheology reference.
+    !> @return Independent value copy of the layer rheology settings.
     PURE FUNCTION layer_physics_configuration(this) RESULT(config)
         CLASS(layer_physics_type), INTENT(IN) :: this
         TYPE(rheology_config_type) :: config
@@ -148,6 +158,9 @@ CONTAINS
         config=this%mass_exchange
     END FUNCTION layer_physics_mass_exchange_configuration
 
+    !> @brief Return the canonical rheology source ID for this layer.
+    !> @param[in] this Layer descriptor being queried.
+    !> @return Selected rheology ID, or RHEOLOGY_ID_NONE when disabled.
     PURE INTEGER FUNCTION layer_physics_rheology_id(this)
         CLASS(layer_physics_type), INTENT(IN) :: this
         layer_physics_rheology_id=this%rheology_id

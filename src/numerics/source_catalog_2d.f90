@@ -135,7 +135,9 @@ MODULE source_catalog_2d
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.)                                     &
             ]
 CONTAINS
-    !> Resolve source names at initialization only, never in cell kernels.
+    !> @brief Resolve a canonical source name to its catalog index during setup.
+    !> @param[in] name Exact source identifier from the immutable registry.
+    !> @return One-based catalog ID, or zero if no source matches.
     PURE INTEGER FUNCTION source_term_id_by_name(name) RESULT(id)
         CHARACTER(*), INTENT(IN) :: name
         INTEGER :: i
@@ -148,13 +150,17 @@ CONTAINS
         END DO
     END FUNCTION source_term_id_by_name
 
-    !> Single integer stores the complete active-source set (24 entries).
+    !> @brief Encode a source catalog ID as one bit of the active-source mask.
+    !> @param[in] id One-based source ID to encode.
+    !> @return The corresponding active bit, or zero when out of range.
     PURE INTEGER FUNCTION source_id_mask(id) RESULT(mask)
         INTEGER, INTENT(IN) :: id
         mask=0
         IF (id>=1 .AND. id<=SOURCE_TERM_COUNT) mask=IBSET(mask,id-1)
     END FUNCTION source_id_mask
-    !> Resolve a canonical rheology once; -1 indicates an unknown source.
+    !> @brief Resolve the source ID of a named rheology at initialization.
+    !> @param[in] name Canonical rheology name, or 'none' to disable rheology.
+    !> @return Source ID; RHEOLOGY_ID_NONE for 'none', -1 when unknown.
     PURE INTEGER FUNCTION rheology_source_id(name) RESULT(id)
         CHARACTER(*), INTENT(IN) :: name
         INTEGER :: i

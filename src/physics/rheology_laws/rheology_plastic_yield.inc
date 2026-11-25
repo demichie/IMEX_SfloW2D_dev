@@ -1,3 +1,6 @@
+!> @file rheology_plastic_yield.inc
+!> @brief Shared plastic yield-stress contribution to the momentum source.
+!> @details Returns an opposing stress aligned with the horizontal velocity and guards zero speed.
 ! Single expression for the plastic implicit contribution in both kinds.
 rate_x=0.0_wp
 rate_y=0.0_wp

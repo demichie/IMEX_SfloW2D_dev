@@ -527,6 +527,17 @@ CONTAINS
     END SUBROUTINE apply_interlayer_lie_group
     !> @brief Reject unsupported semi-implicit treatment for interlayer mass exchange.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide solid transfer and carrier co-lift closure.
+    !> @param[in] rheology_l2 L2 rheology configuration used by interlayer settling.
+    !> @param[in] mass_l2 L2 particle drag and carrier configuration.
+    !> @param[in] eval_l1 Lower-layer physical snapshot for law evaluation.
+    !> @param[in] eval_l2 Upper-layer physical snapshot for law evaluation.
+    !> @param[in] limit_l1 Lower-layer recipient state for donor and packing limits.
+    !> @param[in] limit_l2 Upper-layer recipient state for donor and packing limits.
+    !> @param[in] dt Proposed paired-source duration [s].
+    !> @param[out] source_l1 Zeroed lower-layer conservative source vector before failure.
+    !> @param[out] source_l2 Zeroed upper-layer conservative source vector before failure.
+    !> @param[out] valid False because this source method is unsupported.
     SUBROUTINE eval_interlayer_mass_exchange_semi_implicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
         limit_l1,limit_l2,dt,source_l1,source_l2,valid)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
@@ -545,6 +556,17 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for interlayer mass exchange.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide solid transfer and carrier co-lift closure.
+    !> @param[in] rheology_l2 L2 rheology configuration used by interlayer settling.
+    !> @param[in] mass_l2 L2 particle drag and carrier configuration.
+    !> @param[in] eval_l1 Lower-layer physical snapshot for law evaluation.
+    !> @param[in] eval_l2 Upper-layer physical snapshot for law evaluation.
+    !> @param[in] limit_l1 Lower-layer recipient state for donor and packing limits.
+    !> @param[in] limit_l2 Upper-layer recipient state for donor and packing limits.
+    !> @param[in] dt Proposed paired-source duration [s].
+    !> @param[out] source_l1 Zeroed lower-layer conservative source vector before failure.
+    !> @param[out] source_l2 Zeroed upper-layer conservative source vector before failure.
+    !> @param[out] valid False because this source method is unsupported.
     SUBROUTINE eval_interlayer_mass_exchange_implicit(config,rheology_l2,mass_l2,eval_l1,eval_l2,limit_l1,limit_l2,dt, &
         source_l1,source_l2,valid)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
@@ -563,6 +585,17 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for interlayer mass exchange.
     !> @details No candidate state is committed; report the unsupported method.
+    !> @param[in] config Pair-wide solid transfer and carrier co-lift closure.
+    !> @param[in] rheology_l2 L2 rheology configuration used by interlayer settling.
+    !> @param[in] mass_l2 L2 particle drag and carrier configuration.
+    !> @param[in] eval_l1 Lower-layer physical snapshot for law evaluation.
+    !> @param[in] eval_l2 Upper-layer physical snapshot for law evaluation.
+    !> @param[in] limit_l1 Lower-layer recipient state for donor and packing limits.
+    !> @param[in] limit_l2 Upper-layer recipient state for donor and packing limits.
+    !> @param[in] dt Proposed paired-source duration [s].
+    !> @param[out] source_l1 Zeroed lower-layer conservative source vector before failure.
+    !> @param[out] source_l2 Zeroed upper-layer conservative source vector before failure.
+    !> @param[out] valid False because this source method is unsupported.
     SUBROUTINE solve_interlayer_mass_exchange_analytic(config,rheology_l2,mass_l2,eval_l1,eval_l2,limit_l1, &
             limit_l2,dt, &
         source_l1,source_l2,valid)

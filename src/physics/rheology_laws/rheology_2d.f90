@@ -81,6 +81,9 @@ MODULE rheology_2d
 CONTAINS
 
     !> Reject only motion reversal caused by an isolated rheology update.
+    !> @brief Prevent a rheology-only momentum update from reversing the original flow.
+    !> @param[in] momentum_before Two-dimensional momentum immediately before the rheology substep.
+    !> @param[in,out] momentum_after Proposed momentum; its reversed projection is removed in place.
     PURE SUBROUTINE limit_rheology_momentum_reversal(momentum_before, momentum_after)
         REAL(wp), INTENT(IN) :: momentum_before(2)
         REAL(wp), INTENT(INOUT) :: momentum_after(2)
@@ -98,6 +101,15 @@ CONTAINS
     END SUBROUTINE limit_rheology_momentum_reversal
 
 
+    !> @brief Evaluate the explicit two-component momentum rate for one resolved rheology source.
+    !> @param[in] config Immutable constitutive coefficients of the active layer.
+    !> @param[in] model_id Pre-resolved rheology source identifier.
+    !> @param[in] state Real-valued physical cell state for source evaluation.
+    !> @param[in] grav_coeff Topographic gravity correction in the momentum law.
+    !> @param[in] use_pore_pressure Whether effective stress includes pore pressure.
+    !> @param[in] use_stochastic Whether the stochastic rheology perturbation is active.
+    !> @param[in] stochastic_value Cell-local stochastic rheology multiplier.
+    !> @param[out] rate Two-component conservative momentum source [kg/(m s2)].
     SUBROUTINE eval_rheology_explicit(config,model_id, state, grav_coeff,                                              &
         use_pore_pressure, use_stochastic, stochastic_value,                                                           &
         rate)
@@ -146,6 +158,15 @@ CONTAINS
     END SUBROUTINE eval_rheology_explicit
 
 
+    !> @brief Sum frozen-state semi-implicit momentum rates for the selected rheologies.
+    !> @param[in] config Canonical rheology coefficients for the current layer.
+    !> @param[in] models Names of the rheology sources to evaluate.
+    !> @param[in] state Frozen real physical state for this Newton evaluation.
+    !> @param[in] grav_coeff Topographic gravity correction.
+    !> @param[in] use_pore_pressure Whether the effective-stress correction is active.
+    !> @param[in] use_stochastic Whether stochastic friction is enabled.
+    !> @param[in] stochastic_value Cell-local stochastic rheology coefficient.
+    !> @param[out] rate Summed real horizontal momentum-rate components.
     SUBROUTINE eval_rheology_semi_implicit(config,models, state, grav_coeff, use_pore_pressure, use_stochastic,        &
         stochastic_value, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -171,6 +192,15 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
     !> Frozen Newton semi-implicit dispatch with pre-resolved source identity.
+    !> @brief Evaluate a frozen real rheology rate using a pre-resolved source identifier.
+    !> @param[in] config Current layer rheology coefficients.
+    !> @param[in] model_id Rheology source ID resolved during configuration.
+    !> @param[in] state Frozen physical state for the Newton residual.
+    !> @param[in] grav_coeff Corrected gravitational acceleration factor.
+    !> @param[in] use_pore_pressure Enable effective-stress pore-pressure correction.
+    !> @param[in] use_stochastic Enable stochastic rheology coefficients.
+    !> @param[in] stochastic_value Local stochastic coefficient for the source law.
+    !> @param[out] rate Two-component semi-implicit momentum source.
     SUBROUTINE eval_rheology_semi_implicit_id(config,model_id,state,grav_coeff,use_pore_pressure,                      &
             use_stochastic,stochastic_value,rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -215,6 +245,13 @@ CONTAINS
 
         ! Newton/complex-step contract: read-only state and coefficients; return rates only.
         ! Never advance shared inventories or geometry while evaluating this dispatch.
+    !> @brief Sum complex rheology momentum rates for a Newton complex-step evaluation.
+    !> @param[in] config Current layer rheology coefficients.
+    !> @param[in] models Names of complex-differentiated rheology laws to evaluate.
+    !> @param[in] state Unmodified complex physical cell state for differentiation.
+    !> @param[in] use_stochastic Whether stochastic rheology coefficients are active.
+    !> @param[in] stochastic_value Frozen cell-local stochastic coefficient.
+    !> @param[out] rate Sum of complex two-component momentum rates.
     SUBROUTINE eval_rheology_implicit(config,models, state, use_stochastic, stochastic_value, rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         CHARACTER(*), INTENT(IN) :: models(:)
@@ -238,6 +275,13 @@ CONTAINS
     END SUBROUTINE eval_rheology_implicit
 
     !> Newton complex-rate dispatch with source identity resolved at initialization.
+    !> @brief Evaluate a complex rheology momentum rate using a resolved source ID.
+    !> @param[in] config Current layer rheology parameters.
+    !> @param[in] model_id Rheology source identifier selected during setup.
+    !> @param[in] state Complex physical cell state for Jacobian differentiation.
+    !> @param[in] use_stochastic Whether the stochastic coefficient is applied.
+    !> @param[in] stochastic_value Frozen cell-local stochastic coefficient.
+    !> @param[out] rate Complex two-component conservative momentum rate.
     SUBROUTINE eval_rheology_implicit_id(config,model_id,state,use_stochastic,stochastic_value,rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         INTEGER, INTENT(IN) :: model_id
@@ -278,6 +322,13 @@ CONTAINS
 
 
     !> Evaluate the implicit rheology contribution in REAL for Newton residuals.
+    !> @brief Evaluate the real counterpart of a Newton rheology rate without complex conversion.
+    !> @param[in] config Layer-specific rheology coefficients.
+    !> @param[in] model_id Selected rheology source identifier.
+    !> @param[in] state Real physical cell state at the Newton evaluation point.
+    !> @param[in] use_stochastic Whether stochastic rheology is active.
+    !> @param[in] stochastic_value Frozen stochastic coefficient.
+    !> @param[out] rate Real two-component rate matching the complex residual law.
     SUBROUTINE eval_rheology_implicit_real_id(config,model_id,state,use_stochastic,stochastic_value,rate)
         TYPE(rheology_config_type), INTENT(IN) :: config
         INTEGER, INTENT(IN) :: model_id
@@ -311,6 +362,24 @@ CONTAINS
     END SUBROUTINE eval_rheology_implicit_real_id
 
     !> Integrate analytic rheology without copying state in the single-law Lie case.
+    !> @brief Integrate the selected analytic rheologies over one Lie source substep.
+    !> @param[in] config Current layer rheology coefficients.
+    !> @param[in] models Ordered rheology law names to integrate sequentially.
+    !> @param[in] dt Positive source integration interval [s].
+    !> @param[in] state Physical state before analytic momentum integration.
+    !> @param[in] speed_ratio Ratio of total to horizontal speed used by friction laws.
+    !> @param[in] grav_coeff Topographic gravitational correction.
+    !> @param[in] curvature_acceleration Normal acceleration induced by terrain curvature.
+    !> @param[in] use_pore_pressure Enable effective-stress pore correction.
+    !> @param[in] use_stochastic Enable stochastic rheological coefficients.
+    !> @param[in] stochastic_value Frozen local stochastic coefficient.
+    !> @param[out] velocity_after Horizontal velocity after all supported analytic substeps.
+    !> @param[out] model_supported False if any requested analytic rheology is unavailable.
+    !> @param[in] bx Terrain x-slope used to refresh kinematics between laws.
+    !> @param[in] by Terrain y-slope used to refresh kinematics between laws.
+    !> @param[in] bxx Terrain second x derivative for curvature kinematics.
+    !> @param[in] bxy Terrain mixed second derivative for curvature kinematics.
+    !> @param[in] byy Terrain second y derivative for curvature kinematics.
     SUBROUTINE eval_rheology_analytic(config,models, dt, state, speed_ratio, grav_coeff, curvature_acceleration,       &
         use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported, bx, by, bxx, bxy, byy)
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -350,6 +419,19 @@ CONTAINS
     END SUBROUTINE eval_rheology_analytic
 
     !> Select the model-specific exact velocity flow for one frozen physical state.
+    !> @brief Dispatch one analytic rheology source on the supplied frozen physical state.
+    !> @param[in] config Layer rheology coefficients.
+    !> @param[in] model Registered rheology source name to integrate.
+    !> @param[in] dt Duration of this analytic Lie substep [s].
+    !> @param[in] state Physical state at the start of this selected substep.
+    !> @param[in] speed_ratio Ratio of total speed to horizontal speed.
+    !> @param[in] grav_coeff Topographic gravitational factor.
+    !> @param[in] curvature_acceleration Curvature-induced acceleration for the source law.
+    !> @param[in] use_pore_pressure Whether the friction law accounts for pore pressure.
+    !> @param[in] use_stochastic Whether stochastic rheology is active.
+    !> @param[in] stochastic_value Local stochastic rheology coefficient.
+    !> @param[out] velocity_after Updated horizontal velocity returned by the selected law.
+    !> @param[out] model_supported False when this name has no supported analytic treatment.
     SUBROUTINE dispatch_analytic_rheology(config,model,dt,state,speed_ratio,grav_coeff,curvature_acceleration,         &
         use_pore_pressure,use_stochastic,stochastic_value,velocity_after,model_supported)
         TYPE(rheology_config_type), INTENT(IN) :: config
@@ -396,60 +478,6 @@ CONTAINS
         END SELECT
     END SUBROUTINE dispatch_analytic_rheology
 
-
-
-        ! Both Newton components are evaluated on the same, unchanged physical state.
-
-        !> \brief Dispatch the explicit real-valued rheology momentum source.
-        !> \param[in] model_name Canonical rheology model name.
-        !> \param[in] state Shared real-valued physical state.
-        !> \param[in] mod_vel Total speed [m s^-1].
-        !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
-        !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
-        !> \param[in] grav_coeff Topographic gravity correction.
-        !> \param[in] use_pore_pressure Enable effective-stress pore-pressure correction.
-        !> \param[in] moving Whether the flow is moving.
-        !> \param[in] use_stochastic Enable stochastic rheology coefficient.
-        !> \param[in] stochastic_value Stochastic rheology coefficient.
-        !> \param[out] rate Two-component momentum source.
-
-
-        !> \brief Dispatch the semi-implicit real-valued rheology momentum source.
-        !> \param[in] model_name Canonical rheology model name.
-        !> \param[in] state Shared real-valued physical state.
-        !> \param[in] mod_vel Total speed [m s^-1].
-        !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
-        !> \param[in] grav_coeff Topographic gravity correction.
-        !> \param[in] use_pore_pressure Enable pore-pressure correction.
-        !> \param[in] use_stochastic Enable stochastic rheology coefficient.
-        !> \param[in] stochastic_value Stochastic rheology coefficient.
-        !> \param[out] rate Two-component momentum source.
-
-
-        !> \brief Dispatch the complex-valued implicit rheology momentum source.
-        !> \param[in] model_name Canonical rheology model name.
-        !> \param[in] state Shared complex-valued physical state for complex-step differentiation.
-        !> \param[in] mod_vel Total complex speed.
-        !> \param[in] mod_hor_vel Horizontal complex speed.
-        !> \param[in] mod_vel2 Squared total complex speed.
-        !> \param[in] moving Whether the complex flow state is moving.
-        !> \param[in] use_stochastic Enable stochastic rheology coefficient.
-        !> \param[in] stochastic_value Stochastic rheology coefficient.
-        !> \param[out] rate Two-component complex momentum source.
-
-
-        !> \brief Dispatch exact velocity integration for the selected rheology.
-        !> \param[in] model_name Canonical rheology model name.
-        !> \param[in] dt Source integration interval [s].
-        !> \param[in] state Shared real physical state before source integration.
-        !> \param[in] speed_ratio Total-to-horizontal speed ratio.
-        !> \param[in] grav_coeff Topographic gravity correction.
-        !> \param[in] curvature_acceleration Curvature-induced normal acceleration [m s^-2].
-        !> \param[in] use_pore_pressure Enable pore-pressure correction.
-        !> \param[in] use_stochastic Enable stochastic rheology coefficient.
-        !> \param[in] stochastic_value Stochastic rheology coefficient.
-        !> \param[out] velocity_after Velocity after the analytic source substep.
-        !> \param[out] model_supported Whether the selected model has an analytic treatment.
 
 
         !> \brief Compute curvature-induced normal acceleration.

@@ -1,3 +1,6 @@
+!> @file rheology_voellmy_turbulent.inc
+!> @brief Shared turbulent Voellmy momentum resistance with optional stochastic xi.
+!> @details Limits stochastic xi to its prescribed range before applying reduced-gravity drag.
 ! The same turbulence law is evaluated in REAL for explicit rates and
 ! in COMPLEX for Newton. Branch only on a zero velocity norm.
 rate_x=0.0_wp

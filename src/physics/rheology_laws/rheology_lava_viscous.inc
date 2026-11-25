@@ -1,3 +1,6 @@
+!> @file rheology_lava_viscous.inc
+!> @brief Shared temperature-dependent lava viscous momentum resistance.
+!> @details Evaluates an exponential temperature factor with a regularized inverse flow depth.
 ! The frozen-temperature viscous contribution is shared between precisions.
 rate_x=0.0_wp
 rate_y=0.0_wp
