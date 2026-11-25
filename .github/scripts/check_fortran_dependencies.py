@@ -124,8 +124,10 @@ def main() -> int:
                                    "mass_injection_terms", "pore_pressure",
                                    "thermal_laws"}
                 and basename not in {
-                    "rheology_analytic_utils_2d", "rheology_parameters_2d",
+                    "rheology_analytic_utils_2d",
                     "mass_injection_coefficients_2d"}
+                # Configuration descriptors do not implement source methods.
+                and not basename.endswith("_parameters_2d")
             ) or basename == "source_terms_2d"
             if required:
                 names = set(x.lower() for x in re.findall(

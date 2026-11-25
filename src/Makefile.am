@@ -186,7 +186,8 @@ numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
 core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
-    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/layer_physics_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
@@ -614,10 +615,12 @@ physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): physics/thermal_laws/thermal_
 numerics/time_integration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
-    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
-IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 geometry/domain_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_2d.$(OBJEXT) \
@@ -658,17 +661,26 @@ physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): physics/mass_e
 physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
-    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT)
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
-    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT)
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT) core/constitutive_parameters_2d.$(OBJEXT) \
+    core/solid_transport_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
     physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT) \
     physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT) \
     state/state_types.$(OBJEXT) state/state_physical.$(OBJEXT) \
     state/state_conversions.$(OBJEXT) state/state_composition.$(OBJEXT) \
-    state/state_fields.$(OBJEXT)
+    state/state_fields.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT) core/solid_transport_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
     physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
