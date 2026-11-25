@@ -447,7 +447,8 @@ CONTAINS
         REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
         REAL(wp) :: kinetic_reference,kinetic_drag,layer_mass
         REAL(wp) :: curvature_rate(n_eqns),curvature_effect,solid_budget,expected_deposition
-        INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status
+        REAL(wp) :: initial_mass,initial_solid,cumulative_mass,cumulative_solid,previous_deposition
+        INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status,step_id
         LOGICAL :: created_zone,created_arc,created_diam,created_erodible_fraction,accepted
         LOGICAL :: created_source_fraction,created_fissure_fraction,created_arc_normals
         REAL(wp), ALLOCATABLE :: original_diam(:),original_erodible_fraction(:)
@@ -1036,6 +1037,79 @@ CONTAINS
             END DO
             WRITE(integrated_unit) coupled_state%q,coupled_state%qp,coupled_state%deposit
         END DO
+        ! Evolve the same paired depositional source configuration over
+        ! several complete production spatial-Lie timesteps. There are no
+        ! imposed boundary fluxes in the compact-support fixture; internal
+        ! interlayer transfers cancel and deposited solids close the mobile
+        ! inventory. Keep the original accepted workset for the short horizon.
+        before_q=0.0_wp
+        before_qp=0.0_wp
+        before_qp(idx_T,:,:,:)=T_ambient
+        DO k=5,ny-4
+            DO j=5,nx-4
+                DO layer=1,2
+                    primitive=0.0_wp
+                    primitive(idx_T)=T_ambient
+                    primitive(idx_h)=0.5_wp
+                    primitive(idx_u)=2.0_wp
+                    primitive(idx_solid_first)=0.10_wp
+                    CALL primitive_to_conservative(primitive,before_q(:,layer,j,k),accepted=accepted)
+                    IF (.NOT.accepted) ERROR STOP 'Invalid multistep interlayer deposition initial state'
+                    before_qp(:,layer,j,k)=primitive
+                END DO
+            END DO
+        END DO
+        coupled_state%q=before_q
+        coupled_state%qp=before_qp
+        coupled_state%deposit=0.0_wp
+        coupled_state%deposit_tot=0.0_wp
+        paired%solve_mask=initial_solve_mask
+        initial_mass=SUM(coupled_state%q(idx_totMassEqn,:,:,:))
+        initial_solid=SUM(coupled_state%q(idx_solidEqn_first,:,:,:))
+        previous_deposition=0.0_wp
+        DO step_id=1,5
+            ! Recompute the admissible coupled CFL on the evolving state.
+            pt1=coupled_state%qp(:,1,:,:)
+            pt2=coupled_state%qp(:,2,:,:)
+            CALL operators(1)%compute_timestep(coupled_state%q(:,1,:,:),pt1,0.0_wp,bound1,paired)
+            CALL operators(2)%compute_timestep(coupled_state%q(:,2,:,:),pt2,0.0_wp,bound2,paired, &
+                lower_operator=operators(1),h_lower=pt1(idx_h,:,:))
+            dt_step=MIN(1.0E-6_wp,0.01_wp*MIN(dt_bound,bound1,bound2))
+            IF (dt_step<=0.0_wp) ERROR STOP 'Invalid multistep interlayer deposition timestep'
+            coupled_state%qp(:,1,:,:)=pt1
+            coupled_state%qp(:,2,:,:)=pt2
+            CALL workspace%advance(coupled_state,0.0_wp,dt_step,stochastic,paired,operators, &
+                pre_spatial_primitives_ready=.TRUE.,layer_physics=physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
+            cumulative_mass=SUM(coupled_state%q(idx_totMassEqn,:,:,:)) &
+                +rho_s(1)*SUM(coupled_state%deposit(:,:,1))
+            cumulative_solid=SUM(coupled_state%q(idx_solidEqn_first,:,:,:)) &
+                +rho_s(1)*SUM(coupled_state%deposit(:,:,1))
+            IF (.NOT.ieee_is_finite(cumulative_mass) .OR. .NOT.ieee_is_finite(cumulative_solid)) &
+                ERROR STOP 'Non-finite multistep paired mass budget'
+            scale=MAX(1.0_wp,ABS(initial_mass))
+            IF (ABS(cumulative_mass-initial_mass)>1.0E-9_wp*scale) &
+                ERROR STOP 'Multistep paired mobile-plus-deposit mass budget failed'
+            scale=MAX(1.0_wp,ABS(initial_solid))
+            IF (ABS(cumulative_solid-initial_solid)>1.0E-9_wp*scale) &
+                ERROR STOP 'Multistep paired mobile-plus-deposit solid budget failed'
+            expected_deposition=SUM(coupled_state%deposit(:,:,1))
+            IF (expected_deposition<previous_deposition) &
+                ERROR STOP 'Multistep interlayer deposition inventory decreased'
+            previous_deposition=expected_deposition
+            DO l=1,paired%solve_cells
+                j=paired%j_cent(l)
+                k=paired%k_cent(l)
+                DO layer=1,2
+                    IF (.NOT.conservative_mass_admissible(coupled_state%q(:,layer,j,k))) &
+                        ERROR STOP 'Multistep paired Lie state became inadmissible'
+                END DO
+            END DO
+            WRITE(integrated_unit) coupled_state%q,coupled_state%qp,coupled_state%deposit
+        END DO
+        IF (previous_deposition<=0.0_wp) ERROR STOP 'Multistep paired deposition was inactive'
+        WRITE(*,*) 'PASS: five-step paired mobile/substrate mass and solid budgets'
+
         ! A second external exchange fixture covers erosion from the one
         ! shared substrate, with both external groups and the paired mass
         ! exchange present in the exact same production Lie sequence.

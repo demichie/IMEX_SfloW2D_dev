@@ -210,6 +210,21 @@ total mobile mass and sensible thermal energy. This is a
 **cell-local source-sequence** test, not yet a spatial/time-refinement
 study or a full production-run budget.
 
+### Multistep closed-domain numerical budget
+
+The production spatial-Lie test now advances a compact two-layer wet patch
+through five short accepted timesteps with simultaneous L1 substrate deposition
+and bidirectional interlayer mass exchange. It independently checks cumulative
+mobile-plus-deposited **total mass** and **solid-species mass** after every
+step, monotonic deposited volume, and conservative admissibility of each layer.
+The initial inventory is fixed before the sequence; the expected value is not
+derived from the final residual. Each timestep recomputes the coupled CFL.
+
+This is a closed-domain numerical regression with inactive atmospheric input.
+It does **not** establish a balance for ambient entrainment, nor does it yet
+validate nonzero boundary fluxes or multi-timestep source-order sensitivity
+with concurrent atmospheric entrainment. Those remain explicit C5 work.
+
 ## 8. Verification matrix and acceptance criteria
 
 | Case | Existing evidence or new targeted coverage | Still required |
