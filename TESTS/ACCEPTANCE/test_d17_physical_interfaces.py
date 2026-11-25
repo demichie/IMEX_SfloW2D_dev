@@ -42,6 +42,7 @@ def main() -> int:
     integrator = compact(SRC / "numerics/time_integration_2d.f90")
     simulation = compact(SRC / "core/simulation_2d.f90")
     state = compact(SRC / "state/state_composition.f90")
+    configuration = compact(SRC / "numerics/source_configuration_2d.f90")
     files = {path: compact(path) for path in PHYSICS.rglob("*.f90")}
     entries = re.findall(
         r"source_term_type\s*\(\s*'([^']+)'\s*,\s*"
@@ -85,7 +86,7 @@ def main() -> int:
                         f"pore pressure: missing {method} procedure", failures)
         else:
             # Injection names use a coordinator and dedicated physical owners.
-            require(name in assembly or name in compact(PHYSICS / "source_configuration_2d.f90"),
+            require(name in assembly or name in configuration,
                     f"unrouted source {name}", failures)
         allowed = {"EXPLICIT": exp, "NEWTON": newton, "ANALYTIC": analytic}
         require(allowed[default].lower() == "true",
@@ -100,28 +101,35 @@ def main() -> int:
     for fragment in ("groups(1)%id/=0", "groups(1)%method/=SOURCE_METHOD_EXPLICIT",
                      "SOURCE_METHOD_NEWTON", "source_newton_affected_equations"):
         require(fragment.lower() in registry.lower(), f"registry contract: {fragment}", failures)
-    # D20 cell-major Lie execution: each worklist cell owns local candidates
-    # throughout all source groups. Do not require retired full-domain group
-    # snapshots (q_group/qp_group): they would duplicate storage and defeat the
-    # cell-local parallel execution contract.
-    for fragment in ("q_local=q(:,j,k)", "qp_local=qp(:,j,k)",
-                     "qpentry=qp_original(:,j,k)", "qpentry=qp_local",
+    # D20 execution keeps one pair of local layer candidates per worklist cell.
+    # Group zero reads the pre-spatial state of its own layer. Only accepted
+    # candidates are published, and substrate totals are refreshed afterward.
+    for fragment in ("q_layers=q(:,:,j,k)", "qp_layers=qp(:,:,j,k)",
+                     "q_local=q_layers(:,layer)", "qp_local=qp_layers(:,layer)",
+                     "qpentry=qp_original(:,layer,j,k)", "qpentry=qp_local",
                      "q_local=q_candidate", "qp_local=qp_candidate",
-                     "q(:,j,k)=q_local", "qp(:,j,k)=qp_local",
-                     "CALL state%refresh_substrate_totals()"):
+                     "q(:,:,j,k)=q_layers", "qp(:,:,j,k)=qp_layers",
+                     "CALL state%refresh_substrate_totals("):
         require(fragment.lower() in executor.lower(), f"Lie executor contract: {fragment}", failures)
     executor_lower = executor.lower()
     ordered_fragments = ("group_loop: do group_index=1,size(executor%groups)",
-                         "q(:,j,k)=q_local", "qp(:,j,k)=qp_local")
+                         "q(:,:,j,k)=q_layers", "qp(:,:,j,k)=qp_layers",
+                         "CALL state%refresh_substrate_totals(")
     positions = [executor_lower.find(fragment) for fragment in ordered_fragments]
     require(all(position >= 0 for position in positions) and positions == sorted(positions),
-            "Lie executor contract: ordered cell-local groups before state publication", failures)
-    for fragment in ("snapshot_substrate", "restore_substrate", "begin_geometry_transaction",
-                     "rollback_geometry_transaction", "conservative_mass_admissible"):
-        require(fragment.lower() in integrator.lower(), f"Lie rollback contract: {fragment}", failures)
+            "Lie executor contract: ordered cell-local groups before substrate refresh", failures)
+    # Rejected source steps are fatal; this is not the retired timestep rollback
+    # protocol. The integrator publishes the accepted trial fields only after
+    # source execution and commits the deferred bed geometry once.
+    for fragment in ("begin_geometry_transaction", "commit_geometry_transaction",
+                     "conservative_mass_admissible",
+                     "IF (source_step_failed) CALL fatal_error",
+                     "state%q(:,:,j,k)=this%q_trial(:,:,j,k)",
+                     "state%qp(:,:,j,k)=this%qp_trial(:,:,j,k)"):
+        require(fragment.lower() in integrator.lower(), f"Lie commit contract: {fragment}", failures)
     require("this%runtime%t=step_start+step_length" in simulation,
             "simulation must advance clock once", failures)
-    require("CALL registry%finalize()" in compact(PHYSICS / "source_configuration_2d.f90"),
+    require("CALL registry%finalize()" in configuration,
             "failed source reconfiguration may retain the previous registry", failures)
     require("SUM(q_cell(idx_add_gas_first:idx_add_gas_last))" in state,
             "missing additional-gas fraction admissibility", failures)
