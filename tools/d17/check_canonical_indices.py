@@ -12,7 +12,7 @@ REQUIRED_FIXTURES = (
     "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90",
     "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90",
 )
-FIXTURE_CALL = re.compile(r"\\bcall\\s+configure_canonical_state_indices\\s*(?:\\(\\s*\\))?", re.I)
+FIXTURE_CALL = re.compile(r"\bcall\s+configure_canonical_state_indices\s*(?:\(\s*\))?(?!\w)", re.I)
 FIXED_INDEX = re.compile(r"\b(?:qc|qj)\s*\(\s*[1-4]\s*\)", re.I)
 
 
