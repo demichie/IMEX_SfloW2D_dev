@@ -240,14 +240,12 @@ CONTAINS
         REAL(wp) :: transferred_carrier_mass
         REAL(wp) :: strict_solid,concentrated_solid
         LOGICAL :: valid
-        INTEGER :: mode
+        INTEGER :: mode,fraction_mode
 
         pair%settling_flag=.TRUE.
         pair%elutriation_flag=.TRUE.
         dt_local=1.0_wp
         packing_local=0.6_wp
-        alpha=0.1_wp
-        pair%elutriation_solid_volume_fraction=alpha
         solids1=[0.06_wp,0.03_wp]
         solids2=[0.04_wp,0.02_wp]
         carriers1=0.12_wp
@@ -259,68 +257,81 @@ CONTAINS
         receiver_rho1=1.5_wp
         receiver_rho2=1.4_wp
 
-        DO mode=1,2
-            IF (mode==1) THEN
-                pair%elutriation_carrier_mode='LIMIT_SOLIDS'
+        ! Exercise both a prescribed parcel and the local L1 donor mixture
+        ! with two opposing solid streams and four distinct carrier densities.
+        DO fraction_mode=1,2
+            IF (fraction_mode==1) THEN
+                alpha=0.1_wp
+                pair%elutriation_solid_volume_fraction=alpha
             ELSE
-                pair%elutriation_carrier_mode='ALLOW_CONCENTRATED'
+                alpha=SUM(solids1)/(SUM(solids1)+carriers1)
+                pair%elutriation_solid_volume_fraction=-1.0_wp
             END IF
+            DO mode=1,2
+                IF (mode==1) THEN
+                    pair%elutriation_carrier_mode='LIMIT_SOLIDS'
+                ELSE
+                    pair%elutriation_carrier_mode='ALLOW_CONCENTRATED'
+                END IF
 
-            CALL limit_interlayer_mass_transfer(solids1,solids2,carriers1,carriers2, &
-                rates_down,rates_up,dt_local,packing_local,pair,accepted_down,accepted_up, &
-                flow_down,flow_up,valid, &
-                rho_carrier_l1=donor_rho1,rho_carrier_l2=donor_rho2, &
-                candidate_rho_l1=receiver_rho1,candidate_rho_l2=receiver_rho2)
-            CALL require(valid,'two gross carrier streams with distinct densities accepted')
-            CALL require(ALL(accepted_down>=0.0_wp) .AND. ALL(accepted_up>=0.0_wp), &
-                'nonnegative per-species gross solid rates')
-            CALL require(flow_down>=0.0_wp .AND. flow_up>=0.0_wp, &
-                'nonnegative independent gross carrier streams')
-            CALL require(ALL(dt_local*accepted_down<=solids2+1.0E-12_wp), &
-                'settling cannot spend simultaneous elutriation receipts')
-            CALL require(ALL(dt_local*accepted_up<=solids1+1.0E-12_wp), &
-                'elutriation cannot spend simultaneous settling receipts')
-            CALL require(dt_local*flow_up<=carriers1+1.0E-12_wp .AND. &
-                dt_local*flow_down<=carriers2+1.0E-12_wp, &
-                'donor carrier gross withdrawals do not spend simultaneous receipts')
+                CALL limit_interlayer_mass_transfer(solids1,solids2,carriers1,carriers2, &
+                    rates_down,rates_up,dt_local,packing_local,pair,accepted_down,accepted_up, &
+                    flow_down,flow_up,valid, &
+                    rho_carrier_l1=donor_rho1,rho_carrier_l2=donor_rho2, &
+                    candidate_rho_l1=receiver_rho1,candidate_rho_l2=receiver_rho2)
+                CALL require(valid,'two gross carrier streams with distinct densities accepted')
+                CALL require(SUM(accepted_down)>0.0_wp .AND. SUM(accepted_up)>0.0_wp, &
+                    'both settling and elutriation remain active with each parcel mode')
+                CALL require(ALL(accepted_down>=0.0_wp) .AND. ALL(accepted_up>=0.0_wp), &
+                    'nonnegative per-species gross solid rates')
+                CALL require(flow_down>=0.0_wp .AND. flow_up>=0.0_wp, &
+                    'nonnegative independent gross carrier streams')
+                CALL require(ALL(dt_local*accepted_down<=solids2+1.0E-12_wp), &
+                    'settling cannot spend simultaneous elutriation receipts')
+                CALL require(ALL(dt_local*accepted_up<=solids1+1.0E-12_wp), &
+                    'elutriation cannot spend simultaneous settling receipts')
+                CALL require(dt_local*flow_up<=carriers1+1.0E-12_wp .AND. &
+                    dt_local*flow_down<=carriers2+1.0E-12_wp, &
+                    'donor carrier gross withdrawals do not spend simultaneous receipts')
 
-            new_solids1=solids1+dt_local*(accepted_down-accepted_up)
-            new_solids2=solids2-dt_local*(accepted_down-accepted_up)
-            new_carrier1=carriers1+dt_local* &
-                (donor_rho2*flow_down-donor_rho1*flow_up)/receiver_rho1
-            new_carrier2=carriers2+dt_local* &
-                (donor_rho1*flow_up-donor_rho2*flow_down)/receiver_rho2
-            transferred_carrier_mass=dt_local*(donor_rho2*flow_down-donor_rho1*flow_up)
+                new_solids1=solids1+dt_local*(accepted_down-accepted_up)
+                new_solids2=solids2-dt_local*(accepted_down-accepted_up)
+                new_carrier1=carriers1+dt_local* &
+                    (donor_rho2*flow_down-donor_rho1*flow_up)/receiver_rho1
+                new_carrier2=carriers2+dt_local* &
+                    (donor_rho1*flow_up-donor_rho2*flow_down)/receiver_rho2
+                transferred_carrier_mass=dt_local*(donor_rho2*flow_down-donor_rho1*flow_up)
 
-            CALL require(ALL(new_solids1>=-1.0E-12_wp) .AND. ALL(new_solids2>=-1.0E-12_wp), &
-                'species remain admissible with two gross streams')
-            CALL require(new_carrier1>=-1.0E-12_wp .AND. new_carrier2>=-1.0E-12_wp, &
-                'recipient carrier inventories remain nonnegative')
-            CALL require(SUM(new_solids1)<=packing_local*(SUM(new_solids1)+new_carrier1)+1.0E-12_wp, &
-                'L1 packing with recipient carrier density')
-            CALL require(SUM(new_solids2)<=packing_local*(SUM(new_solids2)+new_carrier2)+1.0E-12_wp, &
-                'L2 packing with recipient carrier density')
-            CALL close(SUM(new_solids1+new_solids2),SUM(solids1+solids2), &
-                'pair conservation of species volume under dissimilar carrier densities')
-            CALL close(receiver_rho1*(new_carrier1-carriers1),transferred_carrier_mass, &
-                'L1 receives actual gross carrier mass')
-            CALL close(receiver_rho2*(new_carrier2-carriers2),-transferred_carrier_mass, &
-                'L2 receives exactly the opposite carrier mass')
-            CALL close(receiver_rho1*(new_carrier1-carriers1)+ &
-                receiver_rho2*(new_carrier2-carriers2),0.0_wp, &
-                'carrier mass exchange is antisymmetric')
+                CALL require(ALL(new_solids1>=-1.0E-12_wp) .AND. ALL(new_solids2>=-1.0E-12_wp), &
+                    'species remain admissible with two gross streams')
+                CALL require(new_carrier1>=-1.0E-12_wp .AND. new_carrier2>=-1.0E-12_wp, &
+                    'recipient carrier inventories remain nonnegative')
+                CALL require(SUM(new_solids1)<=packing_local*(SUM(new_solids1)+new_carrier1)+1.0E-12_wp, &
+                    'L1 packing with recipient carrier density')
+                CALL require(SUM(new_solids2)<=packing_local*(SUM(new_solids2)+new_carrier2)+1.0E-12_wp, &
+                    'L2 packing with recipient carrier density')
+                CALL close(SUM(new_solids1+new_solids2),SUM(solids1+solids2), &
+                    'pair conservation of species volume under dissimilar carrier densities')
+                CALL close(receiver_rho1*(new_carrier1-carriers1),transferred_carrier_mass, &
+                    'L1 receives actual gross carrier mass')
+                CALL close(receiver_rho2*(new_carrier2-carriers2),-transferred_carrier_mass, &
+                    'L2 receives exactly the opposite carrier mass')
+                CALL close(receiver_rho1*(new_carrier1-carriers1)+ &
+                    receiver_rho2*(new_carrier2-carriers2),0.0_wp, &
+                    'carrier mass exchange is antisymmetric')
 
-            IF (mode==1) THEN
-                strict_solid=SUM(accepted_up)
-                CALL close(flow_up,(1.0_wp-alpha)/alpha*strict_solid, &
-                    'LIMIT_SOLIDS preserves upward parcel composition')
-            ELSE
-                concentrated_solid=SUM(accepted_up)
-                CALL require(concentrated_solid>=strict_solid-1.0E-12_wp, &
-                    'ALLOW_CONCENTRATED does not forbid otherwise admissible solid lifting')
-                CALL require(flow_up<=(1.0_wp-alpha)/alpha*concentrated_solid+1.0E-12_wp, &
-                    'concentrated carrier lift does not exceed prescribed composition')
-            END IF
+                IF (mode==1) THEN
+                    strict_solid=SUM(accepted_up)
+                    CALL close(flow_up,(1.0_wp-alpha)/alpha*strict_solid, &
+                        'LIMIT_SOLIDS preserves upward parcel composition')
+                ELSE
+                    concentrated_solid=SUM(accepted_up)
+                    CALL require(concentrated_solid>=strict_solid-1.0E-12_wp, &
+                        'ALLOW_CONCENTRATED does not forbid otherwise admissible solid lifting')
+                    CALL require(flow_up<=(1.0_wp-alpha)/alpha*concentrated_solid+1.0E-12_wp, &
+                        'concentrated carrier lift does not exceed prescribed composition')
+                END IF
+            END DO
         END DO
 
     END SUBROUTINE test_gross_carrier_exchange
@@ -475,6 +486,10 @@ CONTAINS
         CALL close(source2(1)-SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)), &
             4.0_wp*SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)/rho_s), &
             'physical donor L1 gas-to-solid volume ratio')
+        CALL close(source2(4),l1%T*( &
+            SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)*sp_heat_s)+ &
+            (source2(1)-SUM(source2(idx_solidEqn_first:idx_solidEqn_first+1)))*l1%cp_c), &
+            'dynamic co-lift transports donor sensible energy')
 
         ! Group-zero physical rates may use pre-spatial L1, but the co-lift
         ! composition must use the current post-spatial donor inventory.

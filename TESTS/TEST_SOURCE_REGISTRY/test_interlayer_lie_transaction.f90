@@ -90,6 +90,17 @@ PROGRAM test_interlayer_lie_transaction
     CALL check_conservation(before,q,'wet L1 and L2')
     CALL check_admissibility(qp)
 
+    ! Validate the omitted-fraction mode with simultaneous bidirectional
+    ! transfer on complete conservative/primitive recipient states.
+    config%elutriation_solid_volume_fraction=-1.0_wp
+    CALL make_column(1.0_wp,1.0_wp,20.0_wp,2.0_wp,q,qp)
+    before=q; snapshot=qp
+    CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
+    CALL require(status==0,'dynamic co-lift with settling accepts both wet layers')
+    CALL check_conservation(before,q,'dynamic two-way Lie mass exchange')
+    CALL check_admissibility(qp)
+    config%elutriation_solid_volume_fraction=0.1_wp
+
     ! Geometric contact must not let a sole wet L2 deposit directly to bed.
     ! The same physical deposition law is allowed for L1, including after
     ! interlayer settling has created that formerly dry lower layer.

@@ -429,6 +429,15 @@ del solo test di un kernel.
   Non introdurre soglie, viscosita' o forze correttive per
   mascherare problemi fisici.
 
+**TL13b-C — audit delle chiusure fisiche (25 novembre 2026):**
+la verifica dei trasferimenti interlayer e dei bilanci termodinamici e'
+iniziata in [TL13B_C_PHYSICAL_CLOSURES.md](TL13B_C_PHYSICAL_CLOSURES.md).
+L'audit identifica cinque questioni da validare (composizione elutriata,
+carrier nel settling, gas comprimibile, dissipazione del drag e ordine
+Lie) e amplia i test senza cambiare le leggi fisiche.
+Queste verifiche non chiudono TL13b-C; le nuove regressioni richiedono
+build strict/optimized ed esecuzione integrata sulla stessa revisione.
+
 **Da definire o validare scientificamente:**
 validazione scientifica della modalita' dinamica di
 `elutriation_solid_volume_fraction` e della miscela sollevata,
