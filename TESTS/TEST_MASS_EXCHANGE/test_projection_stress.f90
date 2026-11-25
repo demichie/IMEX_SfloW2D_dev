@@ -1,7 +1,7 @@
 !> \brief N8-B prescribed-rate refinement and seeded repeated production geometry checks.
 PROGRAM test_projection_stress
   USE thermal_parameters_2d, ONLY : thermal_l1
-  USE rheology_parameters_2d, ONLY : rheology_l1
+  USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1
   USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
   USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
   USE parameters_2d
