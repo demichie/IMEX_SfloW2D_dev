@@ -19,6 +19,7 @@ MODULE interlayer_mass_exchange_2d
     USE interlayer_settling_2d, ONLY : eval_interlayer_settling_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
+    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
@@ -508,7 +509,28 @@ CONTAINS
         candidate_q(1:n_eqns,2)=candidate_q(1:n_eqns,2)+dt*rate_l2
         status=20
         IF (.NOT.conservative_mass_admissible(candidate_q(1:n_eqns,1)) .OR. &
-            .NOT.conservative_mass_admissible(candidate_q(1:n_eqns,2))) RETURN
+            .NOT.conservative_mass_admissible(candidate_q(1:n_eqns,2))) THEN
+            ! Failure-only witness: no clipping or change to the rejected update.
+            ! Keep complete records together when the Lie sweep runs in parallel.
+            !$OMP CRITICAL(interlayer_admissibility_witness)
+            WRITE(error_unit,'(A,ES24.16,A,L1)') 'TL07_INTERLAYER_REJECT dt=',dt, &
+                ' group_zero=',group_zero
+            DO layer=1,2
+                WRITE(error_unit,'(A,I0,A,L1)') 'TL07_INTERLAYER_REJECT layer=',layer, &
+                    ' admissible=',conservative_mass_admissible(candidate_q(1:n_eqns,layer))
+                WRITE(error_unit,'(A,*(ES24.16,1X))') 'TL07_INTERLAYER_REJECT before=',q(1:n_eqns,layer)
+                IF (layer==1) THEN
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') 'TL07_INTERLAYER_REJECT increment=',dt*rate_l1
+                ELSE
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') 'TL07_INTERLAYER_REJECT increment=',dt*rate_l2
+                END IF
+                WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                    'TL07_INTERLAYER_REJECT candidate=',candidate_q(1:n_eqns,layer)
+            END DO
+            FLUSH(error_unit)
+            !$OMP END CRITICAL(interlayer_admissibility_witness)
+            RETURN
+        END IF
 
         candidate_qp=qp
         status=21
