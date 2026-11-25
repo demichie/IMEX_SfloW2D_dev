@@ -115,7 +115,7 @@ def main() -> int:
     ordered_fragments = ("group_loop: do group_index=1,size(executor%groups)",
                          "q(:,:,j,k)=q_layers", "qp(:,:,j,k)=qp_layers",
                          "CALL state%refresh_substrate_totals(")
-    positions = [executor_lower.find(fragment) for fragment in ordered_fragments]
+    positions = [executor_lower.find(fragment.lower()) for fragment in ordered_fragments]
     require(all(position >= 0 for position in positions) and positions == sorted(positions),
             "Lie executor contract: ordered cell-local groups before substrate refresh", failures)
     # Rejected source steps are fatal; this is not the retired timestep rollback
