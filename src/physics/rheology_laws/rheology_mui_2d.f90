@@ -176,6 +176,7 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
     !> @param[in] config Rheology parameters for the selected constitutive law.
+    !> @param[in] curvature_acceleration Topographic curvature acceleration [m s^-2].
     SUBROUTINE eval_rheology_mui_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,          &
         use_pore_pressure, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config

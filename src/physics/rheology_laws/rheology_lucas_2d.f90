@@ -151,6 +151,7 @@ CONTAINS
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
     !> @param[in] config Rheology parameters for the selected constitutive law.
+    !> @param[in] curvature_term Topographic curvature contribution to normal acceleration.
     SUBROUTINE eval_rheology_lucas_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_term, stochastic,    &
         stochastic_value, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
