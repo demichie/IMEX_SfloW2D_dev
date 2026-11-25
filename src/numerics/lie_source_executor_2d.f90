@@ -1164,6 +1164,8 @@ CONTAINS
         CONTAINS
 
         ! Record a cell/group failure for the caller to report as a fatal error.
+        !> @brief reject cell operation.
+        !> @param[in] message message argument for reject_cell.
         SUBROUTINE reject_cell(message)
             CHARACTER(*), INTENT(IN) :: message
             failure_reason=message

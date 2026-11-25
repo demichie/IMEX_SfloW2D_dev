@@ -26,6 +26,13 @@ MODULE source_configuration_2d
 CONTAINS
     !> Identify active physical sources exactly once for both input syntaxes.
     !> Thermal activation is determined by the physical cooling flag.
+    !> @brief collect active source names operation.
+    !> @param[in] rheology Layer rheology configuration.
+    !> @param[in] mass_config Layer mass exchange configuration.
+    !> @param[in] include_thermal Include thermal sources.
+    !> @param[in] include_pore Include pore pressure sources.
+    !> @param[out] active_names Active source names.
+    !> @param[out] error Validation or error message.
     SUBROUTINE collect_active_source_names(rheology,mass_config,include_thermal,include_pore,active_names,error)
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config

@@ -225,8 +225,6 @@ CONTAINS
     END SUBROUTINE initialize_lie_registry
 
     !> \brief Map one target to conservative equation indices.
-    !> \param[in] target Velocity, energy or pore target ID.
-    !> \param[in] pore Pore equation index, zero when absent.
     !> \return Ordered equations; an invalid target returns an empty list.
     !> \brief Check index bounds and uniqueness before any vector indexing.
     !> \param[in] ids Conservative equation IDs.

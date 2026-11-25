@@ -38,6 +38,22 @@ CONTAINS
     !> Every other conservative component remains fixed at its group input value.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @brief solve backward euler group operation.
+    !> @param[in] source_group Validated source group.
+    !> @param[in,out] q_cell Local conservative state.
+    !> @param[in] dt Integration time increment.
+    !> @param[in] bprime_x bprime x argument for solve_backward_euler_group.
+    !> @param[in] bprime_y bprime y argument for solve_backward_euler_group.
+    !> @param[in] grav_correction grav correction argument for solve_backward_euler_group.
+    !> @param[in] stochastic_value stochastic value argument for solve_backward_euler_group.
+    !> @param[out] iterations_used iterations used argument for solve_backward_euler_group.
+    !> @param[out] converged converged argument for solve_backward_euler_group.
+    !> @param[out] linear_info linear info argument for solve_backward_euler_group.
+    !> @param[out] line_search_failed line search failed argument for solve_backward_euler_group.
+    !> @param[in,out] complex_workspace Complex nonlinear workspace.
+    !> @param[in,out] real_workspace Real nonlinear workspace.
+    !> @param[in] pore_enabled pore enabled argument for solve_backward_euler_group.
+    !> @param[in] stochastic_enabled Whether stochastic source is enabled.
     SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
         stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace,            &
         real_workspace,thermal,rheology,pore_enabled,stochastic_enabled)
@@ -141,6 +157,9 @@ CONTAINS
     !> \param[out] line_search_failed True if backtracking cannot accept a step.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in,out] implicit_scratch Implicit solver scratch.
+    !> @param[in,out] real_scratch Real-valued evaluation scratch.
+    !> @param[in] stochastic_enabled Whether stochastic source is enabled.
     SUBROUTINE solve_newton_group(source_group, group_equations, qj, q_group_input, dt_step, Bprimej_x, Bprimej_y, Zij,&
         coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed,           &
         implicit_scratch, real_scratch,thermal,rheology,stochastic_enabled)
@@ -577,6 +596,9 @@ CONTAINS
 
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in,out] implicit_scratch Implicit solver scratch.
+    !> @param[in,out] real_scratch Real-valued evaluation scratch.
+    !> @param[in] stochastic_enabled Whether stochastic source is enabled.
     SUBROUTINE lnsrch(qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,   &
         scal_f, right_term, stpmax, check, dt_step , Bprimej_x , Bprimej_y, Zij, active_equations, source_group, &
         implicit_scratch, real_scratch,thermal,rheology,stochastic_enabled)
@@ -846,6 +868,9 @@ CONTAINS
 
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in,out] real_scratch Real-valued evaluation scratch.
+    !> @param[out] accepted Whether evaluation is admissible.
+    !> @param[in] stochastic_enabled Whether stochastic source is enabled.
     SUBROUTINE eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y , f_nl , scal_f, Zij,             &
         active_equations, source_group, real_scratch, accepted,thermal,rheology,stochastic_enabled)
 
@@ -931,6 +956,9 @@ CONTAINS
 
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in,out] implicit_scratch Implicit solver scratch.
+    !> @param[out] accepted Whether evaluation is admissible.
+    !> @param[in] stochastic_enabled Whether stochastic source is enabled.
     SUBROUTINE eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,                 &
         active_equations, source_group, implicit_scratch, accepted,thermal,rheology,stochastic_enabled)
 

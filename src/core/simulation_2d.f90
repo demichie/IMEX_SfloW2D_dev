@@ -161,7 +161,6 @@ CONTAINS
     !> \details Preserves the fractional-step ordering: source-window averages,
     !>          OU preparation, full Lie spatial/source advancement, then one clock advance.
     !> \param[in,out] this Initialized simulation context.
-    !> @param[in,out] this Simulation and shared numerical workspaces.
     !> @param[in] observer Optional test hook called after each completed phase.
     !> @param[in] pre_spatial_primitives_ready Optional primitive cache readiness.
     !> @param[in] spatial_residual_ready The pre-step residual is ready for the Lie update.
@@ -201,6 +200,7 @@ CONTAINS
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED,                                            &
             this%runtime%t,step_length)
     CONTAINS
+        !> @brief notify stochastic prepared operation.
         SUBROUTINE notify_stochastic_prepared()
             ! Report the new phase at its actual point, after spatial.
             CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED,step_start,step_length)
