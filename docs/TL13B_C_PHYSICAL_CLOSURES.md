@@ -148,8 +148,12 @@ thermodynamically closed compressible-gas model.
 The analytic Chézy source holds both layer masses fixed, conserves their
 sum of x/y momenta and relaxes their relative velocity. Its tests
 verify a non-increasing kinetic energy and the exact quadratic
-relative-velocity decay. The drag source leaves the existing
-**sensible thermal energy** of each layer unchanged.
+relative-velocity decay. The integrated spatial-Lie regression additionally
+compares, cell by cell, kinetic energy from the same accepted spatial step
+with zero versus nonzero Chézy drag. It rejects energy gain and verifies
+that dry-layer cases are unchanged. This closes a **numerical regression
+gap**, not the model's independent physical calibration. The drag source
+leaves the existing **sensible thermal energy** of each layer unchanged.
 
 **Accepted model limitation C4 (25 November 2026):** mechanical energy
 dissipated by interlayer Chézy drag is **not converted to heat**. The

@@ -445,6 +445,7 @@ CONTAINS
         REAL(wp) :: prepared_cfl,prepared_pos,prepared_ax,prepared_ay,reference_cfl
         REAL(wp) :: reference_rate_l1(n_eqns,nx,ny),reference_rate_l2(n_eqns,nx,ny)
         REAL(wp) :: mass_difference,component_difference,kin_before,vonK_before,primitive(n_vars)
+        REAL(wp) :: kinetic_reference,kinetic_drag,layer_mass
         REAL(wp) :: curvature_rate(n_eqns),curvature_effect,solid_budget,expected_deposition
         INTEGER :: original_layers,j,k,l,eq,scenario,integrated_unit,layer,group_mode,source_status
         LOGICAL :: created_zone,created_arc,created_diam,created_erodible_fraction,accepted
@@ -649,6 +650,25 @@ CONTAINS
                         ERROR STOP 'Integrated interlayer drag did not conserve paired momentum'
                     drag_difference=drag_difference+SUM(ABS(coupled_state%q(eq,:,j,k)-base_q(eq,:,j,k)))
                 END DO
+                ! Compare mechanical energy after the same spatial step, with
+                ! and without the analytic interlayer drag. The drag source
+                ! conserves total momentum and cannot increase kinetic energy.
+                kinetic_reference=0.0_wp
+                kinetic_drag=0.0_wp
+                DO layer=1,2
+                    layer_mass=base_q(idx_totMassEqn,layer,j,k)
+                    IF (layer_mass<=0.0_wp) CYCLE
+                    kinetic_reference=kinetic_reference+ &
+                        SUM(base_q(idx_uEqn:idx_vEqn,layer,j,k)**2)/(2.0_wp*layer_mass)
+                    kinetic_drag=kinetic_drag+ &
+                        SUM(coupled_state%q(idx_uEqn:idx_vEqn,layer,j,k)**2)/(2.0_wp*layer_mass)
+                END DO
+                IF (.NOT.ieee_is_finite(kinetic_reference) .OR. .NOT.ieee_is_finite(kinetic_drag)) &
+                    ERROR STOP 'Non-finite kinetic energy after integrated interlayer drag'
+                IF (kinetic_drag>kinetic_reference+1.0E-12_wp*MAX(1.0_wp,kinetic_reference)) &
+                    ERROR STOP 'Integrated interlayer drag increased kinetic energy'
+                IF (scenario/=1 .AND. kinetic_drag/=kinetic_reference) &
+                    ERROR STOP 'Integrated drag changed kinetic energy with a dry layer'
                 IF (.NOT.ALL(ieee_is_finite(coupled_state%qp(:,:,j,k)))) &
                     ERROR STOP 'Non-finite primitive state after integrated two-layer Lie timestep'
             END DO
