@@ -138,7 +138,7 @@ For implementation details, see [spatial methods](src/spatial/README.md), [numer
 | [`EXAMPLES/`](EXAMPLES/) | Runnable cases, input files, preparation scripts and case-specific instructions |
 | [`TESTS/`](TESTS/) | Unit, numerical, integration and acceptance-oriented checks |
 | [`docs/`](docs/README.md) | Scientific architecture, formats, validation, developer guides and website sources |
-| [`.github/workflows/`](.github/README.md) | Manually dispatched GitHub Actions for verification and publication |
+| [`.github/workflows/`](.github/ACTIONS.md) | Manually dispatched GitHub Actions for verification and publication |
 
 The governing architecture keeps **one authoritative simulation-wide state** in `q/qp(component,layer,x,y)`. Per-layer physical configurations have defined owners; cell-local physical states are reusable workspaces rather than independent persistent copies. Physical kernels do not traverse the grid themselves. See the [development roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md) for current integration status and remaining scientific work.
 
@@ -179,7 +179,7 @@ make -j2
 
 This profile enables gfortran diagnostics, bounds checks and floating-point traps. On systems with nonstandard library installations, replace `/usr` with a compiler-compatible NetCDF prefix; `NETCDF_LIBS`, `LAPACK_LIBS` and `OPENMP_FCFLAGS` are configurable build variables.
 
-Run the repository's available local tests with `make check` once the executable is built. See [installation details](docs/website/getting-started/installation.md) and [test workflow descriptions](.github/README.md).
+Run the repository's available local tests with `make check` once the executable is built. See [installation details](docs/website/getting-started/installation.md) and [test workflow descriptions](.github/ACTIONS.md).
 
 ## Configuring and running a simulation
 
@@ -315,7 +315,7 @@ make check
 2. **Cell physics and numerical regressions** — state, physical-source and spatial tests.
 3. **Solver integration and OpenMP validation** — optimized and strict/debug builds, representative end-to-end simulations and OpenMP/restart checks.
 
-Separate manual workflows publish the combined MkDocs/Doxygen website and the GHCR image. A passing result verifies **the exact Git revision tested**; it does not establish calibration or physical validity for every model regime. Consult the [GitHub Actions guide](.github/README.md), [verification overview](docs/website/development/validation.md) and [current roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
+Separate manual workflows publish the combined MkDocs/Doxygen website and the GHCR image. A passing result verifies **the exact Git revision tested**; it does not establish calibration or physical validity for every model regime. Consult the [GitHub Actions guide](.github/ACTIONS.md), [verification overview](docs/website/development/validation.md) and [current roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
 
 For reproducible scientific results, record the **commit SHA**, compiler and build flags, complete `IMEX_SfloW2D.inp`, input/DEM checksums, relevant physical model coefficients and runtime settings (including OpenMP threads), together with diagnostics and output data.
 
