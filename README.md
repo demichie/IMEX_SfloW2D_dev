@@ -1,10 +1,12 @@
 # IMEX-SfloW2D
 
+**Documentation:** **[User guide, model and examples (MkDocs)](https://demichie.github.io/IMEX_SfloW2D_dev/)** · **[Fortran API reference (Doxygen)](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/)**
+
 **IMEX-SfloW2D** is an open-source, depth-averaged **finite-volume solver for two-dimensional geophysical flows**, written in Fortran. It combines a hydrostatic, path-conservative central-upwind spatial discretization with implicit-explicit time integration, ordered physical-source treatments, and OpenMP parallelism.
 
 The code addresses gravity-driven, potentially multiphase flows over non-flat terrain, including granular avalanches, pyroclastic-density-current models, lahars and lava flows. Depending on the configuration, it evolves mixture composition, temperature, pore-pressure or stochastic variables, and exchanges material with the substrate and surrounding atmosphere. The integrated solver supports **one layer** (`N_LAYERS=1`) or **two dynamically coupled layers** (`N_LAYERS=2`), selected directly in the input file.
 
-**Project resources:** [Documentation website](https://demichie.github.io/IMEX_SfloW2D_dev/) · [Fortran API reference](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/) · [Examples](EXAMPLES/) · [Source code](src/) · [Citation](CITATION.cff) · [License](COPYING)
+**Project resources:** [Examples](EXAMPLES/) · [Source code](src/) · [Citation](CITATION.cff) · [License](COPYING)
 
 > **Scientific scope:** The two-layer formulation is available for research use within documented restrictions. Its gravitational characteristic spectrum is not always real or complete, and the CFL condition does not detect loss of hyperbolicity. A successful simulation or regression test is not proof of physical validity for arbitrary density contrasts, interlayer shear or constitutive parameters. Read [Two-layer hyperbolicity](docs/TWO_LAYER_HYPERBOLICITY.md) before using coupled results quantitatively.
 
