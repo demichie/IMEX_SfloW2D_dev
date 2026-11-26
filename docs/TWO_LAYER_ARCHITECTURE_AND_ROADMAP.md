@@ -37,6 +37,8 @@ Per `L=rho_m2*gprime2*h2`, i contributi di pressione interlayer sono
 gia' compreso nel path idrostatico di L2. Conservare il clamp buoyant L2
 previsto dal modello, senza introdurre compensazioni artificiali.
 La pressione interlayer e' un termine **spaziale**, non una sorgente Lie.
+L'analisi delle caratteristiche e delle limitazioni del bound CFL e' in
+[TWO_LAYER_HYPERBOLICITY.md](TWO_LAYER_HYPERBOLICITY.md).
 
 ### Contratto dell'integratore Lie
 
@@ -465,6 +467,18 @@ modificare automaticamente la fisica. `N_LAYERS=2` conserva il gate
 `IMEX_TWO_LAYER_VALIDATION=1`. I dossier TL13b-A/B/C non diventano
 nuove fasi; eventuali future indagini richiedono una decisione
 scientifica esplicita sul campo di applicabilita' desiderato.
+
+**Accettazione sperimentale limitata (26 novembre 2026):** la formulazione
+two-layer viene mantenuta senza interventi al solver, con il campo di
+validita' e i regimi a autovalori complessi documentati in
+[TWO_LAYER_HYPERBOLICITY.md](TWO_LAYER_HYPERBOLICITY.md).
+La stratificazione inversa genera autovalori gravitazionali complessi
+gia' a velocita' uguali; l'uguaglianza delle densita' e' degenere e
+lo shear puo' rendere non iperbolica anche una stratificazione stabile.
+Il limite CFL non certifica l'iperbolicita'. Questa decisione
+**non approva il modello per ogni stato fisicamente ammissibile**,
+non modifica il giudizio sul gate generale TL13b e lascia invariato
+`IMEX_TWO_LAYER_VALIDATION=1`. Non si aprono nuove fasi.
 
 ## 4. Verifica e questioni scientifiche aperte
 
