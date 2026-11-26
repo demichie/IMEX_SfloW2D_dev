@@ -228,7 +228,7 @@ abilitazione in produzione.
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
 | **TL13a — Gate funzionale** | **Completata** su `89a9f2b`: workflow `44712747883` interamente verde | Operatori e workset OR, smoke Etna, conservazione, restart e OpenMP two-layer, integrazione optimized/strict-debug e confronto OpenMP single-layer verificati. Il gate produttivo rimane chiuso fino alla validazione scientifica TL13b. |
-| **TL13b — Validazione scientifica** | Successiva | Benchmark fisici, convergenza, robustezza, iperbolicita', shear, wet/dry, pressioni e limiti delle chiusure. Rilascio solo dopo approvazione scientifica. |
+| **TL13b — Validazione scientifica** | **In corso, non approvata** | Le regressioni di fisica e spaziale sono verdi su `d85fabe` (workflow `45771800979`); mancano la conferma integrata strict/optimized/OpenMP sulla revisione finale, la valutazione di benchmark/convergenza e una decisione esplicita sul campo di validita' e sui limiti delle chiusure. Nessun nuovo sottogate. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
 post-spaziale in `time_integration_2d%advance` e' stato rimosso: lo stesso
@@ -403,6 +403,50 @@ rimane chiuso fino a TL13a/TL13b.
 coltivando in parallelo i test ancora mancanti TL00–TL05 e l'I/O TL12.
 Poi TL13a e TL13b. Non dichiarare una fase conclusa sulla base
 del solo test di un kernel.
+
+### TL13 — Decisione finale di accettazione (26 novembre 2026)
+
+**Un solo gate scientifico: TL13b.** TL13a resta funzionalmente chiusa.
+I precedenti nomi TL13b-A/B/C identificano dossier di evidenze e non
+introducono ulteriori milestone, condizioni automatiche di espansione o
+nuove fasi.
+
+**Evidenza corrente (commit `d85fabe53f7f2d2d29a65eb3dbd3ee5d71a36537`):**
+la workflow `Cell physics and numerical regressions`, run
+[`45771800979`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45771800979),
+ha concluso con successo tutti e tre i job: `state`,
+`physical-sources` e `spatial`. Questo include la regressione
+integrata su cinque timestep con deposizione e scambi interlayer e la
+protezione numerica per l'esaurimento della massa solida. La
+workflow `Solver integration and OpenMP validation` non risulta
+eseguita su questo stesso commit; il successo su una revisione
+precedente non sostituisce tale evidenza.
+
+**Criteri finali, senza espandere lo scope:**
+
+1. **Correttezza numerica e regressione:** test esistenti di
+   conservazione, positivita', wet/dry, BC, geometria e sorgenti
+   superati. Le regressioni di fisica/stato/spaziale sono verificate
+   sul commit corrente; resta il controllo integrato strict/optimized,
+   restart e OpenMP sulla revisione che si intende accettare.
+2. **Validita' delle equazioni accoppiate:** usare le analisi
+   dell'iperbolicita' e i test shear gia' disponibili per definire
+   esplicitamente gli stati fisicamente ammissibili e i regimi con
+   autovalori complessi. Il bound CFL non certifica l'iperbolicita'.
+   Non modificare le equazioni per forzare un esito positivo.
+3. **Validazione fisica nel campo dichiarato:** valutare l'evidenza
+   disponibile per benchmark e convergenza e decidere esplicitamente
+   se le incertezze residue di composizione elutriata, carrier,
+   parametri di scambio e ordine Lie sono limitazioni accettabili
+   oppure impedimenti. La dissipazione Chézy senza riscaldamento
+   e' gia' una limitazione accettata.
+
+**Decisione al 26 novembre:** TL13a completata, TL13b **non ancora
+scientificamente approvata**. Una workflow verde non prova
+l'accuratezza fisica fuori dai casi testati. La chiusura richiede
+la valutazione dei tre criteri sopra e l'approvazione scientifica
+esplicita; non comporta automaticamente l'attivazione di
+`N_LAYERS=2` senza `IMEX_TWO_LAYER_VALIDATION=1`.
 
 ## 4. Verifica e questioni scientifiche aperte
 
