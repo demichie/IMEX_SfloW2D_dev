@@ -51,7 +51,7 @@ MODULE lie_source_executor_2d
     TYPE :: lie_source_executor_type
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
-        TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
+        INTEGER, ALLOCATABLE :: non_exchange_mask(:) !< Resolved non-exchange source bits per Lie group.
         TYPE(physical_state_real), ALLOCATABLE :: source_physical_scratch(:)
         ! Four reusable cell-local physical records per worker for paired sources.
         TYPE(physical_state_real), ALLOCATABLE :: interlayer_physical_scratch(:,:)
@@ -107,9 +107,10 @@ CONTAINS
             CALL fatal_error('TL07: INTERLAYER groups require two allocated layers')
         ALLOCATE(executor%exchange_group(SIZE(executor%groups)),                                                       &
             executor%dry_noop_group(SIZE(executor%groups)),                                                           &
-            executor%non_exchange_groups(SIZE(executor%groups)))
+            executor%non_exchange_mask(SIZE(executor%groups)))
         executor%exchange_group=.FALSE.
         executor%dry_noop_group=.FALSE.
+        executor%non_exchange_mask=0
         DO group_index=1,SIZE(executor%groups)
             IF (.NOT.ALLOCATED(executor%groups(group_index)%source_names))                                        &
                 CALL fatal_error('D20: Lie source group has no allocated source list')
@@ -120,16 +121,16 @@ CONTAINS
             CASE DEFAULT
                 CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
             END SELECT
-            ! Resolved catalogue IDs 18:23 are all mass-exchange processes.
+            ! The contiguous catalogue range from lava deposition to vaporization is mass exchange.
             executor%exchange_group(group_index)=                                                                      &
                 IAND(executor%groups(group_index)%source_mask,                                                        &
                 ISHFT(IBITS(NOT(0),0,SOURCE_ID_EXCHANGE_VAPORIZATION-SOURCE_ID_EXCHANGE_LAVA_DEPOSITION+1),           &
                 SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1))/=0
-            executor%non_exchange_groups(group_index)=executor%groups(group_index)
+            executor%non_exchange_mask(group_index)=executor%groups(group_index)%source_mask
             IF (executor%exchange_group(group_index)) THEN
                 DO source_id=SOURCE_ID_EXCHANGE_LAVA_DEPOSITION,SOURCE_ID_EXCHANGE_VAPORIZATION
-                    executor%non_exchange_groups(group_index)%source_mask=                                            &
-                        IBCLR(executor%non_exchange_groups(group_index)%source_mask,source_id-1)
+                    executor%non_exchange_mask(group_index)=                                                       &
+                        IBCLR(executor%non_exchange_mask(group_index),source_id-1)
                 END DO
             END IF
             executor%dry_noop_group(group_index)=                                                                     &
@@ -207,7 +208,7 @@ CONTAINS
         IF (ALLOCATED(executor%groups)) DEALLOCATE(executor%groups)
         IF (ALLOCATED(executor%exchange_group)) DEALLOCATE(executor%exchange_group)
         IF (ALLOCATED(executor%dry_noop_group)) DEALLOCATE(executor%dry_noop_group)
-        IF (ALLOCATED(executor%non_exchange_groups)) DEALLOCATE(executor%non_exchange_groups)
+        IF (ALLOCATED(executor%non_exchange_mask)) DEALLOCATE(executor%non_exchange_mask)
         IF (ALLOCATED(executor%source_physical_scratch)) DEALLOCATE(executor%source_physical_scratch)
         IF (ALLOCATED(executor%interlayer_physical_scratch)) DEALLOCATE(executor%interlayer_physical_scratch)
         IF (ALLOCATED(executor%source_complex_scratch)) DEALLOCATE(executor%source_complex_scratch)
@@ -625,7 +626,7 @@ CONTAINS
                 CASE(SOURCE_METHOD_EXPLICIT)
                     ! The current recipient provides strict conservation bounds.
                     ! The pre-spatial inventory separately caps withdrawals by
-                    ! mass present before any source group (legacy Lie semantics).
+                    ! mass present before any source group (existing Lie ordering).
                     ! Newly injected solids cannot settle within the same step.
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL assemble_lie_explicit_transaction(qpentry, q_local(1:n_eqns), time_step, source_time,     &
@@ -634,7 +635,7 @@ CONTAINS
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
                         cell_fissure_fractions(j,k,:),cell_arc_perim(j,k),cell_arc_n_x(j,k),                         &
                         cell_arc_n_y(j,k),dx*dy,                                                                     &
-                        executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
+                        executor%non_exchange_mask(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
                         q_original(1:n_eqns,layer,j,k),executor%injection_materials, &
                         thermal(layer),rheology(layer),mass_config(layer), &

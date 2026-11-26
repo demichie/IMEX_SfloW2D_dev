@@ -114,6 +114,17 @@ PROGRAM test_curvature_source
   CALL assert_small('resolved y source retained',ABS(explicit_source(3)-expected_y),tolerance)
   IF (explicit_source(2)==0.0_wp .OR. explicit_source(3)==0.0_wp) ERROR STOP 1
 
+    ! A prefiltered non-exchange mask must suppress curvature without changing
+    ! the original group descriptor or its canonical source mask.
+    CALL eval_source_explicit(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+        0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+        curvature_group,0.0_wp,materials=materials,thermal=thermal_l1,rheology=rheology_l1, &
+        pore_enabled=pore_pressure_l1%pore_pressure_flag,stochastic_enabled=rheology_l1%stochastic_rheology_flag, &
+        non_exchange_mask=0)
+    CALL assert_small('filtered curvature mask',MAXVAL(ABS(explicit_source)),0.0_wp)
+    IF (.NOT.BTEST(curvature_group%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1)) &
+        ERROR STOP 'prefiltered call modified canonical source group'
+
   ! The curvature guard must not disable injection into an unresolved cell.
   xs_source=0.0_wp; xg_source=0.0_wp
   bottom_radial_source_flag=.TRUE.; vel_source=0.01_wp; T_source=300.0_wp

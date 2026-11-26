@@ -83,6 +83,36 @@ selection recognizes rheologies through the catalog instead of a second
 hand-maintained list. The REAL/COMPLEX laws, treatment entry points and
 hot-loop input values are unchanged.
 
+## Ownership and workspace consolidation
+
+The validated `source_registry_type` is now local to simulation
+initialization. After the Lie executor receives the ordered group metadata,
+the setup registry is finalized; there is no second persistent copy of the
+source groups in `simulation_context_type`. The old driver probe for
+`boundary_injection` was removed because that name is not a schedulable
+Lie source. The existing `boundary_source_enabled=.FALSE.` CFL override
+remains unchanged; boundary-condition physics is not altered. Its interaction
+with configured lateral Dirichlet inflow requires a separate physical audit:
+the reconstruction default is `lateral_source_flag`, but this production
+call explicitly overrides it with `.FALSE.`. Do not silently change that
+behavior as part of structural cleanup.
+
+The executor retains a single group descriptor per scheduled source
+group. Prepartitioned exchange-free source selection is stored as an
+integer bit mask rather than a second complete array of group descriptors
+(with duplicated allocatable names and equation indices). The physical
+explicit evaluator accepts that mask while continuing to read dispatch
+metadata from the canonical group. A focused curvature regression verifies
+that filtering does not modify the original descriptor.
+
+The per-layer rheology, thermal, Darcy and mass-exchange values assembled
+by `advance_lie` remain **temporary, read-only timestep snapshots**.
+They are required by the existing array-based physical-source API and
+keep configuration reads outside OpenMP cell loops. Similarly, the trial
+conservative/primitive states, the optional pre-CFL primitive halo, and
+thread-owned REAL/COMPLEX physical scratch remain essential numerical
+workspaces. Removing them would change transaction or worker ownership.
+
 ## Invariants of the integrated solver
 
 - **One authoritative state:** `q/qp(component,layer,x,y)`; no synchronized

@@ -94,7 +94,7 @@ CONTAINS
     !> @param[in] arc_n_x Horizontal x component of exposed lateral normal.
     !> @param[in] arc_n_y Horizontal y component of exposed lateral normal.
     !> @param[in] cell_area Horizontal cell area [m2].
-    !> @param[in] non_exchange_group Subset of sources that do not exchange with terrain or air.
+    !> @param[in] non_exchange_mask Mask of sources that do not exchange with terrain or air.
     !> @param[in] exchange_selected Whether group metadata activates mass exchange.
     !> @param[in,out] physical_scratch Optional caller-owned physical state workspace.
     !> @param[in,out] exchange_scratch Optional caller-owned mass-exchange workspace.
@@ -111,7 +111,7 @@ CONTAINS
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
-            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
+            non_exchange_mask,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
             thermal,rheology,mass_config,transport_stochastic,pore_enabled,stochastic_enabled, &
             terrain_exposed,atmosphere_exposed)
         INTEGER, INTENT(IN) :: B_zone_cell
@@ -120,8 +120,8 @@ CONTAINS
         REAL(wp), INTENT(IN) :: arc_perim,arc_n_x,arc_n_y,cell_area
         REAL(wp), INTENT(IN) :: qp_eval(n_vars),q_recipient(n_eqns),dt,t
         TYPE(source_group_type), INTENT(IN) :: group
-        ! Prepartitioned immutable metadata supplied by the Lie executor.
-        TYPE(source_group_type), INTENT(IN) :: non_exchange_group
+        ! The Lie executor precomputes the exchange-free mask during initialization.
+        INTEGER, INTENT(IN) :: non_exchange_mask
         LOGICAL, INTENT(IN) :: exchange_selected
         TYPE(physical_state_real), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
@@ -149,12 +149,13 @@ CONTAINS
         physical_ready=.FALSE.
         ! Partitioned immutable metadata comes from the Lie registry/executor.
         ! Never copy allocatable group members or PACK source names inside cells.
-        IF (non_exchange_group%source_mask/=0) THEN
+        IF (non_exchange_mask/=0) THEN
             CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
-                physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled)
+                arc_perim,arc_n_x,arc_n_y,cell_area,group,stochastic_value,physical_scratch,              &
+                physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled,                            &
+                non_exchange_mask=non_exchange_mask)
         END IF
 
         IF (has_exchange) THEN
@@ -715,7 +716,7 @@ CONTAINS
     !> @param[in] lat_n_x_jk X component of lateral injection normal.
     !> @param[in] lat_n_y_jk Y component of lateral injection normal.
     !> @param[in] cell_area_jk Cell horizontal area [m2].
-    !> @param[in] group Registered non-exchange Lie group.
+    !> @param[in] group Registered Lie group with canonical identity and dispatch metadata.
     !> @param[in] stochastic_value Local stochastic rheology coefficient.
     !> @param[in,out] physical_scratch Optional caller-owned physical-state workspace.
     !> @param[out] physical_ready Optional flag for reusable local physical-state conversion.
@@ -724,11 +725,12 @@ CONTAINS
     !> @param[in] rheology Immutable layer rheology source configuration.
     !> @param[in] pore_enabled Whether pore-pressure effective stress is enabled.
     !> @param[in] stochastic_enabled Whether stochastic rheology is enabled.
+    !> @param[in] non_exchange_mask Optional filtered mask for non-exchange source evaluation.
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
-            physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled )
+            physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled,non_exchange_mask )
 
     IMPLICIT NONE
 
@@ -760,6 +762,9 @@ CONTAINS
         TYPE(thermal_config_type), INTENT(IN) :: thermal
         TYPE(rheology_config_type), INTENT(IN) :: rheology
         LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
+        ! Optional exchange-free mask; standalone callers use the group's full mask.
+        INTEGER, INTENT(IN), OPTIONAL :: non_exchange_mask
+        INTEGER :: active_mask
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -778,6 +783,8 @@ CONTAINS
         REAL(wp) :: injection_rate(n_eqns)
 
 
+        active_mask=group%source_mask
+        IF (PRESENT(non_exchange_mask)) active_mask=non_exchange_mask
         expl_term(1:n_eqns) = 0.0_wp
         IF (PRESENT(physical_ready)) physical_ready=.FALSE.
 
@@ -810,7 +817,7 @@ CONTAINS
 
             q1 = r_h * r_rho_m
 
-            IF ( BTEST(group%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1) .AND.                                         &
+            IF ( BTEST(active_mask,SOURCE_ID_GEOMETRY_CURVATURE-1) .AND.                                         &
                 r_h .GT. dry_thickness_tolerance ) THEN
 
                 ! Hydrostatic pressure and the ordinary bed-slope source are already
@@ -850,9 +857,9 @@ CONTAINS
 
         CALL eval_mass_injection_explicit(physical_state,time,cell_fract_jk,                                           &
             cell_fissure_fract,lat_arc_perim_jk,lat_n_x_jk,lat_n_y_jk,cell_area_jk,                                    &
-            BTEST(group%source_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                            &
-            BTEST(group%source_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                            &
-            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials,pore_enabled)
+            BTEST(active_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                            &
+            BTEST(active_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                            &
+            BTEST(active_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials,pore_enabled)
         expl_term=expl_term+injection_rate
 
         RETURN

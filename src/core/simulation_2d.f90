@@ -4,9 +4,9 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, one shared active-cell domain, layout, source registry
-!> and numerical workspaces. Initialization follows dependency order, and
-!> finalization releases their storage.
+!> Owns state, runtime, one shared active-cell domain, layout and numerical
+!> workspaces. A temporary source registry validates groups before the
+!> executor takes ownership; finalization releases the persistent storage.
 !********************************************************************************
 
 MODULE simulation_2d
@@ -71,7 +71,6 @@ MODULE simulation_2d
         TYPE(runtime_state_type) :: runtime
         TYPE(model_layout_type) :: model_layout
         TYPE(layer_physics_type), ALLOCATABLE :: layer_physics(:) !< Validated before worker allocation.
-        TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
         TYPE(state_type) :: state
         TYPE(domain_type) :: domain !< Shared OR active cell and face workset for all layer slots.
         TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
@@ -100,6 +99,7 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
 
         CHARACTER(LEN=256) :: source_error
+        TYPE(source_registry_type) :: source_registry !< Temporary validated source groups for executor setup.
         INTEGER :: layer
 
         ! Canonical state indices must be available before any initial-condition
@@ -122,11 +122,11 @@ CONTAINS
             CALL this%layer_physics(2)%initialize(rheology_flag,rheology_l2,thermal_l2, &
                 pore_pressure_l2,mass_exchange_l2,source_error)
             IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
-            CALL initialize_configured_sources(this%source_registry,source_error, &
+            CALL initialize_configured_sources(source_registry,source_error, &
                 rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
                 rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
         ELSE
-            CALL initialize_configured_sources(this%source_registry,source_error, &
+            CALL initialize_configured_sources(source_registry,source_error, &
                 rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
         END IF
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
@@ -145,7 +145,9 @@ CONTAINS
         ! Per-layer HP and flux data remain owned by spatial_operators.
         CALL this%domain%initialize
 
-        CALL this%time_integration%initialize(this%source_registry)
+        CALL this%time_integration%initialize(source_registry)
+        ! The Lie executor now owns the operational group metadata.
+        CALL source_registry%finalize()
 
         ALLOCATE(this%stochastic(this%model_layout%n_layers))
         CALL this%stochastic(1)%initialize(stochastic_l1,rheology_l1,layer=1)
@@ -230,7 +232,6 @@ CONTAINS
         CALL this%state%finalize
 
 
-        CALL this%source_registry%finalize()
         IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
         CALL this%model_layout%finalize
         IF (ALLOCATED(this%stochastic)) THEN

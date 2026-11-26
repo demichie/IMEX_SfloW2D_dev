@@ -272,6 +272,8 @@ CONTAINS
         TYPE(rheology_config_type) :: rheology(n_layers)
         TYPE(pore_pressure_config_type) :: pore_pressure(n_layers)
         TYPE(mass_exchange_config_type) :: mass_config(n_layers)
+        ! These are read-only timestep-local snapshots, not persistent state:
+        ! they supply the existing per-layer array arguments to the OpenMP Lie executor.
         LOGICAL :: transport_stochastic(n_layers),pore_enabled(n_layers),stochastic_enabled(n_layers)
         LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready,spatial_residual_ready
         LOGICAL :: reuse_cfl_traces,residual_prepared
@@ -479,9 +481,8 @@ CONTAINS
             this%profile_spatial=this%profile_spatial+REAL(tock-tick,wp)/REAL(tick_rate,wp)
             tick=tock
         END IF
-        ! The two-layer spatial candidates now enter the same ordered Lie
-        ! executor as L1. The model-layout gate still prevents production use;
-        ! no alternative timestep or layer-specific commit path is introduced.
+        ! Both one- and two-layer spatial candidates enter the same ordered
+        ! Lie executor. There is no alternative or layer-specific commit path.
 
         ! OU is now the post-spatial fractional stage.  q_trial/qp_trial
         ! are valid only on the solve worklist, so stochastic%prepare_timestep

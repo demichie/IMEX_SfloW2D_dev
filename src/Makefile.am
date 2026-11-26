@@ -558,8 +558,6 @@ numerics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
 
 # Remaining direct USE dependencies, audited against all production .f90 sources.
-IMEX_SfloW2D.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
-    numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)

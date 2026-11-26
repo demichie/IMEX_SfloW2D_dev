@@ -21,7 +21,7 @@ Solver-wide configuration, model layout, execution lifecycle, diagnostics and in
 
 ## Mathematical and architectural contracts
 
-The simulation object aggregates state, per-layer geometry, source registry and workspaces. Model layout is resolved before allocation; do not duplicate its component indices or move the numerical kernels here.
+The simulation object aggregates the canonical state, shared domain and per-layer workspaces. The source registry is a temporary validated configuration during initialization; the Lie executor retains the operational groups. Model layout is resolved before allocation; do not duplicate its component indices or move numerical kernels here.
 
 ## Interfaces, invariants and checks
 
