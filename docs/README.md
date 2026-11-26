@@ -6,7 +6,7 @@ and CI for the exact active commit remain the source of truth.
 
 ## Current documentation
 
-- [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md): current TL13 priorities.
+- [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md): integrated solver status and remaining scientific priorities.
 - [Two-layer architecture](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md):
   authoritative design, physical assumptions and integration status.
 - [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md):
@@ -26,13 +26,17 @@ and CI for the exact active commit remain the source of truth.
   binary checkpoints hold the full restart state.
 - [Visualization with ParaView and QGIS](website/getting-started/visualization.md):
   menu-by-menu instructions for scientific plots and geographic textures.
+- [Docker guide](website/getting-started/docker.md): run the published solver on mounted input data.
+- [Doxygen entry page](doxygen/mainpage.md): generated API navigation and data ownership.
+- [Publishing workflows](website/development/publishing.md): manually build and deploy Pages and GHCR.
 
 ## Other authoritative sources
 
 - [Physics/source documentation](../src/physics/README.md) and
   [state documentation](../src/state/README.md) describe owners and APIs.
 - Each example's `EXAMPLES/*/README.md` is the canonical run guide.
-- [Website sources](website/) are built by the MkDocs publishing workflow.
+- [Website sources](website/) are built by the manual MkDocs/Doxygen publishing workflow.
+  The example catalogue is generated from primary example READMEs, not supporting DEM notes.
 - [Dated acceptance reports](acceptance/README.md) and their pinned JSON
   fixtures are historical evidence; some are still **required by the
   executable acceptance tests** in `TESTS/ACCEPTANCE/`.

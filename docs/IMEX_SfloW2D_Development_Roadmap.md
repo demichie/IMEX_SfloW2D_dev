@@ -1,10 +1,10 @@
 # IMEX-SfloW2D — Development roadmap
 
-**Current development branch:** `feature/two-layer`. This file contains *current
-priorities*, not a cumulative commit diary. For authoritative behavior always
-inspect the branch HEAD, source code and the CI outcome for that exact revision.
+**Current integration baseline:** `master`, following [Pull Request #7](https://github.com/demichie/IMEX_SfloW2D_dev/pull/7).
+This file contains current contracts and outstanding work, not a cumulative commit diary.
+For authoritative behavior inspect the source code and CI outcome for the exact revision.
 
-## Current objective: consolidate integrated one- and two-layer execution
+## Integrated one- and two-layer execution
 
 Both `N_LAYERS=1` and `N_LAYERS=2` select the standard solver path
 without an environment activation gate. The single-layer path remains
@@ -112,6 +112,18 @@ keep configuration reads outside OpenMP cell loops. Similarly, the trial
 conservative/primitive states, the optional pre-CFL primitive halo, and
 thread-owned REAL/COMPLEX physical scratch remain essential numerical
 workspaces. Removing them would change transaction or worker ownership.
+
+## Post-merge maintenance priorities
+
+- Keep the root README, MkDocs site and Doxygen API consistent with the
+  integrated `master` architecture and with the exact published revision.
+- Publish a runnable solver container to GitHub Container Registry using the
+  manually selected `master` commit; make its runtime dependencies and
+  immutable image tag explicit.
+- Revalidate remaining historical N7 acceptance criteria against current
+  observables without reinstating obsolete development infrastructure.
+- Resolve the existing lateral Dirichlet boundary/CFL override question in
+  a separate physics review, not in documentation or packaging cleanup.
 
 ## Invariants of the integrated solver
 

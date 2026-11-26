@@ -1,185 +1,151 @@
 # IMEX-SfloW2D
 
-IMEX-SfloW2D is a Fortran finite-volume, depth-averaged model for geophysical
-and volcanic flows, using high-resolution spatial discretization and
-implicit-explicit (IMEX) time integration. Supported single-layer carrier
-configurations include gas, liquid and lava, with model-specific physics.
+**A depth-averaged, finite-volume Fortran solver for volcanic and other
+geophysical flows.** The model combines high-resolution spatial
+discretization with IMEX time integration, analytic/implicit physical
+source treatments and OpenMP parallelism.
 
-The solver supports both `N_LAYERS=1` and `N_LAYERS=2` directly
-through the input file, without an additional activation variable.
-The two-layer formulation has documented scientific limitations,
-particularly for density inversion and interlayer shear; see
-[two-layer hyperbolicity](docs/TWO_LAYER_HYPERBOLICITY.md) and the
-[two-layer architecture](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
-The existing single-layer numerical path remains unchanged.
+The integrated solver supports both **single-layer** (`N_LAYERS=1`) and
+**coupled two-layer** (`N_LAYERS=2`) configurations through
+`IMEX_SfloW2D.inp`. No special two-layer activation flag is required.
+Single-layer carrier configurations include gas, liquid and lava, with
+appropriate rheological and mass-exchange laws.
 
-## Build
+> **Scientific limitation:** the two-layer gravitational characteristic
+> spectrum is not unconditionally real. Inverted density ordering and
+> some interlayer shear states can produce complex eigenvalues, and
+> repeated real eigenvalues need not yield a complete eigenbasis.
+> The CFL envelope is not a general hyperbolicity detector. See
+> [two-layer hyperbolicity](docs/TWO_LAYER_HYPERBOLICITY.md) and
+> [the architecture specification](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
 
-Requirements: a Fortran compiler, Autoconf/Automake, NetCDF-Fortran,
-LAPACK/BLAS and Make. On Ubuntu, equivalent packages include `gfortran`,
-`autoconf`, `automake`, `libnetcdff-dev`, `liblapack-dev` and
-`libblas-dev`. Use libraries built for your selected Fortran compiler.
+## Getting started
 
-```sh
+### Build from source
+
+Requirements: a compatible Fortran compiler, Autoconf, Automake,
+NetCDF-Fortran, LAPACK/BLAS and Make. On Ubuntu 24.04:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y gfortran autoconf automake make \
+    libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev
+```
+
+From the repository root:
+
+```bash
 autoreconf -fi
 ./configure --with-netcdf=/usr FC=gfortran
 make -j2
 make check
 ```
 
-For a strict/debug build, configure with `--enable-strict-debug`.
-The default build is optimized. Configure-time overrides include `FCFLAGS`,
-`OPENMP_FCFLAGS`, `NETCDF_LIBS` and `LAPACK_LIBS`. For Conda or another
-custom NetCDF-Fortran prefix, set `--with-netcdf=/path/to/prefix`.
-Generated Autotools files are not tracked in Git.
+The executable is `src/IMEX_SfloW2D`. To build with runtime bounds
+checks and floating-point traps, use `./configure --with-netcdf=/usr
+FC=gfortran --enable-strict-debug` before `make`.
 
-`make install` installs the compiled executable. Focused numerical, physics,
-restart and OpenMP checks are available under `TESTS/`; see
-[contributing](CONTRIBUTING.md) and the [manual CI workflows](.github/README.md).
-GitHub Actions in this repository run only on manual dispatch.
+For custom NetCDF-Fortran installations, replace `/usr` with the
+appropriate prefix. The generated Autotools files are intentionally
+not tracked in Git.
 
-## Documentation and examples
+### Run a prepared example
 
-- [Developer documentation](docs/README.md)
-- [Documentation website](https://demichie.github.io/IMEX_SfloW2D_dev/)
-- [Example configurations](EXAMPLES/) (each runnable example has its own README)
-- [Etna two-layer granular collapse and dilute upper current](EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/README.md)
-- [Two-layer 1D dam-break with initially dry upper layer](EXAMPLES/EXAMPLE_DAMBREAK_TWO_LAYER_1D/README.md)
-- [Model architecture and implementation status](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
-- [NetCDF fields and binary restart](docs/NETCDF_OUTPUT.md)
-- [Citation metadata](CITATION.cff) and [GPLv3 license](COPYING)
+The one-dimensional two-layer dam-break example builds its input rasters
+without running the Fortran solver:
 
-## Releases
-
-GitHub automatically supplies source snapshots for tags; these are not
-Autotools-generated distribution archives and may omit `configure`. When
-available, download the separately prepared source and examples archives from
-the [releases page](https://github.com/demichie/IMEX_SfloW2D_dev/releases).
-
-## Per-run output directories
-
-Solver-generated files are grouped below `OUTPUT/<RUN_NAME>/` by default.
-`OUTPUT_BASE_DIRECTORY` in `RUN_PARAMETERS` selects a different parent
-directory, and `OUTPUT_OVERWRITE=T` explicitly allows reusing an existing run
-directory. Reuse does not remove files left by an earlier run. Without the
-overwrite flag, an existing run directory is rejected before solver outputs
-are opened.
-
-The run directory contains `metadata/` (effective input backup and snapshot
-manifest), `fields/` (NetCDF), `snapshots/` (conservative and raster snapshots,
-each in an index/time-stamped directory), `diagnostics/`, `probes/`,
-`vulnerability/`, `terrain/`, and `restart/` (the written `restart.bin`).
-The manifest records each snapshot index and its exact time. Input files such
-as topography and externally supplied restart checkpoints remain at their
-configured input paths. For an in-place binary continuation, the basename
-`restart.bin` resolves to `OUTPUT/<RUN_NAME>/restart/restart.bin` when that
-checkpoint exists; otherwise the configured input path is used.
-
-`RUN_NAME` accepts ASCII letters, digits, `_` and `-`. Output path components
-are created without following symlinks; parent-directory (`..`) components in
-the configured output base are rejected. Before reusing an existing run
-directory, its contents are checked for symlinks, hard-linked files and
-non-regular entries.
-
-## CFL timestep policies
-
-`NUMERIC_PARAMETERS` accepts `CFL_POLICY='directional_min'` (the default,
-including when omitted) or `CFL_POLICY='combined'`. Both use the same final
-HP-PCCU face speeds. With nonnegative directional speed maxima `lambda_x/y`,
-the spatial suggestion is respectively:
-
-- `min(MAX_DT, CFL*dx/lambda_x, CFL*dy/lambda_y)`, ignoring zero-speed directions;
-- `min(MAX_DT, CFL/(lambda_x/dx + lambda_y/dy))`, using only active directions.
-
-If no direction propagates, the suggestion is `MAX_DT`. Both policies agree
-on a one-dimensional x/y grid. The existing admissible CFL range remains
-`0 <= CFL <= 0.5` in 1D and `0 <= CFL <= 0.25` in 2D. Precisely `CFL=-1`
-is also accepted: it returns `MAX_DT` without evaluating reconstruction/speeds.
-Other negative values and unknown policy names are rejected.
-
-The accepted timestep still obeys output/runout/probe events, the final time
-and the existing growth limiter. Neither policy is a general stability proof
-for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected policy is written to the effective input backup
-(`metadata/RUN_NAME.bak` within the per-run output directory).
-
-## Runout and binary continuation
-
-Binary restart is a **single development-only checkpoint schema**. It stores
-the canonical conservative and auxiliary state together with the runtime and
-runout sampling history required for continuation. Checkpoints written by
-superseded development implementations are not accepted; regenerate them
-instead of maintaining a versioned reader.
-
-Runout diagnostics are written to `RUN_NAME_runout.csv` and
-`RUN_NAME_mass_center.csv`. On continuation, their existing headers and
-sampling history must be consistent with the restored checkpoint; incompatible
-histories are rejected without truncation. A missing CSV begins a new output
-segment and cannot reconstruct earlier diagnostic rows.
-
-Keep the runout origin and relevant diagnostic scheduling parameters unchanged
-for a continuous restart. The dated
-[restart acceptance report](docs/acceptance/N9_RESTART_V5_2026_10_11.md)
-records historical validation evidence, **not** an additional supported
-checkpoint format. Consult [the current output guide](docs/NETCDF_OUTPUT.md)
-for physical-field and restart-file responsibilities.
-
-## Runtime diagnostics
-
-`VERBOSE_LEVEL` controls how much diagnostic information is printed and never
-pauses an execution. Interactive debug pauses can be enabled independently in
-the `RUN_PARAMETERS` namelist:
-
-```fortran
-INTERACTIVE_DEBUG_FLAG = T,
+```bash
+cd EXAMPLES/EXAMPLE_DAMBREAK_TWO_LAYER_1D
+python3 prepare.py
+../../src/IMEX_SfloW2D
 ```
 
-The flag defaults to `F` and should remain disabled for batch and production
-runs. Interactive pauses requested inside an active OpenMP parallel region are
-skipped to avoid unsafe concurrent access to standard input. Invalid input and
-nonphysical solver states terminate with a nonzero error status after printing
-their diagnostic context.
+The solver reads `IMEX_SfloW2D.inp` from the current directory.
+Other examples may need a shared DEM ZIP copied and extracted first;
+follow each example's own README.
 
-## Vertical closure status
+### Run with Docker
 
-The former velocity/concentration vertical-profile implementation has been
-removed. The current solver uses the standard depth-averaged equations, and
-the input options `VERTICAL_PROFILES_FLAG` and
-`VERTICAL_PROFILES_PARAMETERS` are no longer accepted.
+Once the [manual GHCR publishing workflow](.github/workflows/docker_create_publish.yml)
+has successfully published the container and its package is accessible:
 
-Vertical-structure effects will be reintroduced through a separate closure
-interface that maps conservative state and local context to coefficients used
-by the equation terms. This will allow analytical/quadrature and data-driven
-backends to share the same solver-facing contract.
-
-## Bottom fissural sources
-
-Bottom fissural sources are enabled with `BOTTOM_FISSURAL_SOURCE_FLAG = T` and
-`N_FISSURES` in `NEWRUN_PARAMETERS`. They cannot be combined with radial or
-lateral source flags. Each fissure is a finite-width rectangular strip defined
-by two centerline endpoints and a width. Its cell coverage is computed by exact
-polygon/cell intersection and kept separate from the other fissures.
-
-`FISSURAL_SOURCE_PARAMETERS` accepts endpoint coordinates, widths, a linear
-injection velocity and temperature per fissure, plus four time parameters per
-fissure: period, active duration, ramp duration and phase. If the time
-parameters are omitted, the source is active at constant strength for the run.
-All fissures use the same source composition, specified with the existing
-`ALPHAS_SOURCE`/`XS_SOURCE`, `ALPHAG_SOURCE`/`XG_SOURCE`, and liquid fraction
-fields in the fissural namelist. Volumetric-flow-rate input is not implemented.
-
-```fortran
-&NEWRUN_PARAMETERS
-	BOTTOM_FISSURAL_SOURCE_FLAG = T,
-	N_FISSURES = 1,
-	...
-/
-&FISSURAL_SOURCE_PARAMETERS
-	X_FISSURES_END_POINTS = 100.0, 300.0,
-	Y_FISSURES_END_POINTS = 200.0, 200.0,
-	WIDTH_FISSURES = 20.0,
-	LINEAR_VEL_FISSURES = 1.0,
-	T_FISSURES = 1200.0,
-	TIME_PARAM_FISSURES = 60.0, 45.0, 5.0, 0.0,
-	ALPHAS_SOURCE = 0.02,
-/
+```bash
+docker pull ghcr.io/demichie/imex_sflow2d_dev:latest
+cd EXAMPLES/EXAMPLE_DAMBREAK_TWO_LAYER_1D
+python3 prepare.py
+docker run --rm --user "$(id -u):$(id -g)" \
+    --mount "type=bind,src=$PWD,dst=/work" --workdir /work \
+    ghcr.io/demichie/imex_sflow2d_dev:latest
 ```
+
+The Docker image contains the **compiled solver**, not the examples or
+data files, and writes results to the mounted case directory. For
+reproducibility, use the published `sha-<40-character-commit>` image tag
+rather than `latest`. To build the image locally, run
+`docker build -t imex-sflow2d:local .` at the repository root.
+
+See the [Docker guide](docs/website/getting-started/docker.md) for
+mounts and container permissions.
+
+## Model configuration
+
+- **One layer:** use `N_LAYERS=1`. Unsuffixed physical NAMELIST groups
+  are intentional single-layer input forms, not obsolete aliases.
+- **Two layers:** use `N_LAYERS=2` and independent L1/L2 configuration
+  groups. Both layers share the mesh, terrain and species catalogue.
+  Interlayer exchange and drag have one pair-wide `INTERLAYER_PARAMETERS`
+  configuration.
+- **State:** the solver owns one canonical conservative/primitive
+  representation `q/qp(component,layer,x,y)`. Per-layer constitutive
+  laws and the accepted-timestep execution are not duplicated.
+
+For input details, see
+[initial conditions and restart](docs/RESTART_INPUT.md),
+[model architecture](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md) and
+[the model website](https://demichie.github.io/IMEX_SfloW2D_dev/model/).
+
+## Results and restart
+
+By default, generated files are placed under `OUTPUT/<RUN_NAME>/` in
+the case directory (override with `OUTPUT_BASE_DIRECTORY`). Principal
+subdirectories include `fields/` (NetCDF), `diagnostics/`,
+`snapshots/`, `terrain/`, `metadata/` and `restart/`.
+
+- [NetCDF variables and two-layer field names](docs/NETCDF_OUTPUT.md).
+- [Binary restart and initial-state inputs](docs/RESTART_INPUT.md).
+- [ParaView and QGIS visualization](docs/website/getting-started/visualization.md).
+
+The binary checkpoint has one current development schema; obsolete
+checkpoint formats are not maintained.
+
+## Examples
+
+- [Etna two-layer granular collapse and upper dilute current](EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/README.md).
+- [Two-layer one-dimensional dam break](EXAMPLES/EXAMPLE_DAMBREAK_TWO_LAYER_1D/README.md).
+- [Vesuvius lahar](EXAMPLES/EXAMPLE_LAHAR/README.md).
+- [Complete example catalogue](EXAMPLES/) and its
+  [published searchable index](https://demichie.github.io/IMEX_SfloW2D_dev/examples/).
+
+Example parameters are illustrative unless an example explicitly
+documents calibration and comparison with reference data.
+
+## Documentation, validation and publication
+
+- [Documentation website](https://demichie.github.io/IMEX_SfloW2D_dev/).
+- [Fortran/Doxygen reference](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/).
+- [Developer documentation](docs/README.md) and [Fortran style](docs/FORTRAN_STYLE.md).
+- [Current tests and scientific acceptance scope](.github/README.md).
+- [Contributing](CONTRIBUTING.md).
+
+GitHub Actions are deliberately **manual**: source/documentation audit,
+cell-physics regressions, solver/OpenMP integration, documentation
+publication and GHCR image publication all run only when explicitly
+dispatched. For a new revision, validate the first three workflows
+before updating the public site or container. A green build is not a
+general scientific validation for all physical states.
+
+## Citation and license
+
+Please cite the software using [CITATION.cff](CITATION.cff) and relevant
+scientific literature for your chosen model configuration.
+IMEX-SfloW2D is distributed under [GNU GPL v3](COPYING).

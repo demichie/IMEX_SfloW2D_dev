@@ -1,0 +1,22 @@
+# Keep build contexts small: only the source and Autotools manifests are needed.
+**
+!Dockerfile
+!Makefile.am
+!configure.ac
+!COPYING
+!CITATION.cff
+!README.md
+!CONTRIBUTING.md
+!src/
+!src/**
+
+# No local outputs or generated compiler/autotools files.
+src/IMEX_SfloW2D
+src/**/*.o
+src/**/*.mod
+src/**/*.smod
+src/**/.deps/
+src/**/.dirstamp
+src/**/__pycache__/
+*.py[cod]
+.DS_Store

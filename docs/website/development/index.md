@@ -1,11 +1,16 @@
 # Development and validation
 
-The development repository maintains automated solver validation, Intel `ifx` portability and Docker workflows. See [GitHub Actions](https://github.com/demichie/IMEX_SfloW2D_dev/actions) for the current results.
+IMEX-SfloW2D is maintained as a scientific Fortran solver with explicit ownership of canonical state and physical configurations. The integrated single- and two-layer paths are tested together.
 
-The validation workflows run when a tag is pushed, a release is published, or a maintainer starts them manually; ordinary branch commits and pull requests do not trigger these resource-intensive checks.
+## Current workflows
 
-The [N9 scientific baseline and M12c build acceptance records](https://github.com/demichie/IMEX_SfloW2D_dev/tree/master/docs/acceptance) document tested revisions, compiler configurations and limitations. Those acceptance records must not be interpreted as automatic approval of subsequent numerical changes.
+The active GitHub Actions workflows are **manual** (`workflow_dispatch`). Ordinary commits, PRs and tags do not automatically compile, validate, publish documentation or release a container.
 
-## Documentation workflow
+- [Validation and acceptance](validation.md): optimized/strict builds, physical and numerical regressions, solver/OpenMP integration, and scientific acceptance scope.
+- [Documentation and Docker publication](publishing.md): generate MkDocs and Doxygen, deploy Pages and publish a GHCR container intentionally.
+- [Contributing guidance](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/CONTRIBUTING.md)
+- [Current development roadmap](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/IMEX_SfloW2D_Development_Roadmap.md)
 
-The site is rebuilt manually or on tag/release events. Each example's `README.md` is authoritative: its metadata drives the catalogue, and the complete Markdown body is published as the example page. Source-code API pages are created from `template.doxy` in the same build.
+The GitHub [Actions dashboard](https://github.com/demichie/IMEX_SfloW2D_dev/actions) records results for specific commit SHAs; a green run on another commit is not evidence that the current branch has been validated.
+
+Source documentation is generated with [Doxygen](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/) from the exact revision selected for Pages deployment.

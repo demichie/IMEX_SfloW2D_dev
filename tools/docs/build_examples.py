@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import shutil
+import textwrap
 from pathlib import Path
 from urllib.parse import quote
 
@@ -17,22 +18,61 @@ SECTIONS = ("Overview", "Main parameters", "How to run", "Expected output")
 
 
 def parse_readme(path):
+    """Preserve authored metadata, or derive it for plain Markdown example guides."""
     raw = path.read_text(encoding="utf-8-sig")
     match = re.match(r"\A---\s*\n(.*?)\n---\s*\n", raw, re.S)
-    if not match:
-        raise ValueError(f"{path}: missing YAML front matter")
-    meta = yaml.safe_load(match.group(1))
-    if not isinstance(meta, dict):
-        raise ValueError(f"{path}: invalid metadata")
-    for key in REQUIRED:
-        if not meta.get(key):
-            raise ValueError(f"{path}: missing {key}")
-    if not isinstance(meta["tags"], list) or not all(isinstance(t, str) for t in meta["tags"]):
-        raise ValueError(f"{path}: tags must be a string list")
-    body = raw[match.end():]
-    missing = [s for s in SECTIONS if not re.search(r"^#{2,4}\s+" + re.escape(s) + r"\s*$", body, re.I | re.M)]
-    # Do not discard existing content just because a README is still being standardized.
+    if match:
+        meta = yaml.safe_load(match.group(1))
+        if not isinstance(meta, dict):
+            raise ValueError(f"{path}: invalid metadata")
+        for key in REQUIRED:
+            if not meta.get(key):
+                raise ValueError(f"{path}: missing {key}")
+        if not isinstance(meta["tags"], list) or not all(isinstance(t, str) for t in meta["tags"]):
+            raise ValueError(f"{path}: tags must be a string list")
+        body = raw[match.end():]
+    else:
+        body = raw
+        heading = re.search(r"^#\s+(.+?)\s*$", body, re.M)
+        if not heading:
+            raise ValueError(f"{path}: missing top-level heading")
+        title = heading.group(1).strip()
+        paragraphs = re.split(r"\n\s*\n", body[heading.end():])
+        description = next(
+            (p for p in paragraphs if p.strip() and not p.lstrip().startswith(("#", "|"))),
+            title,
+        )
+        summary = textwrap.shorten(" ".join(description.split()), width=240, placeholder="...")
+        folder = path.parent.as_posix().upper()
+        if "TWO_LAYER" in folder:
+            category = "Two-layer flows"
+        elif "EXAMPLE_BUMP" in folder:
+            category = "Analytical benchmarks"
+        elif any(label in folder for label in ("ETNA", "TAAL", "LAHAR", "VESUVIO")):
+            category = "Volcanic flows"
+        else:
+            category = "Other examples"
+        tags = [part.lower() for part in path.parent.name.split("_") if part and part != "EXAMPLE"]
+        meta = {"title": title, "summary": summary, "category": category, "tags": tags or ["simulation"]}
+    missing = [section for section in SECTIONS
+               if not re.search(r"^#{2,4}\s+" + re.escape(section) + r"\s*$", body, re.I | re.M)]
     return meta, body, missing
+
+
+def is_example_readme(readme, examples_root):
+    """Exclude supporting DEM and template guides from the public example catalogue."""
+    parts = readme.parent.relative_to(examples_root).parts
+    if not parts or not parts[0].startswith("EXAMPLE_"):
+        return False
+    if len(parts) == 1:
+        return True
+    if any(part.casefold() in {"dem", "initial_conditions", "templatedir", "output"}
+           for part in parts[1:]):
+        return False
+    return any(
+        item.is_file() and item.name.casefold() in {"imex_sflow2d.inp", "imex_sflow2d.template"}
+        for item in readme.parent.iterdir()
+    )
 
 
 def rewrite_markdown_links(body, example_dir, repo_url, revision):
@@ -79,6 +119,8 @@ def generate(repo, output, revision, repo_slug):
     pages.mkdir(parents=True, exist_ok=True)
     records, warnings = [], []
     for readme in sorted(examples_root.rglob("README.md")):
+        if not is_example_readme(readme, examples_root):
+            continue
         relative_dir = readme.parent.relative_to(examples_root)
         meta, body, missing = parse_readme(readme)
         body = rewrite_markdown_links(body, relative_dir, repo_slug, revision)
@@ -101,13 +143,34 @@ def generate(repo, output, revision, repo_slug):
             link = f"{slug}/index.md"
             lines.extend([f"### [{meta['title']}]({link})", "", str(meta["summary"]), "", "Tags: " + ", ".join(f"`{t}`" for t in meta["tags"]), ""])
     (pages / "index.md").write_text("\n".join(lines), encoding="utf-8")
-    nav = ["  - Home: index.md", "  - Getting started:", "      - Overview: getting-started/index.md", "      - Installation: getting-started/installation.md", "      - Output files: getting-started/output-files.md", "      - Visualization (ParaView and QGIS): getting-started/visualization.md", "  - Model: model/index.md", "  - Examples:", "      - Catalogue: examples/index.md"]
+    nav = [
+        "  - Home: index.md",
+        "  - Getting started:",
+        "      - Overview: getting-started/index.md",
+        "      - Build from source: getting-started/installation.md",
+        "      - Docker: getting-started/docker.md",
+        "      - Output files: getting-started/output-files.md",
+        "      - Visualization (ParaView and QGIS): getting-started/visualization.md",
+        "  - Model:",
+        "      - Overview: model/index.md",
+        "      - Spatial and temporal integration: model/numerics.md",
+        "      - Two-layer formulation and limits: model/two-layer.md",
+        "  - Examples:",
+        "      - Catalogue: examples/index.md",
+    ]
     for category in sorted(categories, key=str.casefold):
         nav.append(f"      - {json.dumps(category, ensure_ascii=False)}:")
         for slug, meta, _ in sorted(categories[category], key=lambda entry: entry[1]["title"].casefold()):
             label = json.dumps(meta['title'], ensure_ascii=False)
             nav.append(f"          - {label}: examples/{slug}/index.md")
-    nav += ["  - Development: development/index.md", "  - Doxygen: https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/", "  - References: references/index.md"]
+    nav += [
+        "  - Development:",
+        "      - Overview: development/index.md",
+        "      - Validation: development/validation.md",
+        "      - Publishing: development/publishing.md",
+        "  - Doxygen: https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/",
+        "  - References: references/index.md",
+    ]
     config = (repo / "mkdocs.yml").read_text(encoding="utf-8")
     config = config.replace("# GENERATED_NAVIGATION", "\n".join(nav))
     (output / "mkdocs.generated.yml").write_text(config, encoding="utf-8")

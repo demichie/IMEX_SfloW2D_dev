@@ -1,6 +1,6 @@
 # Doxygen configuration for the IMEX-SfloW2D Fortran API.
-# The publication workflow overrides OUTPUT_DIRECTORY, HTML_OUTPUT, INPUT,
-# RECURSIVE, GENERATE_HTML, GENERATE_LATEX and PROJECT_BRIEF.
+# The publication workflow overrides OUTPUT_DIRECTORY, HTML_OUTPUT,
+# GENERATE_HTML, GENERATE_LATEX and PROJECT_BRIEF. INPUT includes the API main page.
 PROJECT_NAME           = "IMEX-SfloW2D"
 PROJECT_BRIEF          = "Fortran API for a depth-averaged geophysical flow solver"
 OUTPUT_DIRECTORY       = doc
@@ -16,8 +16,8 @@ QUIET                  = YES
 WARNINGS               = YES
 WARN_IF_UNDOCUMENTED   = NO
 WARN_IF_DOC_ERROR      = YES
-INPUT                  = src
-FILE_PATTERNS          = *.f90 *.F90 *.f95 *.F95
+INPUT                  = src docs/doxygen/mainpage.md
+FILE_PATTERNS          = *.f90 *.F90 *.f95 *.F95 *.md
 RECURSIVE              = YES
 SOURCE_BROWSER         = YES
 INLINE_SOURCES         = NO
@@ -27,5 +27,7 @@ GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 GENERATE_LATEX         = NO
 GENERATE_XML           = NO
+MARKDOWN_SUPPORT       = YES
+USE_MDFILE_AS_MAINPAGE = docs/doxygen/mainpage.md
 HAVE_DOT               = YES
 DOT_GRAPH_MAX_NODES    = 80

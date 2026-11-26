@@ -6,7 +6,7 @@ menu paths and filter controls from the original utility guides. Menu names
 may differ across versions of ParaView, QGIS and QuickMapServices.
 
 For plotting ESRI ASCII rasters or diagnostic CSV series with the repository's
-Python scripts, see the [post-processing utilities](https://github.com/demichie/IMEX_SfloW2D_dev/tree/feature/two-layer/UTILS).
+Python scripts, see the [post-processing utilities](https://github.com/demichie/IMEX_SfloW2D_dev/tree/master/UTILS).
 
 ## ParaView: simulation fields and 3D visualization
 
@@ -45,9 +45,9 @@ Current single-layer variables include:
 | `hMax` | Maximum thickness | m |
 | `pDynMax` | Maximum dynamic pressure | Pa |
 
-See [the full NetCDF reference](https://github.com/demichie/IMEX_SfloW2D_dev/blob/feature/two-layer/docs/NETCDF_OUTPUT.md). For prepared
-two-layer fields, layer-specific names use `_l1` and `_l2`;
-production two-layer execution remains disabled.
+See [the full NetCDF reference](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/NETCDF_OUTPUT.md). For two-layer simulations, layer-specific fields use `_l1` and `_l2`;
+`N_LAYERS=2` runs through the standard integrated solver. Interpret the coupled
+fields within the [two-layer hyperbolicity limits](../model/two-layer.md).
 
 ### 2. Build a 3D terrain surface
 

@@ -1,5 +1,5 @@
-site_name: IMEX_SfloW2D
-site_description: Scientific documentation and reproducible examples for IMEX_SfloW2D
+site_name: IMEX-SfloW2D
+site_description: User guide, two-layer scientific limits, examples and Fortran API for IMEX-SfloW2D
 site_url: https://demichie.github.io/IMEX_SfloW2D_dev/
 repo_url: https://github.com/demichie/IMEX_SfloW2D_dev
 repo_name: demichie/IMEX_SfloW2D_dev

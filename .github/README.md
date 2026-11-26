@@ -13,8 +13,10 @@ No workflow is triggered by a push, pull request, release, tag or schedule.
 | [Cell physics and numerical regressions](workflows/physics-regressions.yml) | Run current focused `TESTS/` suites in three groups: state, physical sources and spatial discretization. Each suite has its own saved log. | After modifying a physical law, state conversion or spatial operator. |
 | [Static source and documentation audit](workflows/fortran-dependency-audit.yml) | Check Fortran module/Makefile dependencies, Doxygen/formatting, source interface contracts and indexing. Does not compile the full solver. | After modifying module dependencies, APIs, source terms or documentation. |
 | [OpenMP performance benchmark](workflows/lie-openmp-benchmark.yml) | Timed end-to-end performance measurements and CPU-resource reports for manually selected grid, horizon and repetition counts. | When assessing OpenMP optimization/scaling, not for every change. |
-| [Publish documentation](workflows/publish-documentation.yml) | Build MkDocs and Doxygen, then publish to GitHub Pages. | Only when ready to update the public website. |
-| [Publish Docker image to GHCR](workflows/docker_create_publish.yml) | Build and publish a Docker image with provenance attestation. | Only when intentionally publishing a container image. |
+| [Publish documentation](workflows/publish-documentation.yml) | Test example catalogue generation, build MkDocs + Doxygen (including the API main page) and deploy one GitHub Pages artifact. Only the selected `master` revision may publish. | After merging validated documentation changes into `master`. |
+| [Publish Docker image to GHCR](workflows/docker_create_publish.yml) | Build the multi-stage runtime image, check shared-library linkage, and publish `latest` plus an immutable `sha-<commit>` tag with provenance attestation. Only `master` may publish. | After validating and merging changes into `master`; verify package visibility. |
+
+The documentation and Docker publishing workflows can also be run as **build-only previews** on a PR branch. Their deployment and registry push steps are restricted to `master`.
 
 All workflows are intentionally independent. Running the build-only
 workflow does **not** trigger any regression, benchmark or publication.
