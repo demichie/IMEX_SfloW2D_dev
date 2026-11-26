@@ -227,16 +227,19 @@ di [TWO_LAYER_HYPERBOLICITY.md](TWO_LAYER_HYPERBOLICITY.md).
 I resoconti datati che seguono documentano le fasi precedenti e non
 definiscono lo stato operativo corrente.
 
-| Fase | Stato | Lavoro residuo / gate |
+| Componente | Stato integrato | Evidenza e limiti |
 |---|---|---|
-| **TL00–TL04 — Stato e fisica per layer** | Slot opzionali e OU L1/L2 validati nei blocchi 1-3 | L1/L2 condividono il layout opzionale ma mantengono configurazioni, campi OU e flussi casuali indipendenti. Restano IC/BC e I/O/restart completi nei blocchi successivi. |
-| **TL05 — Operatori L2** | Percorso spaziale e BC L1/L2 validati nel blocco 3 | Ricostruzione HP e BC per layer, selezione di velocita' L1/L2 e componenti inattive riusano gli operatori canonici; regressioni estese a tutti i lati e alle quattro occupazioni wet/dry. |
-| **TL06 — Spaziale accoppiato** | Regresioni accoppiate validate nel blocco 3 | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
-| **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
-| **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
-| **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Gli esempi two-layer sono utilizzabili con `N_LAYERS=2`. |
-| **TL13a — Gate funzionale** | **Completata** su `89a9f2b`: workflow `44712747883` interamente verde | Operatori e workset OR, smoke Etna, conservazione, restart e OpenMP two-layer, integrazione optimized/strict-debug e confronto OpenMP single-layer verificati. Il modello two-layer e' direttamente utilizzabile, con i limiti scientifici TL13b. |
-| **TL13b — Validazione scientifica** | **Audit finale completato; approvazione scientifica non concessa** | Verifica tecnica verde: `45771800979` (fisica/stato/spaziale) e `45773582543` (solver strict/optimized, OpenMP, Etna estesa). Non e' validato lo spettro accoppiato con shear e densita' diverse; mancano confronti quantitativi di convergenza e benchmark fisici per le chiusure. Nessun nuovo sottogate. |
+| **TL00–TL06 — Stato e operatore spaziale** | Layout L1/L2, variabili condivise, ricostruzione, contorni e flussi accoppiati | Regresioni wet/dry, trasporto, CFL e integrazione; il CFL non certifica l'iperbolicita'. |
+| **TL07–TL11 — Lie e sorgenti fisiche** | Un esecutore per cella, scambi di massa interlayer, deposizione/entrainment per layer, drag Chézy | Test di conservazione e sorgenti verificati; le chiusure restano soggette ai limiti fisici documentati. |
+| **TL12 — I/O e restart** | Input a uno o due layer, output per layer, un checkpoint binario, substrato condiviso | Round-trip, Etna, restart e confronto OpenMP verificati. |
+| **TL13a — Integrazione funzionale** | **Completata:** `N_LAYERS=2` direttamente eseguibile senza gate ambientale | [Action 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249) tutta verde su `7388eeeb7`; la CI ordinaria include ora il test breve Etna. |
+| **TL13b — Validita' scientifica** | Modello accettato per studi nel campo di applicabilita' dichiarato | Autovalori complessi e limiti CFL in [TWO_LAYER_HYPERBOLICITY.md](TWO_LAYER_HYPERBOLICITY.md); calibrazione e convergenza fisica generale non dimostrate. |
+
+### Cronologia dei blocchi di implementazione
+
+Le note datate seguenti conservano le decisioni e le verifiche svolte
+durante lo sviluppo. Le frasi storiche sull'attivazione sperimentale
+e sui gate chiusi **non descrivono il comportamento attuale** del solver.
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
 post-spaziale in `time_integration_2d%advance` e' stato rimosso: lo stesso

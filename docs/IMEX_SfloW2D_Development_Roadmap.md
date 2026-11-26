@@ -4,30 +4,35 @@
 priorities*, not a cumulative commit diary. For authoritative behavior always
 inspect the branch HEAD, source code and the CI outcome for that exact revision.
 
-## Current objective: TL13
+## Current objective: maintain integrated one- and two-layer execution
 
-The single-layer path remains the regression baseline. The integrated
-two-layer architecture can now run directly with `N_LAYERS=2`; no
-environment activation gate remains. Functional integration passed the
-previously recorded CI checks; scientific validity is restricted by the
-conditions in [two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md).
-Direct execution is not a claim of general physical validation.
+Both `N_LAYERS=1` and `N_LAYERS=2` select the standard solver path
+without an environment activation gate. The single-layer path remains
+the regression baseline. Optimized, strict/debug, OpenMP and Etna
+two-layer end-to-end integration all passed on `7388eeeb7`:
+[workflow 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249).
+This verifies the functional removal of the previous activation gate;
+it does not establish general physical validity. The characteristic
+restrictions are in [two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md).
+
+The solver-integration workflow now includes the short Etna two-layer
+test in every manually dispatched run; extended Etna checks remain
+optional. Every changed SHA requires its own CI verification.
 
 The [two-layer architecture and roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
 is the single authoritative specification of layer ownership, contacts,
 conservative exchanges, spatial coupling, Lie scheduling and scientific
 assumptions. Do not introduce competing implementation plans.
 
-| Stage | Current position | Next required evidence |
+| Area | Integrated implementation | Evidence and remaining scope |
 | --- | --- | --- |
-| TL00–TL06 | Shared layer-aware state, spatial reconstruction/BC and coupled spatial fixtures implemented | Preserve single-layer output; confirm shared wet/dry workset and per-layer boundaries in end-to-end cases |
-| TL07 | Coupled Lie trial, source scheduling and optional layer physics exercised structurally | Validate actual two-layer production timestep |
-| TL08–TL11 | Interlayer settling, elutriation, carrier and analytic drag implemented/tested in isolated and integrated fixtures | Validate coupled mass/species/energy/momentum budgets through a complete run |
-| TL12 | Two-layer input, snapshots, named NetCDF physical fields, and binary restart structurally implemented | Verify real driver I/O, restart continuation and OpenMP |
-| TL13a | **Complete — functional integration verified on `89a9f2b`** | Run `44712747883` verified optimized and strict/debug integration, OpenMP and two-layer Etna end-to-end tests; the no-gate integration change needs new CI evidence. |
-| TL13b | **Open** | Scientifically validate hyperbolicity/shear, density contrasts, coupled pressure, wet/dry, convergence and physical closures |
+| Layer-aware state and spatial operator (TL00–TL06) | Canonical `q/qp(component,layer,x,y)`, per-layer reconstructions and boundaries, shared two-layer spatial workset | Structural regressions and optimized/strict-debug integration verified; general coupled hyperbolicity is not assumed. |
+| Coupled Lie and physical sources (TL07–TL11) | Local external sources, conservative interlayer mass transfer, and analytic interlayer drag share one scheduler | Source, conservation and wet/dry regressions verified; physical closure calibration remains model-dependent. |
+| Input, output and restart (TL12) | Direct `N_LAYERS=1/2` selection, per-layer input and output, shared-substrate budgets and binary continuation | End-to-end Etna checks include output, restart and OpenMP; no special activation is required. |
+| Functional integration (TL13a) | **Complete**; short two-layer Etna smoke is now standard solver-workflow coverage | [Workflow 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249) passed all four jobs on `7388eeeb7`. |
+| Scientific validity (TL13b) | Formulation retained with documented applicability limits | Inverted density, degenerate equal-density states, excessive shear, coupled spectral behavior and empirical closure calibration are not generally validated. |
 
-## Invariants preserved at TL13a closure
+## Invariants of the integrated solver
 
 - **One authoritative state:** `q/qp(component,layer,x,y)`; no synchronized
   copies, global duplicates or transitional internal APIs.
@@ -48,9 +53,9 @@ assumptions. Do not introduce competing implementation plans.
 
 - [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md): characteristic
   limits and accepted scientific restrictions.
-- [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): technical baseline and
-  remaining functional evidence; historical commit-specific claims must be
-  rechecked against the current HEAD.
+- [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): historical
+  implementation evidence; dated gate statements do not describe the
+  current supported execution path.
 - [State architecture](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md): current state
   ownership and performance-validation contract.
 - [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md): authoritative

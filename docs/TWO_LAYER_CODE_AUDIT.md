@@ -13,7 +13,7 @@ Source code and the current roadmap define present behavior.
 
 | Domain | Authoritative owner | Current invariant |
 | --- | --- | --- |
-| Model configuration | `model_layout_2d` and per-layer physical descriptors | State arrays have shape `(component,layer,x,y)`; layout admits one or two layers, while the production parser requires explicit TL13a opt-in for two. |
+| Model configuration | `model_layout_2d` and per-layer physical descriptors | State arrays have shape `(component,layer,x,y)`; one or two layers run directly through `N_LAYERS` without an activation gate. |
 | Fluid and substrate inventories | `state_fields::state_type` | `q/qp` are per-layer; bed, deposit, erosion and erodible inventories are shared. |
 | Contact exposure | `layer_contacts_2d::evaluate_layer_contacts` | Four two-layer wet/dry occupations define atmosphere/substrate contacts, not layer-dependent copies of physics. |
 | Source scheduling | `source_registry_2d` | L1, L2 and INTERLAYER scopes are validated in one registry. |

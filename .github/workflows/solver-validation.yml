@@ -8,11 +8,6 @@ on:
         type: boolean
         required: false
         default: true
-      two_layer_smoke:
-        description: 'Run Etna two-layer end-to-end integration smoke test'
-        type: boolean
-        required: false
-        default: false
       two_layer_extended:
         description: 'Run extended Etna conservation, restart and 1/2/4 OpenMP checks'
         type: boolean
@@ -137,7 +132,6 @@ jobs:
 
   two-layer-smoke:
     name: Two-layer Etna integration
-    if: ${{ inputs.two_layer_smoke || inputs.two_layer_extended }}
     runs-on: ubuntu-24.04
     timeout-minutes: 80
     env:
@@ -164,8 +158,7 @@ jobs:
           dem_dir=EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/DEM
           unzip -q -o -j EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip -d "$dem_dir"
           test -s "$dem_dir/Etna2014_crop.asc"
-      - name: Run short controlled Etna two-layer simulation
-        if: ${{ inputs.two_layer_smoke }}
+      - name: Run short Etna two-layer integration test
         working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
         run: |
           python3 run_validation.py \

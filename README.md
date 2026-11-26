@@ -43,6 +43,8 @@ GitHub Actions in this repository run only on manual dispatch.
 - [Developer documentation](docs/README.md)
 - [Documentation website](https://demichie.github.io/IMEX_SfloW2D_dev/)
 - [Example configurations](EXAMPLES/) (each runnable example has its own README)
+- [Etna two-layer granular collapse and dilute upper current](EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/README.md)
+- [Two-layer 1D dam-break with initially dry upper layer](EXAMPLES/EXAMPLE_DAMBREAK_TWO_LAYER_1D/README.md)
 - [Model architecture and implementation status](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
 - [NetCDF fields and binary restart](docs/NETCDF_OUTPUT.md)
 - [Citation metadata](CITATION.cff) and [GPLv3 license](COPYING)
