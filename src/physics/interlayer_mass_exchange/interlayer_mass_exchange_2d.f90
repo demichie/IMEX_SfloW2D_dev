@@ -19,7 +19,6 @@ MODULE interlayer_mass_exchange_2d
     USE interlayer_settling_2d, ONLY : eval_interlayer_settling_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type
-    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     IMPLICIT NONE
     PRIVATE
@@ -456,6 +455,9 @@ CONTAINS
     !>          recipients. All four physical workspaces are owned by the caller
     !>          (one quartet per OpenMP worker). No grid indices, allocations or
     !>          additional time integrator are introduced.
+    !>          A solid withdrawal that exceeds the conservative donor by only
+    !>          floating-point roundoff receives a common paired rate margin
+    !>          before committing; any other invalid candidate remains fatal.
     !> @param[in] config Canonical interlayer configuration.
     !> @param[in] rheology_l2 Settling rheology of the donor upper layer.
     !> @param[in] mass_l2 Upper-layer deposition/settling closure.
@@ -478,9 +480,9 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT) :: physical(4)
         INTEGER, INTENT(OUT) :: status
         REAL(wp) :: candidate_q(n_vars,2),candidate_qp(n_vars,2)
-        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns)
-        LOGICAL :: ok
-        INTEGER :: layer
+        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns),rate_margin
+        LOGICAL :: ok,roundoff_depletion,has_negative_solid
+        INTEGER :: layer,i,eq
 
         status=18
         IF (group_zero) THEN
@@ -510,26 +512,30 @@ CONTAINS
         status=20
         IF (.NOT.conservative_mass_admissible(candidate_q(1:n_eqns,1)) .OR. &
             .NOT.conservative_mass_admissible(candidate_q(1:n_eqns,2))) THEN
-            ! Failure-only witness: no clipping or change to the rejected update.
-            ! Keep complete records together when the Lie sweep runs in parallel.
-            !$OMP CRITICAL(interlayer_admissibility_witness)
-            WRITE(error_unit,'(A,ES24.16,A,L1)') 'TL07_INTERLAYER_REJECT dt=',dt, &
-                ' group_zero=',group_zero
+            ! The physical limiter uses primitive phase volumes, whereas the
+            ! recipient is a rounded conservative mass. An exhausted donor
+            ! solid may differ by one ULP after the rate is assembled. Reserve
+            ! a relative roundoff margin on BOTH paired source vectors, never
+            ! clip the conservative state or relax strict admissibility.
+            roundoff_depletion=.TRUE.
+            has_negative_solid=.FALSE.
             DO layer=1,2
-                WRITE(error_unit,'(A,I0,A,L1)') 'TL07_INTERLAYER_REJECT layer=',layer, &
-                    ' admissible=',conservative_mass_admissible(candidate_q(1:n_eqns,layer))
-                WRITE(error_unit,'(A,*(ES24.16,1X))') 'TL07_INTERLAYER_REJECT before=',q(1:n_eqns,layer)
-                IF (layer==1) THEN
-                    WRITE(error_unit,'(A,*(ES24.16,1X))') 'TL07_INTERLAYER_REJECT increment=',dt*rate_l1
-                ELSE
-                    WRITE(error_unit,'(A,*(ES24.16,1X))') 'TL07_INTERLAYER_REJECT increment=',dt*rate_l2
-                END IF
-                WRITE(error_unit,'(A,*(ES24.16,1X))') &
-                    'TL07_INTERLAYER_REJECT candidate=',candidate_q(1:n_eqns,layer)
+                DO i=1,n_solid
+                    eq=idx_solidEqn_first+i-1
+                    IF (candidate_q(eq,layer)>=0.0_wp) CYCLE
+                    has_negative_solid=.TRUE.
+                    IF (q(eq,layer)<=0.0_wp) roundoff_depletion=.FALSE.
+                    IF (ABS(candidate_q(eq,layer))>16.0_wp*SPACING(q(eq,layer))) &
+                        roundoff_depletion=.FALSE.
+                END DO
             END DO
-            FLUSH(error_unit)
-            !$OMP END CRITICAL(interlayer_admissibility_witness)
-            RETURN
+            IF (has_negative_solid .AND. roundoff_depletion) THEN
+                rate_margin=1.0_wp-64.0_wp*EPSILON(1.0_wp)
+                candidate_q(1:n_eqns,1)=q(1:n_eqns,1)+dt*(rate_margin*rate_l1)
+                candidate_q(1:n_eqns,2)=q(1:n_eqns,2)+dt*(rate_margin*rate_l2)
+            END IF
+            IF (.NOT.conservative_mass_admissible(candidate_q(1:n_eqns,1)) .OR. &
+                .NOT.conservative_mass_admissible(candidate_q(1:n_eqns,2))) RETURN
         END IF
 
         candidate_qp=qp

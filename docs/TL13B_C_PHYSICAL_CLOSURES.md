@@ -113,6 +113,14 @@ the downward gas stream must remain positive while both solid
 processes and upward gas transfer are active. This is a source
 regression, **not yet experimental validation** of the closure.
 
+A numerical roundoff guard applies only if the assembled conservative
+candidate would withdraw a solid species by at most 16 ULP beyond its
+remaining donor mass. In that case, both opposite source vectors are
+scaled by the same factor `1 - 64*epsilon` and strict admissibility is
+rechecked. Larger over-withdrawals or any remaining invalid candidate are
+rejected. This is a finite-precision rate safety margin, not a new
+physical transfer law, a conservative-state clip, or a relaxed tolerance.
+
 ## 5. Compressible carrier and thermal exchange
 
 The paired limiter converts accepted carrier mass into recipient volumes
