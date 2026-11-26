@@ -2,6 +2,8 @@
 set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
+# A frozen-state eigenvalue audit accompanies the compiled spatial regressions.
+PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python3}" "$test_dir/coupled_characteristic_audit.py"
 build_dir=$(mktemp -d /tmp/imex-spatial-operator.XXXXXX)
 if [ "${KEEP_TEST_WORKDIR:-0}" = 1 ]; then
     echo "Keeping test work directory: $build_dir"

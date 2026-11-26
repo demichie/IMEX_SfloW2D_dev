@@ -191,6 +191,13 @@ certify hyperbolicity.
   No verified full-field spectral classification of the Etna
   simulation is available at this decision point.
 
+A reproducible frozen-state algebraic audit is run by
+[TEST_SPATIAL_OPERATOR](../TESTS/TEST_SPATIAL_OPERATOR/run_test.sh).
+It checks stable and inverted density ordering, the defective
+equal-density internal mode, shear-induced complex roots and the
+conditional total-depth envelope. This is a regression of the local
+principal symbol, **not** a field-wide spectral diagnosis of a simulation.
+
 ## 6. Limited scientific acceptance
 
 **Available for research use within the stated limits:** the current two-layer equations,

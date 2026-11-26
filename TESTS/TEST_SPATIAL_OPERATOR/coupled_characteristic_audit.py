@@ -1,12 +1,12 @@
-"""Independent principal-symbol audit of preliminary two-layer face bounds.
+"""Audit frozen two-layer gravitational eigenvalues and the total-depth CFL bound.
 
-This freezes the density/temperature/composition coefficients and linearizes
-the existing hydrostatic and interlayer pressure paths on flat terrain.
-It samples locally frozen density, layer depths, gravity metric and shear.
-These variations are independent local states, NOT gradients of composition or
-variable pressure coefficients within a Riemann problem. It does NOT certify
-the full variable-composition, wet/dry or curved-bed system, and must not
-enable the two-layer production driver.
+Freeze density, temperature and composition locally and linearize the implemented
+hydrostatic and interlayer pressure paths on flat terrain. Sample positive depths,
+density contrasts and interlayer shear, without changing solver coefficients.
+The envelope is assessed only for *real* eigenvalues under stable density ordering.
+A real spectrum alone does not establish strong hyperbolicity (equal-density
+states are defective), and no result here certifies variable-composition,
+wet/dry or curved-bed dynamics.
 """
 
 import numpy as np
@@ -29,7 +29,7 @@ def principal_matrix(h1, h2, u1, u2, rho1, rho2, rho_air=1.2, g=9.81, metric=1.0
     ], dtype=float)
 
 
-def provisional_bounds(h1, h2, u1, u2, rho1, rho2, rho_air=1.2, g=9.81, metric=1.0):
+def total_depth_bounds(h1, h2, u1, u2, rho1, rho2, rho_air=1.2, g=9.81, metric=1.0):
     """Reproduce the current total-depth envelope, without modifying it."""
     total = h1 + h2
     speeds = [
@@ -41,21 +41,21 @@ def provisional_bounds(h1, h2, u1, u2, rho1, rho2, rho_air=1.2, g=9.81, metric=1
     return min([0.0] + [u - c for u, c in speeds]), max([0.0] + [u + c for u, c in speeds])
 
 
-def audit_case(label, h1, h2, u1, u2, rho1, rho2, expect_hyperbolic):
+def audit_case(label, h1, h2, u1, u2, rho1, rho2, expect_real_spectrum):
     matrix = principal_matrix(h1, h2, u1, u2, rho1, rho2)
     roots = np.linalg.eigvals(matrix)
     scale = max(1.0, np.max(np.abs(roots)))
     imaginary = float(np.max(np.abs(roots.imag)))
     # Coincident internal modes can split by O(sqrt(machine epsilon)).
-    hyperbolic = imaginary <= 1.0e-7 * scale
-    if hyperbolic != expect_hyperbolic:
-        raise AssertionError(f"{label}: unexpected hyperbolicity ({roots})")
+    has_real_spectrum = imaginary <= 1.0e-7 * scale
+    if has_real_spectrum != expect_real_spectrum:
+        raise AssertionError(f"{label}: unexpected reality of gravitational spectrum ({roots})")
 
-    lower, upper = provisional_bounds(h1, h2, u1, u2, rho1, rho2)
-    if hyperbolic:
+    lower, upper = total_depth_bounds(h1, h2, u1, u2, rho1, rho2)
+    if has_real_spectrum:
         tolerance = 1.0e-10 * scale
         if min(roots.real) < lower - tolerance or max(roots.real) > upper + tolerance:
-            raise AssertionError(f"{label}: provisional envelope misses real eigenvalues: {roots}")
+            raise AssertionError(f"{label}: total-depth envelope misses real eigenvalues: {roots}")
         if label == "identical_material":
             expected = np.sqrt(9.81 * (rho1 - 1.2) / rho1 * (h1 + h2))
             if not np.allclose(sorted(roots.real), [-expected, 0.0, 0.0, expected],
@@ -71,11 +71,24 @@ def audit_case(label, h1, h2, u1, u2, rho1, rho2, expect_hyperbolic):
 
 
 
+def audit_equal_density_defect():
+    """Check the double zero-slip internal mode has only one eigenvector."""
+    matrix = principal_matrix(1.4, 0.6, 0.0, 0.0, 1000.0, 1000.0)
+    roots = np.linalg.eigvals(matrix)
+    scale = max(1.0, float(np.max(np.abs(roots))))
+    zero_roots = np.count_nonzero(np.abs(roots) < 1.0e-7 * scale)
+    if zero_roots != 2 or np.linalg.matrix_rank(matrix, tol=1.0e-10 * scale) != 3:
+        raise AssertionError("Equal-density zero-slip internal mode must be defective")
+    print("COUPLED_CHARACTERISTICS equal_density_defect: "
+          "algebraic_multiplicity=2 geometric_multiplicity=1", flush=True)
+
+
 def audit_frozen_parameter_families():
     """Sweep local frozen states and identify nonhyperbolic shear intervals.
 
     The interval endpoints are grid-resolved diagnostics, not analytic critical
     thresholds. Never classify complex eigenvalues as a CFL-bound violation.
+    Counting real roots is not a test of eigenvector completeness.
     """
     shears = np.linspace(0.0, 12.0, 241)
     families = (
@@ -84,15 +97,15 @@ def audit_frozen_parameter_families():
         ("strong_density_contrast", 1200.0, 600.0),
         ("near_ambient_upper", 1000.0, 2.0),
     )
-    total_hyperbolic = 0
-    total_nonhyperbolic = 0
+    total_real = 0
+    total_complex = 0
     total_bound_failures = 0
 
     for label, rho1, rho2 in families:
         for h1, h2 in ((1.4, 0.6), (0.3, 1.7)):
             for metric in (0.6, 1.0):
-                nonhyperbolic_shears = []
-                hyperbolic_count = 0
+                complex_shears = []
+                real_count = 0
                 misses = 0
                 for shear in shears:
                     u1, u2 = 0.5 * shear, -0.5 * shear
@@ -101,10 +114,10 @@ def audit_frozen_parameter_families():
                     scale = max(1.0, float(np.max(np.abs(roots))))
                     # Double roots at zero shear are numerically ill-conditioned.
                     if np.max(np.abs(roots.imag)) > 1.0e-7 * scale:
-                        nonhyperbolic_shears.append(shear)
+                        complex_shears.append(shear)
                         continue
-                    hyperbolic_count += 1
-                    lower, upper = provisional_bounds(
+                    real_count += 1
+                    lower, upper = total_depth_bounds(
                         h1, h2, u1, u2, rho1, rho2, metric=metric)
                     if (np.min(roots.real) < lower - 1.0e-9 * scale or
                             np.max(roots.real) > upper + 1.0e-9 * scale):
@@ -112,36 +125,38 @@ def audit_frozen_parameter_families():
 
                 if misses:
                     raise AssertionError(
-                        f"{label}: {misses} hyperbolic states outside the wave envelope")
-                if not hyperbolic_count:
-                    raise AssertionError(f"{label}: no hyperbolic state sampled")
-                if not nonhyperbolic_shears:
+                        f"{label}: {misses} real-spectrum states outside the wave envelope")
+                if not real_count:
+                    raise AssertionError(f"{label}: no real-spectrum state sampled")
+                if not complex_shears:
                     raise AssertionError(f"{label}: missing nonhyperbolic shear window")
-                if label == "equal_density" and nonhyperbolic_shears[0] > shears[1]:
+                if label == "equal_density" and complex_shears[0] > shears[1]:
                     raise AssertionError("Equal-density shear did not lose hyperbolicity near rest")
 
-                total_hyperbolic += hyperbolic_count
-                total_nonhyperbolic += len(nonhyperbolic_shears)
+                total_real += real_count
+                total_complex += len(complex_shears)
                 total_bound_failures += misses
                 print(f"COUPLED_SHEAR_SCAN {label} h1={h1:g} h2={h2:g} G={metric:g} "
-                      f"hyperbolic={hyperbolic_count} complex={len(nonhyperbolic_shears)} "
-                      f"first_complex={nonhyperbolic_shears[0]:g} "
-                      f"last_complex={nonhyperbolic_shears[-1]:g}", flush=True)
+                      f"real_spectrum={real_count} complex={len(complex_shears)} "
+                      f"first_complex={complex_shears[0]:g} "
+                      f"last_complex={complex_shears[-1]:g}", flush=True)
 
-    print(f"COUPLED_SHEAR_TOTAL hyperbolic={total_hyperbolic} "
-          f"complex={total_nonhyperbolic} bound_misses={total_bound_failures}", flush=True)
-    if not total_hyperbolic or not total_nonhyperbolic or total_bound_failures:
+    print(f"COUPLED_SHEAR_TOTAL real_spectrum={total_real} "
+          f"complex={total_complex} bound_misses={total_bound_failures}", flush=True)
+    if not total_real or not total_complex or total_bound_failures:
         raise AssertionError("Frozen-parameter characteristic audit is incomplete")
 
 
 def run():
     audit_case("identical_material", 1.4, 0.6, 0.0, 0.0, 1000.0, 1000.0, True)
+    audit_equal_density_defect()
+    audit_case("inverted_density", 1.4, 0.6, 0.0, 0.0, 1000.0, 1200.0, False)
     audit_case("stable_stratification", 1.4, 0.6, 0.0, 0.0, 1800.0, 1400.0, True)
     audit_case("moderate_shear", 1.4, 0.6, 0.5, -0.5, 1800.0, 1400.0, True)
     audit_case("nonhyperbolic_shear", 1.4, 0.6, 1.5, -1.5, 1800.0, 1400.0, False)
     audit_case("large_hyperbolic_shear", 1.4, 0.6, 5.0, -5.0, 1800.0, 1400.0, True)
     audit_frozen_parameter_families()
-    print("PASS: principal-symbol bounds, frozen-parameter sweep and shear warning", flush=True)
+    print("PASS: real-root envelope, defective/inverted density and shear checks", flush=True)
 
 
 if __name__ == "__main__":

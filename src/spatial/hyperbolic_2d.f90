@@ -69,22 +69,19 @@ MODULE hyperbolic_2d
 CONTAINS
 
     !> @brief Estimate a shared two-layer wave envelope using the total depth.
-    !> @details Each physically present layer uses the existing single-layer
-    !> local-speed kernel with h=h1+h2. This reproduces single-layer speeds
-    !> for equal material and velocity. It encloses real gravity-wave speeds
-    !> only under the stable-density assumptions of docs/TWO_LAYER_HYPERBOLICITY.md.
-    !> It does not compute the coupled eigensystem or test hyperbolicity.
-    !> @param[in] q1_left,q2_left Primitive L1/L2 traces on the negative side.
-    !> @param[in] q1_right,q2_right Primitive L1/L2 traces on the positive side.
+    !> @details Each physically present layer uses the single-layer local-speed
+    !> kernel with h=h1+h2. This recovers the single-layer speeds for equal
+    !> material and velocity and encloses real gravitational speeds only under
+    !> the stable-density assumptions of docs/TWO_LAYER_HYPERBOLICITY.md.
+    !> Complex roots cannot be detected or repaired by this envelope.
+    !> @param[in] q1_left Lower-layer primitive trace at the negative face endpoint.
+    !> @param[in] q2_left Upper-layer primitive trace at the negative face endpoint.
+    !> @param[in] q1_right Lower-layer primitive trace at the positive face endpoint.
+    !> @param[in] q2_right Upper-layer primitive trace at the positive face endpoint.
     !> @param[in] metric Large-slope gravity factor at the shared face.
     !> @param[in] normal Normal velocity index (idx_u or idx_v).
-    !> @param[out] a_minus,a_plus Shared wave bounds, not a hyperbolicity test.
-    !> @param[in] q1_left q1 left argument of eval_total_depth_face_speed_bounds.
-    !> @param[in] q2_left q2 left argument of eval_total_depth_face_speed_bounds.
-    !> @param[in] q1_right q1 right argument of eval_total_depth_face_speed_bounds.
-    !> @param[in] q2_right q2 right argument of eval_total_depth_face_speed_bounds.
-    !> @param[out] a_minus a minus argument of eval_total_depth_face_speed_bounds.
-    !> @param[out] a_plus a plus argument of eval_total_depth_face_speed_bounds.
+    !> @param[out] a_minus Lower shared characteristic-speed envelope.
+    !> @param[out] a_plus Upper shared characteristic-speed envelope.
     SUBROUTINE eval_total_depth_face_speed_bounds(q1_left,q2_left,q1_right,q2_right, &
         metric,normal,a_minus,a_plus)
         USE equation_terms_2d, ONLY : eval_local_speeds_direction
@@ -134,20 +131,17 @@ CONTAINS
 
     !> @brief Populate canonical face-speed storage using the total-depth envelope.
     !> @details Both reconstruction workspaces must be current on the shared OR
-    !> face workset. The single-layer speed path is unchanged. See
-    !> docs/TWO_LAYER_HYPERBOLICITY.md for the conditional bound analysis.
+    !> face workset. The single-layer path remains unchanged. See
+    !> docs/TWO_LAYER_HYPERBOLICITY.md for the conditional speed bound.
     !> @param[in,out] this Existing HP-PCCU face-speed workspace.
-    !> @param[in] lower,upper Prepared reconstructed layer traces.
-    !> @param[in] nxfaces,nyfaces Numbers of active x/y faces.
-    !> @param[in] jx,kx,jy,ky Shared compact face indices.
-    !> @param[in] lower lower argument of eval_total_depth_speeds.
-    !> @param[in] upper upper argument of eval_total_depth_speeds.
-    !> @param[in] nxfaces nxfaces argument of eval_total_depth_speeds.
-    !> @param[in] jx jx argument of eval_total_depth_speeds.
-    !> @param[in] kx kx argument of eval_total_depth_speeds.
-    !> @param[in] nyfaces nyfaces argument of eval_total_depth_speeds.
-    !> @param[in] jy jy argument of eval_total_depth_speeds.
-    !> @param[in] ky ky argument of eval_total_depth_speeds.
+    !> @param[in] lower Prepared lower-layer reconstruction workspace.
+    !> @param[in] upper Prepared upper-layer reconstruction workspace.
+    !> @param[in] nxfaces Number of active x-direction faces.
+    !> @param[in] jx X-direction face column indices.
+    !> @param[in] kx X-direction face row indices.
+    !> @param[in] nyfaces Number of active y-direction faces.
+    !> @param[in] jy Y-direction face column indices.
+    !> @param[in] ky Y-direction face row indices.
     SUBROUTINE eval_total_depth_speeds(this,lower,upper,nxfaces,jx,kx,nyfaces,jy,ky)
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: lower,upper
