@@ -67,6 +67,12 @@ subset. The test suite verifies the exact source mask of a combined
 Newton group. Cached fields needed by the timestep executor and all
 uniform physical-treatment interfaces remain intact.
 
+The source group no longer stores a second copy of the rheology's
+canonical name. Its validated numeric rheology ID is reused for the
+mu(I)-only momentum-reversal guard in the Lie cell sweep; the source
+identity is still available in the canonical source-name list. The
+restriction to positive single-source groups is unchanged.
+
 The per-layer physics descriptor now owns only non-owning references to
 canonical rheology, thermal, Darcy and mass-exchange configurations plus
 their validation status. Rheology names and numeric dispatch IDs are

@@ -24,7 +24,7 @@ MODULE lie_source_executor_2d
     USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2,       &
         SOURCE_SCOPE_INTERLAYER
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
-        SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
+        SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION, RHEOLOGY_ID_MUI
     USE state_fields, ONLY : state_type
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                               &
         initialize_physical_state_real, initialize_physical_state_complex
@@ -665,7 +665,7 @@ CONTAINS
                     ! Group zero evaluates rates at the pre-spatial state, so
                     ! projecting its post-spatial recipient would also affect transport.
                     IF (executor%groups(group_index)%id>0 .AND. &
-                        executor%groups(group_index)%rheology_name=='rheology_mui' .AND. &
+                        executor%groups(group_index)%rheology_id==RHEOLOGY_ID_MUI .AND. &
                         SIZE(executor%groups(group_index)%source_names)==1) THEN
                         CALL limit_rheology_momentum_reversal(q_local(idx_uEqn:idx_vEqn), &
                             q_candidate(idx_uEqn:idx_vEqn))

@@ -113,7 +113,7 @@ PROGRAM test_source_registry
        source_id_mask(SOURCE_ID_THERMAL_COOLING)), 'Newton group source mask is exact')
   CALL require(.NOT.BTEST(groups(2)%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1), &
        'numeric source mask excludes inactive curvature')
-   CALL require(groups(2)%rheology_name=='rheology_voellmy','cached rheology identity')
+   CALL require(group_contains_name(groups(2),'rheology_voellmy'),'configured rheology identity')
    CALL require(groups(2)%rheology_id==RHEOLOGY_ID_VOELLMY,'cached numeric rheology ID')
    CALL require(groups(2)%rheology_implicit,'cached implicit role')
    CALL require(groups(2)%thermal_active,'cached Newton thermal term')
