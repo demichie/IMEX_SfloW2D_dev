@@ -30,13 +30,13 @@ The solver evolves depth-integrated mass, horizontal momentum, thermal content a
 
 For each present layer `l`, the leading conservative variables per unit horizontal area are
 
-\[
+$$
 \mathbf q_l =
 \left(
 M_l,\ M_l u_l,\ M_l v_l,\ M_l c_{p,m,l}T_l,\ \ldots
 \right)^{\mathsf T},
 \qquad M_l=\rho_{m,l}h_l .
-\]
+$$
 
 Here `h` denotes layer thickness, `rho_m` mixture density, `u` and `v` depth-averaged horizontal velocities, `T` temperature and `c_p,m` mixture specific heat. **The fourth component is sensible thermal content per unit area, not total mechanical energy.** Additional conservative components represent individual solid and additional-gas species masses and configured transported variables.
 

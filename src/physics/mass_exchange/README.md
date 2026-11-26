@@ -19,13 +19,13 @@ Layer-local exchange with bed and atmosphere, assembled through one shared-inven
 
 ## Physical equations
 
-For a layer, conservative source contributions are additive: \(S_M=\sum_p R_M^{(p)}\) and \(S_{Q_T}=\sum_p R_{Q_T}^{(p)}\), with \(Q_T=M c_{p,m}T\). Positive mass rate enters the moving layer.
+For a layer, conservative source contributions are additive: $S_M=\sum_p R_M^{(p)}$ and $S_{Q_T}=\sum_p R_{Q_T}^{(p)}$, with $Q_T=M c_{p,m}T$. Positive mass rate enters the moving layer.
 
-**Erosion:** solid volume influx \(E_i\) yields \(R_{s,i}=\rho_{s,i}E_i\); carrier influx \(E_c\) yields \(R_c=\rho_{c,\mathrm{bed}}E_c\), with thermal content evaluated at substrate temperature. The empirical rate depends on erosion coefficient, speed, depth and erodible inventory.
+**Erosion:** solid volume influx $E_i$ yields $R_{s,i}=\rho_{s,i}E_i$; carrier influx $E_c$ yields $R_c=\rho_{c,\mathrm{bed}}E_c$, with thermal content evaluated at substrate temperature. The empirical rate depends on erosion coefficient, speed, depth and erodible inventory.
 
-**Deposition:** accepted settling volume flux \(D_i\) gives \(R_{s,i}=-\rho_{s,i}D_i\); carrier deposition is determined by bed porosity. The settling kernel is shared with interlayer settling.
+**Deposition:** accepted settling volume flux $D_i$ gives $R_{s,i}=-\rho_{s,i}D_i$; carrier deposition is determined by bed porosity. The settling kernel is shared with interlayer settling.
 
-**Ambient-air entrainment:** \(R_M=\rho_{a,\mathrm{amb}} E_a\), \(R_{Q_T}=T_{\mathrm{amb}} c_{p,a}R_M\). **Liquid-carrier loss:** for \(L=\max(0,\mathrm{loss\_rate})\), \(R_M=-\rho_c L\) and \(R_{Q_T}=T c_{p,c}R_M\). **Lava deposition:** \(R_M=-\rho_l D_l\), \(R_{Q_T}=c_{p,l}T R_M\), proposed bed growth \(\dot B=D_l\). **Vaporization** uses a temperature-dependent liquid-to-vapor rate and corresponding gas thermal contribution; its thresholds and precise formula reside in the vaporization module.
+**Ambient-air entrainment:** $R_M=\rho_{a,\mathrm{amb}} E_a$, $R_{Q_T}=T_{\mathrm{amb}} c_{p,a}R_M$. **Liquid-carrier loss:** for $L=\max(0,\mathrm{loss\_rate})$, $R_M=-\rho_c L$ and $R_{Q_T}=T c_{p,c}R_M$. **Lava deposition:** $R_M=-\rho_l D_l$, $R_{Q_T}=c_{p,l}T R_M$, proposed bed growth $\dot B=D_l$. **Vaporization** uses a temperature-dependent liquid-to-vapor rate and corresponding gas thermal contribution; its thresholds and precise formula reside in the vaporization module.
 
 ## Architectural and numerical contracts
 

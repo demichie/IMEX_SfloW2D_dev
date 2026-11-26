@@ -16,10 +16,10 @@ Layer-local Darcy pore pressure and optional carrier-gas evolution.
 
 The pore-pressure term has its own conservative component and can couple to interstitial carrier gas. The implemented *frozen-state analytic* solve returns a complete average conservative source:
 
-\[
+$$
 \overline{\boldsymbol S}_{\mathrm{Darcy}}=
 \frac{\boldsymbol q_{\mathrm{after}}-\boldsymbol q_{\mathrm{before}}}{\Delta t},\qquad \Delta t>0.
-\]
+$$
 
 This rate represents the integrated Darcy pressure/gas update and is not an explicit Euler discretization. Pore pressure can reduce effective basal normal stress in the rheology law; the stress subtraction itself is owned by rheology. Detailed permeability and thermodynamic closures are implemented in the Darcy module.
 

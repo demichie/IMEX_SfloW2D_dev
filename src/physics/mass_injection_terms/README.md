@@ -17,13 +17,13 @@ Bottom circular/fissural, radial and boundary source material injection.
 
 ## Physical equations
 
-For an injection activation coefficient \(a(t)\), interval-based source scheduling uses
+For an injection activation coefficient $a(t)$, interval-based source scheduling uses
 
-\[
+$$
 \bar a_{[t,t+\Delta t]}=\frac1{\Delta t}\int_t^{t+\Delta t}a(s)\,ds.
-\]
+$$
 
-A volumetric injection rate per horizontal area \(q_V\), from geometric source coverage and the selected time window, adds mass \(S_M=\rho_{\mathrm{inj}}q_V\). Constituent and thermal rates use the injected composition and temperature. Bottom circular, fissural and radial geometries compute different local \(q_V\); boundary injection instead supplies physical boundary traces and must not be treated as a cell-volume source.
+A volumetric injection rate per horizontal area $q_V$, from geometric source coverage and the selected time window, adds mass $S_M=\rho_{\mathrm{inj}}q_V$. Constituent and thermal rates use the injected composition and temperature. Bottom circular, fissural and radial geometries compute different local $q_V$; boundary injection instead supplies physical boundary traces and must not be treated as a cell-volume source.
 
 ## Architectural and numerical contracts
 

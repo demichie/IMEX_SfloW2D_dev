@@ -15,30 +15,30 @@ Paired conservative L1/L2 solid and carrier transfer without terrain or atmosphe
 
 ## Physical equations
 
-For accepted downward solid volume fluxes \(S_i\) (L2 to L1) and upward elutriation \(E_i\) (L1 to L2), both in m/s:
+For accepted downward solid volume fluxes $S_i$ (L2 to L1) and upward elutriation $E_i$ (L1 to L2), both in m/s:
 
-\[
+$$
 \dot V_{s,i,1}=S_i-E_i,\qquad \dot V_{s,i,2}=-S_i+E_i.
-\]
+$$
 
-Mass transfers use species density \(\rho_{s,i}\), and carrier co-lift and
+Mass transfers use species density $\rho_{s,i}$, and carrier co-lift and
 downward carrier exchange enter the two layers with opposite signs.
 
 When `ELUTRIATION_SOLID_VOLUME_FRACTION` is omitted, its default `-1`
 selects the current L1 donor solid volume fraction:
 
-\[
+$$
 \alpha_{s,1}=\frac{\sum_i V_{s,i,1}}{\sum_i V_{s,i,1}+V_{c,1}}.
-\]
+$$
 
-Otherwise a positive value in \((0,1]\) prescribes the lifted parcel
-composition. With accepted upward solid volume rate \(E_s\), the requested
-upward carrier volume flux is \(E_c=(1-\alpha_{\mathrm{lift}})E_s/\alpha_{\mathrm{lift}}\).
+Otherwise a positive value in $(0,1]$ prescribes the lifted parcel
+composition. With accepted upward solid volume rate $E_s$, the requested
+upward carrier volume flux is $E_c=(1-\alpha_{\mathrm{lift}})E_s/\alpha_{\mathrm{lift}}$.
 When L1 contains no donor solids, there is no upward co-lift.
 
 Each paired total-mass/species/momentum/thermal exchange conserves the sum
 of both layers. Upward LINEAR_USTAR elutriation includes the factor
-\(\epsilon\alpha_{s,i,1}u_*\phi A\), filtered by shear/Rouse and availability
+$\epsilon\alpha_{s,i,1}u_*\phi A$, filtered by shear/Rouse and availability
 factors; SHEAR_POWER is a distinct branch. Downward settling delegates to
 the basal deposition-volume kernel using L2 properties. The coordinator
 limits both gross donors, carrier supply and final packing *simultaneously*:

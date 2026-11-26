@@ -40,12 +40,12 @@ The same cell can be described at three complementary levels.
 The time integrator evolves a vector of conserved quantities per unit
 horizontal area. Its first four components are
 
-\[
+$$
 q_1=M=\rho_m h,\qquad
 q_2=Mu,\qquad
 q_3=Mv,\qquad
 q_4=M c_{p,m}T.
-\]
+$$
 
 Here `h` is flow thickness, `rho_m` is mixture density, `u` and `v`
 are depth-averaged horizontal velocities, `T` is temperature, and `c_{p,m}`
@@ -65,10 +65,10 @@ used for many reconstruction and flux calculations.
 For a non-dry cell the conversion uses the mixture composition and
 thermodynamic relationships, including
 
-\[
+$$
 x_{s,i}=q_{s,i}/M,\qquad x_{g,i}=q_{g,i}/M,
 \qquad T=q_4/(M c_{p,m}).
-\]
+$$
 
 The strict conversions and the separate normalization of reconstructed
 face compositions are deliberately different contracts.

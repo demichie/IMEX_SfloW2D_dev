@@ -17,12 +17,12 @@ Cell-local radiative/convective cooling: explicit, implicit REAL/COMPLEX and fro
 
 The exact shared thermal-cooling source in thermal_cooling_rate.inc is
 
-\[
+$$
 S_{Q_T}=-r(T^4-T_{\mathrm{amb}}^4)-c(T-T_{\mathrm{amb}}),
 \qquad Q_T=M c_{p,m}T.
-\]
+$$
 
-Here \(r,c\) are the configured radiative and convective coefficients; \(Q_T\) is conservative *thermal content*, not total kinetic-plus-potential energy. The cooling-only analytic path integrates its supported frozen-composition/heat-capacity flow. The scalar-temperature Newton path avoids rebuilding the physical state where no other coupling requires it.
+Here $r,c$ are the configured radiative and convective coefficients; $Q_T$ is conservative *thermal content*, not total kinetic-plus-potential energy. The cooling-only analytic path integrates its supported frozen-composition/heat-capacity flow. The scalar-temperature Newton path avoids rebuilding the physical state where no other coupling requires it.
 
 ## Architectural and numerical contracts
 

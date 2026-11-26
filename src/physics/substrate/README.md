@@ -12,11 +12,11 @@ Shared terrain/substrate configuration for both layers; not a second mobile mate
 
 ## Physical equations
 
-Erosion and deposition update substrate inventories. Schematically, with eroded solid volume rate \(E_i\) and deposited rate \(D_i\), a bed-species storage \(B_{s,i}\) satisfies
+Erosion and deposition update substrate inventories. Schematically, with eroded solid volume rate $E_i$ and deposited rate $D_i$, a bed-species storage $B_{s,i}$ satisfies
 
-\[
+$$
 \dot B_{s,i}=D_i-E_i.
-\]
+$$
 
 This is a balance illustration: substrate parameters do **not** integrate it. Actual porosity conversion, inventory and topographic updates are defined in state, geometry and mass-exchange source code.
 

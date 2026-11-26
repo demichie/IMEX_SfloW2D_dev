@@ -30,22 +30,22 @@ Cell-local momentum resistance models, their shared REAL/COMPLEX mathematical ke
 
 ## Physical equations
 
-With horizontal velocity \(\boldsymbol u_h\), mixture density \(\rho_m\), thickness \(h\), and moving-state speed \(U=|\boldsymbol u_h|\), the model-specific source opposes motion.
+With horizontal velocity $\boldsymbol u_h$, mixture density $\rho_m$, thickness $h$, and moving-state speed $U=|\boldsymbol u_h|$, the model-specific source opposes motion.
 
 | Law | Defining implemented relation |
 | --- | --- |
-| Voellmy | Coulomb basal stress plus turbulent \(\boldsymbol S_t=-(\rho_m g'/\xi)|\boldsymbol u|^2\boldsymbol u_h/|\boldsymbol u|\). |
-| Plastic | \(\boldsymbol S=-\rho_m\tau\boldsymbol u_h/|\boldsymbol u|\) for moving states. |
-| Lava | Viscous \(\boldsymbol S_v=-\rho_m\gamma\boldsymbol u_h\), \(\gamma=3\nu_{\mathrm{ref}}\exp[-b(T-T_{\mathrm{ref}})]/h_*\), plus yield \(-\tau_0\boldsymbol u_h/|\boldsymbol u|\). |
-| Lahar | Fluid viscosity \(\eta_f(T,C)=\alpha_1(T)\exp(\beta_1 C)\) with temperature piecewise \(\alpha_1\), turbulent resistance and yield \(Y=\alpha_2[\exp(\beta_2 C)-1]\). |
-| Empirical | \(C=10^{-3}|\boldsymbol u|/(1+10h)\), \(\boldsymbol S=-\rho_m C\boldsymbol u_h/U\). |
-| Quadratic | \(\boldsymbol S=-\rho_m f_q|\boldsymbol u|^2\boldsymbol u_h/U\). |
-| Froude | \(\mathrm{Fr}=|\boldsymbol u|/\sqrt{g'h}\), \(\mu=\mu_\infty+(\mu_0-\mu_\infty)e^{-\mathrm{Fr}/\mathrm{Fr}_0}\). |
-| Lucas | \(\mu=\mu_0\) below threshold \(U_w\) or for shallow \(h<0.1\); otherwise \(\mu_\infty+(\mu_0-\mu_\infty)U_w/U_f\). |
-| mu(I) | \(I=d\dot\gamma/\sqrt{\sigma'_n/\rho_p}\), \(\mu(I)=(\mu_s I_0+\mu_2 I+\mu_{I,\infty}I^2)/(I_0+I)\), \(\tau_b=\mu(I)\sigma'_n\). |
+| Voellmy | Coulomb basal stress plus turbulent $\boldsymbol S_t=-(\rho_m g'/\xi)|\boldsymbol u|^2\boldsymbol u_h/|\boldsymbol u|$. |
+| Plastic | $\boldsymbol S=-\rho_m\tau\boldsymbol u_h/|\boldsymbol u|$ for moving states. |
+| Lava | Viscous $\boldsymbol S_v=-\rho_m\gamma\boldsymbol u_h$, $\gamma=3\nu_{\mathrm{ref}}\exp[-b(T-T_{\mathrm{ref}})]/h_*$, plus yield $-\tau_0\boldsymbol u_h/|\boldsymbol u|$. |
+| Lahar | Fluid viscosity $\eta_f(T,C)=\alpha_1(T)\exp(\beta_1 C)$ with temperature piecewise $\alpha_1$, turbulent resistance and yield $Y=\alpha_2[\exp(\beta_2 C)-1]$. |
+| Empirical | $C=10^{-3}|\boldsymbol u|/(1+10h)$, $\boldsymbol S=-\rho_m C\boldsymbol u_h/U$. |
+| Quadratic | $\boldsymbol S=-\rho_m f_q|\boldsymbol u|^2\boldsymbol u_h/U$. |
+| Froude | $\mathrm{Fr}=|\boldsymbol u|/\sqrt{g'h}$, $\mu=\mu_\infty+(\mu_0-\mu_\infty)e^{-\mathrm{Fr}/\mathrm{Fr}_0}$. |
+| Lucas | $\mu=\mu_0$ below threshold $U_w$ or for shallow $h<0.1$; otherwise $\mu_\infty+(\mu_0-\mu_\infty)U_w/U_f$. |
+| mu(I) | $I=d\dot\gamma/\sqrt{\sigma'_n/\rho_p}$, $\mu(I)=(\mu_s I_0+\mu_2 I+\mu_{I,\infty}I^2)/(I_0+I)$, $\tau_b=\mu(I)\sigma'_n$. |
 | mu(I)+Voellmy | Regularized granular basal stress plus turbulent Voellmy resistance. |
 
-The exact dry-state, pore-pressure, curvature, and velocity regularizations must be read in each law. In isolated dissipative friction groups, the limiter restricts the momentum result to \(\boldsymbol m_{\mathrm{after}}=\alpha\boldsymbol m_{\mathrm{before}}\), \(0\le\alpha\le1\), preventing reversal or unwanted rotation.
+The exact dry-state, pore-pressure, curvature, and velocity regularizations must be read in each law. In isolated dissipative friction groups, the limiter restricts the momentum result to $\boldsymbol m_{\mathrm{after}}=\alpha\boldsymbol m_{\mathrm{before}}$, $0\le\alpha\le1$, preventing reversal or unwanted rotation.
 
 ## Architectural and numerical contracts
 

@@ -25,16 +25,16 @@ As a deliberately simple example, introduce a linear momentum relaxation model.
 For a mixture with thickness `h`, density `rho_m`, and horizontal velocity
 `u_h = (u,v)`, define the conservative horizontal momentum
 
-\[
+$$
 \mathbf{m} = \rho_m h\,\mathbf{u}_h
-\]
+$$
 
 and the **cell-local rheological source**
 
-\[
+$$
 \left.\frac{d\mathbf{m}}{dt}\right|_{\mathrm{rheo}}
   = -\gamma\,\mathbf{m}, \qquad \gamma \ge 0,
-\]
+$$
 
 where `gamma` has units of `s^-1`. This is not a momentum flux and does
 not change mass, species inventories, or thermal energy. It is an example of
@@ -42,10 +42,10 @@ linear drag, **not** a claim that such a law is appropriate for a particular flo
 
 For fixed `gamma`, density, and thickness, the exact source-only solution is
 
-\[
+$$
 \mathbf{u}_h(t+\Delta t)
   = e^{-\gamma\Delta t}\,\mathbf{u}_h(t).
-\]
+$$
 
 An explicit Euler substep instead gives
 `m_new = (1 - gamma*dt)*m_old`, and can reverse the direction if

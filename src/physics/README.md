@@ -55,11 +55,11 @@ The model evolves conservative cell quantities such as mixture mass,
 horizontal momenta, thermal content, and transported constituent
 masses. For a wet cell, the leading variables are
 
-\[
+$$
 \mathbf{q} =
 \left(M,\; Mu,\; Mv,\; M c_{p,m}T,\;\ldots\right)^\mathsf{T},
 \qquad M=\rho_m h.
-\]
+$$
 
 The fourth component represents **thermal content per unit area**;
 it is not kinetic or gravitational energy.
@@ -176,8 +176,8 @@ rotation of momentum by a dissipative substep.
 | `rheology_quadratic_2d.f90` | Quadratic drag law. |
 | `rheology_froude_2d.f90` | Froude-dependent resistance. |
 | `rheology_lucas_2d.f90` | Lucas rheology. |
-| `rheology_mui_2d.f90` | \(\mu(I)\)-related rheology. |
-| `rheology_mui_voellmy_2d.f90` | Combined \(\mu(I)\) and Voellmy formulation. |
+| `rheology_mui_2d.f90` | $\mu(I)$-related rheology. |
+| `rheology_mui_voellmy_2d.f90` | Combined $\mu(I)$ and Voellmy formulation. |
 
 The directory also contains
 `rheology_empirical_drag.inc`,

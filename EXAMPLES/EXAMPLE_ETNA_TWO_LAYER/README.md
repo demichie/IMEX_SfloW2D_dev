@@ -163,11 +163,11 @@ negative concentration.** It derives the transferred parcel's solid
 volume fraction from the *current local L1 donor inventories*, after
 spatial transport and any preceding Lie source updates:
 
-\[
+$$
 \alpha_{\mathrm{lift}}
   =\frac{V_{s,1}}{V_{s,1}+V_{c,1}},\qquad
 E_c=\frac{1-\alpha_{\mathrm{lift}}}{\alpha_{\mathrm{lift}}}E_s.
-\]
+$$
 
 Here `V_{s,1}` and `V_{c,1}` are local L1 solid and carrier volumes
 per unit area; `E_s` is the accepted upward solid-volume rate and
@@ -239,11 +239,11 @@ elutriation cancels when summing both layers. Omitting boundary
 transport and any other optional mass-removal mechanism, the net
 external source for the combined moving flow is:
 
-\[
+$$
 \dot M_{\mathrm{mobile},1+2}
   = \dot M_{\mathrm{air\ into\ L2}}
     - \dot M_{\mathrm{L1\ deposited}}.
-\]
+$$
 
 The total mobile **solid** inventory decreases through L1
 deposition, while solid elutriation merely redistributes solids
