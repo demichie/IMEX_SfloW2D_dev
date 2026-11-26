@@ -33,6 +33,7 @@ calibrated for a particular event.
 | Install the solver and run your first case | [Getting started](getting-started/index.md) |
 | Choose a simulation to adapt | [Example catalogue](examples/index.md) |
 | Understand the equations and numerical treatment | [Physical and numerical model](model/index.md) |
+| Compare rheological and environmental processes | [Rheological models](model/rheology.md) and [erosion and deposition](model/mass-exchange.md) |
 | Configure two interacting layers | [Two-layer model](model/two-layer.md) |
 | Read and visualize NetCDF results | [Output files](getting-started/output-files.md) and [visualization](getting-started/visualization.md) |
 | Cite the software | [References and citation](references/index.md) |

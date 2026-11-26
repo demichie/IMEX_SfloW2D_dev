@@ -1,61 +1,63 @@
 # Physical and numerical model
 
-IMEX-SfloW2D evolves depth-integrated mixtures over a two-dimensional
-Cartesian grid and a supplied terrain surface. The model combines
-finite-volume transport with constitutive laws and source terms selected
-in the simulation input.
+IMEX-SfloW2D simulates two-dimensional, depth-averaged geophysical flows over
+a terrain surface. It combines finite-volume transport with a configurable
+mixture description, constitutive rheology, and physical source processes.
+Simulations can use one moving layer or two interacting layers.
 
-## Flow variables
+The choice of rheology, exchanged materials, thermal processes and numerical
+source treatment determines the physical model of a particular simulation.
+**Two-layer coupling is an optional extension, not a prerequisite for the
+other physical processes.**
 
-The principal physical quantities are flow depth, horizontal velocity,
-mixture density and composition. Depending on the configuration, the
-simulation may also transport thermal content, multiple solid or gas
-species, excess pore pressure and a stochastic variable.
+## State variables and governing balances
 
-The model advances conservative mass, momentum and thermal/constituent
-quantities and converts them to physical variables such as depth,
-velocity and temperature for constitutive laws and output. Dry cells
-have no flowing material.
+For each flowing layer, the solver advances conservative quantities including
+mixture mass, two horizontal momenta, thermal content and transported
+constituent masses. With mixture density $\rho_m$, thickness $h$, horizontal
+velocities $u,v$, mixture heat capacity $c_{p,m}$ and temperature $T$, the
+leading conserved quantities per unit horizontal area are
 
-## Physical processes
+$$
+M=\rho_m h,\qquad Mu,\qquad Mv,\qquad Q_T=M c_{p,m}T.
+$$
 
-The available source laws describe, where enabled:
+The thermal quantity is **thermal content**, not total mechanical energy.
+Optional variables describe pore pressure, stochastic forcing and configured
+additional constituents. Constitutive laws use the corresponding physical
+states reconstructed from these conservative variables.
 
-- Resistance to motion through the configured rheology, including
-  frictional or velocity-dependent formulations.
-- Exchange with the substrate or atmosphere, including erosion,
-  deposition, entrainment and carrier loss when supported by the
-  selected flow model.
-- Thermal cooling and other temperature-dependent effects.
-- Optional pore-pressure and stochastic processes.
-- Sources of new material, such as configured injections.
+## Choose the physical processes
 
-Not every law or time-integration treatment is valid for every
-material. Choose a model from an existing example and verify that
-its physical assumptions fit your application.
+| Topic | What the model represents |
+| --- | --- |
+| [Rheological models](rheology.md) | Friction, yield stress, velocity-dependent and temperature/composition-dependent resistance |
+| [Erosion, deposition and entrainment](mass-exchange.md) | Exchanges with terrain, atmosphere and carrier material; bed growth and erosion |
+| [Thermal processes](thermal.md) | Radiative and convective cooling, temperature-dependent material behaviour, vaporization |
+| [Pore pressure and other sources](additional-processes.md) | Darcy pore pressure, stochastic variations and external injections |
+| [Lava and lahar applications](applications.md) | How multiple physical laws are combined for representative volcanic-flow settings |
+| [Numerical methods](numerics.md) | Reconstruction, fluxes, source integration, CFL limits and admissibility |
+| [Two-layer flows](two-layer.md) | Optional interaction of two moving mixtures through pressure, exchange and drag |
 
-## Single layer and two layers
+These processes are configurable, not necessarily active in every run.
+Some laws require particular material assumptions or support only specific
+source-integration treatments.
 
-With `N_LAYERS=1`, one depth-averaged flow exchanges material and momentum
-with its surroundings according to its configured laws.
+## One layer or two?
 
-With `N_LAYERS=2`, two flowing layers share a computational terrain and
-are coupled by hydrostatic pressure and, when enabled, interlayer
-mass and momentum exchange. Layer configurations may differ.
-The two-layer equations have important restrictions related to density
-ordering and relative velocity.
+A **single-layer** run evolves one moving mixture, with the configured
+rheology, heat transfer, sources and exchange with its environment.
 
-## Read more
+A **two-layer** run evolves two moving mixtures over the same terrain,
+with independent layer properties and additional pressure coupling and
+interlayer interactions. It requires separate attention to density ordering,
+relative velocity and the validity of the coupled characteristic speeds.
+Read the [two-layer formulation](two-layer.md) and
+[characteristic limits](hyperbolicity.md) for these assumptions.
 
-- [Numerical methods](numerics.md) — reconstruction, fluxes, time stepping
-  and timestep selection.
-- [Two-layer formulation](two-layer.md) — layer variables and input.
-- [Coupled pressure equations](coupling.md) — the implemented pressure
-  coupling between layers.
-- [Interlayer processes](interlayer-processes.md) — settling, elutriation,
-  carrier transfer, drag and energy accounting.
-- [Characteristic limits](hyperbolicity.md) — when the coupled
-  gravitational wave speeds can become complex.
+## From equations to a simulation
 
-To connect the equations to a concrete configuration, use the
-[example catalogue](../examples/index.md).
+The [example catalogue](../examples/index.md) provides complete cases with
+specific parameter sets. Use it together with the physical-process pages to
+identify which laws are active; a working example does not, by itself,
+establish calibration or predictive validity for a different event.
