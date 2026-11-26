@@ -7,7 +7,8 @@ import tempfile
 import unittest
 
 from extended_validation import (
-    BUDGET_COLUMNS, RUN, budgets, cells, compare_snapshots, set_input,
+    BUDGET_COLUMNS, RUN, budgets, cells, check_conservation_records,
+    compare_snapshots, set_input,
 )
 
 def fixed_record(values):
@@ -70,6 +71,35 @@ class ExtendedEtnaValidationTest(unittest.TestCase):
                 writer.writerow([0.01, 8.0, 2.0, 11.0, 0.16, 0.04, 0.2, 4.0, 1.0, 0.0, 5.0])
             with self.assertRaisesRegex(AssertionError, "mass_total"):
                 budgets(Path(directory))
+
+    def test_deposition_conserves_total_system_mass(self):
+        # Deposition removes mobile mass but retains it in the substrate.
+        rows = [
+            dict(mass_total=1000.0, solid_substrate=100.0, solid_system=600.0),
+            dict(mass_total=999.0, solid_substrate=101.0, solid_system=600.0),
+            dict(mass_total=998.0, solid_substrate=102.0, solid_system=600.0),
+        ]
+        check_conservation_records(rows)
+        rows[2]["mass_total"] = 997.0
+        with self.assertRaisesRegex(AssertionError, "mass_system"):
+            check_conservation_records(rows)
+
+    def test_atmospheric_input_is_not_assumed_conservative(self):
+        # L2 entrainment is an external, nonnegative mass contribution.
+        rows = [
+            dict(mass_total=1000.0, solid_substrate=100.0, solid_system=600.0),
+            dict(mass_total=1001.0, solid_substrate=101.0, solid_system=600.0),
+        ]
+        check_conservation_records(rows, allow_atmospheric_input=True)
+        with self.assertRaisesRegex(AssertionError, "mass_system"):
+            check_conservation_records(rows)
+        rows[1]["mass_total"] = 998.0
+        with self.assertRaisesRegex(AssertionError, "mass_system"):
+            check_conservation_records(rows, allow_atmospheric_input=True)
+        rows[1]["mass_total"] = 1001.0
+        rows[1]["solid_system"] = 599.0
+        with self.assertRaisesRegex(AssertionError, "solid_system"):
+            check_conservation_records(rows, allow_atmospheric_input=True)
 
     def test_snapshot_comparison_rejects_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:

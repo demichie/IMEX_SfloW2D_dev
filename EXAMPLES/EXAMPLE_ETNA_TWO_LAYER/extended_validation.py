@@ -176,16 +176,35 @@ def compare_snapshots(reference, candidate, index, tolerance=REL_COMPARISON):
             raise AssertionError("Empty comparison snapshot")
 
 
+def check_conservation_records(records, allow_atmospheric_input=False):
+    """Balance mobile and substrate mass; ambient entrainment is an external source."""
+    initial_mass = records[0]["mass_total"] + records[0]["solid_substrate"]
+    initial_solids = records[0]["solid_system"]
+    for n, record in enumerate(records):
+        mass = record["mass_total"] + record["solid_substrate"]
+        tolerance = REL_CONSERVATION * max(1.0, abs(initial_mass))
+        if allow_atmospheric_input:
+            # Atmospheric entrainment can add carrier mass, never remove it.
+            invalid_mass = mass < initial_mass - tolerance
+        else:
+            invalid_mass = abs(mass - initial_mass) > tolerance
+        if invalid_mass:
+            raise AssertionError(
+                f"Conservation failure mass_system at output {n}: "
+                f"{mass:.16g} vs {initial_mass:.16g}"
+            )
+        if abs(record["solid_system"] - initial_solids) > (
+            REL_CONSERVATION * max(1.0, abs(initial_solids))
+        ):
+            raise AssertionError(
+                f"Conservation failure solid_system at output {n}: "
+                f"{record['solid_system']:.16g} vs {initial_solids:.16g}"
+            )
+
+
 def check_invariants(root, require_growth=False):
     records = budgets(root)
-    for key in ("mass_total", "solid_system"):
-        initial = records[0][key]
-        for n, record in enumerate(records):
-            if abs(record[key] - initial) > REL_CONSERVATION * max(1.0, abs(initial)):
-                raise AssertionError(
-                    f"Conservation failure {key} at output {n}: "
-                    f"{record[key]:.16g} vs {initial:.16g}"
-                )
+    check_conservation_records(records, allow_atmospheric_input=require_growth)
     if records[0]["mass_L2"] != 0.0 or records[0]["solid_L2"] != 0.0:
         raise AssertionError("L2 must be exactly dry at initial output")
     max_mass_l2 = max(record["mass_L2"] for record in records[1:])
@@ -227,7 +246,7 @@ def check_invariants(root, require_growth=False):
                         f"{actual:.16g} vs {expected:.16g}"
                     )
     print(f"PASS {root.name}: {len(records)} snapshots, "
-          f"max L2 mass={max_mass_l2:.12g}, conserved mass and solids, "
+          f"max L2 mass={max_mass_l2:.12g}, system mass and solids checked, "
           f"L2 activation {'required' if require_growth else 'not assumed'}")
     return records
 
