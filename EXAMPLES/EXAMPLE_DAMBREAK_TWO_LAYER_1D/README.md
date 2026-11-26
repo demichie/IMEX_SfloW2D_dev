@@ -1,6 +1,6 @@
 # Two-layer 1D dam-break on flat topography
 
-A diagnostic test of the production two-layer spatial operator. The mesh has
+This case isolates the two-layer spatial operator on flat topography. The mesh has
 **200 cells in x and exactly one cell in y** (`COMP_CELLS_Y=1`).
 The topography is constant zero; no transverse evolution is intended.
 
@@ -26,12 +26,14 @@ There is no need to run the solver to prepare initial conditions.
 With the executable built at `../../src/IMEX_SfloW2D`:
 
 ```bash
-IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 The simulation ends at 3 s and writes output every 0.25 s in
-`OUTPUT/dambreak_two_layer_1d/`. This is a numerical smoke test, not
-validation of the full coupled two-layer equations.
+`OUTPUT/dambreak_two_layer_1d/`. Because L2 remains dry, this test
+does not exercise two wet interacting layers. For the coupled
+characteristic limits, see
+[two-layer hyperbolicity](../../docs/TWO_LAYER_HYPERBOLICITY.md).
 
 ## Interpretation
 
@@ -49,11 +51,11 @@ The single y cell has no y-direction interior flux and is intentional.
 
 ## Wet/dry-front mass diagnostic
 
-Enable the same opt-in diagnostic in both a single-layer reference and the
-two-layer run:
+Enable the same optional diagnostic in both a single-layer reference
+and the two-layer run:
 
 ```bash
-IMEX_FRONT_MASS_DIAGNOSTICS=1 IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D > front.log 2>&1
+IMEX_FRONT_MASS_DIAGNOSTICS=1 ../../src/IMEX_SfloW2D > front.log 2>&1
 grep FRONT_MASS front.log | head -n 30
 ```
 

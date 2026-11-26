@@ -204,12 +204,13 @@ admissible states, validity of inverted-density or excessive-shear
 regimes, physical reliability of solutions in complex-eigenvalue
 regions, and quantitative validation of all interlayer closures.
 
-**No implementation change is authorized by this decision:** do not
-add ad hoc shear/density thresholds, artificial pressure corrections,
-numerical hyperbolicity repairs, new runtime controls or milestones.
-The existing `IMEX_TWO_LAYER_VALIDATION=1` opt-in remains active.
-TL13a is functionally complete; general TL13b scientific approval
-is **not** granted by limited experimental acceptance.
+**No change to the physical or numerical model is authorized by this
+decision:** do not add ad hoc shear/density thresholds, artificial
+pressure corrections, numerical hyperbolicity repairs or new scientific
+milestones. Both `N_LAYERS=1` and `N_LAYERS=2` are directly selectable
+in the input file; no special environment activation is needed.
+TL13a is functionally complete; direct execution of two-layer cases
+does **not** imply general TL13b scientific approval.
 
 For interpretation of an individual run, the wet/wet density ordering
 and its characteristic roots should be assessed using its actual

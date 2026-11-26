@@ -8,7 +8,9 @@ and CI for the exact active commit remain the source of truth.
 
 - [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md): current TL13 priorities.
 - [Two-layer architecture](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md):
-  authoritative design, physical assumptions and remaining gates.
+  authoritative design, physical assumptions and integration status.
+- [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md):
+  characteristic spectrum, density/shear limits and conditional CFL bound.
 - [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): technical snapshot;
   historical status claims must be checked against current code.
 - [State architecture](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md): ownership,

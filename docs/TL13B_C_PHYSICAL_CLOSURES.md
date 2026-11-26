@@ -256,8 +256,8 @@ checks on the **same commit**. Run at least
 documented no-heating limitation. Assess the empirical parameters
 and compare with suitable analytical/benchmark/laboratory evidence.
 This is separate from TL13b-A hyperbolicity and TL13b-B spatial
-positivity and does **not** authorize removing
-`IMEX_TWO_LAYER_VALIDATION=1`.
+positivity. Two-layer examples execute without an environment
+activation gate; this does not establish physical validation.
 
 **Evidence update (26 November 2026).** The cell-physics and spatial
 regressions passed on Fortran revision `d85fabe` (run
@@ -271,5 +271,6 @@ revision. This closes the *specified functional/numerical CI evidence*;
 it does not establish a coupled eigensystem with shear, a grid/time
 convergence result, external-air flux closure against a measured
 source integral, or empirical validation of C1-C3/C5. C4 remains an
-accepted no-heating limitation. TL13b is not scientifically approved;
-the two-layer production gate remains closed.
+accepted no-heating limitation. General TL13b scientific approval is
+not claimed; two-layer cases are directly executable with documented
+physical limitations.

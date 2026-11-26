@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Controlled TL13a Etna two-layer smoke test; not a physical validation."""
+"""Etna two-layer integration smoke test for output and restart files."""
 import argparse
 import csv
 import math
@@ -101,18 +101,11 @@ def run_test(solver, root, end_time, timeout):
     root.mkdir(parents=True, exist_ok=True)
     text = (EXAMPLE / "IMEX_SfloW2D.inp").read_text(encoding="utf-8")
     (root / "IMEX_SfloW2D.inp").write_text(text, encoding="utf-8")
-    closed_env = dict(os.environ, OMP_NUM_THREADS="1", OMP_DYNAMIC="FALSE")
-    closed_env.pop("IMEX_TWO_LAYER_VALIDATION", None)
-    gate = subprocess.run([str(solver)], cwd=root, env=closed_env,
-                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          timeout=timeout, text=True, check=False)
-    if gate.returncode == 0 or "requires IMEX_TWO_LAYER_VALIDATION=1" not in gate.stdout:
-        raise RuntimeError("Default two-layer production gate was not enforced")
     prepare(root)
     text = change_parameter(text, "T_END", f"{end_time:.16g}")
     text = change_parameter(text, "DT_OUTPUT", f"{end_time:.16g}")
     (root / "IMEX_SfloW2D.inp").write_text(text, encoding="utf-8")
-    env = dict(os.environ, IMEX_TWO_LAYER_VALIDATION="1", OMP_NUM_THREADS="1", OMP_DYNAMIC="FALSE")
+    env = dict(os.environ, OMP_NUM_THREADS="1", OMP_DYNAMIC="FALSE")
     process = subprocess.run([str(solver)], cwd=root, env=env, text=True,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                              timeout=timeout, check=False)
@@ -120,8 +113,6 @@ def run_test(solver, root, end_time, timeout):
     if process.returncode != 0:
         print(process.stdout[-16000:], file=sys.stderr)
         raise RuntimeError(f"Two-layer solver exited with status {process.returncode}")
-    if "TL13a experimental two-layer validation" not in process.stdout:
-        raise RuntimeError("Solver did not acknowledge controlled two-layer activation")
     check_run(root, "exampleEtna_two_layer")
 
 
@@ -143,7 +134,7 @@ def main():
             parser.error("Work directory must be absent or empty")
         run_test(solver, root, args.end_time, args.timeout)
     else:
-        with tempfile.TemporaryDirectory(prefix="imex-tl13a-etna-") as directory:
+        with tempfile.TemporaryDirectory(prefix="imex-two-layer-etna-") as directory:
             run_test(solver, Path(directory), args.end_time, args.timeout)
 
 

@@ -5,12 +5,13 @@ and volcanic flows, using high-resolution spatial discretization and
 implicit-explicit (IMEX) time integration. Supported single-layer carrier
 configurations include gas, liquid and lava, with model-specific physics.
 
-**Development status:** the `feature/two-layer` branch is preparing a
-two-layer architecture. The production `N_LAYERS=2` gate remains disabled
-until its validation is complete; the existing single-layer solver is the
-supported execution path. See the
-[two-layer architecture and roadmap](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
-for design decisions and remaining validation.
+The solver supports both `N_LAYERS=1` and `N_LAYERS=2` directly
+through the input file, without an additional activation variable.
+The two-layer formulation has documented scientific limitations,
+particularly for density inversion and interlayer shear; see
+[two-layer hyperbolicity](docs/TWO_LAYER_HYPERBOLICITY.md) and the
+[two-layer architecture](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
+The existing single-layer numerical path remains unchanged.
 
 ## Build
 

@@ -1,8 +1,13 @@
 # Two-layer closure audit — TL13a
 
 **Branch:** `feature/two-layer`. **Audit baseline:** `7f8189a76e`, 18 November 2026; output-schema wording verified against `src/io/inpout_2d.f90` on 19 November 2026.
-**Scope:** architectural closure and functional gate; scientific model validation remains TL13b.
-This document is the current audit, not a historical compatibility matrix.
+**Scope:** historical architectural and functional integration evidence from
+the TL13 development phase. Dated gate statements below are **historical**,
+not current operating instructions. Two-layer execution now uses
+`N_LAYERS=2` directly, without the former environment variable.
+For current characteristic limits see
+[TWO_LAYER_HYPERBOLICITY.md](TWO_LAYER_HYPERBOLICITY.md).
+Source code and the current roadmap define present behavior.
 
 ## Architectural ownership
 

@@ -6,11 +6,12 @@ inspect the branch HEAD, source code and the CI outcome for that exact revision.
 
 ## Current objective: TL13
 
-The single-layer production path remains the reference baseline. The two-layer
-architecture is structurally implemented. **`N_LAYERS=2` is rejected by default**;
-`IMEX_TWO_LAYER_VALIDATION=1` permits an explicitly experimental TL13a run,
-not a production-approved configuration. Functional and scientific acceptance
-remain separate gates.
+The single-layer path remains the regression baseline. The integrated
+two-layer architecture can now run directly with `N_LAYERS=2`; no
+environment activation gate remains. Functional integration passed the
+previously recorded CI checks; scientific validity is restricted by the
+conditions in [two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md).
+Direct execution is not a claim of general physical validation.
 
 The [two-layer architecture and roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
 is the single authoritative specification of layer ownership, contacts,
@@ -23,7 +24,7 @@ assumptions. Do not introduce competing implementation plans.
 | TL07 | Coupled Lie trial, source scheduling and optional layer physics exercised structurally | Validate actual two-layer production timestep |
 | TL08–TL11 | Interlayer settling, elutriation, carrier and analytic drag implemented/tested in isolated and integrated fixtures | Validate coupled mass/species/energy/momentum budgets through a complete run |
 | TL12 | Two-layer input, snapshots, named NetCDF physical fields, and binary restart structurally implemented | Verify real driver I/O, restart continuation and OpenMP |
-| TL13a | **Complete — functional gate verified on `89a9f2b`** | Run `44712747883`: optimized and strict/debug integration, single-layer OpenMP 1/2/4, controlled Etna two-layer smoke and extended conservation/restart/OpenMP all passed; the scientific/production approval gate remains TL13b |
+| TL13a | **Complete — functional integration verified on `89a9f2b`** | Run `44712747883` verified optimized and strict/debug integration, OpenMP and two-layer Etna end-to-end tests; the no-gate integration change needs new CI evidence. |
 | TL13b | **Open** | Scientifically validate hyperbolicity/shear, density contrasts, coupled pressure, wet/dry, convergence and physical closures |
 
 ## Invariants preserved at TL13a closure
@@ -39,11 +40,14 @@ assumptions. Do not introduce competing implementation plans.
   retry, post-update clipping or unapproved changes of physics.
 - Tests must cover REAL/COMPLEX consistency, conservation, dry states,
   strict/debug and optimized builds, and OpenMP.
-- Do not enable `N_LAYERS=2` as a validated production configuration before
-  the functional and scientific gates are independently satisfied.
+- `N_LAYERS=2` is directly runnable, but individual simulations must
+  be interpreted within the documented density/shear limits.
+  Executable availability is not general scientific validation.
 
 ## Current companion references
 
+- [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md): characteristic
+  limits and accepted scientific restrictions.
 - [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): technical baseline and
   remaining functional evidence; historical commit-specific claims must be
   rechecked against the current HEAD.
@@ -69,5 +73,5 @@ Acceptance report summaries remain under [acceptance](acceptance/README.md),
 with links to the raw evidence at the same revision.
 
 **Verification rule:** A green workflow only verifies the SHA it ran.
-Structural two-layer tests or single-layer production simulations do not imply
-TL13a completion, and TL13a does not imply TL13b scientific approval.
+Structural tests or single-layer simulations alone do not establish
+coupled-model validity; functional and scientific evidence remain distinct.

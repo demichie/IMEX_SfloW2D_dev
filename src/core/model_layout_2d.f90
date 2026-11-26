@@ -3,7 +3,7 @@
 !>
 !> The layout snapshots variable counts and component indices before solver
 !> workspaces are allocated. State arrays are rank four (component,layer,x,y). The production driver
-!> controls experimental two-layer execution at the input boundary.
+!> determines the material-layer count selected by the input.
 !********************************************************************************
 
 MODULE model_layout_2d

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""TL13a extended two-layer Etna checks: evolution, restart and OpenMP.
+"""Etna two-layer integration checks: evolution, restart and OpenMP.
 
-This is functional regression evidence, not validation of coupled eigenvalues
-or an endorsement of two-layer physics for production use.
+These regressions verify numerical behavior, not physical calibration or
+hyperbolicity of every simulated state.
 """
 
 import argparse
@@ -61,8 +61,7 @@ def set_input(root, end_time, output_interval, restart_binary=False):
 
 
 def execute(solver, root, threads, timeout, label):
-    env = dict(os.environ, IMEX_TWO_LAYER_VALIDATION="1",
-               OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
+    env = dict(os.environ, OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
                OPENBLAS_NUM_THREADS="1")
     try:
         result = subprocess.run([str(solver)], cwd=root, env=env, text=True,
@@ -78,8 +77,6 @@ def execute(solver, root, threads, timeout, label):
     match = re.search(r"Parallel run:\s*number of threads used\s+(\d+)", result.stdout)
     if match is None or int(match.group(1)) != threads:
         raise AssertionError(f"{label}: OpenMP team size {threads} not verified")
-    if "TL13a experimental two-layer validation" not in result.stdout:
-        raise AssertionError(f"{label}: validation gate was not acknowledged")
 
 
 def budgets(root):
@@ -342,9 +339,9 @@ def main():
     try:
         run_validation(args.solver.resolve(), root, args.horizon, args.growth_horizon, args.timeout)
     except Exception as error:
-        print(f"FAIL: TL13a extended validation: {error}", file=sys.stderr)
+        print(f"FAIL: extended two-layer validation: {error}", file=sys.stderr)
         return 1
-    print("PASS: extended TL13a functional validation (not scientific approval)")
+    print("PASS: extended two-layer integration checks")
     return 0
 
 

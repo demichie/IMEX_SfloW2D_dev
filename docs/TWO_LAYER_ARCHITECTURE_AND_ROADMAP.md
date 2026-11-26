@@ -1,6 +1,8 @@
 # IMEX-SfloW2D — Architettura e roadmap two-layer
 
-**Stato:** 20 novembre 2026 · branch `feature/two-layer` · `N_LAYERS=2` rifiutato per default; opt-in `IMEX_TWO_LAYER_VALIDATION=1` soltanto per test TL13a.
+**Stato:** 26 novembre 2026 · branch `feature/two-layer` ·
+`N_LAYERS=1` e `N_LAYERS=2` selezionabili direttamente dall'input;
+i limiti scientifici dell'iperbolicita' two-layer sono documentati.
 **Obiettivo:** completare L1 inferiore e L2 superiore preservando comportamento, input e risultati single-layer.
 Questa e' la specifica operativa delle scelte e del lavoro residuo, non una cronologia dei commit.
 L'evidenza tecnica delle fasi precedenti e' in [TWO_LAYER_CODE_AUDIT.md](TWO_LAYER_CODE_AUDIT.md).
@@ -217,9 +219,13 @@ termodinamiche deve essere verificato nelle implementazioni.
 
 ## 3. Stato e sequenza di lavoro
 
-**Priorita': completare il percorso two-layer end-to-end.** La
-predisposizione architetturale e i test isolati non equivalgono ad
-abilitazione in produzione.
+**Stato corrente:** il percorso end-to-end two-layer e' integrato nel
+driver. `N_LAYERS=2` seleziona direttamente una simulazione senza
+variabili di attivazione aggiuntive. La disponibilita' del solver non
+equivale a una validazione scientifica generale; si applicano i limiti
+di [TWO_LAYER_HYPERBOLICITY.md](TWO_LAYER_HYPERBOLICITY.md).
+I resoconti datati che seguono documentano le fasi precedenti e non
+definiscono lo stato operativo corrente.
 
 | Fase | Stato | Lavoro residuo / gate |
 |---|---|---|
@@ -228,8 +234,8 @@ abilitazione in produzione.
 | **TL06 — Spaziale accoppiato** | Regresioni accoppiate validate nel blocco 3 | Il passo Lie usa lo stesso workset L1/L2, le velocita' di faccia comuni sono propagate sulle sole facce attive. Regresioni per BC indipendenti sui quattro lati, quattro stati wet/dry, budget e CFL condiviso su topografie Q1; la validazione degli autovalori accoppiati con shear resta nel gate scientifico TL13b. |
 | **TL07 — Lie accoppiato** | Integrato; blocco 1 verificato | Trial L1/L2, gruppo zero, transazione interlayer, drag e scambi esterni di erosione/deposizione sono esercitati sul timestep produttivo nei quattro stati wet/dry. Il blocco 2 aggiunge trasporto Darcy L1/OU L2 e cooling L2 nel passo accoppiato. Il gate funzionale generale resta chiuso. |
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
-| **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
-| **TL13a — Gate funzionale** | **Completata** su `89a9f2b`: workflow `44712747883` interamente verde | Operatori e workset OR, smoke Etna, conservazione, restart e OpenMP two-layer, integrazione optimized/strict-debug e confronto OpenMP single-layer verificati. Il gate produttivo rimane chiuso fino alla validazione scientifica TL13b. |
+| **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Gli esempi two-layer sono utilizzabili con `N_LAYERS=2`. |
+| **TL13a — Gate funzionale** | **Completata** su `89a9f2b`: workflow `44712747883` interamente verde | Operatori e workset OR, smoke Etna, conservazione, restart e OpenMP two-layer, integrazione optimized/strict-debug e confronto OpenMP single-layer verificati. Il modello two-layer e' direttamente utilizzabile, con i limiti scientifici TL13b. |
 | **TL13b — Validazione scientifica** | **Audit finale completato; approvazione scientifica non concessa** | Verifica tecnica verde: `45771800979` (fisica/stato/spaziale) e `45773582543` (solver strict/optimized, OpenMP, Etna estesa). Non e' validato lo spettro accoppiato con shear e densita' diverse; mancano confronti quantitativi di convergenza e benchmark fisici per le chiusure. Nessun nuovo sottogate. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
@@ -462,11 +468,11 @@ verificano la stessa revisione del codice numerico Fortran.
 insufficiente evidenza sullo spettro accoppiato e sulla validazione delle
 chiusure; questo e' un limite documentato delle prove disponibili,
 non la dimostrazione di instabilita' fisica o di un errore del solver.
-Non e' giustificato ne' abilitare il two-layer produttivo ne'
-modificare automaticamente la fisica. `N_LAYERS=2` conserva il gate
-`IMEX_TWO_LAYER_VALIDATION=1`. I dossier TL13b-A/B/C non diventano
-nuove fasi; eventuali future indagini richiedono una decisione
-scientifica esplicita sul campo di applicabilita' desiderato.
+La validazione scientifica generale non e' stabilita: questo non
+impedisce di eseguire casi two-layer tramite `N_LAYERS=2`, ma
+richiede di interpretarli entro le limitazioni dichiarate.
+Non si modificano automaticamente le equazioni o il CFL.
+I dossier TL13b-A/B/C non diventano nuove fasi.
 
 **Accettazione sperimentale limitata (26 novembre 2026):** la formulazione
 two-layer viene mantenuta senza interventi al solver, con il campo di
@@ -477,8 +483,9 @@ gia' a velocita' uguali; l'uguaglianza delle densita' e' degenere e
 lo shear puo' rendere non iperbolica anche una stratificazione stabile.
 Il limite CFL non certifica l'iperbolicita'. Questa decisione
 **non approva il modello per ogni stato fisicamente ammissibile**,
-non modifica il giudizio sul gate generale TL13b e lascia invariato
-`IMEX_TWO_LAYER_VALIDATION=1`. Non si aprono nuove fasi.
+non modifica il giudizio scientifico generale TL13b.
+L'accesso al solver non richiede un gate ambientale aggiuntivo.
+Non si aprono nuove fasi.
 
 ## 4. Verifica e questioni scientifiche aperte
 

@@ -1,4 +1,4 @@
-# Etna two-layer — experimental granular collapse and upper dilute current
+# Etna two-layer — granular collapse and upper dilute current
 
 This example represents the collapse and downslope motion of a concentrated
 granular deposit (lower layer, L1), which feeds an initially dry upper
@@ -6,10 +6,12 @@ particle-laden gas current (L2). The upper current can entrain ambient air;
 the lower current can deposit particles onto the substrate. Interlayer
 mass transfer and interlayer momentum drag are separate processes.
 
-This is an experimental TL13 two-layer configuration, **not a scientifically
-validated prediction of an Etna event**. Its source-law coefficients and
-single-size particle population are exploratory. Running with
-`N_LAYERS=2` requires `IMEX_TWO_LAYER_VALIDATION=1`.
+The source-law coefficients and single-size particle population are
+illustrative, not a calibrated reconstruction of an Etna event.
+The coupled model's characteristic limits, including complex eigenvalues
+for some density and velocity states, are explained in
+[two-layer hyperbolicity](../../docs/TWO_LAYER_HYPERBOLICITY.md).
+The simulation runs directly with `N_LAYERS=2`.
 
 Run every command from **EXAMPLES/EXAMPLE_ETNA_TWO_LAYER**. Preprocessing
 scripts and input files are local to this example. The only file shared
@@ -58,7 +60,7 @@ conversions. A preliminary single-layer simulation or external
 conservative-state initialization is **not** needed.
 
 ```bash
-IMEX_TWO_LAYER_VALIDATION=1 ../../src/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ### 3.1 Initial state and numerical setup
@@ -290,8 +292,9 @@ initial state when each test begins.
 The short test checks snapshots, ESRI/NetCDF output, budgets and binary
 restart presence. The extended test compares continuous vs restarted
 trajectories, 1/2/4 OpenMP threads and L2 formation over a 2 s
-trajectory. These are **functional** checks only; TL13b coupled wave
-and physical validation is still pending.
+trajectory. These checks cover outputs, budgets and reproducibility;
+they do not establish physical calibration or guarantee that all
+states have real characteristic eigenvalues.
 
 ## Source files
 

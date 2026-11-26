@@ -661,7 +661,6 @@
 
         LOGICAL :: lexist
         INTEGER :: ios, n_pore_legacy, n_pore_l1, n_pore_l2
-        CHARACTER(LEN=8) :: validation_mode
         CHARACTER(LEN=2048) :: pore_line
 
         ! Reset canonical NAMELIST objects between runs.
@@ -833,18 +832,9 @@
 
             END IF
 
-            ! Two-layer execution is opt-in for TL13a integration tests only.
-            ! This is the sole production-driver activation gate; the model
-            ! layout itself represents both supported structural layer counts.
+            ! Both single-layer and two-layer configurations use this input path.
             IF (n_layers<1 .OR. n_layers>2) &
                 CALL fatal_error('N_LAYERS must be 1 or 2')
-            IF (n_layers==2) THEN
-                validation_mode=''
-                CALL GET_ENVIRONMENT_VARIABLE('IMEX_TWO_LAYER_VALIDATION',validation_mode)
-                IF (TRIM(validation_mode)/='1') &
-                    CALL fatal_error('N_LAYERS=2 requires IMEX_TWO_LAYER_VALIDATION=1 (unvalidated)')
-                WRITE(*,'(A)') 'TL13a experimental two-layer validation; NOT production validated'
-            END IF
 
             idx_solid_first = 5
             idx_solid_last = 4 + n_solid
@@ -3973,7 +3963,6 @@
             IF (n_thermal_legacy+n_thermal_l1/=1)                                                               &
                 CALL fatal_error('Provide exactly one TEMPERATURE_PARAMETERS or TEMPERATURE_L1_PARAMETERS')
         ELSE IF (n_layers==2) THEN
-            ! This path is not enabled until the two-layer solver passes its gates.
             IF (n_thermal_legacy/=0 .OR. n_thermal_l1/=1 .OR. n_thermal_l2/=1)                                 &
                 CALL fatal_error('N_LAYERS=2 requires TEMPERATURE_L1_PARAMETERS and TEMPERATURE_L2_PARAMETERS')
         END IF
