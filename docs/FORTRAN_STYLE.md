@@ -39,8 +39,14 @@ it also supports `--check-against-git REF` to compare executable lines. The comp
 The published Doxygen API uses a single `@mainpage` from
 `src/IMEX_SfloW2D.f90`, extracts documented private procedures,
 checks incomplete parameter documentation and **fails the Pages build
-when Doxygen emits a warning**. The independent source coverage checker
-still protects declarations that Doxygen may not extract.
+when Doxygen emits a warning**. The Doxygen input includes Fortran source
+and the explicit API guide, not the Markdown README files intended for GitHub;
+MathJax renders equations in HTML without requiring a LaTeX toolchain.
+Document procedure arguments once in the header: use ordinary `!` comments
+inside the procedure for additional implementation notes, rather than `!>`
+comments that Doxygen can interpret as duplicate argument documentation.
+The independent source coverage checker still protects declarations that
+Doxygen may not extract.
 Run `python3 -m unittest discover -s tools/docs -p 'test_doxygen_policy.py'`
 to verify these publication settings.
 

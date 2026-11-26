@@ -24,7 +24,9 @@ WARN_AS_ERROR          = FAIL_ON_WARNINGS
 WARN_LOGFILE           = build/doxygen.warnings
 WARN_IF_DOC_ERROR      = YES
 INPUT                  = src docs/doxygen/mainpage.md
-FILE_PATTERNS          = *.f90 *.F90 *.f95 *.F95 *.md
+FILE_PATTERNS          = *.f90 *.F90 *.f95 *.F95
+# Parse the explicitly listed API guide, but not GitHub-oriented src/ READMEs.
+EXCLUDE_PATTERNS       = */README.md
 RECURSIVE              = YES
 SOURCE_BROWSER         = YES
 INLINE_SOURCES         = NO
@@ -34,6 +36,9 @@ GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 GENERATE_LATEX         = NO
 GENERATE_XML           = NO
+# Render source formulae in HTML without a LaTeX installation on the CI runner.
+USE_MATHJAX            = YES
+MATHJAX_VERSION        = MathJax_3
 MARKDOWN_SUPPORT       = YES
 USE_MDFILE_AS_MAINPAGE =
 HAVE_DOT               = YES

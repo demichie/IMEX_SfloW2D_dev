@@ -455,7 +455,7 @@ CONTAINS
     !>       retain the Gaussian OU state.
 
     SUBROUTINE refresh_effective_stochastic_field(this)
-        !> Derive the fluctuation used by friction without modifying the OU state.
+        ! Derive the fluctuation used by friction without modifying the OU state.
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
 
         IF (this%config%sym_noise > 0.0_wp) THEN
@@ -478,7 +478,7 @@ CONTAINS
     !> \return Squared speed [m^2 s^-2], or zero when the cell mass is negligible.
 
     REAL(wp) FUNCTION VelocitySquared(state,j,k,layer)
-    !> Compute |u|^2 at the cell center.
+    ! Compute |u|^2 at the cell center.
     IMPLICIT NONE
     CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
@@ -583,8 +583,8 @@ END FUNCTION VelocitySquared
 !> \param[out] result Convolved field with the same shape as input_signal.
 
 subroutine convolve_2d(input_signal, kernel, result)
-    !> Zero-padded two-dimensional convolution.
-    !> All arrays follow the solver convention (x,y).
+    ! Zero-padded two-dimensional convolution.
+    ! All arrays follow the solver convention (x,y).
     implicit none
     real(wp), dimension(:,:), intent(in) :: input_signal, kernel
     real(wp), dimension(:,:), intent(out) :: result

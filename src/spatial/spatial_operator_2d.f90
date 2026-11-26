@@ -74,7 +74,6 @@ CONTAINS
     !> changing fluxes or candidate states. The decomposition assumes a central-upwind
     !> mass flux; dry-donor guards are reported separately by the existing face diagnosis.
     !> @param[in] this Prepared layer-local spatial and reconstruction workspaces.
-    !> @param[in] j,k Coordinates of the rejected cell.
     !> @param[in] qp_cell Published primitive state in that cell.
     !> @param[in] mass_cell Published conservative mixture mass per unit area.
     !> @param[in] dt Rejected forward-Euler spatial timestep.
@@ -384,8 +383,6 @@ CONTAINS
     !> This remains test-only until coupled eigenvalues and shear are validated.
     !> @param[in,out] this Prepared lower-layer spatial operator.
     !> @param[in,out] upper Prepared upper-layer spatial operator.
-    !> @param[in] qp1,qp2 Current layer primitive fields.
-    !> @param[out] term1,term2 Coupled spatial residuals, on active cells.
     !> @param[in] time Explicit stage time [s].
     !> @param[in] domain Shared OR cell, face and HP reconstruction workset.
     !> @param[out] dt Optional preliminary shared CFL timestep [s].
@@ -532,8 +529,6 @@ CONTAINS
 
     !> @brief Accumulate the unchanged four-face characteristic maxima for one cell.
     !> @param[in] this Owns the reconstructed face-speed arrays.
-    !> @param[in] j,k Active cell indices.
-    !> @param[in,out] max_a_x,max_a_y Directional maximum characteristic speeds [m/s].
     !> @param[in] paired_bounds Skip collapsed axes for the shared coupled envelope.
     !> @param[in] j X-cell index in the active worklist.
     !> @param[in] k Y-cell index in the active worklist.
@@ -601,7 +596,6 @@ CONTAINS
 
     !> @brief Convert reduced characteristic maxima to the existing CFL policy bound.
     !> @param[in] this Operator whose CFL policy is applied.
-    !> @param[in] max_a_x,max_a_y Maximum characteristic speeds [m/s].
     !> @param[out] dt Resulting spatial CFL bound [s].
     !> @param[in] max_a_x Maximum x-direction propagation speed.
     !> @param[in] max_a_y Maximum y-direction propagation speed.
@@ -772,8 +766,6 @@ CONTAINS
     !> isolated L1/L2 eigenvalues are not substituted for coupled bounds.
     !> @param[in] this Spatial operator carrying the public timestep API.
     !> @param[in] domain Shared OR cell/face workset for the coupled pair.
-    !> @param[in] axneg,axpos Coupled nonpositive/nonnegative x-face bounds.
-    !> @param[in] ayneg,aypos Coupled nonpositive/nonnegative y-face bounds.
     !> @param[out] dt Shared CFL-limited timestep [s].
     !> @param[in] axneg Negative x-face wave-speed array [m/s].
     !> @param[in] axpos Positive x-face wave-speed array [m/s].
@@ -816,7 +808,6 @@ CONTAINS
 
     !> @brief Apply the canonical CFL policy to maximum directional wave speeds.
     !> @details Keeps the legacy floating-point evaluation order and 1D branch.
-    !> @param[in] max_a_x,max_a_y Maximum face speed magnitudes [m/s].
     !> @param[in,out] dt Existing maximum permitted timestep [s].
     !> @param[in] max_a_x Maximum x-direction propagation speed.
     !> @param[in] max_a_y Maximum y-direction propagation speed.

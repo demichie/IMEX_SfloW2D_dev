@@ -12,7 +12,7 @@
 !> \f$\boldsymbol{S}_{y}=-\tau_0\boldsymbol{u}_h/|\boldsymbol{u}|\f$.
 !> \ref eval_rheology_lava_implicit evaluates the complex-valued viscous rate;
 !> \ref eval_rheology_lava_semi_implicit evaluates the real-valued yield rate.
-!> \ref nu_ref, \ref visc_par and \ref tau0 are the model parameters. Thermal
+!> \c nu_ref, \c visc_par and \c tau0 are the model parameters. Thermal
 !> cooling is owned by the thermal-source module, not by this rheology.
 !> \ref eval_rheology_lava_analytic integrates the frozen affine velocity
 !> source exactly with T and other non-velocity inputs explicit.

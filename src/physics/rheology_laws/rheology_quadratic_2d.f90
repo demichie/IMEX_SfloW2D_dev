@@ -5,7 +5,7 @@
 !> \boldsymbol{S}=-\rho_m f_q|\boldsymbol{u}|^2
 !>                \frac{\boldsymbol{u}_h}{|\boldsymbol{u}_h|},
 !> \f]
-!> where \f$f_q\f$ is \ref friction_factor. The module provides
+!> where \f$f_q\f$ is \c friction_factor. The module provides
 !> \ref eval_rheology_quadratic_implicit, which returns zero for a stationary
 !> state and otherwise evaluates the complex-valued x/y sources.
 !> \ref eval_rheology_quadratic_analytic integrates the frozen quadratic

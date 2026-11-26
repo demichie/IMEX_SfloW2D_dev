@@ -10,7 +10,7 @@
 !> \ref eval_rheology_plastic_implicit evaluates the complex-valued x/y rates
 !> for the implicit solve, while \ref eval_rheology_plastic_analytic
 !> integrates its frozen velocity source exactly.
-!> \ref tau stores the model strength.
+!> \c tau stores the model strength.
 !********************************************************************************
 MODULE rheology_plastic_2d
     USE diagnostics_2d, ONLY : fatal_error

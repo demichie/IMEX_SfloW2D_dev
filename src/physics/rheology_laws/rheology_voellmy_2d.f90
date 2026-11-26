@@ -16,8 +16,8 @@
 !> where \f$a_c\f$ is the optional curvature acceleration and the pore
 !> pressure subtraction is enabled only when requested. The module provides
 !> \ref eval_rheology_voellmy_implicit for the turbulent term and
-!> \ref eval_rheology_voellmy_semi_implicit for the Coulomb term; \ref mu and
-!> \ref xi are their respective friction parameters. When enabled,
+!> \ref eval_rheology_voellmy_semi_implicit for the Coulomb term; \c mu and
+!> \c xi are their respective friction parameters. When enabled,
 !> \f$a_c=c_{xx}u_x^2+2c_{xy}u_xu_y+c_{yy}u_y^2\f$.
 !> \ref eval_rheology_voellmy_analytic exactly integrates the frozen
 !> combined velocity source while holding non-velocity inputs fixed.

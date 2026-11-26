@@ -330,7 +330,7 @@ CONTAINS
         !> Sauter diameter
         REAL(wp) :: sauter_diameter
 
-        !> depth-averaged volumetric fractions of solid phases
+        ! depth-averaged volumetric fractions of solid phases
         REAL(wp), INTENT(IN) :: alpha_solids(n_solid)
 
         IF ( SUM( alpha_solids ) .LT. EPSILON(1.0_wp) ) THEN
@@ -349,7 +349,7 @@ CONTAINS
         !> Average density
         REAL(wp) :: average_density_solids
 
-        !> depth-averaged volumetric fractions of solid phases
+        ! depth-averaged volumetric fractions of solid phases
         REAL(wp), INTENT(IN) :: alpha_solids(n_solid)
 
         IF ( SUM( alpha_solids ) .LT. EPSILON(1.0_wp) ) THEN

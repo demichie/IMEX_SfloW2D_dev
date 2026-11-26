@@ -36,6 +36,16 @@ class DoxygenPolicyTests(unittest.TestCase):
         program = (ROOT / "src" / "IMEX_SfloW2D.f90").read_text(encoding="utf-8")
         self.assertEqual(len(re.findall(r"(?m)^\s*!>\s*[@\\]mainpage\b", program)), 1)
 
+    def test_only_fortran_sources_and_the_explicit_api_guide(self):
+        self.assertEqual(option("EXCLUDE_PATTERNS"), "*/README.md")
+        self.assertNotIn("*.md", option("FILE_PATTERNS").split())
+        self.assertIn("*.f90", option("FILE_PATTERNS").split())
+        self.assertIn("docs/doxygen/mainpage.md", option("INPUT"))
+
+    def test_mathjax_renders_html_formulas_without_latex(self):
+        self.assertEqual(option("USE_MATHJAX"), "YES")
+        self.assertEqual(option("MATHJAX_VERSION"), "MathJax_3")
+
     def test_warning_log_is_retained(self):
         self.assertEqual(option("WARN_LOGFILE"), "build/doxygen.warnings")
 

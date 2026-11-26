@@ -605,42 +605,42 @@ CONTAINS
 
     IMPLICIT NONE
 
-        !> Initial point
+        ! Initial point
         REAL(wp), DIMENSION(:), INTENT(IN) :: qj_rel_NR_old
 
-        !> Initial point
+        ! Initial point
         REAL(wp), DIMENSION(:), INTENT(IN) :: qj_org
 
         ! Non-group variables must remain bitwise unchanged during line search.
         REAL(wp), INTENT(IN) :: qj_fixed(n_vars)
 
-        !> Initial point
+        ! Initial point
         REAL(wp), DIMENSION(:), INTENT(IN) :: q_group_input
 
-        !> Gradient at xold
+        ! Gradient at xold
         REAL(wp), DIMENSION(:), INTENT(IN) :: grad_f
 
-        !> Value of the function at xold
+        ! Value of the function at xold
         REAL(wp), INTENT(IN) :: scal_f_old
 
-        !> Descent direction (usually Newton direction)
+        ! Descent direction (usually Newton direction)
         REAL(wp), DIMENSION(:), INTENT(INOUT) :: desc_dir
 
         REAL(wp), INTENT(IN) :: stpmax
 
-        !> Coefficients to rescale the nonlinear function
+        ! Coefficients to rescale the nonlinear function
         REAL(wp), DIMENSION(:), INTENT(IN) :: coeff_f
 
-        !> Updated solution
+        ! Updated solution
         REAL(wp), DIMENSION(:), INTENT(OUT) :: qj_rel
 
-        !> Value of the scalar function at x
+        ! Value of the scalar function at x
         REAL(wp), INTENT(OUT) :: scal_f
 
-        !> Residual at the initial point, updated with the accepted step
+        ! Residual at the initial point, updated with the accepted step
         REAL(wp), INTENT(INOUT) :: right_term(n_eqns)
 
-        !> Output quantity check is false on a normal exit
+        ! Output quantity check is false on a normal exit
         LOGICAL, INTENT(OUT) :: check
 
         REAL(wp), INTENT(IN) :: dt_step
