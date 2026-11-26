@@ -4,7 +4,7 @@
 priorities*, not a cumulative commit diary. For authoritative behavior always
 inspect the branch HEAD, source code and the CI outcome for that exact revision.
 
-## Current objective: maintain integrated one- and two-layer execution
+## Current objective: consolidate integrated one- and two-layer execution
 
 Both `N_LAYERS=1` and `N_LAYERS=2` select the standard solver path
 without an environment activation gate. The single-layer path remains
@@ -31,6 +31,26 @@ assumptions. Do not introduce competing implementation plans.
 | Input, output and restart (TL12) | Direct `N_LAYERS=1/2` selection, per-layer input and output, shared-substrate budgets and binary continuation | End-to-end Etna checks include output, restart and OpenMP; no special activation is required. |
 | Functional integration (TL13a) | **Complete**; short two-layer Etna smoke is now standard solver-workflow coverage | [Workflow 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249) passed all four jobs on `7388eeeb7`. |
 | Scientific validity (TL13b) | Formulation retained with documented applicability limits | Inverted density, degenerate equal-density states, excessive shear, coupled spectral behavior and empirical closure calibration are not generally validated. |
+
+## Consolidation scope
+
+The first repository cleanup removes tracked interpreter caches, macOS
+metadata and three N7 stage-observer directories whose executable
+entrypoints had already been retired. Their scientific contracts remain
+named in `TESTS/ACCEPTANCE/acceptance_plan.json` with the status
+`historical_only_pending_current_revalidation`; they are recoverable
+from [the pre-consolidation revision](https://github.com/demichie/IMEX_SfloW2D_dev/tree/6650582fea44ca5bcbeeb73fc5f631ba0e7bd166/TESTS).
+This is **not** new evidence that the missing N7 criteria pass.
+
+Further consolidation must be dependency-complete, not blind deletion.
+In particular, `rheology_newmodel` remains a registered Newton-only
+development fixture: it is referenced by the source catalog, rheology
+dispatch, source configuration, Makefile and active REAL/COMPLEX tests.
+Retiring it requires migrating its quantitative test coverage while
+updating all affected catalog IDs and source masks. Physical laws,
+source ordering and numerical results must remain unchanged.
+The existing unsuffixed single-layer NAMELISTs are intentional input
+contracts and are **not** cleanup targets.
 
 ## Invariants of the integrated solver
 

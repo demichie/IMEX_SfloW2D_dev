@@ -10,10 +10,13 @@ changed by the audit.
 ## Current runnable inventory (25 November 2026)
 
 `acceptance_plan.json` lists only suites with existing `run_test.sh`
-entry points on the current branch. The retired N7 stage-observer packages
-remain available as historical scientific evidence but are **not** run
-against the present Lie timestep architecture. Criteria depending on their
-unreproduced raw-stage measurements are marked
+entry points on the current branch. The retired N7 stage-observer harnesses cannot run against the
+current Lie timestep architecture. Their contracts, checkers and source
+files are preserved in the immutable Git revision
+[6650582](https://github.com/demichie/IMEX_SfloW2D_dev/tree/6650582fea44ca5bcbeeb73fc5f631ba0e7bd166/TESTS);
+they are no longer present as non-executable packages in the active
+`TESTS/` tree. Criteria depending on their unreproduced raw-stage
+measurements remain marked
 `historical_only_pending_current_revalidation`; a passing surviving test
 is reported as `partial_current_coverage`, never full N7 revalidation.
 The live inventory is checked by `test_plan_inventory.py` in the static

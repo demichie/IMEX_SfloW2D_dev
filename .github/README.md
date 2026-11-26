@@ -30,9 +30,11 @@ it depended on retired implementation paths.
 
 Unreferenced D17 programs, the obsolete state-equivalence executable and
 shell drivers requiring the removed IMEX-stage observer have been removed.
-Historical N7 contracts, checkers, reports and completed evidence are retained
-for inspection; they are not counted as executable coverage of the current
-source tree. The active acceptance inventory is validated by
+Historical N7 contracts and checkers remain accessible at
+[the pre-consolidation revision](https://github.com/demichie/IMEX_SfloW2D_dev/tree/6650582fea44ca5bcbeeb73fc5f631ba0e7bd166/TESTS);
+completed evidence and dated acceptance reports remain in `docs/acceptance/`.
+The retired packages are not executable coverage of the current source tree.
+The active acceptance inventory is validated by
 `TESTS/ACCEPTANCE/test_plan_inventory.py`.
 
 Workflows have deliberately narrow permissions: publication workflows
