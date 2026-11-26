@@ -228,7 +228,7 @@ abilitazione in produzione.
 | **TL08–TL11 — Chiusure e scambi** | Blocco 4 verificato nelle Actions strict/optimized | Settling/elutriazione e co-lift con due modalita' sono limitati congiuntamente per inventari lordi e packing finale. I tre fattori (settling, elutriazione, carrier in ALLOW_CONCENTRATED) possono differire. I test esercitano densita' e temperature diverse, specie multiple, trasferimenti opzionali e sequenza massa/drag. Il gate scientifico e gli end-to-end restano TL13. |
 | **TL12 — I/O e integrazione** | Blocco 5 implementato; regressione spaziale/I/O verificata su `7f8189a76` | Cold-start da due file .q_2d, snapshot e raster L2, NetCDF q/qp L1+L2, restart v8 con OU/RNG L2, budget per layer e totale e regressione di round-trip. Il gate produttivo e gli EXAMPLES two-layer rimangono TL13a. |
 | **TL13a — Gate funzionale** | **Completata** su `89a9f2b`: workflow `44712747883` interamente verde | Operatori e workset OR, smoke Etna, conservazione, restart e OpenMP two-layer, integrazione optimized/strict-debug e confronto OpenMP single-layer verificati. Il gate produttivo rimane chiuso fino alla validazione scientifica TL13b. |
-| **TL13b — Validazione scientifica** | **In corso, non approvata** | Le regressioni di fisica e spaziale sono verdi su `d85fabe` (workflow `45771800979`); mancano la conferma integrata strict/optimized/OpenMP sulla revisione finale, la valutazione di benchmark/convergenza e una decisione esplicita sul campo di validita' e sui limiti delle chiusure. Nessun nuovo sottogate. |
+| **TL13b — Validazione scientifica** | **Audit finale completato; approvazione scientifica non concessa** | Verifica tecnica verde: `45771800979` (fisica/stato/spaziale) e `45773582543` (solver strict/optimized, OpenMP, Etna estesa). Non e' validato lo spettro accoppiato con shear e densita' diverse; mancano confronti quantitativi di convergenza e benchmark fisici per le chiusure. Nessun nuovo sottogate. |
 
 **TL07 - collegamento del timestep (17 novembre 2026):** il vecchio arresto
 post-spaziale in `time_integration_2d%advance` e' stato rimosso: lo stesso
@@ -417,18 +417,23 @@ la workflow `Cell physics and numerical regressions`, run
 ha concluso con successo tutti e tre i job: `state`,
 `physical-sources` e `spatial`. Questo include la regressione
 integrata su cinque timestep con deposizione e scambi interlayer e la
-protezione numerica per l'esaurimento della massa solida. La
-workflow `Solver integration and OpenMP validation` non risulta
-eseguita su questo stesso commit; il successo su una revisione
-precedente non sostituisce tale evidenza.
+protezione numerica per l'esaurimento della massa solida.
+Il successivo commit `d2da06cdd2a504bf7b6e4344e99360b430d36481`
+modifica soltanto la validazione Python e la sua copertura di test,
+senza modificare il codice Fortran. Sul commit `d2da06c` la workflow
+[`Solver integration and OpenMP validation`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45773582543)
+ha superato tutti e quattro i job: optimized, strict/debug, confronto
+OpenMP 1/2/4 ed Etna two-layer smoke/extended. Le due esecuzioni
+verificano la stessa revisione del codice numerico Fortran.
 
 **Criteri finali, senza espandere lo scope:**
 
 1. **Correttezza numerica e regressione:** test esistenti di
    conservazione, positivita', wet/dry, BC, geometria e sorgenti
-   superati. Le regressioni di fisica/stato/spaziale sono verificate
-   sul commit corrente; resta il controllo integrato strict/optimized,
-   restart e OpenMP sulla revisione che si intende accettare.
+   superati. Le regressioni di fisica/stato/spaziale e l'integrazione
+   strict/optimized, restart e OpenMP sono verificate sulla stessa
+   revisione Fortran; il controllo tecnico e' completo nel perimetro
+   delle workflow esistenti.
 2. **Validita' delle equazioni accoppiate:** usare le analisi
    dell'iperbolicita' e i test shear gia' disponibili per definire
    esplicitamente gli stati fisicamente ammissibili e i regimi con
@@ -441,12 +446,25 @@ precedente non sostituisce tale evidenza.
    oppure impedimenti. La dissipazione Chézy senza riscaldamento
    e' gia' una limitazione accettata.
 
-**Decisione al 26 novembre:** TL13a completata, TL13b **non ancora
-scientificamente approvata**. Una workflow verde non prova
-l'accuratezza fisica fuori dai casi testati. La chiusura richiede
-la valutazione dei tre criteri sopra e l'approvazione scientifica
-esplicita; non comporta automaticamente l'attivazione di
-`N_LAYERS=2` senza `IMEX_TWO_LAYER_VALIDATION=1`.
+**Audit scientifico conclusivo (26 novembre 2026).**
+
+| Criterio | Evidenza verificata | Giudizio scientifico |
+| --- | --- | --- |
+| Correttezza numerica/integrata | Regresioni stato, sorgenti, spaziale, cinque timestep accoppiati, strict/optimized, restart, OpenMP ed Etna estesa verdi, stessa revisione Fortran | **Soddisfatto nel perimetro dei test**; non implica convergenza rispetto a soluzioni fisiche di riferimento. |
+| Iperbolicita' con shear e densita' differenti | `src/spatial/hyperbolic_2d.f90::eval_total_depth_face_speed_bounds` usa l'inviluppo di velocita' monostrato a profondita' totale; `TEST_SPATIAL_OPERATOR` verifica CFL/equivalenza omogenea e riposo stratificato | **Non dimostrata.** Il codice qualifica esplicitamente il bound come preliminare, non come autovalori del simbolo accoppiato. Non e' possibile approvare in generale i regimi con shear o contrasto di densita'. |
+| Chiusure C1-C3 e C5 | Test locali di composizione elutriata, flussi solidi/carrier, massa/specie/momento/energia, ordine Lie e bilancio a piu' timestep; Etna short/extended | **Coerenza implementativa verificata, validazione fisica non dimostrata.** Non risultano nel dossier confronti quantitativi con benchmark o dati sperimentali, studi di convergenza temporale/spaziale o analisi sistematiche di sensibilita' ai parametri. Il bilancio della traiettoria Etna con entrainment ammette massa esterna non negativa, ma non misura direttamente il flusso integrato di atmosfera. |
+| Drag Chézy C4 | Invarianza del momento, energia cinetica non crescente, energia termica invariata | **Limitazione fisica accettata:** la dissipazione meccanica non diventa calore. Non riaprire la scelta. |
+
+**Decisione:** TL13a e la verifica tecnica di TL13b sono completate.
+**TL13b non supera il gate di approvazione scientifica generale** per
+insufficiente evidenza sullo spettro accoppiato e sulla validazione delle
+chiusure; questo e' un limite documentato delle prove disponibili,
+non la dimostrazione di instabilita' fisica o di un errore del solver.
+Non e' giustificato ne' abilitare il two-layer produttivo ne'
+modificare automaticamente la fisica. `N_LAYERS=2` conserva il gate
+`IMEX_TWO_LAYER_VALIDATION=1`. I dossier TL13b-A/B/C non diventano
+nuove fasi; eventuali future indagini richiedono una decisione
+scientifica esplicita sul campo di applicabilita' desiderato.
 
 ## 4. Verifica e questioni scientifiche aperte
 

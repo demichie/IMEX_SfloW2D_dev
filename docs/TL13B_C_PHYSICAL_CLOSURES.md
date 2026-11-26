@@ -259,8 +259,17 @@ This is separate from TL13b-A hyperbolicity and TL13b-B spatial
 positivity and does **not** authorize removing
 `IMEX_TWO_LAYER_VALIDATION=1`.
 
-The last verified solver-integration Action currently predates the
-dynamic co-lift change. The new C2/C3/C5 regression extensions have
-passed only source-level static checks; they have **not** yet been
-compiled or executed in strict or optimized modes. No claim of
-scientific acceptance is made.
+**Evidence update (26 November 2026).** The cell-physics and spatial
+regressions passed on Fortran revision `d85fabe` (run
+[`45771800979`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45771800979)).
+The complete solver integration, optimized/strict-debug, restart,
+OpenMP 1/2/4 and Etna two-layer smoke/extended checks passed on
+`d2da06c` (run
+[`45773582543`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45773582543)),
+which changed only Python validation code and tests after the Fortran
+revision. This closes the *specified functional/numerical CI evidence*;
+it does not establish a coupled eigensystem with shear, a grid/time
+convergence result, external-air flux closure against a measured
+source integral, or empirical validation of C1-C3/C5. C4 remains an
+accepted no-heating limitation. TL13b is not scientifically approved;
+the two-layer production gate remains closed.
