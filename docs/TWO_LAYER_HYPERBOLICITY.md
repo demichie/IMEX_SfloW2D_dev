@@ -1,9 +1,10 @@
 # Two-layer hyperbolicity: characteristic limits and acceptance
 
-**Status (26 November 2026):** the present formulation is accepted as an
-**explicitly limited experimental/research model**, not as a generally
-hyperbolic or fully physically validated model. This document makes no
-change to the governing equations, CFL, sources or validation gate.
+**Status (26 November 2026):** the integrated two-layer formulation is
+available for research simulations within its **explicit scientific
+applicability limits**. It is not a generally hyperbolic or fully
+empirically validated physical model. This analysis does not modify
+the governing equations, CFL or source closures.
 
 ## 1. Scope and implemented operators
 
@@ -192,7 +193,7 @@ certify hyperbolicity.
 
 ## 6. Limited scientific acceptance
 
-**Accepted for experimental use:** the current two-layer equations,
+**Available for research use within the stated limits:** the current two-layer equations,
 the existing total-depth CFL estimate, both implemented elutriation
 composition options (`-1`: local L1 donor fraction; positive:
 prescribed lifted fraction), and the existing source-group

@@ -71,13 +71,14 @@ CONTAINS
     !> @brief Estimate a shared two-layer wave envelope using the total depth.
     !> @details Each physically present layer uses the existing single-layer
     !> local-speed kernel with h=h1+h2. This reproduces single-layer speeds
-    !> for equal material and velocity. It is a preliminary envelope, NOT a
-    !> validated coupled eigensystem for shear or unequal density.
+    !> for equal material and velocity. It encloses real gravity-wave speeds
+    !> only under the stable-density assumptions of docs/TWO_LAYER_HYPERBOLICITY.md.
+    !> It does not compute the coupled eigensystem or test hyperbolicity.
     !> @param[in] q1_left,q2_left Primitive L1/L2 traces on the negative side.
     !> @param[in] q1_right,q2_right Primitive L1/L2 traces on the positive side.
     !> @param[in] metric Large-slope gravity factor at the shared face.
     !> @param[in] normal Normal velocity index (idx_u or idx_v).
-    !> @param[out] a_minus,a_plus Common preliminary wave bounds.
+    !> @param[out] a_minus,a_plus Shared wave bounds, not a hyperbolicity test.
     !> @param[in] q1_left q1 left argument of eval_total_depth_face_speed_bounds.
     !> @param[in] q2_left q2 left argument of eval_total_depth_face_speed_bounds.
     !> @param[in] q1_right q1 right argument of eval_total_depth_face_speed_bounds.
@@ -133,8 +134,8 @@ CONTAINS
 
     !> @brief Populate canonical face-speed storage using the total-depth envelope.
     !> @details Both reconstruction workspaces must be current on the shared OR
-    !> face workset. The single-layer speed path is unchanged. These bounds
-    !> remain preliminary pending a coupled hyperbolicity analysis.
+    !> face workset. The single-layer speed path is unchanged. See
+    !> docs/TWO_LAYER_HYPERBOLICITY.md for the conditional bound analysis.
     !> @param[in,out] this Existing HP-PCCU face-speed workspace.
     !> @param[in] lower,upper Prepared reconstructed layer traces.
     !> @param[in] nxfaces,nyfaces Numbers of active x/y faces.
@@ -199,8 +200,8 @@ CONTAINS
     END SUBROUTINE eval_total_depth_speeds
 
     !> @brief Accumulate coupled interlayer face and within-cell pressure in both residuals.
-    !> @details Reuses the common pressure kernel and requires validated coupled
-    !> wave bounds on the shared OR workset. Subtract within-cell paths with
+    !> @details Reuses the common pressure kernel and shared total-depth face-speed
+    !> envelope on the OR workset. Subtract within-cell paths with
     !> the exact Gamma2 selected by the existing L2 hydrostatic cell kernel.
     !> @param[in] l1,l2 Reconstructed layer traces on the shared workset.
     !> @param[in] hp2 Upper-layer pressure coefficients from the same traces.
@@ -210,7 +211,7 @@ CONTAINS
     !> @param[in] qp2 Upper-layer primitive state for dry-cell treatment.
     !> @param[in] nx,ny Shared face counts by Cartesian direction.
     !> @param[in] jx,kx,jy,ky Shared compact face coordinates.
-    !> @param[in] axn,axp,ayn,ayp Validated coupled face-speed bounds.
+    !> @param[in] axn,axp,ayn,ayp Shared total-depth face-speed bounds.
     !> @param[in] l1 l1 argument of add_interlayer_terms.
     !> @param[in] l2 l2 argument of add_interlayer_terms.
     !> @param[in,out] r1 r1 argument of add_interlayer_terms.
