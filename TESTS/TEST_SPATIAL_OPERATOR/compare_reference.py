@@ -327,8 +327,9 @@ def main():
                     tail = "\n".join(lines[-90:])
                     raise AssertionError(
                         f"{tag}, threads={threads}: exit {run.returncode}; full log: {log_path}\n"
-                        f"INTERLAYER FAILURE WITNESS:\n{detail or '(no TL07 witness found)'}\n"
-                        f"LAST 90 LOG LINES:\n{tail}"
+                        f"LAST 90 LOG LINES:\n{tail}\n"
+                        f"INTERLAYER FAILURE WITNESS (diagnostic values):\n"
+                        f"{detail or '(no TL07 witness found)'}"
                     )
                 paths.append(directory/"result.bin")
                 record = compare(read_payload(paths[-1]), q, vertices, bed, params, name)
