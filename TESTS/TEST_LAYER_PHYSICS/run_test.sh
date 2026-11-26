@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
+build_dir=$(mktemp -d /tmp/imex-layer-physics.XXXXXX)
+trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
+cd "$build_dir"
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/numerics/source_catalog_2d.f90" \
+    "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
+    "$repo_dir/src/core/constitutive_parameters_2d.f90" \
+    "$repo_dir/src/physics/thermal_laws/thermal_parameters_2d.f90" \
+    "$repo_dir/src/physics/pore_pressure/pore_pressure_parameters_2d.f90" \
+    "$repo_dir/src/physics/mass_exchange/mass_exchange_parameters_2d.f90" \
+    "$repo_dir/src/core/layer_physics_2d.f90" \
+    "$test_dir/test_layer_physics.f90" -o test_layer_physics
+./test_layer_physics
+
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
+    "$test_dir/test_rheology_config_namelist.f90" -o test_rheology_config_namelist
+./test_rheology_config_namelist
+
+# The substrate input has one scalar derived object plus an allocatable class array.
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/physics/substrate/substrate_parameters_2d.f90" \
+    "$test_dir/test_substrate_config_namelist.f90" -o test_substrate_config_namelist
+./test_substrate_config_namelist
+
+# Shared solid species and packing are owned by the canonical material module.
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/core/solid_transport_parameters_2d.f90" \
+    "$test_dir/test_solid_transport_namelist.f90" -o test_solid_transport_namelist
+./test_solid_transport_namelist
+
+# The interlayer modules use diagnostics_2d, whose fatal_error needs the OpenMP runtime.
+# Link the isolated NAMELIST fixture with the same OpenMP support as production.
+gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace -fopenmp \
+    "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/physics/mass_exchange/mass_exchange_parameters_2d.f90" \
+    "$repo_dir/src/physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.f90" \
+    "$repo_dir/src/core/diagnostics_2d.f90" \
+    "$repo_dir/src/physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.f90" \
+    "$repo_dir/src/physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.f90" \
+    "$repo_dir/src/numerics/source_input_2d.f90" \
+    "$test_dir/test_mass_exchange_namelist_alias.f90" -o test_mass_exchange_namelist_alias
+./test_mass_exchange_namelist_alias

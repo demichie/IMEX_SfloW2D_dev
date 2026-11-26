@@ -36,7 +36,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_kt_reference.py"
 OMP_NUM_THREADS=${IMEX_AUDIT_FORCE_THREADS:-${OMP_NUM_THREADS:-1}}
 OMP_DYNAMIC=FALSE
 export OMP_NUM_THREADS OMP_DYNAMIC
-python3 "$test_dir/build_dt_observer.py" "$executable" "$work_dir/observer-build" "$repo_dir"
+python3 "$test_dir/build_dt_observer.py" "$executable" "$work_dir/observer-build" "$repo_dir" --include-states
 observer="$work_dir/observer-build/observe_accepted_times"
 
 failed=0
@@ -56,6 +56,11 @@ do
         if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_fields.py" "$case_dir" "$mode"; then
             failed=1
         fi
+        # Every accepted step is required to agree from the same Fortran state.
+        if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/diagnose_trajectory.py" \
+            "$case_dir" "$mode"; then
+            failed=1
+        fi
         if ! python3 "$test_dir/analyze_case.py" "$case_dir" "$mode" "$reference"; then
             failed=1
         fi
@@ -63,9 +68,9 @@ do
 done
 
 if [ "$failed" -ne 0 ]; then
-    echo "FAIL: Gate-H full-field evidence retained for every completed grid/mode" >&2
+    echo "FAIL: Gate-H same-input operator or physical invariants" >&2
     exit "$failed"
 fi
 
 echo "PASS: Gate-H G=1 and slope-plus-curvature excavation refinements"
-echo "      match the current KT-PYTHON reference fields and mass budget"
+echo "      match KT-PYTHON per-step operators and physical mass budget"

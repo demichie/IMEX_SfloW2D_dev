@@ -151,7 +151,7 @@ class NetCDF:
 
 
 def checkpoint(path):
-    """Decode GNU Fortran little-endian sequential records, explicitly scoped."""
+    """Decode the sole canonical GNU Fortran sequential checkpoint layout."""
     records = []
     with path.open('rb') as stream:
         while marker := stream.read(4):
@@ -161,21 +161,19 @@ def checkpoint(path):
             record = stream.read(length)
             assert len(record) == length and stream.read(4) == marker
             records.append(record)
-    assert records[0] == b'IMEX_SFLOW2D_RST'
-    version = struct.unpack('<i', records[1])[0]
-    assert version in (4, 5)
-    dims = struct.unpack('<9i', records[2])
-    nx, ny, nv, ns, ng, nz, npore, nth, npress = dims
-    state = np.frombuffer(records[6], '<f8').reshape((nv, nx, ny), order='F')
-    bed = np.frombuffer(records[7], '<f8').reshape((nx+1, ny+1), order='F')
+    assert records[0].rstrip() == b'IMEX_LAYER_CKPT'
+    dims = struct.unpack('<10i', records[1])
+    nx, ny, nv, ns, ng, nz, npore, nth, npress, nlayers = dims
+    state = np.frombuffer(records[5], '<f8').reshape((nv, nlayers, nx, ny), order='F')
+    bed = np.frombuffer(records[6], '<f8').reshape((nx+1, ny+1), order='F')
     assert np.isfinite(state).all() and np.isfinite(bed).all()
     assert state[0].min() >= 0
-    return {'magic': records[0].decode().rstrip(), 'version': version,
-            'layout': list(dims), 'model_flags': list(struct.unpack('<2i', records[3])),
-            'time_state': list(struct.unpack('<4d', records[4])),
+    return {'magic': records[0].decode().rstrip(),
+            'layout': list(dims), 'model_flags': list(struct.unpack('<5i', records[2])),
+            'time_state': list(struct.unpack('<4d', records[3])),
             'records': len(records), 'sha256': digest(path),
-            'conservative_sha256': hashlib.sha256(records[6]).hexdigest(),
-            'nodal_bed_sha256': hashlib.sha256(records[7]).hexdigest()}, state
+            'conservative_sha256': hashlib.sha256(records[5]).hexdigest(),
+            'nodal_bed_sha256': hashlib.sha256(records[6]).hexdigest()}, state
 
 
 def diagnostic_csv(path):
@@ -213,7 +211,16 @@ def diagnostic_comparison(full, resumed, run_name):
 
 def observations(fields, metadata, restart, case):
     """Check native physical schema and observe budgets without new tolerances."""
-    times, h = fields['time'], fields['h']
+    times = fields['time']
+    # Native NetCDF contains scalar (time,y,x) physical fields.
+    h = fields['h']
+    density = np.zeros_like(h)
+    wet_density = h > 1.e-10
+    density[wet_density] = fields['rho_m'][wet_density]
+    solid_fraction = np.zeros_like(h)
+    if 'solid_fraction' in fields:
+        solid_fraction[wet_density] = fields['solid_fraction'][wet_density]
+    temperature = fields['T']
     end, interval = (200, 5) if case == 'ETNA' else (3600, 60)
     assert np.array_equal(times, np.arange(0, end+1, interval))
     assert np.array_equal(fields['x'], 499813+(np.arange(250)+.5)*10)
@@ -221,23 +228,26 @@ def observations(fields, metadata, restart, case):
     for name, values in fields.items():
         assert np.isfinite(values).all() and not np.any(values == 9.969209968386869e36), name
         assert metadata[name]['nc_type'] == 6, (name, 'not NC_DOUBLE')
-        expected = [name] if name in ('x', 'y', 'time') else ['time', 'y', 'x']
+        if name in ('x','y','time'):
+            expected = [name]
+        else:
+            expected = ['time','y','x']
         assert metadata[name]['dimensions'] == expected, name
         assert metadata[name]['long_name'], name
-    for name, unit in [('h', 'meters'), ('b', 'meters'), ('eta', 'meters'),
-                       ('T', 'kelvin'), ('u', 'meters/seconds'), ('v', 'meters/seconds'),
-                       ('w', 'meters/seconds'), ('rhomix', 'kg/m3')]:
+    for name, unit in [('b','meters'),('h_total','meters'),('eta_top','meters'),
+                       ('mass_total','kg/m2')]:
         assert metadata[name]['units'] == unit, (name, metadata[name])
+    assert not any(name in fields for name in ('q_layers','qp_layers'))
     assert h.min() >= 0
     assert np.array_equal(fields['b'], np.broadcast_to(fields['b'][0], h.shape))
-    eta_error = float(np.max(np.abs(fields['eta']-(fields['b']+h))))
+    eta_error = float(np.max(np.abs(fields['eta_top']-(fields['b']+h))))
     # Existing field-roundoff multiplier, not a changed solver/test limit.
-    assert eta_error <= 8192*np.finfo(float).eps*max(1., float(np.max(np.abs(fields['eta']))))
+    assert eta_error <= 8192*np.finfo(float).eps*max(1., float(np.max(np.abs(fields['eta_top']))))
     volume = 100*np.sum(h, axis=(1,2))
     # The native output intentionally zeroes density/composition below dry
     # depth, not conservative mass. Pure liquid has constant density, so h
     # alone retains its entire inventory, including positive dry residues.
-    masked_mass = 100*np.sum(h*fields['rhomix'], axis=(1,2))
+    masked_mass = 100*np.sum(h*density, axis=(1,2))
     mass = 2600*volume if case == 'ETNA_LAVA' else masked_mass
     edge = np.maximum(np.max(h[:,(0,-1),:], axis=(1,2)),
                       np.max(h[:,:,(0,-1)], axis=(1,2)))
@@ -268,44 +278,46 @@ def observations(fields, metadata, restart, case):
         assert times[stop-1] == 3180 and times[stop] == 3240
     else:
         residual = mass[:stop]-mass[0]
-        solid = 100*np.sum(h*fields['solid_frac_01']*2000, axis=(1,2))
+        solid = 100*np.sum(h*solid_fraction*2000, axis=(1,2))
         budget.update(mass_residual_kg=residual.tolist(),
                       max_abs_mass_residual_kg=float(np.max(np.abs(residual))),
                       max_scaled_mass_residual=float(np.max(np.abs(residual))/mass[0]),
                       max_abs_solid_mass_residual_kg=float(np.max(np.abs(solid[:stop]-solid[0]))),
                       volume_conservation_required=False,
                       volume_note='Gas density depends on T; mixture volume is not the conservative mass.',
-                      intermediate_mass_note='Native rhomix and solid fractions exclude dry-depth residuals; these intermediate sums are observations, not the conservative budget gate.')
-    info, q = checkpoint(restart)
+                      intermediate_mass_note='Derived density and solid fractions exclude dry-depth residuals; these intermediate sums are observations, not the conservative budget gate.')
+    info, checkpoint_state = checkpoint(restart)
     expected_nv, expected_ns = (5, 1) if case == 'ETNA' else (4, 0)
     assert info['layout'][:7] == [250, 150, expected_nv, expected_ns, 0, 0, 0]
-    assert info['model_flags'] == [0,0] and info['time_state'][0] == end
-    final_mass = 100*np.sum(q[0])
+    assert info['model_flags'][:2] == [0,0] and info['time_state'][0] == end
+    final_mass = 100*np.sum(checkpoint_state[0,0])
     wet = h[-1] > 1.e-10
     dry = ~wet
-    assert np.all(fields['rhomix'][-1][dry] == 0)
+    assert np.all(density[-1][dry] == 0)
     if case == 'ETNA':
-        assert np.all(fields['solid_frac_01'][-1][dry] == 0)
+        assert np.all(solid_fraction[-1][dry] == 0)
         # Initial ETNA data are either exactly empty or safely above the dry
         # cutoff, so its initial native sum contains the whole initial mass.
         assert np.min(h[0][h[0] > 0]) > 1.e-10
-        initial_solid = 100*np.sum(h[0]*fields['solid_frac_01'][0]*2000)
+        initial_solid = 100*np.sum(h[0]*solid_fraction[0]*2000)
         budget.update(conservative_endpoint_initial_mass_kg=float(mass[0]),
                       conservative_endpoint_final_mass_kg=float(final_mass),
                       conservative_endpoint_mass_residual_kg=float(final_mass-mass[0]),
-                      conservative_endpoint_solid_mass_residual_kg=float(100*np.sum(q[4])-initial_solid),
-                      final_retained_dry_mass_kg=float(100*np.sum(q[0].T[dry])),
+                      conservative_endpoint_solid_mass_residual_kg=float(100*np.sum(checkpoint_state[4,0])-initial_solid),
+                      final_retained_dry_mass_kg=float(100*np.sum(checkpoint_state[0,0].T[dry])),
                       conservative_endpoint_scope='t=0 native fields (no positive dry cells) versus full raw conservative checkpoint at t=200; no boundary contact in all saved outputs')
-    decoded_mass_error = float(np.max(np.abs(q[0].T-h[-1]*fields['rhomix'][-1])[wet]))
-    thermal_capacity = q[0]*1150 if case == 'ETNA_LAVA' else q[4]*1617+(q[0]-q[4])*998
-    thermal_error = float(np.max(np.abs(q[3].T-thermal_capacity.T*fields['T'][-1])))
-    scale_mass = max(1., float(np.max(np.abs(q[0]))))
-    scale_thermal = max(1., float(np.max(np.abs(q[3]))))
+    decoded_mass_error = float(np.max(np.abs(checkpoint_state[0,0].T-h[-1]*density[-1])[wet]))
+    thermal_capacity = (checkpoint_state[0,0]*1150 if case == 'ETNA_LAVA' else
+                        checkpoint_state[4,0]*1617+
+                        (checkpoint_state[0,0]-checkpoint_state[4,0])*998)
+    thermal_error = float(np.max(np.abs(checkpoint_state[3,0].T-thermal_capacity.T*temperature[-1])))
+    scale_mass = max(1., float(np.max(np.abs(checkpoint_state[0,0]))))
+    scale_thermal = max(1., float(np.max(np.abs(checkpoint_state[3,0]))))
     assert decoded_mass_error <= 8192*np.finfo(float).eps*scale_mass
     assert thermal_error <= 8192*np.finfo(float).eps*scale_thermal
     if case == 'ETNA':
-        component_error = float(np.max(np.abs(q[4].T-h[-1]*fields['solid_frac_01'][-1]*2000)[wet]))
-        assert component_error <= 8192*np.finfo(float).eps*max(1,float(q[4].max()))
+        component_error = float(np.max(np.abs(checkpoint_state[4,0].T-h[-1]*solid_fraction[-1]*2000)[wet]))
+        assert component_error <= 8192*np.finfo(float).eps*max(1,float(checkpoint_state[4,0].max()))
     else:
         component_error = None
     return {'snapshots': len(times), 'variables': len(fields), 'metadata': metadata,
@@ -313,7 +325,7 @@ def observations(fields, metadata, restart, case):
             'eta_identity_Linf_m': eta_error, 'checkpoint': info, 'budget': budget,
             'final_volume_m3': float(volume[-1]), 'final_mass_kg': float(final_mass),
             'checkpoint_physical_mass_Linf_kg_m2': decoded_mass_error,
-            'checkpoint_physical_mass_scope': 'wet cells only; native dry density and fractions are zero by existing schema',
+            'checkpoint_physical_mass_scope': 'wet cells only; derived dry density and fractions are zero by definition',
             'checkpoint_thermal_energy_Linf_J_m2': thermal_error,
             'checkpoint_solid_mass_Linf_kg_m2': component_error}
 

@@ -6,7 +6,7 @@ OpenMP teams. The production change is confined to `geometry_2d.f90`: correct
 the missing y-directed 1D fit and safely handle short lines and a single cell.
 Fluxes, thermodynamic laws, IMEX tableaux and CFL policy are unchanged.
 
-The [evidence index](results_n7_b_2026_10_10.json) records frozen contracts,
+The [evidence index](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n7_b_2026_10_10.json) records frozen contracts,
 source/test hashes, independent comparisons, retained failures and the complete
 acceptance audit. The base revision is `a8148e4e`, after the stationary-roundoff
 correction. N7 remains open for N7-C, N7-D and D-N7-CFL; N8 stays satisfied and

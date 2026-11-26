@@ -7,18 +7,31 @@
 
 MODULE lie_source_executor_2d
     USE diagnostics_2d, ONLY : fatal_error
+    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+    USE thermal_parameters_2d, ONLY : thermal_config_type
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE rheology_2d, ONLY : limit_rheology_momentum_reversal
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange
+    USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
+    USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
+        apply_interlayer_momentum_exchange_analytic
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
-        idx_solidEqn_first, idx_solidEqn_last
+        idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
     USE domain_2d, ONLY : domain_type
-    USE source_registry_2d, ONLY : source_registry_type, source_group_type
+    USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2,       &
+        SOURCE_SCOPE_INTERLAYER
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
-        SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION
+        SOURCE_ID_EXCHANGE_LAVA_DEPOSITION, SOURCE_ID_EXCHANGE_VAPORIZATION, RHEOLOGY_ID_MUI
     USE state_fields, ONLY : state_type
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                               &
         initialize_physical_state_real, initialize_physical_state_complex
     USE mass_exchange_2d, ONLY : mass_exchange_scratch_type
     USE mass_injection_coefficients_2d, ONLY : injection_material_set_type,prepare_injection_materials
+    USE layer_contacts_2d, ONLY : layer_contacts_type,evaluate_layer_contacts
+    USE parameters_2d, ONLY : n_layers
 
     IMPLICIT NONE
 
@@ -38,8 +51,10 @@ MODULE lie_source_executor_2d
     TYPE :: lie_source_executor_type
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
-        TYPE(source_group_type), ALLOCATABLE :: non_exchange_groups(:)
+        INTEGER, ALLOCATABLE :: non_exchange_mask(:) !< Resolved non-exchange source bits per Lie group.
         TYPE(physical_state_real), ALLOCATABLE :: source_physical_scratch(:)
+        ! Four reusable cell-local physical records per worker for paired sources.
+        TYPE(physical_state_real), ALLOCATABLE :: interlayer_physical_scratch(:,:)
         ! Per-worker complex-step workspace persists across cells and timesteps.
         TYPE(physical_state_complex), ALLOCATABLE :: source_complex_scratch(:)
         TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
@@ -56,12 +71,16 @@ MODULE lie_source_executor_2d
         REAL(wp), ALLOCATABLE :: injection_mass(:),injection_solids(:),pre_buoyancy_mass(:)
         REAL(wp), ALLOCATABLE :: pre_buoyancy_solids(:),buoyancy_reduced_gravity(:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
-        REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
+        REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:)
+        ! Previous step's nonzero bed-rate coordinates: avoid a full-grid reset.
+        INTEGER, ALLOCATABLE :: bed_dirty_j(:),bed_dirty_k(:)
+        INTEGER :: bed_dirty_count=0
     END TYPE lie_source_executor_type
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
     REAL(wp), SAVE :: profile_cell_sweep=0.0_wp,profile_final_commit=0.0_wp
-    REAL(wp), SAVE :: profile_thread_cell=0.0_wp
+    ! Optional per-cell timers also characterize the slowest worker on each sweep.
+    REAL(wp), SAVE :: profile_thread_cell=0.0_wp,profile_cell_balance_capacity=0.0_wp
 
 CONTAINS
 
@@ -71,8 +90,7 @@ CONTAINS
     !> @param[in] source_registry Validated ordered physical-source groups.
     SUBROUTINE initialize_lie_source_executor(executor,source_registry)
         USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON
-        USE parameters_2d, ONLY : topo_change_flag
-        USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
+        USE substrate_parameters_2d, ONLY : substrate
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         TYPE(source_registry_type), INTENT(IN) :: source_registry
         INTEGER :: group_index,env_status,parse_status,ncells,source_id
@@ -82,11 +100,17 @@ CONTAINS
         IF (executor%initialized) CALL fatal_error('Lie source executor already initialized')
         ! Cache the groups and classify their methods once per simulation.
         executor%groups=source_registry%groups()
+        ! Reject a group that cannot address an allocated layer state.
+        IF (ANY(executor%groups%scope==SOURCE_SCOPE_L2) .AND. n_layers<2) &
+            CALL fatal_error('TL07: Lie source group addresses an inactive layer')
+        IF (ANY(executor%groups%scope==SOURCE_SCOPE_INTERLAYER) .AND. n_layers/=2) &
+            CALL fatal_error('TL07: INTERLAYER groups require two allocated layers')
         ALLOCATE(executor%exchange_group(SIZE(executor%groups)),                                                       &
             executor%dry_noop_group(SIZE(executor%groups)),                                                           &
-            executor%non_exchange_groups(SIZE(executor%groups)))
+            executor%non_exchange_mask(SIZE(executor%groups)))
         executor%exchange_group=.FALSE.
         executor%dry_noop_group=.FALSE.
+        executor%non_exchange_mask=0
         DO group_index=1,SIZE(executor%groups)
             IF (.NOT.ALLOCATED(executor%groups(group_index)%source_names))                                        &
                 CALL fatal_error('D20: Lie source group has no allocated source list')
@@ -97,22 +121,16 @@ CONTAINS
             CASE DEFAULT
                 CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
             END SELECT
-            IF (ANY(executor%groups(group_index)%source_names=='pore_pressure_dissipation')                            &
-                .OR. ANY(executor%groups(group_index)%source_names=='pore_pressure_darcy')) THEN
-                IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR. TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
-                    IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
-                END IF
-            END IF
-            ! Resolved catalogue IDs 18:23 are all mass-exchange processes.
+            ! The contiguous catalogue range from lava deposition to vaporization is mass exchange.
             executor%exchange_group(group_index)=                                                                      &
                 IAND(executor%groups(group_index)%source_mask,                                                        &
                 ISHFT(IBITS(NOT(0),0,SOURCE_ID_EXCHANGE_VAPORIZATION-SOURCE_ID_EXCHANGE_LAVA_DEPOSITION+1),           &
                 SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1))/=0
-            executor%non_exchange_groups(group_index)=executor%groups(group_index)
+            executor%non_exchange_mask(group_index)=executor%groups(group_index)%source_mask
             IF (executor%exchange_group(group_index)) THEN
                 DO source_id=SOURCE_ID_EXCHANGE_LAVA_DEPOSITION,SOURCE_ID_EXCHANGE_VAPORIZATION
-                    executor%non_exchange_groups(group_index)%source_mask=                                            &
-                        IBCLR(executor%non_exchange_groups(group_index)%source_mask,source_id-1)
+                    executor%non_exchange_mask(group_index)=                                                       &
+                        IBCLR(executor%non_exchange_mask(group_index),source_id-1)
                 END DO
             END IF
             executor%dry_noop_group(group_index)=                                                                     &
@@ -123,13 +141,13 @@ CONTAINS
                 IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                   &
                     CALL fatal_error('D19: mass exchange requires explicit group method')
                 executor%has_exchange_group=.TRUE.
-                IF (topo_change_flag) executor%bed_group_id=executor%groups(group_index)%id
+                IF (substrate%topo_change_flag) executor%bed_group_id=executor%groups(group_index)%id
             END IF
             IF (executor%groups(group_index)%method==SOURCE_METHOD_NEWTON) executor%has_newton_group=.TRUE.
         END DO
         executor%all_groups_dry_noop=ALL(executor%dry_noop_group .OR.                                   &
             [(SIZE(executor%groups(group_index)%source_names)==0,group_index=1,SIZE(executor%groups))])
-        executor%has_bed_group=executor%has_exchange_group .AND. topo_change_flag
+        executor%has_bed_group=executor%has_exchange_group .AND. substrate%topo_change_flag
         ! Read diagnostic and D20 test settings only at startup.
         env_value=''
         CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_DIAGNOSTICS',env_value)
@@ -163,8 +181,9 @@ CONTAINS
             .AND. executor%has_newton_group) ALLOCATE(executor%newton_iterations(ncells,SIZE(executor%groups)))
         IF (executor%has_bed_group) THEN
             ALLOCATE(executor%bed_rate_cell(comp_cells_x,comp_cells_y))
-            ALLOCATE(executor%bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
-            ALLOCATE(executor%bed_candidate(comp_interfaces_x,comp_interfaces_y))
+            ALLOCATE(executor%bed_dirty_j(ncells),executor%bed_dirty_k(ncells))
+            executor%bed_rate_cell=0.0_wp
+            executor%bed_dirty_count=0
         END IF
         IF (.NOT.profiling_initialized) THEN
             env_value=''
@@ -189,8 +208,9 @@ CONTAINS
         IF (ALLOCATED(executor%groups)) DEALLOCATE(executor%groups)
         IF (ALLOCATED(executor%exchange_group)) DEALLOCATE(executor%exchange_group)
         IF (ALLOCATED(executor%dry_noop_group)) DEALLOCATE(executor%dry_noop_group)
-        IF (ALLOCATED(executor%non_exchange_groups)) DEALLOCATE(executor%non_exchange_groups)
+        IF (ALLOCATED(executor%non_exchange_mask)) DEALLOCATE(executor%non_exchange_mask)
         IF (ALLOCATED(executor%source_physical_scratch)) DEALLOCATE(executor%source_physical_scratch)
+        IF (ALLOCATED(executor%interlayer_physical_scratch)) DEALLOCATE(executor%interlayer_physical_scratch)
         IF (ALLOCATED(executor%source_complex_scratch)) DEALLOCATE(executor%source_complex_scratch)
         IF (ALLOCATED(executor%source_exchange_scratch)) DEALLOCATE(executor%source_exchange_scratch)
         IF (ALLOCATED(executor%source_transfers)) DEALLOCATE(executor%source_transfers)
@@ -210,8 +230,9 @@ CONTAINS
         IF (ALLOCATED(executor%buoyancy_reduced_gravity)) DEALLOCATE(executor%buoyancy_reduced_gravity)
         IF (ALLOCATED(executor%newton_iterations)) DEALLOCATE(executor%newton_iterations)
         IF (ALLOCATED(executor%bed_rate_cell)) DEALLOCATE(executor%bed_rate_cell)
-        IF (ALLOCATED(executor%bed_rate_vertex)) DEALLOCATE(executor%bed_rate_vertex)
-        IF (ALLOCATED(executor%bed_candidate)) DEALLOCATE(executor%bed_candidate)
+        IF (ALLOCATED(executor%bed_dirty_j)) DEALLOCATE(executor%bed_dirty_j)
+        IF (ALLOCATED(executor%bed_dirty_k)) DEALLOCATE(executor%bed_dirty_k)
+        executor%bed_dirty_count=0
         executor%has_exchange_group=.FALSE.
         executor%has_bed_group=.FALSE.
         executor%has_newton_group=.FALSE.
@@ -228,11 +249,11 @@ CONTAINS
     !> @details Each OpenMP iteration processes one cell and visits the groups
     !>          sequentially. Group zero reads the pre-spatial snapshot while
     !>          incrementing the post-spatial trial state. Geometry remains
-    !>          frozen until all cells succeed; failure triggers caller rollback.
+    !>          frozen until all cells succeed; failure is fatal to the caller.
     !> @param[in,out] executor Configured Lie groups and reusable work arrays.
     !> @param[in,out] state Owns substrate inventories and aggregate fields.
-    !> @param[in,out] q Conservative cell states (component,x-cell,y-cell).
-    !> @param[in,out] qp Primitive cell states (component,x-cell,y-cell).
+    !> @param[in,out] q Conservative candidates (component,layer,x-cell,y-cell).
+    !> @param[in,out] qp Primitive candidates (component,layer,x-cell,y-cell).
     !> @param[in] time_step Positive Lie substep duration [s].
     !> @param[in] domain Active cell list and per-cell coordinate lookup.
     !> @param[in] stochastic_values Optional stochastic cell samples.
@@ -241,10 +262,20 @@ CONTAINS
     !> @param[in] qp_original Pre-spatial primitive snapshot (read-only).
     !> @param[out] step_failed True when candidate group state is rejected.
     !> @param[out] failure_message Optional diagnostic describing rejected group.
+    !> @param[in] thermal Immutable thermal configurations indexed by layer.
+    !> @param[in] rheology Immutable rheology configurations indexed by layer.
+    !> @param[in] pore_pressure Immutable Darcy configurations indexed by layer.
+    !> @param[in] pore_cache Derived Pascal coefficients indexed by layer.
+    !> @param[in] mass_config Immutable mass-exchange closures indexed by layer.
+    !> @param[in] transport_stochastic Layer-specific stochastic transport switches.
+    !> @param[in] pore_enabled Layer-specific pore pressure switches.
+    !> @param[in] stochastic_enabled Layer-specific stochastic rheology switches.
+    !> @param[in] stochastic_values_l2 Optional independent upper-layer effective OU field.
     SUBROUTINE execute_lie_source_groups(executor,state,q,qp,time_step,domain,stochastic_values,                       &
-        step_start_time,q_original,qp_original,step_failed,failure_message)
+        step_start_time,q_original,qp_original,step_failed,failure_message,thermal,rheology,pore_pressure,pore_cache, &
+        mass_config,transport_stochastic,pore_enabled,stochastic_enabled,stochastic_values_l2)
         USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, B_second_xy_geom,                    &
-            B_second_yy_geom, grav_coeff, project_cell_field_to_vertices, assign_topography_vertices, B_vertex,        &
+            B_second_yy_geom, grav_coeff, apply_local_bed_rate, B_vertex,        &
             B_zone, cell_source_fractions, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, cell_arc_n_y, dx,     &
             dy
         USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, eval_source_analytic,source_cell_context_type
@@ -254,31 +285,49 @@ CONTAINS
         USE state_conversions, ONLY : conservative_to_primitive
         USE state_fields, ONLY : initialize_dry_physical_cell,physical_cell_state_finite,finite_real_value
         USE state_composition, ONLY : conservative_mass_admissible
-        USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag,sea_mass_removal_flag,idx_h
+        USE parameters_2d, ONLY : sea_mass_removal_flag,idx_h
+        USE parameters_2d, ONLY : idx_uEqn,idx_vEqn
+        USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+        USE substrate_parameters_2d, ONLY : substrate
         !$ USE omp_lib, ONLY : omp_get_max_threads,omp_get_thread_num
         TYPE(lie_source_executor_type), INTENT(INOUT) :: executor
         CLASS(state_type), INTENT(INOUT) :: state
         TYPE(source_cell_context_type) :: cell_context
-        REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(INOUT) :: qp(n_vars,comp_cells_x,comp_cells_y)
+        TYPE(thermal_config_type), INTENT(IN) :: thermal(:)
+        TYPE(rheology_config_type), INTENT(IN) :: rheology(:)
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure(:)
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache(:)
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config(:)
+        LOGICAL, INTENT(IN) :: transport_stochastic(:),pore_enabled(:),stochastic_enabled(:)
+        REAL(wp), INTENT(INOUT) :: q(n_vars,n_layers,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(INOUT) :: qp(n_vars,n_layers,comp_cells_x,comp_cells_y)
         REAL(wp), INTENT(IN) :: time_step
         CLASS(domain_type), INTENT(IN) :: domain
-        REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
+        REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:),stochastic_values_l2(:,:)
         REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
-        REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
-        REAL(wp), INTENT(IN) :: qp_original(n_vars,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: q_original(n_vars,n_layers,comp_cells_x,comp_cells_y)
+        REAL(wp), INTENT(IN) :: qp_original(n_vars,n_layers,comp_cells_x,comp_cells_y)
         LOGICAL, INTENT(OUT) :: step_failed
         CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
         REAL(wp) :: qpentry(n_vars),q_candidate(n_vars),qp_candidate(n_vars)
         REAL(wp) :: q_local(n_vars),qp_local(n_vars)
+        REAL(wp) :: q_layers(n_vars,n_layers),qp_layers(n_vars,n_layers)
+        TYPE(layer_contacts_type) :: contacts
+        LOGICAL :: contacts_valid
         REAL(wp) :: deposit_local(n_solid),erosion_local(n_solid),erodible_local(n_solid),lava_local
         REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),source_time,noise
         LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
-        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure
+        INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,layer
+        INTEGER :: changed_jmin,changed_jmax,changed_kmin,changed_kmax
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
+        ! Retain only the earliest invalid substrate candidate across OpenMP workers.
+        ! Species columns: deposit, erosion, erodible; rates: deposition, erosion.
+        INTEGER :: substrate_witness_cell,substrate_witness_group
+        REAL(wp) :: substrate_witness_before(n_solid,3),substrate_witness_after(n_solid,3)
+        REAL(wp) :: substrate_witness_rates(n_solid,2),substrate_witness_lava(3)
         REAL(wp) :: cell_mass,cell_components
         REAL(wp) :: red_grav,rho_mix
         LOGICAL :: remove_buoyant
@@ -300,6 +349,25 @@ CONTAINS
         source_time=0.0_wp
         IF (PRESENT(step_start_time)) source_time=step_start_time
         IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
+        ! Validate Darcy inhibition against the configuration of the group's
+        ! actual layer; no global L1 physics may be used for an L2 group.
+        DO group_index=1,SIZE(executor%groups)
+            IF (.NOT.ANY(executor%groups(group_index)%source_names=='pore_pressure_dissipation') .AND. &
+                .NOT.ANY(executor%groups(group_index)%source_names=='pore_pressure_darcy')) CYCLE
+            SELECT CASE(executor%groups(group_index)%scope)
+            CASE(SOURCE_SCOPE_L1)
+                layer=1
+            CASE(SOURCE_SCOPE_L2)
+                layer=2
+            CASE DEFAULT
+                CALL fatal_error('Darcy source requires a layer-specific Lie scope')
+            END SELECT
+            IF (layer>SIZE(pore_pressure)) CALL fatal_error('Missing Darcy configuration for Lie layer')
+            IF (TRIM(ADJUSTL(pore_pressure(layer)%f_inhibit_mode))=='STATIC' .OR. &
+                TRIM(ADJUSTL(pore_pressure(layer)%f_inhibit_mode))=='DYNAMIC') THEN
+                IF (pore_pressure(layer)%N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
+            END IF
+        END DO
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tick,clock_rate)
             DO group_index=1,SIZE(executor%groups)
@@ -307,7 +375,16 @@ CONTAINS
                 group_profile(group_index)%calls=group_profile(group_index)%calls+1
             END DO
         END IF
-        IF (executor%has_bed_group) executor%bed_rate_cell=0.0_wp
+        IF (executor%has_bed_group) THEN
+            ! Only last step's nonzero rates can be stale; other cells remain zero.
+            !$OMP PARALLEL DO PRIVATE(j,k)
+            DO cell=1,executor%bed_dirty_count
+                j=executor%bed_dirty_j(cell); k=executor%bed_dirty_k(cell)
+                executor%bed_rate_cell(j,k)=0.0_wp
+            END DO
+            !$OMP END PARALLEL DO
+            executor%bed_dirty_count=0
+        END IF
         IF (executor%diagnostics_enabled) THEN
             executor%injection_mass(1:domain%solve_cells)=0.0_wp
             executor%injection_solids(1:domain%solve_cells)=0.0_wp
@@ -352,6 +429,20 @@ CONTAINS
                     CALL initialize_physical_state_complex(executor%source_complex_scratch(tid))
             END IF
         END DO
+        IF (n_layers==2 .AND. ANY(executor%groups%scope==SOURCE_SCOPE_INTERLAYER)) THEN
+            IF (ALLOCATED(executor%interlayer_physical_scratch)) THEN
+                IF (SIZE(executor%interlayer_physical_scratch,2)<nthreads) &
+                    DEALLOCATE(executor%interlayer_physical_scratch)
+            END IF
+            IF (.NOT.ALLOCATED(executor%interlayer_physical_scratch)) &
+                ALLOCATE(executor%interlayer_physical_scratch(4,nthreads))
+            DO tid=1,nthreads
+                DO layer=1,4
+                    IF (.NOT.executor%interlayer_physical_scratch(layer,tid)%layout_valid) &
+                        CALL initialize_physical_state_real(executor%interlayer_physical_scratch(layer,tid))
+                END DO
+            END DO
+        END IF
         IF (ALLOCATED(executor%source_exchange_scratch)) THEN
             IF (SIZE(executor%source_exchange_scratch)<nthreads) DEALLOCATE(executor%source_exchange_scratch)
         END IF
@@ -374,9 +465,12 @@ CONTAINS
         ! Independent cells share a fixed geometry. Reduce the first failed
         ! worklist index without a separate serial scan.
         first_failure=HUGE(0)
+        substrate_witness_cell=HUGE(0)
+        substrate_witness_group=-1
         !$OMP PARALLEL DEFAULT(SHARED)                                                                              &
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
-        !$OMP& q_local,qp_local,deposit_local,erosion_local,erodible_local,lava_local,                                 &
+        !$OMP& q_local,qp_local,q_layers,qp_layers,layer,contacts,contacts_valid,                                    &
+        !$OMP& deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
         !$OMP& cell_has_exchange,ok,failed,conversion_ok,status,iterations,linear_info,context,                       &
@@ -387,7 +481,10 @@ CONTAINS
         !$OMP& REDUCTION(MIN:first_failure)
         tid=1
         !$ tid=omp_get_thread_num()+1
-        !$OMP DO
+        ! Wet and dry cells have very different costs, clustered along the
+        ! spatially ordered worklist. Small dynamic chunks balance that work
+        ! without changing the source order or ownership of any cell.
+        !$OMP DO SCHEDULE(DYNAMIC,16)
         cell_loop: DO cell=1,domain%solve_cells
             IF (profiling_enabled) CALL SYSTEM_CLOCK(cell_tick,physical_tick_rate)
             cell_error=0
@@ -405,15 +502,16 @@ CONTAINS
             IF (sea_mass_removal_flag .AND. B_zone(j,k)==1) CYCLE cell_loop
             ! No configured group can create mass in a dry cell in this case.
             IF (executor%all_groups_dry_noop) THEN
-                IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. q_original(idx_totMassEqn,j,k)<=0.0_wp) CYCLE cell_loop
+                IF (ALL(q(idx_totMassEqn,:,j,k)<=0.0_wp) .AND. &
+                    ALL(q_original(idx_totMassEqn,:,j,k)<=0.0_wp)) CYCLE cell_loop
             END IF
-            q_local=q(:,j,k)
-            qp_local=qp(:,j,k)
+            q_layers=q(:,:,j,k)
+            qp_layers=qp(:,:,j,k)
             IF (executor%has_exchange_group) THEN
                 deposit_local=state%deposit(j,k,1:n_solid)
                 erosion_local=state%erosion(j,k,1:n_solid)
                 erodible_local=state%erodible(1:n_solid,j,k)
-                lava_local=state%lava_deposit(j,k)
+                lava_local=state%deposit_tot(j,k)
             END IF
             ! Capture cell-local geometry and stochastic forcing for all groups.
             cell_context%Bprime_x=B_prime_x_geom(j,k)
@@ -422,13 +520,57 @@ CONTAINS
             cell_context%Bsecond_xy=B_second_xy_geom(j,k)
             cell_context%Bsecond_yy=B_second_yy_geom(j,k)
             cell_context%grav_coeff=grav_coeff(j,k)
-            noise=0.0_wp
-            IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
-            cell_context%Zij=noise
+            ! The Lie groups select the OU field for their own layer.
 
             ! The Lie groups run in order within each OpenMP cell iteration.
             group_loop: DO group_index=1,SIZE(executor%groups)
                 IF (SIZE(executor%groups(group_index)%source_names)==0) CYCLE group_loop
+                layer=executor%groups(group_index)%scope
+                ! Each layer uses its own OU field. In particular L2 must
+                ! never inherit the effective friction noise of L1.
+                noise=0.0_wp
+                IF (layer==SOURCE_SCOPE_L1) THEN
+                    IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
+                ELSEIF (layer==SOURCE_SCOPE_L2) THEN
+                    IF (PRESENT(stochastic_values_l2)) noise=stochastic_values_l2(j,k)
+                END IF
+                cell_context%Zij=noise
+                IF (layer==SOURCE_SCOPE_INTERLAYER) THEN
+                    ! The same cell-local Lie order applies to both paired laws.
+                    ! Each update commits both recipients only after validation.
+                    IF (ANY(executor%groups(group_index)%source_names=='interlayer_mass_exchange')) THEN
+                        IF (executor%groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) THEN
+                            cell_error=17
+                            EXIT group_loop
+                        END IF
+                        CALL apply_interlayer_lie_group(interlayer_mass_exchange,rheology(2),mass_config(2), &
+                            qp_original(:,1:2,j,k),executor%groups(group_index)%id==0,time_step, &
+                            q_layers(:,1:2),qp_layers(:,1:2), &
+                            executor%interlayer_physical_scratch(:,tid),cell_error)
+                    ELSEIF (ANY(executor%groups(group_index)%source_names=='interlayer_drag')) THEN
+                        IF (executor%groups(group_index)%method/=SOURCE_METHOD_ANALYTIC .OR. &
+                            executor%groups(group_index)%id==0) THEN
+                            cell_error=17
+                            EXIT group_loop
+                        END IF
+                        CALL apply_interlayer_momentum_exchange_analytic(interlayer_momentum_exchange,time_step, &
+                            q_layers(:,1:2),qp_layers(:,1:2),ok)
+                        IF (.NOT.ok) cell_error=22
+                    ELSE
+                        cell_error=17
+                    END IF
+                    IF (cell_error/=0) EXIT group_loop
+                    IF (profiling_enabled) thread_evaluations(group_index,tid)= &
+                        thread_evaluations(group_index,tid)+1
+                    CYCLE group_loop
+                END IF
+                CALL evaluate_layer_contacts(qp_layers(idx_h,:),contacts,contacts_valid)
+                IF (.NOT.contacts_valid) THEN
+                    cell_error=16
+                    EXIT group_loop
+                END IF
+                q_local=q_layers(:,layer)
+                qp_local=qp_layers(:,layer)
                 ! The buoyancy sink precedes admissibility checks in the next
                 ! source transaction. Evaluate only accepted local states:
                 ! never interpret an inadmissible conservative candidate as
@@ -448,13 +590,16 @@ CONTAINS
                         END IF
                         q_local=0.0_wp
                         CALL initialize_dry_physical_cell(qp_local)
-                        EXIT group_loop
+                        q_layers(:,layer)=q_local
+                        qp_layers(:,layer)=qp_local
+                        IF (n_layers==1) EXIT group_loop
+                        CYCLE group_loop
                     END IF
                 END IF
                 ! Group zero reads the pre-spatial primitive state; subsequent
                 ! groups read the previous group's accepted local state.
                 IF (executor%groups(group_index)%id==0) THEN
-                    qpentry=qp_original(:,j,k)
+                    qpentry=qp_original(:,layer,j,k)
                 ELSE
                     qpentry=qp_local
                 END IF
@@ -481,18 +626,22 @@ CONTAINS
                 CASE(SOURCE_METHOD_EXPLICIT)
                     ! The current recipient provides strict conservation bounds.
                     ! The pre-spatial inventory separately caps withdrawals by
-                    ! mass present before any source group (legacy Lie semantics).
+                    ! mass present before any source group (existing Lie ordering).
                     ! Newly injected solids cannot settle within the same step.
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
-                    CALL assemble_lie_explicit_transaction(qpentry, q_local(1:n_eqns), time_step, source_time,           &
+                    CALL assemble_lie_explicit_transaction(qpentry, q_local(1:n_eqns), time_step, source_time,     &
                         executor%groups(group_index), erodible_local, total_rate,                                      &
                         executor%source_transfers(tid),cell_has_exchange,ok,                                          &
                         noise, B_zone(j,k), cell_context, cell_source_fractions(j,k),                              &
                         cell_fissure_fractions(j,k,:),cell_arc_perim(j,k),cell_arc_n_x(j,k),                         &
                         cell_arc_n_y(j,k),dx*dy,                                                                     &
-                        executor%non_exchange_groups(group_index),executor%exchange_group(group_index),                &
+                        executor%non_exchange_mask(group_index),executor%exchange_group(group_index),                &
                         executor%source_physical_scratch(tid),executor%source_exchange_scratch(tid),                &
-                        q_original(1:n_eqns,j,k),executor%injection_materials)
+                        q_original(1:n_eqns,layer,j,k),executor%injection_materials, &
+                        thermal(layer),rheology(layer),mass_config(layer), &
+                        transport_stochastic(layer),pore_enabled(layer),stochastic_enabled(layer), &
+                        n_layers==1 .OR. contacts%terrain_exposed(layer), &
+                        n_layers==1 .OR. contacts%atmosphere_exposed(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -512,6 +661,17 @@ CONTAINS
                     q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
 
+                    ! Apply the existing friction-only projection only when the
+                    ! explicit group contains mu(I) and no other source.
+                    ! Group zero evaluates rates at the pre-spatial state, so
+                    ! projecting its post-spatial recipient would also affect transport.
+                    IF (executor%groups(group_index)%id>0 .AND. &
+                        executor%groups(group_index)%rheology_id==RHEOLOGY_ID_MUI .AND. &
+                        SIZE(executor%groups(group_index)%source_names)==1) THEN
+                        CALL limit_rheology_momentum_reversal(q_local(idx_uEqn:idx_vEqn), &
+                            q_candidate(idx_uEqn:idx_vEqn))
+                    END IF
+
                     IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                         cell_error=6
                         IF (executor%diagnostics_enabled) THEN
@@ -529,11 +689,29 @@ CONTAINS
                         deposit_candidate=deposit_local+time_step*executor%source_transfers(tid)%solid_deposition_rate
                         erosion_candidate=erosion_local+time_step*executor%source_transfers(tid)%solid_erosion_rate
                         erodible_candidate=erodible_local-time_step*executor%source_transfers(tid)%solid_erosion_rate
-                        IF (erodible_deposit_flag) erodible_candidate=                                                 &
+                        IF (substrate%erodible_deposit_flag) erodible_candidate= &
                             erodible_candidate+time_step*executor%source_transfers(tid)%solid_deposition_rate
                         lava_candidate=lava_local+time_step*executor%source_transfers(tid)%lava_deposit_rate
                         IF (ANY(erodible_candidate<0.0_wp) .OR. ANY(deposit_candidate<0.0_wp) .OR.                 &
                             ANY(erosion_candidate<0.0_wp) .OR. lava_candidate<0.0_wp) THEN
+                            ! Failure-only witness: one synchronized copy, no per-cell
+                            ! allocation or output inside the OpenMP region.
+                            !$OMP CRITICAL(d19_substrate_witness)
+                            IF (cell<substrate_witness_cell) THEN
+                                substrate_witness_cell=cell
+                                substrate_witness_group=executor%groups(group_index)%id
+                                substrate_witness_before(:,1)=deposit_local
+                                substrate_witness_before(:,2)=erosion_local
+                                substrate_witness_before(:,3)=erodible_local
+                                substrate_witness_after(:,1)=deposit_candidate
+                                substrate_witness_after(:,2)=erosion_candidate
+                                substrate_witness_after(:,3)=erodible_candidate
+                                substrate_witness_rates(:,1)=executor%source_transfers(tid)%solid_deposition_rate
+                                substrate_witness_rates(:,2)=executor%source_transfers(tid)%solid_erosion_rate
+                                substrate_witness_lava=[lava_local,lava_candidate, &
+                                    executor%source_transfers(tid)%lava_deposit_rate]
+                            END IF
+                            !$OMP END CRITICAL(d19_substrate_witness)
                             cell_error=7
                             EXIT group_loop
                         END IF
@@ -546,6 +724,14 @@ CONTAINS
                             CALL conservative_to_primitive(q_candidate,qp_candidate,accepted=conversion_ok)
                             IF (.NOT.conversion_ok) THEN
                                 cell_error=8
+                                IF (executor%diagnostics_enabled) THEN
+                                    cell_group=executor%groups(group_index)%id
+                                    cell_mass=q_candidate(idx_totMassEqn)
+                                    cell_components=SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))
+                                    executor%failure_reference(:,cell)=q_local(1:n_eqns)
+                                    executor%failure_rate(:,cell)=total_rate
+                                    executor%failure_candidate(:,cell)=q_candidate(1:n_eqns)
+                                END IF
                                 EXIT group_loop
                             END IF
                         ELSE
@@ -555,6 +741,8 @@ CONTAINS
                     END IF
                     ! Publish to cell-local state; the trial array is written once after all groups.
                     q_local=q_candidate
+                    q_layers(:,layer)=q_local
+                    qp_layers(:,layer)=qp_local
                     IF (executor%diagnostics_enabled .AND. executor%groups(group_index)%id==0) THEN
                         IF (cell_arc_perim(j,k)>0.0_wp) THEN
                             executor%injection_mass(cell)=q_local(idx_totMassEqn)
@@ -567,18 +755,30 @@ CONTAINS
                         erosion_local=erosion_candidate
                         erodible_local=erodible_candidate
                         lava_local=lava_candidate
-                        IF (topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+                &
+                        IF (substrate%topo_change_flag) executor%bed_rate_cell(j,k)=executor%bed_rate_cell(j,k)+ &
                             executor%source_transfers(tid)%dB_dt
                     END IF
                 CASE(SOURCE_METHOD_ANALYTIC)
                     ! Group 0 evaluates on the immutable pre-spatial state;
                     ! its increment is applied to the post-spatial group candidate.
                     analytic_input=q_local
-                    IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,j,k)
+                    IF (executor%groups(group_index)%id==0) analytic_input=q_original(:,layer,j,k)
                     IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
+                    ! Opt-in cell witness precedes the analytic call, which may terminate in quadrature.
+                    ! Run with OMP_NUM_THREADS=1 to keep the last witness unambiguous.
+                    IF (executor%diagnostics_enabled .AND. &
+                        ANY(executor%groups(group_index)%source_names=='rheology_mui')) THEN
+                        WRITE(error_unit,'(A,4(A,I0),2(A,ES24.16))') 'MUI_ANALYTIC_CELL', &
+                            ' j=',j,' k=',k,' layer=',layer,' group=',executor%groups(group_index)%id, &
+                            ' t=',source_time,' dt=',time_step
+                        WRITE(error_unit,'(A,*(ES24.16,1X))') 'MUI_ANALYTIC_Q=',analytic_input(1:n_eqns)
+                        FLUSH(error_unit)
+                    END IF
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL eval_source_analytic(executor%groups(group_index), analytic_input, cell_context,          &
-                        time_step, analytic_rate, status, executor%source_physical_scratch(tid))
+                        time_step, analytic_rate, status, executor%source_physical_scratch(tid), &
+                        thermal(layer),rheology(layer),pore_pressure(layer),pore_cache(layer), &
+                        pore_enabled(layer),stochastic_enabled(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -595,13 +795,14 @@ CONTAINS
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
                 CASE(SOURCE_METHOD_NEWTON)
                     ! Solve the coupled implicit update on a cell-local candidate.
-                    IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+                    IF (q(idx_totMassEqn,layer,j,k)<=0.0_wp) CYCLE
                     q_candidate=q_local
                     IF (profiling_enabled) CALL SYSTEM_CLOCK(physical_tick)
                     CALL solve_backward_euler_group(executor%groups(group_index), q_candidate, time_step,              &
                         cell_context%Bprime_x, cell_context%Bprime_y, cell_context%grav_coeff, noise,      &
                         iterations, ok, linear_info, failed, executor%source_complex_scratch(tid),                    &
-                        executor%source_physical_scratch(tid))
+                        executor%source_physical_scratch(tid),thermal(layer),rheology(layer), &
+                        pore_enabled(layer),stochastic_enabled(layer))
                     IF (profiling_enabled) THEN
                         CALL SYSTEM_CLOCK(profile_tock)
                         thread_physics(group_index,tid)=thread_physics(group_index,tid)+                            &
@@ -655,6 +856,8 @@ CONTAINS
                 END IF
 
                 q_local=q_candidate
+                q_layers(:,layer)=q_local
+                qp_layers(:,layer)=qp_local
                 IF (profiling_enabled) THEN
                     CALL SYSTEM_CLOCK(profile_tock)
                     thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &
@@ -666,7 +869,11 @@ CONTAINS
             ! Check buoyancy again after the final source group, including
             ! cases with no subsequent group to trigger the early sink.
             ! This is a physical sink, not a numerical limiter on source rates.
-            IF (cell_error==0 .AND. q_local(idx_totMassEqn)>0.0_wp) THEN
+            DO layer=1,n_layers
+                IF (cell_error/=0) EXIT
+                q_local=q_layers(:,layer)
+                qp_local=qp_layers(:,layer)
+                IF (q_local(idx_totMassEqn)<=0.0_wp) CYCLE
                 CALL evaluate_density_from_qp(qp_local,rho_mix,red_grav,conversion_ok,remove_buoyant)
                 IF (.NOT.conversion_ok) THEN
                     cell_error=15
@@ -681,24 +888,28 @@ CONTAINS
                         CALL initialize_dry_physical_cell(qp_local)
                     END IF
                 END IF
-            END IF
+                q_layers(:,layer)=q_local
+                qp_layers(:,layer)=qp_local
+            END DO
             ! Check finiteness only for cells actually changed by the complete
             ! spatial + Lie update. Test once, after all groups and buoyancy,
             ! before publishing the local fluid/substrate candidate.
             IF (cell_error==0) THEN
-                cell_updated=ANY(q_local/=q_original(:,j,k))
-                IF (.NOT.cell_updated) cell_updated=ANY(qp_local/=qp_original(:,j,k))
+                cell_updated=ANY(q_layers/=q_original(:,:,j,k))
+                IF (.NOT.cell_updated) cell_updated=ANY(qp_layers/=qp_original(:,:,j,k))
                 IF (executor%has_exchange_group .AND. .NOT.cell_updated) THEN
                     cell_updated=ANY(deposit_local/=state%deposit(j,k,1:n_solid)) .OR.                              &
                         ANY(erosion_local/=state%erosion(j,k,1:n_solid)) .OR.                                        &
                         ANY(erodible_local/=state%erodible(1:n_solid,j,k)) .OR.                                      &
-                        lava_local/=state%lava_deposit(j,k)
+                        lava_local/=state%deposit_tot(j,k)
                 END IF
                 IF (executor%has_bed_group .AND. .NOT.cell_updated)                                                  &
                     cell_updated=executor%bed_rate_cell(j,k)/=0.0_wp
                 IF (cell_updated) THEN
-                    IF (.NOT.ALL(finite_real_value(q_local)) .OR. .NOT.physical_cell_state_finite(qp_local))         &
-                        cell_error=2
+                    DO layer=1,n_layers
+                        IF (.NOT.ALL(finite_real_value(q_layers(:,layer))) .OR. &
+                            .NOT.physical_cell_state_finite(qp_layers(:,layer))) cell_error=2
+                    END DO
                     IF (executor%has_exchange_group .AND. cell_error==0) THEN
                         IF (.NOT.ALL(finite_real_value(deposit_local)) .OR.                                           &
                             .NOT.ALL(finite_real_value(erosion_local)) .OR.                                           &
@@ -709,13 +920,13 @@ CONTAINS
             END IF
             ! Publish this cell only after the final numerical check.
             IF (cell_error==0) THEN
-                q(:,j,k)=q_local
-                qp(:,j,k)=qp_local
+                q(:,:,j,k)=q_layers
+                qp(:,:,j,k)=qp_layers
                 IF (executor%has_exchange_group) THEN
                     state%deposit(j,k,1:n_solid)=deposit_local
                     state%erosion(j,k,1:n_solid)=erosion_local
                     state%erodible(1:n_solid,j,k)=erodible_local
-                    state%lava_deposit(j,k)=lava_local
+                    state%deposit_tot(j,k)=lava_local
                 END IF
             END IF
             IF (cell_error/=0) THEN
@@ -736,6 +947,20 @@ CONTAINS
         END DO cell_loop
         !$OMP END DO
         !$OMP END PARALLEL
+        ! Track dirty bed rates for clearing before the next accepted sweep.
+        IF (executor%has_bed_group) THEN
+            changed_jmin=comp_cells_x+1; changed_jmax=0
+            changed_kmin=comp_cells_y+1; changed_kmax=0
+            DO cell=1,domain%solve_cells
+                j=domain%j_cent(cell); k=domain%k_cent(cell)
+                IF (executor%bed_rate_cell(j,k)==0.0_wp) CYCLE
+                executor%bed_dirty_count=executor%bed_dirty_count+1
+                executor%bed_dirty_j(executor%bed_dirty_count)=j
+                executor%bed_dirty_k(executor%bed_dirty_count)=k
+                changed_jmin=MIN(changed_jmin,j); changed_jmax=MAX(changed_jmax,j)
+                changed_kmin=MIN(changed_kmin,k); changed_kmax=MAX(changed_kmax,k)
+            END DO
+        END IF
         IF (profiling_enabled) THEN
             DO group_index=1,SIZE(executor%groups)
                 group_profile(group_index)%elapsed=group_profile(group_index)%elapsed+SUM(thread_group(group_index,:))
@@ -745,6 +970,7 @@ CONTAINS
                     SUM(thread_evaluations(group_index,:))
             END DO
             profile_thread_cell=profile_thread_cell+SUM(thread_cell)
+            profile_cell_balance_capacity=profile_cell_balance_capacity+REAL(nthreads,wp)*MAXVAL(thread_cell)
             DEALLOCATE(thread_group,thread_physics,thread_evaluations,thread_cell)
         END IF
         IF (profiling_enabled) THEN
@@ -775,6 +1001,24 @@ CONTAINS
             SELECT CASE(executor%failure_code(first_failure))
             CASE(1)
                 failure_reason='D19: non-finite source-group geometry'
+            CASE(16)
+                failure_reason='TL07: invalid candidate layer contacts'
+            CASE(17)
+                failure_reason='TL07: interlayer Lie source and method mismatch'
+            CASE(22)
+                failure_reason='TL09: paired analytic interlayer drag rejected'
+            CASE(18)
+                failure_reason='TL07: interlayer source or recipient physical state invalid'
+            CASE(19)
+                failure_reason='TL07: paired interlayer physical transfer rejected'
+            CASE(20)
+                failure_reason='TL07: paired interlayer conservative state inadmissible'
+                j=domain%j_cent(first_failure)
+                k=domain%k_cent(first_failure)
+                WRITE(error_unit,'(A,2(I0,1X),A,ES24.16,A,ES24.16)') &
+                    'TL07_INTERLAYER_FIRST_FAILURE cell=',j,k,' t=',source_time,' dt=',time_step
+            CASE(21)
+                failure_reason='TL07: paired interlayer primitive conversion failed'
             CASE(2)
                 failure_reason='D19: non-finite source-group physical input'
             CASE(3)
@@ -785,8 +1029,52 @@ CONTAINS
                 failure_reason='D19: physical source transaction rejected'
             CASE(7)
                 failure_reason='D19: invalid candidate substrate inventory'
+                ! The reduction selects the first failed worklist cell. Emit its
+                ! exact pre-update and rejected post-update inventories serially.
+                IF (substrate_witness_cell==first_failure) THEN
+                    j=domain%j_cent(first_failure)
+                    k=domain%k_cent(first_failure)
+                    WRITE(error_unit,'(A,2(I0,1X),A,I0)') 'D19_SUBSTRATE cell=',j,k, &
+                        ' group=',substrate_witness_group
+                    WRITE(error_unit,'(A,2(ES24.16,1X))') 'D19_SUBSTRATE t,dt=',source_time,time_step
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE deposit_before=',substrate_witness_before(:,1)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE deposit_candidate=',substrate_witness_after(:,1)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erosion_before=',substrate_witness_before(:,2)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erosion_candidate=',substrate_witness_after(:,2)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erodible_before=',substrate_witness_before(:,3)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erodible_candidate=',substrate_witness_after(:,3)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE deposition_rate=',substrate_witness_rates(:,1)
+                    WRITE(error_unit,'(A,*(ES24.16,1X))') &
+                        'D19_SUBSTRATE erosion_rate=',substrate_witness_rates(:,2)
+                    WRITE(error_unit,'(A,3(ES24.16,1X))') 'D19_SUBSTRATE lava_before,candidate,rate=', &
+                        substrate_witness_lava
+                    FLUSH(error_unit)
+                END IF
             CASE(8)
                 failure_reason='D19: explicit candidate conversion failed'
+                IF (executor%diagnostics_enabled) THEN
+                    j=domain%j_cent(first_failure)
+                    k=domain%k_cent(first_failure)
+                    WRITE(*,'(A,2(I0,1X),A,I0)') 'D19_CONVERSION cell=',j,k, &
+                        'group=',executor%failure_group(first_failure)
+                    WRITE(*,'(A,ES24.16)') 'D19_CONVERSION dt=',time_step
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_CONVERSION recipient=', &
+                        executor%failure_reference(:,first_failure)
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_CONVERSION scaled_rate=', &
+                        executor%failure_rate(:,first_failure)
+                    WRITE(*,'(A,*(ES24.16,1X))') 'D19_CONVERSION candidate=', &
+                        executor%failure_candidate(:,first_failure)
+                    WRITE(*,'(A,ES24.16,A,ES24.16)') 'D19_CONVERSION mass=', &
+                        executor%failure_candidate(idx_totMassEqn,first_failure), &
+                        ' energy=',executor%failure_candidate(idx_engyEqn,first_failure)
+                END IF
             CASE(10)
                 failure_reason='D19: analytic source returned non-finite rate'
             CASE(12)
@@ -847,27 +1135,30 @@ CONTAINS
         ! Geometry is the same for every source group in the step. Project
         ! all mass-exchange bed rates only once, after the cell sweep.
         IF (executor%has_bed_group) THEN
-            CALL project_cell_field_to_vertices(executor%bed_rate_cell,executor%bed_rate_vertex)
-            executor%bed_candidate=B_vertex+time_step*executor%bed_rate_vertex
-            IF (executor%diagnostics_enabled .OR. executor%reject_active) THEN
-                WRITE(*,'(A,I0,A,ES16.8)') 'D20_BED_WITNESS group=',executor%bed_group_id,                             &
-                    ' max_abs_delta=',MAXVAL(ABS(executor%bed_candidate-B_vertex))
-            END IF
-            CALL assign_topography_vertices(executor%bed_candidate,bed_accepted)
+            ! Worklist and bounds were collected after the cell sweep.
+            CALL apply_local_bed_rate(executor%bed_rate_cell,time_step,changed_jmin,changed_jmax, &
+                changed_kmin,changed_kmax,bed_accepted)
             IF (.NOT.bed_accepted) THEN
                 CALL reject_cell('D19: invalid refreshed geometry')
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
             END IF
+            ! Report the accepted bed increment only in diagnostic mode.
+            ! The same cell-local bed rates are used by apply_local_bed_rate.
+            IF (executor%diagnostics_enabled) THEN
+                WRITE(*,'(A,I0,A,ES24.16)') 'D20_BED_WITNESS group=',executor%bed_group_id, &
+                    ' max_abs_delta=',MAXVAL(ABS(executor%bed_rate_cell))*ABS(time_step)
+            END IF
         END IF
         ! Refresh derived inventories only after all cells have been accepted.
-        IF (executor%has_exchange_group) CALL state%refresh_substrate_totals()
+        IF (executor%has_exchange_group) &
+            CALL state%refresh_substrate_totals(domain%j_cent(1:domain%solve_cells),domain%k_cent(1:domain%solve_cells))
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)
         END IF
-        ! Inject after the deferred geometry refresh, so the D20 rollback
-        ! witness still verifies restoration of genuinely changed geometry.
+        ! Inject after the deferred geometry refresh to verify fatal
+        ! termination without any state restoration or timestep retry.
         IF (executor%reject_active) THEN
             step_failed=.TRUE.
             failure_reason='D20_INJECTED_LATE_LIE_FAILURE'
@@ -877,8 +1168,9 @@ CONTAINS
 
         CONTAINS
 
-        ! Return a recoverable cell/group rejection without leaving the executor
-        ! before returning the source-group status.
+        ! Record a cell/group failure for the caller to report as a fatal error.
+        !> @brief reject cell operation.
+        !> @param[in] message message argument for reject_cell.
         SUBROUTINE reject_cell(message)
             CHARACTER(*), INTENT(IN) :: message
             failure_reason=message
@@ -888,8 +1180,11 @@ CONTAINS
 
     !> @brief Report cell-major sweep wall time and per-group summed thread times.
     !> @details Group times are summed thread CPU-like times, not wall-clock durations.
+    !>          The balance metric uses instrumented cell times, excluding early-skipped
+    !>          cells, team launch and barriers; it is not end-to-end OpenMP efficiency.
     SUBROUTINE report_lie_source_profile()
         INTEGER :: n
+        REAL(wp) :: balance_efficiency
         IF (.NOT.profiling_initialized) RETURN
         IF (.NOT.profiling_enabled) RETURN
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_BEGIN'
@@ -908,6 +1203,10 @@ CONTAINS
                 ' overhead_thread_seconds=',MAX(0.0_wp,group_profile(n)%elapsed-group_profile(n)%physical)
         END DO
         WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL cell_thread_seconds=',profile_thread_cell
+        balance_efficiency=0.0_wp
+        IF (profile_cell_balance_capacity>0.0_wp) &
+            balance_efficiency=profile_thread_cell/profile_cell_balance_capacity
+        WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL cell_balance_efficiency=',balance_efficiency
         WRITE(*,'(A,ES15.7)') 'LIE_SOURCE_DETAIL outside_groups_thread_seconds=',                                  &
             MAX(0.0_wp,profile_thread_cell-SUM(group_profile%elapsed))
         WRITE(*,'(A)') 'LIE_SOURCE_DETAIL_END'

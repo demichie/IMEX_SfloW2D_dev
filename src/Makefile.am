@@ -17,8 +17,16 @@ IMEX_SfloW2D_SOURCES = \
                 physics/rheology_laws/rheology_parameters_2d.f90 \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
+                core/solid_transport_parameters_2d.f90 \
+                physics/substrate/substrate_parameters_2d.f90 \
+                physics/thermal_laws/thermal_parameters_2d.f90 \
+                physics/pore_pressure/pore_pressure_parameters_2d.f90 \
+                physics/mass_exchange/mass_exchange_parameters_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.f90 \
+                numerics/layer_contacts_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/source_catalog_2d.f90 \
+                core/layer_physics_2d.f90 \
                 numerics/source_registry_2d.f90 \
                 core/runtime_2d.f90 \
                 core/complexify.f90 \
@@ -38,7 +46,6 @@ IMEX_SfloW2D_SOURCES = \
                 physics/rheology_laws/rheology_lahar_2d.f90 \
                 physics/rheology_laws/rheology_empirical_2d.f90 \
                 physics/rheology_laws/rheology_quadratic_2d.f90 \
-                physics/rheology_laws/rheology_newmodel_2d.f90 \
                 physics/rheology_laws/rheology_mui_2d.f90 \
                 physics/rheology_laws/rheology_mui_voellmy_2d.f90 \
                 physics/rheology_laws/rheology_2d.f90 \
@@ -49,12 +56,17 @@ IMEX_SfloW2D_SOURCES = \
                 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.f90 \
                 physics/mass_exchange/mass_exchange_erosion_2d.f90 \
                 physics/mass_exchange/mass_exchange_deposition_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_settling_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_elutriation_2d.f90 \
+                physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.f90 \
+                physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.f90 \
+                physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.f90 \
                 physics/mass_exchange/mass_exchange_lava_deposition_2d.f90 \
                 numerics/source_input_2d.f90 \
                 physics/mass_exchange/mass_exchange_vaporization_2d.f90 \
                 physics/mass_exchange/mass_exchange_entrainment_2d.f90 \
                 physics/mass_exchange/mass_exchange_2d.f90 \
-                physics/source_configuration_2d.f90 \
+                numerics/source_configuration_2d.f90 \
                 physics/mass_injection_terms/mass_injection_coefficients_2d.f90 \
                 physics/mass_injection_terms/mass_boundary_injection_2d.f90 \
                 physics/mass_injection_terms/mass_bottom_circular_injection_2d.f90 \
@@ -96,7 +108,7 @@ EXTRA_DIST = state/inc/dry_thermodynamics.inc state/inc/mixture_heat_capacity.in
              physics/rheology_laws/rheology_quadratic_drag.inc \
              physics/rheology_laws/rheology_empirical_drag.inc \
              physics/rheology_laws/rheology_lahar_drag.inc \
-             physics/rheology_laws/rheology_newmodel_linear.inc \
+             physics/rheology_laws/rheology_lahar_viscosity.inc \
              physics/thermal_laws/thermal_cooling_rate.inc
 
 # Keep spatial cell scratch on each OpenMP thread's stack.
@@ -105,6 +117,12 @@ spatial/hyperbolic_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 numerics/nonlinear_solver_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 # Explicit source cell kernels hold only bounded per-cell scratch, never grids.
 physics/source_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Keep runtime-sized cell composition scratch on the OpenMP worker stack.
+state/state_conversions.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+physics/equation_terms_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+# Reconstruction and nonconservative path scratch is bounded by state/path sizes.
+spatial/reconstruction_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
+spatial/nonconservative_2d.$(OBJEXT): AM_FCFLAGS += -fstack-arrays
 
 # F5: physical source consumers must wait for the canonical .mod producers,
 # including under parallel make (Fortran modules are not inferred by automake).
@@ -117,33 +135,60 @@ physics/rheology_laws/rheology_lava_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/rheology_laws/rheology_mui_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
 physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
     state/state_mixture.$(OBJEXT)
+numerics/layer_contacts_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/thermal_laws/thermal_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
+    core/layer_physics_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+physics/pore_pressure/pore_pressure_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_circular_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_bottom_fissural_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
 physics/mass_injection_terms/mass_injection_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
+physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_physical.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): state/state_physical.$(OBJEXT)
-physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): state/state_types.$(OBJEXT)
-numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): state/state_types.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
+    numerics/layer_contacts_2d.$(OBJEXT)
 
 # F5: new general state kernels are built in module dependency order.
+core/layer_physics_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): core/layer_physics_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 state/state_types.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state/state_composition.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 # F5: physical particle descriptors belong to mixture physics.
@@ -190,7 +235,6 @@ physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       
                                 physics/rheology_laws/rheology_lahar_2d.$(OBJEXT)         \
                                 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT)     \
                                 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT)     \
-                                physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT)      \
                                 physics/rheology_laws/rheology_froude_2d.$(OBJEXT)        \
                                 physics/rheology_laws/rheology_lucas_2d.$(OBJEXT)         \
                                 physics/rheology_laws/rheology_mui_2d.$(OBJEXT)           \
@@ -202,6 +246,7 @@ physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_froude_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
@@ -232,9 +277,8 @@ physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) 
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
-physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-    core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/diagnostics_2d.$(OBJEXT)
@@ -252,10 +296,12 @@ physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/param
 physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_lahar_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT) \
     core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_lava_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
@@ -263,6 +309,7 @@ physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2
     core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT) \
     physics/pore_pressure/pore_pressure_2d.$(OBJEXT) \
     physics/thermal_laws/thermal_laws_2d.$(OBJEXT) \
@@ -470,14 +517,35 @@ IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
 IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 
 # Explicit Fortran module dependencies for deterministic parallel builds.
+# TL04-C2: canonical shared solids catalog and all its direct consumers.
+core/solid_transport_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+state/state_mixture.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_darcy_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/rheology_laws/rheology_mui_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/solid_transport_parameters_2d.$(OBJEXT)
+
+# TL04-C1: the SHARED substrate module must be compiled after parameters_2d.
+# Every direct USE needs an explicit producer edge for parallel Automake builds.
+physics/substrate/substrate_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+state/state_fields.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+IMEX_SfloW2D.$(OBJEXT): physics/substrate/substrate_parameters_2d.$(OBJEXT)
+
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
+numerics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
                                          numerics/source_input_2d.$(OBJEXT) \
                                          core/constitutive_parameters_2d.$(OBJEXT)
-core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT) \
+core/simulation_2d.$(OBJEXT): numerics/source_configuration_2d.$(OBJEXT) \
                                      physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
                               numerics/source_input_2d.$(OBJEXT)
 
@@ -486,17 +554,13 @@ physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                   numerics/source_registry_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): physics/source_terms_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
-                                          physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
 
 # Remaining direct USE dependencies, audited against all production .f90 sources.
-IMEX_SfloW2D.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
-    numerics/source_catalog_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): core/constitutive_parameters_2d.$(OBJEXT) \
-    core/parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
@@ -513,7 +577,9 @@ physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(O
 physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
-physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+stochastic/stochastic_module.$(OBJEXT): physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT)
 
@@ -529,21 +595,32 @@ physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): physics/rheology_laws/rhe
 
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): physics/rheology_laws/rheology_empirical_drag.inc
 
-physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc
+physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): physics/rheology_laws/rheology_lahar_drag.inc \
+    physics/rheology_laws/rheology_lahar_viscosity.inc
 
 # Blocco 1: include dependencies used by source kernels.
-physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): physics/rheology_laws/rheology_newmodel_linear.inc
 physics/thermal_laws/thermal_cooling_2d.$(OBJEXT): physics/thermal_laws/thermal_cooling_rate.inc
 
 # Block 1: missing direct USE edges, independently audited against all
 # 68 production Fortran sources. Keep these for deterministic parallel make.
-IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_2d.$(OBJEXT)
+numerics/nonlinear_solver_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
+IMEX_SfloW2D.$(OBJEXT): core/diagnostics_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 geometry/domain_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_2d.$(OBJEXT) \
     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 physics/rheology_laws/rheology_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
+physics/thermal_laws/thermal_laws_2d.$(OBJEXT): physics/thermal_laws/thermal_parameters_2d.$(OBJEXT)
 physics/thermal_laws/thermal_laws_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 spatial/hyperbolic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
@@ -551,3 +628,72 @@ state/state_conversions.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
 state/state_physical.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
     core/constitutive_parameters_2d.$(OBJEXT)
+
+# TL04-C3/C4: canonical layer-local mass exchange owns all process coefficients.
+physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+geometry/geometry_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+core/layer_physics_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/time_integration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/source_configuration_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+
+# Pair-wide cell-local limiter and canonical input: explicit module dependencies.
+physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) state/state_types.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT) core/constitutive_parameters_2d.$(OBJEXT) \
+    core/solid_transport_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT) \
+    physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT) \
+    state/state_types.$(OBJEXT) state/state_physical.$(OBJEXT) \
+    state/state_conversions.$(OBJEXT) state/state_composition.$(OBJEXT) \
+    state/state_fields.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT) core/solid_transport_parameters_2d.$(OBJEXT) \
+    physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
+
+# The paired source shares the canonical physics kernel and existing Lie executor.
+numerics/source_configuration_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
+numerics/lie_source_executor_2d.$(OBJEXT): \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT) \
+    physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
+
+# Analytic pair momentum exchange: coordinator depends only on the Chezy law.
+physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT): \
+    core/parameters_2d.$(OBJEXT) \
+    physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT)
+
+# Interlayer unsupported-method interfaces call diagnostics_2d%fatal_error.
+physics/interlayer_mass_exchange/interlayer_settling_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_momentum_exchange/interlayer_drag_chezy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)

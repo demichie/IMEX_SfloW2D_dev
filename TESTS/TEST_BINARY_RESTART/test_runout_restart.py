@@ -26,8 +26,8 @@ def records(path):
             payload = stream.read(size)
             assert len(payload) == size and stream.read(4) == marker
             result.append(payload)
-    assert result[0] == b'IMEX_SFLOW2D_RST'
-    assert struct.unpack('<i', result[1])[0] == 7
+    assert result[0].rstrip() == b'IMEX_LAYER_CKPT'
+    assert len(result[1]) == 40 and struct.unpack('<i', result[1][-4:])[0] == 1
     return result
 
 
@@ -222,15 +222,15 @@ def main():
     manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
 
     payloads = records(checkpoint(case))
-    original_output_index = struct.unpack('<i', payloads[5][:4])[0]
+    original_output_index = struct.unpack('<i', payloads[4][:4])[0]
     assert original_output_index < 10000
-    checkpoint_time = struct.unpack('<4d', payloads[4])[0]
+    checkpoint_time = struct.unpack('<4d', payloads[3])[0]
     synthetic_rows = ['snapshot_index,time_seconds'] + [
         f'{index},{checkpoint_time*index/10000:.16E}' for index in range(10000)
     ]
     manifest_path.write_text('\n'.join(synthetic_rows)+'\n')
     previous_manifest_rows = manifest_path.read_text().splitlines()
-    payloads[5] = struct.pack('<i', 10000)+payloads[5][4:]
+    payloads[4] = struct.pack('<i', 10000)+payloads[4][4:]
     write_records(checkpoint(case), payloads)
     continuation(case, end=0.045)
     run(case, 'high-index.log')
@@ -475,13 +475,13 @@ def main():
     manifest_after_fault = manifest_path.read_bytes()
     assert manifest_after_fault.endswith(b'\n') is False
     hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
-    checkpoint_time = struct.unpack('<4d', records(checkpoint(case))[4])[0]
+    checkpoint_time = struct.unpack('<4d', records(checkpoint(case))[3])[0]
     continuation(case, end=0.045)
     run(case, 'manifest-fault-rejected.log', 'manifest')
     assert tree_hashes(case/'OUTPUT'/'TEST_2D') == hashes_before
 
     checkpoint_payloads = records(checkpoint(case))
-    next_output_index = struct.unpack('<i', checkpoint_payloads[5][:4])[0]
+    next_output_index = struct.unpack('<i', checkpoint_payloads[4][:4])[0]
     recovered_rows = intact_manifest.decode().splitlines()
     assert len(recovered_rows) == next_output_index+1
     assert float(recovered_rows[-1].split(',')[1]) == checkpoint_time
@@ -563,7 +563,7 @@ def main():
     run(case, 'netcdf-fault-orphan-rejected.log',
         'uncommitted snapshot directory')
     assert tree_hashes(case/'OUTPUT'/'TEST_2D') == output_hashes_before
-    next_output_index = struct.unpack('<i', records(checkpoint(case))[5][:4])[0]
+    next_output_index = struct.unpack('<i', records(checkpoint(case))[4][:4])[0]
     for directory in (case/'OUTPUT'/'TEST_2D'/'snapshots').iterdir():
         match = re.match(r'(\d+)_t_', directory.name)
         if match and int(match[1]) >= next_output_index:
@@ -587,21 +587,20 @@ def main():
             require_output(case, filename).read_bytes()
     passed('real NetCDF interruption after synced time record: partial field repaired and recovered')
 
-    case = prepare('reject-v4')
+    case = prepare('reject-incompatible-layout')
     payloads = records(source_case/'split_checkpoint.bin')
-    payloads[1] = struct.pack('<i',4)
-    with (case/'restart.bin').open('wb') as stream:
-        for payload in payloads[:-2]:
-            marker = struct.pack('<i',len(payload))
-            stream.write(marker+payload+marker)
-    continuation(case); run(case, 'rejected.log', 'Unsupported restart format version:')
-    passed('reject legacy version 4 with an explicit incompatible-format error')
+    dims = list(struct.unpack('<10i', payloads[1]))
+    dims[-1] = 2
+    payloads[1] = struct.pack('<10i',*dims)
+    write_records(case/'restart.bin',payloads)
+    continuation(case); run(case,'rejected.log','Restart dimensions or equation layout do not match')
+    passed('reject a checkpoint whose canonical layer layout is incompatible')
 
     source = text.replace(' EPS_STOP=0,', ' EPS_STOP=1.0E99,')
     full = prepare('positive-stop-full', parameter(source, 'T_END','0.03'))
     split = prepare('positive-stop-split', source)
     run(full, 'full.log'); run(split,'first.log')
-    assert struct.unpack('<4d',records(checkpoint(full))[4])[0] == 0.015
+    assert struct.unpack('<4d',records(checkpoint(full))[3])[0] == 0.015
     continuation(split); run(split,'resumed.log')
     assert records(checkpoint(full)) == records(checkpoint(split))
     for suffix in ('runout','mass_center'):

@@ -1,9 +1,15 @@
 !> \brief N8-B prescribed-rate refinement and seeded repeated production geometry checks.
 PROGRAM test_projection_stress
+  USE thermal_parameters_2d, ONLY : thermal_l1
+  USE rheology_parameters_2d, ONLY : rheology_config_type, rheology_l1
+  USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1, pore_pressure_cache_l1
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
+  USE substrate_parameters_2d, ONLY : substrate, erodible_fract, coeff_porosity
   USE geometry_2d
-  USE state_fields, ONLY : state_type,substrate_snapshot_type
+  USE state_fields, ONLY : state_type
   USE state_composition, ONLY : conservative_mass_admissible
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
@@ -38,13 +44,17 @@ PROGRAM test_projection_stress
   OPEN(NEWUNIT=unit,FILE='projection_snapshot.bin',ACCESS='STREAM', &
        FORM='UNFORMATTED',STATUS='REPLACE')
   CALL initialize_physics
+  CALL check_contact_eligibility
   CALL check_limiter_representability
+  CALL check_erodible_representability
+  CALL check_lava_energy_depletion
   CALL check_taal_saturated_species_budget
   CALL check_late_group_recipient_budget
   CALL check_injection_before_settling_budget
   CALL check_preexisting_settling_budget
   CALL check_settling_drag_transition
   CALL check_settling_newton_roots
+  CALL check_settling_activation
   CALL check_complete_physical_state
   DO dimension=1,2
      DO level=0,2
@@ -54,7 +64,7 @@ PROGRAM test_projection_stress
         CALL reset_state(.FALSE.)
         IF (level==0) THEN
            CALL check_lie_exchange_transaction
-           CALL check_lie_rejected_transaction
+           CALL check_lie_failure_status
         END IF
         DO k=1,ny
            DO j=1,nx
@@ -119,6 +129,68 @@ CONTAINS
             ERROR STOP 'Deposition limiter left negative solid mass'
     END DO
   END SUBROUTINE check_limiter_representability
+
+  !> @brief Verify the LAHAR saturated-bed erosion bound on the actual Lie update.
+  !> @details Cell (188,98), group 4, t=196.4312 s formerly produced two
+  !>          negative substrate residues of order 1E-34 m on Apple Silicon.
+  SUBROUTINE check_erodible_representability
+    REAL(wp) :: reference(nq),rates(nq),inventory(ns),erosion_rates(ns),remaining(ns)
+    REAL(wp) :: scale,dt
+    LOGICAL :: valid
+
+    dt=7.0977076815961893E-01_wp
+    inventory=[6.8056786853308694E-17_wp,2.4073983433856908E-17_wp]
+    erosion_rates=[9.5885587159041100E-17_wp,3.3917969735889375E-17_wp]
+    reference=0.0_wp
+    rates=0.0_wp
+    reference(idx_totMassEqn)=1.0_wp
+    reference(idx_engyEqn)=1.0E+06_wp
+    reference(idx_solidEqn_first:idx_solidEqn_last)=0.1_wp
+    rates(idx_totMassEqn)=SUM(erosion_rates)*1000.0_wp
+    rates(idx_solidEqn_first:idx_solidEqn_last)=erosion_rates*1000.0_wp
+
+    CALL limit_explicit_source_rates(reference,inventory,dt,rates,erosion_rates,scale,valid)
+    IF (.NOT.valid) ERROR STOP 'LAHAR saturated-bed erosion rate rejected'
+    IF (scale>=1.0_wp) ERROR STOP 'LAHAR saturated-bed erosion did not reserve rounding margin'
+    remaining=inventory-dt*(scale*erosion_rates)
+    IF (ANY(remaining<0.0_wp)) ERROR STOP 'LAHAR saturated-bed erosion left negative inventory'
+    IF (ANY(remaining>8192.0_wp*EPSILON(1.0_wp)*inventory)) &
+        ERROR STOP 'LAHAR saturated-bed erosion limiter over-reduced the physical transfer'
+  END SUBROUTINE check_erodible_representability
+
+  ! Etna lava group 4, cell (791,494), t=4440.8249 s:
+  ! the original mass budget is nonnegative but energy rounds to zero
+  ! with a wet residue of 2*EPSILON. The coupled withdrawal limiter must
+  ! leave a reconstructable wet state, not adjust q after the update.
+  SUBROUTINE check_lava_energy_depletion
+    REAL(wp) :: recipient(nq),rates(nq),candidate(nq),scale,dt
+    REAL(wp) :: raw_candidate(nq)
+    LOGICAL :: valid
+
+    recipient=0.0_wp
+    rates=0.0_wp
+    dt=7.3281621641375327E-01_wp
+    recipient(idx_totMassEqn)=1.9043435144233587E+00_wp
+    recipient(idx_engyEqn)=2.1038749547555055E+06_wp
+    rates(idx_totMassEqn)=-2.5986645379421467E+00_wp
+    rates(idx_engyEqn)=-2.8709448667108133E+06_wp
+    raw_candidate=recipient+dt*rates
+    IF (raw_candidate(idx_totMassEqn)<=EPSILON(1.0_wp) .OR. &
+        raw_candidate(idx_engyEqn)/=0.0_wp) &
+        ERROR STOP 'Etna lava conversion regression witness no longer reproduces'
+
+    CALL limit_explicit_source_rates(recipient,[REAL(wp)::],dt,rates, &
+        [REAL(wp)::],scale,valid)
+    IF (.NOT.valid) ERROR STOP 'Etna lava energy limiter rejected candidate'
+    candidate=recipient+dt*(scale*rates)
+    IF (.NOT.conservative_mass_admissible(candidate)) &
+        ERROR STOP 'Etna lava energy limiter violates conservative mass bounds'
+    IF (candidate(idx_totMassEqn)>EPSILON(1.0_wp) .AND. &
+        candidate(idx_engyEqn)<=0.0_wp) &
+        ERROR STOP 'Etna lava limiter left wet state without positive energy'
+    ! Also check the unchanged zero-transfer limit: no fictitious heat added.
+    IF (scale<0.0_wp .OR. scale>1.0_wp) ERROR STOP 'Invalid lava rate scale'
+  END SUBROUTINE check_lava_energy_depletion
 
   !> Exact conservative witness from EXAMPLE_TAAL group 4, cell (224,379).
   !> The unbuffered active species bound rounded to a negative 1.43E-20.
@@ -251,32 +323,99 @@ CONTAINS
         ERROR STOP 'Two-budget limiter accepted negative solid mass'
   END SUBROUTINE check_preexisting_settling_budget
 
+  !> \brief Verify that column contacts gate actual terrain/atmosphere exchange rates.
+  SUBROUTINE check_contact_eligibility
+    USE layer_contacts_2d, ONLY : layer_contacts_type,evaluate_layer_contacts
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS,SOURCE_ID_EXCHANGE_ENTRAINMENT
+    USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
+    USE state_types, ONLY : physical_state_real,initialize_physical_state_real
+    USE state_physical, ONLY : build_physical_state_from_qp
+    TYPE(layer_contacts_type) :: contacts
+    TYPE(physical_state_real) :: wet
+    TYPE(mass_exchange_rates_type) :: transfers
+    REAL(wp) :: primitive(n_vars),rates(n_eqns)
+    REAL(wp), PARAMETER :: columns(2,4)=RESHAPE([1.0_wp,1.0_wp,0.0_wp,0.0_wp, &
+        1.0_wp,0.0_wp,0.0_wp,1.0_wp],[2,4])
+    LOGICAL :: valid
+    INTEGER :: cell_case,layer,mask
+
+    primitive=0.0_wp
+    primitive(idx_h)=2.0_wp
+    primitive(idx_u)=3.0_wp
+    primitive(idx_v)=4.0_wp
+    primitive(idx_T)=320.0_wp
+    primitive(idx_solid_first)=0.15_wp
+    primitive(idx_solid_first+1)=0.05_wp
+    CALL initialize_physical_state_real(wet)
+    CALL build_physical_state_from_qp(primitive,wet)
+    mass_exchange_l1%carrier_liquid_loss%loss_rate=0.05_wp
+    mass_exchange_l1%entrainment%flag=.TRUE.
+
+    DO cell_case=1,4
+       CALL evaluate_layer_contacts(columns(:,cell_case),contacts,valid)
+       IF (.NOT.valid) ERROR STOP 'Invalid test column contacts'
+       DO layer=1,2
+          mask=IBSET(0,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
+          CALL eval_mass_exchange_explicit(rheology_l1,mass_exchange_l1,wet,0, &
+              [0.0_wp,0.0_wp],1.0_wp,mask,transfers,rates, &
+              transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
+              terrain_exposed=contacts%terrain_exposed(layer), &
+              atmosphere_exposed=contacts%atmosphere_exposed(layer), &
+               static_deposition_allowed=layer==1)
+          IF (contacts%terrain_exposed(layer)) THEN
+             IF (rates(idx_totMassEqn)>=0.0_wp) ERROR STOP 'Terrain contact did not enable carrier loss'
+          ELSE
+             IF (ANY(rates/=0.0_wp)) ERROR STOP 'Carrier loss without terrain contact'
+          END IF
+
+          mask=IBSET(0,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
+          CALL eval_mass_exchange_explicit(rheology_l1,mass_exchange_l1,wet,0, &
+              [0.0_wp,0.0_wp],1.0_wp,mask,transfers,rates, &
+              transport_stochastic=.FALSE.,pore_enabled=.FALSE., &
+              terrain_exposed=contacts%terrain_exposed(layer), &
+              atmosphere_exposed=contacts%atmosphere_exposed(layer), &
+               static_deposition_allowed=layer==1)
+          IF (contacts%atmosphere_exposed(layer)) THEN
+             IF (rates(idx_totMassEqn)<=0.0_wp) ERROR STOP 'Atmosphere contact did not enable entrainment'
+          ELSE
+             IF (ANY(rates/=0.0_wp)) ERROR STOP 'Entrainment without atmosphere contact'
+          END IF
+       END DO
+    END DO
+    mass_exchange_l1%carrier_liquid_loss%loss_rate=0.0_wp
+    mass_exchange_l1%entrainment%flag=.FALSE.
+  END SUBROUTINE check_contact_eligibility
+
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics
     n_solid=ns; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
     kt_trace_reconstruction = 'froude_blend'
-    n_vars=nq; n_eqns=nq
+    n_vars=nq; n_eqns=nq; n_layers=1
     CALL configure_canonical_state_indices()
-    gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.; rheology_model='none'
-    stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
-    gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
-    sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; topo_change_flag=.TRUE.
+    gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.
+    rheology_l1%stochastic_rheology_flag=.FALSE.; pore_pressure_l1%pore_pressure_flag=.FALSE.
+    pore_pressure_l1%gas_loss_flag=.FALSE.
+    mass_exchange_l1%vaporization%liquid_vaporization_flag=.FALSE.
+    mass_exchange_l1%entrainment%flag=.FALSE.
+    sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; substrate%topo_change_flag=.TRUE.
     n_fissures=0
-    erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
+    substrate%erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.; radial_source_flag=.FALSE.
-    erosion_coeff=1000.0_wp; settling_flag=.FALSE.; alphastot_min=0.0_wp
-    erodible_porosity=0.25_wp; coeff_porosity=erodible_porosity/(1.0_wp-erodible_porosity)
-    grav=9.81_wp; rho_a_amb=1.2_wp; T_ambient=300.0_wp; T_erodible=317.0_wp
-    rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l; rho_c_sub=rho_l
+    mass_exchange_l1%erosion%coefficient=1000.0_wp
+    mass_exchange_l1%deposition%settling_flag=.FALSE.; alphastot_min=0.0_wp
+    substrate%erodible_porosity=0.25_wp; coeff_porosity=substrate%erodible_porosity/(1.0_wp-substrate%erodible_porosity)
+    grav=9.81_wp; rho_a_amb=1.2_wp; T_ambient=300.0_wp; substrate%T_ground=317.0_wp
+    rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l
     sp_heat_l=4180.0_wp; sp_heat_a=998.0_wp; sp_gas_const_a=287.05_wp
     pres=101300.0_wp; inv_pres=1.0_wp/pres
-    kin_visc_c=1.0E-6_wp; hydraulic_permeability=0.0_wp; maximum_solid_packing=0.6_wp
+    kin_visc_c=1.0E-6_wp; pore_pressure_l1%hydraulic_permeability=0.0_wp; maximum_solid_packing=0.6_wp
     eps_sing=1.0E-8_wp; eps_sing4=eps_sing**4; verbose_level=0
     ALLOCATE(rho_s(ns),inv_rho_s(ns),sp_heat_s(ns),diam_s(ns),erodible_fract(ns))
-    ALLOCATE(sp_heat_g(0),sp_gas_const_g(0),loss_rate)
+    ALLOCATE(sp_heat_g(0),sp_gas_const_g(0))
     rho_s=[2000.0_wp,3000.0_wp]; inv_rho_s=1.0_wp/rho_s
     sp_heat_s=[900.0_wp,1100.0_wp]; diam_s=[1.0E-4_wp,2.0E-4_wp]
-    erodible_fract=[0.6_wp,0.4_wp]; loss_rate=0.0_wp
+    erodible_fract=[0.6_wp,0.4_wp]
+    mass_exchange_l1%carrier_liquid_loss%loss_rate=0.0_wp
   END SUBROUTINE initialize_physics
 
   !> \brief Check continuity of the settling drag closure at physical Re=1000.
@@ -293,22 +432,22 @@ CONTAINS
 
     const_part=SQRT((4.0_wp/3.0_wp)*(solid_density/carrier_density-1.0_wp)*diam*grav)
     DO mode=1,2
-       collective_settling_flag=(mode==2)
-       IF (collective_settling_flag) THEN
+       mass_exchange_l1%deposition%collective_settling_flag=(mode==2)
+       IF (mass_exchange_l1%deposition%collective_settling_flag) THEN
           ! Use a positive, smooth collective correction at the transition.
-          A_drag=0.01_wp
-          B_drag=1.0_wp
+          mass_exchange_l1%deposition%A_drag=0.01_wp
+          mass_exchange_l1%deposition%B_drag=1.0_wp
        END IF
        cd_transition=24.0_wp*(1.0_wp+0.15_wp*re_transition**0.687_wp)/re_transition
-       IF (collective_settling_flag) cd_transition=cd_transition+ &
-            A_drag*(LOG(re_transition)-B_drag)
+       IF (mass_exchange_l1%deposition%collective_settling_flag) cd_transition=cd_transition+ &
+            mass_exchange_l1%deposition%A_drag*(LOG(re_transition)-mass_exchange_l1%deposition%B_drag)
        initial_re_transition=re_transition*SQRT(cd_transition)
        inv_visc=initial_re_transition/(diam*const_part)
 
-       w_below=settling_velocity(diam,solid_density,carrier_density, &
+       w_below=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density, &
             inv_visc*(1.0_wp-delta))
-       w_at=settling_velocity(diam,solid_density,carrier_density,inv_visc)
-       w_above=settling_velocity(diam,solid_density,carrier_density, &
+       w_at=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density,inv_visc)
+       w_above=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density, &
             inv_visc*(1.0_wp+delta))
        w_expected=const_part/SQRT(cd_transition)
 
@@ -327,8 +466,8 @@ CONTAINS
        IF (ABS(w_above-w_expected)>64.0_wp*EPSILON(1.0_wp)*w_expected) &
            ERROR STOP 'incorrect constant high-Re settling drag'
     END DO
-    collective_settling_flag=.FALSE.
-    IF (settling_velocity(diam,carrier_density,carrier_density,inv_visc)/=0.0_wp) &
+    mass_exchange_l1%deposition%collective_settling_flag=.FALSE.
+    IF (settling_velocity(mass_exchange_l1,diam,carrier_density,carrier_density,inv_visc)/=0.0_wp) &
          ERROR STOP 'no buoyant settling at equal density'
   END SUBROUTINE check_settling_drag_transition
 
@@ -339,29 +478,30 @@ CONTAINS
   SUBROUTINE check_settling_newton_roots
     USE mass_exchange_deposition_2d, ONLY : settling_velocity
     REAL(wp), PARAMETER :: diam=1.0E-4_wp, solid_density=2000.0_wp, carrier_density=1.2_wp
-    REAL(wp), PARAMETER :: reference_re(*)=[1.0E-5_wp,1.0E-2_wp,1.0_wp,10.0_wp, &
-         100.0_wp,500.0_wp,999.0_wp,1000.0_wp,1100.0_wp,3000.0_wp]
+    REAL(wp), PARAMETER :: reference_re(*)=[1.0E-5_wp,1.0E-2_wp,1.0_wp,9.2_wp, &
+         9.3_wp,9.4_wp,10.0_wp,100.0_wp,500.0_wp,999.0_wp,1000.0_wp,1100.0_wp,3000.0_wp]
     REAL(wp) :: cd_transition, cd, reference, inv_visc, speed, actual_re, k
     INTEGER :: mode,i
 
     k=SQRT((4.0_wp/3.0_wp)*(solid_density/carrier_density-1.0_wp)*diam*grav)
     DO mode=1,2
-       collective_settling_flag=(mode==2)
-       A_drag=0.01_wp
-       B_drag=1.0_wp
+       mass_exchange_l1%deposition%collective_settling_flag=(mode==2)
+       mass_exchange_l1%deposition%A_drag=0.01_wp
+       mass_exchange_l1%deposition%B_drag=1.0_wp
        cd_transition=24.0_wp*(1.0_wp+0.15_wp*1000.0_wp**0.687_wp)/1000.0_wp
-       IF (collective_settling_flag) cd_transition=cd_transition+ &
-            A_drag*(LOG(1000.0_wp)-B_drag)
+       IF (mass_exchange_l1%deposition%collective_settling_flag) cd_transition=cd_transition+ &
+            mass_exchange_l1%deposition%A_drag*(LOG(1000.0_wp)-mass_exchange_l1%deposition%B_drag)
        DO i=1,SIZE(reference_re)
           reference=reference_re(i)
           IF (reference<=1000.0_wp) THEN
              cd=24.0_wp*(1.0_wp+0.15_wp*reference**0.687_wp)/reference
-             IF (collective_settling_flag) cd=cd+A_drag*(LOG(reference)-B_drag)
+             IF (mass_exchange_l1%deposition%collective_settling_flag) &
+                 cd=cd+mass_exchange_l1%deposition%A_drag*(LOG(reference)-mass_exchange_l1%deposition%B_drag)
           ELSE
              cd=cd_transition
           END IF
           inv_visc=reference*SQRT(cd)/(diam*k)
-          speed=settling_velocity(diam,solid_density,carrier_density,inv_visc)
+          speed=settling_velocity(mass_exchange_l1,diam,solid_density,carrier_density,inv_visc)
           actual_re=diam*speed*inv_visc
           IF (ABS(actual_re-reference)>1.0E-8_wp*reference) THEN
              WRITE(*,*) 'FAIL: settling root',mode,reference,actual_re
@@ -369,8 +509,40 @@ CONTAINS
           END IF
        END DO
     END DO
-    collective_settling_flag=.FALSE.
+    mass_exchange_l1%deposition%collective_settling_flag=.FALSE.
   END SUBROUTINE check_settling_newton_roots
+
+  !> @brief Verify disabled settling and explicit interlayer-style activation.
+  !> @details The override must take precedence in both directions without changing
+  !> the state of the layer's own settling configuration.
+  SUBROUTINE check_settling_activation
+    USE mass_exchange_deposition_2d, ONLY : eval_deposition_volume_kernel
+    TYPE(rheology_config_type) :: config
+    REAL(wp) :: deposition(ns)
+
+    config=rheology_l1
+    config%rheology_model='lahar'
+    config%alpha1_coeff=1.0_wp
+    config%beta1=2.0_wp
+    mass_exchange_l1%deposition%settling_flag=.FALSE.
+
+    CALL eval_deposition_volume_kernel(config,mass_exchange_l1,2.0_wp,293.15_wp, &
+         [0.1_wp,0.05_wp],0.15_wp,1400.0_wp,1000.0_wp,1.0_wp,deposition)
+    IF (ANY(deposition/=0.0_wp)) ERROR STOP 'Disabled settling produced deposition'
+
+    CALL eval_deposition_volume_kernel(config,mass_exchange_l1,2.0_wp,293.15_wp, &
+         [0.1_wp,0.05_wp],0.15_wp,1400.0_wp,1000.0_wp,1.0_wp,deposition, &
+         enable_settling=.TRUE.)
+    IF (.NOT.ALL(deposition>0.0_wp)) ERROR STOP 'Settling override did not activate deposition'
+
+    mass_exchange_l1%deposition%settling_flag=.TRUE.
+    CALL eval_deposition_volume_kernel(config,mass_exchange_l1,2.0_wp,293.15_wp, &
+         [0.1_wp,0.05_wp],0.15_wp,1400.0_wp,1000.0_wp,1.0_wp,deposition, &
+         enable_settling=.FALSE.)
+    IF (ANY(deposition/=0.0_wp)) ERROR STOP 'Settling override did not disable deposition'
+
+    mass_exchange_l1%deposition%settling_flag=.FALSE.
+  END SUBROUTINE check_settling_activation
 
   !> \brief Verify that cached real and complex physical properties are complete.
   SUBROUTINE check_complete_physical_state
@@ -452,8 +624,8 @@ CONTAINS
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
     ALLOCATE(grav_coeff(nx,ny),grav_coeff_stag_x(nx+1,ny),grav_coeff_stag_y(nx,ny+1))
     ALLOCATE(state%deposit(nx,ny,ns),state%erosion(nx,ny,ns), &
-         state%erodible(ns,nx,ny),state%lava_deposit(nx,ny))
-    ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
+         state%erodible(ns,nx,ny),state%deposit_tot(nx,ny))
+    ALLOCATE(state%erosion_tot(nx,ny))
     state%deposit_tot=0.0_wp;state%erosion_tot=0.0_wp
     ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
     ALLOCATE(cell_fissure_fractions(nx,ny,n_fissures))
@@ -469,7 +641,7 @@ CONTAINS
     LOGICAL, INTENT(IN) :: wet_dry
     INTEGER :: a,b,l
     REAL(wp) :: x,y,carrier_mass
-    state%deposit=0.0_wp; state%erosion=0.0_wp; state%erodible=0.0_wp; state%lava_deposit=0.0_wp
+    state%deposit=0.0_wp; state%erosion=0.0_wp; state%erodible=0.0_wp; state%deposit_tot=0.0_wp
     B_zone=0; cell_source_fractions=0.0_wp
     qp=0.0_wp; qp(4,:,:)=T_ambient
     l=0
@@ -507,6 +679,7 @@ CONTAINS
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
+    REAL(wp) :: q_work(nq,1,nx,ny),qp_work(nq,1,nx,ny)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: bed_before(nx+1,ny+1),available_before(ns,nx,ny)
     REAL(wp) :: pressure,fluid_delta,solid_delta,inventory_delta
@@ -528,18 +701,29 @@ CONTAINS
        END DO
     END DO
     q_before=q;qp_before=qp
+    q_work(:,1,:,:)=q;qp_work(:,1,:,:)=qp
     deposited_before=state%deposit;eroded_before=state%erosion
     bed_before=B_vertex;available_before=state%erodible
     CALL initialize_lie_source_executor(executor,registry)
-    CALL execute_lie_source_groups(executor,state,q,qp,1.0_wp,domain, &
-         q_original=q_before,qp_original=qp_before, &
-         step_failed=failed,failure_message=message)
+    ! The standalone executor test owns the same sparse geometry
+    ! transaction as the production Lie timestep driver.
+    CALL begin_geometry_transaction(sparse=.TRUE.)
+    CALL execute_lie_source_groups(executor,state,q_work,qp_work,1.0_wp,domain, &
+         q_original=RESHAPE(q_before,[nq,1,nx,ny]),qp_original=RESHAPE(qp_before,[nq,1,nx,ny]), &
+         step_failed=failed,failure_message=message,thermal=[thermal_l1],rheology=[rheology_l1], &
+          pore_pressure=[pore_pressure_l1],pore_cache=[pore_pressure_cache_l1], &
+          mass_config=[mass_exchange_l1], &
+           transport_stochastic=[.FALSE.],pore_enabled=[pore_pressure_l1%pore_pressure_flag], &
+           stochastic_enabled=[rheology_l1%stochastic_rheology_flag])
     IF (failed) THEN
+       CALL rollback_geometry_transaction
        WRITE(error_unit,'(A)') 'Lie exchange transaction rejected: '//TRIM(message)
        WRITE(error_unit,'(A,I0,A,I0)') 'Lie exchange workset=',domain%solve_cells,', group=',groups(1)%id
        FLUSH(error_unit)
        ERROR STOP 'Lie exchange transaction rejected'
     END IF
+    CALL commit_geometry_transaction
+    q=q_work(:,1,:,:);qp=qp_work(:,1,:,:)
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
     solid_delta=SUM(q(5:6,:,:)-q_before(5:6,:,:))
     inventory_delta=SUM(state%erosion-eroded_before)
@@ -565,25 +749,21 @@ CONTAINS
     CALL reset_state(.FALSE.)
   END SUBROUTINE check_lie_exchange_transaction
 
-  !> A later-cell failure invalidates the whole Lie time-step.
-  !> The caller must restore substrate and geometry snapshots, while the
-  !> partially updated fluid trial is never published.
-  SUBROUTINE check_lie_rejected_transaction
+  !> A later-cell rejection must be reported to the fatal-only timestep.
+  !> This direct-executor regression checks failure propagation, not a
+  !> recoverable rollback of substrate inventories or published fluid fields.
+  SUBROUTINE check_lie_failure_status
     TYPE(source_registry_type) :: registry
     TYPE(lie_source_executor_type) :: executor
     TYPE(source_group_type) :: groups(1)
-    TYPE(substrate_snapshot_type) :: substrate_before
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq,nx,ny)
-    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq,nx,ny)
+    REAL(wp) :: q_work(nq,1,nx,ny),qp_work(nq,1,nx,ny)
     REAL(wp) :: qp_invalid(nq,nx,ny)
-    REAL(wp) :: bed_before(nx+1,ny+1)
-    REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
-    REAL(wp) :: erodible_before(ns,nx,ny),lava_before(nx,ny)
-    REAL(wp) :: centers_before(nx,ny),slope_before(nx,ny)
     REAL(wp) :: pressure
     INTEGER :: a,b,l
     LOGICAL :: failed,accepted
     CHARACTER(LEN=256) :: error,message
+
     CALL reset_state(.FALSE.)
     groups(1)%id=0
     groups(1)%method=SOURCE_METHOD_EXPLICIT
@@ -591,6 +771,7 @@ CONTAINS
     groups(1)%equation_ids=[(l,l=1,nq)]
     CALL registry%initialize(nq,0,groups,error)
     IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
+
     DO b=1,ny
        DO a=1,nx
           CALL conservative_to_primitive(q(:,a,b),qp(:,a,b),accepted,pressure)
@@ -598,40 +779,35 @@ CONTAINS
           state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
     END DO
-    q_before=q;qp_before=qp
-    bed_before=B_vertex
-    deposited_before=state%deposit;eroded_before=state%erosion
-    erodible_before=state%erodible;lava_before=state%lava_deposit
-    centers_before=B_cent;slope_before=B_prime_x_geom
-    q_trial=q_before;qp_trial=qp_before
-    ! Cell 2 is rejected after cell 1 has been considered for transfer.
-    ! An independent immutable pre-spatial input avoids aliasing an INTENT(INOUT)
-    ! candidate with the executor's INTENT(IN) GROUP-0 reference.
+
+    q_before=q
+    qp_before=qp
+    q_work(:,1,:,:)=q_before
+    qp_work(:,1,:,:)=qp_before
+
+    ! A rejected cell follows a valid one. The executor may have modified
+    ! its trial and shared substrate arrays when reporting the failure.
     qp_invalid=qp_before
     qp_invalid(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
-    CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
     CALL initialize_lie_source_executor(executor,registry)
-    CALL execute_lie_source_groups(executor,state,q_trial,qp_trial,1.0_wp,domain, &
-         q_original=q_before,qp_original=qp_invalid, &
-         step_failed=failed,failure_message=message)
+    CALL execute_lie_source_groups(executor,state,q_work,qp_work,1.0_wp,domain, &
+         q_original=RESHAPE(q_before,[nq,1,nx,ny]),qp_original=RESHAPE(qp_invalid,[nq,1,nx,ny]), &
+         step_failed=failed,failure_message=message,thermal=[thermal_l1],rheology=[rheology_l1], &
+         pore_pressure=[pore_pressure_l1],pore_cache=[pore_pressure_cache_l1], &
+         mass_config=[mass_exchange_l1], &
+         transport_stochastic=[.FALSE.],pore_enabled=[pore_pressure_l1%pore_pressure_flag], &
+         stochastic_enabled=[rheology_l1%stochastic_rheology_flag])
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
-    CALL state%restore_substrate(substrate_before)
+
+    ! Dispose of this test's geometry transaction. Production treats the
+    ! rejected timestep as fatal and never promises substrate recovery.
     CALL rollback_geometry_transaction
-    ! Fluid workspaces are not published by the Lie driver on rejection.
-    q_trial=q_before;qp_trial=qp_before
-    IF (ANY(q_trial/=q_before) .OR. ANY(qp_trial/=qp_before)) &
-         ERROR STOP 'Rejected Lie fluid state changed'
-    IF (ANY(B_vertex/=bed_before) .OR. ANY(B_cent/=centers_before) .OR. &
-         ANY(B_prime_x_geom/=slope_before)) ERROR STOP 'Lie bed rollback mismatch'
-    IF (ANY(state%deposit/=deposited_before) .OR. ANY(state%erosion/=eroded_before) .OR. &
-         ANY(state%erodible/=erodible_before) .OR. ANY(state%lava_deposit/=lava_before)) &
-         ERROR STOP 'Lie inventory rollback mismatch'
     CALL finalize_lie_source_executor(executor)
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
-  END SUBROUTINE check_lie_rejected_transaction
+  END SUBROUTINE check_lie_failure_status
 
   !> \brief Generate reproducible rates with a portable nonoverflowing integer generator.
   !> \param[in] signed_rate Allow either deposition-like or erosion-like bed proposals.
@@ -805,7 +981,7 @@ CONTAINS
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
     DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_zone,cell_source_fractions)
     DEALLOCATE(cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y)
-    DEALLOCATE(state%deposit,state%erosion,state%erodible,state%lava_deposit, &
+    DEALLOCATE(state%deposit,state%erosion,state%erodible, &
          state%deposit_tot,state%erosion_tot)
   END SUBROUTINE release_grid
 END PROGRAM test_projection_stress

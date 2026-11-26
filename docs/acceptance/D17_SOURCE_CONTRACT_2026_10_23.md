@@ -1,3 +1,7 @@
+> Historical source links: retired paths below now lead to their Git history,
+> not to a current production module. Line numbers from the original audit
+> must not be interpreted as current source positions.
+
 # D17 source-term inventory and compatibility contract — 23 October 2026
 
 Status: **inventory and contracts documented; runtime D17 not implemented**.
@@ -90,24 +94,24 @@ current interfaces, owners and evaluation batches are in the manifest.
 | `RHEOLOGY_MUI_FRICTION` | [eval_mui_momentum_rate](../../src/physics/rheology_laws/rheology_mui_2d.f90#L139) | SI / stage 3 |
 | `RHEOLOGY_MUI_VOELLMY_FRICTION` | [eval_mui_voellmy_momentum_rate](../../src/physics/rheology_laws/rheology_mui_voellmy_2d.f90#L209) | SI / stage 3 |
 | `RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG` | [eval_mui_voellmy_implicit_momentum_rate](../../src/physics/rheology_laws/rheology_mui_voellmy_2d.f90#L157) | I / stage 3 |
-| `THERMAL_RADIATIVE_COOLING` | [eval_rheology_cooling_energy_rate](../../src/physics/thermal_laws_2d.f90#L98) | A/I / stage 1 |
-| `THERMAL_CONVECTIVE_COOLING` | [eval_rheology_cooling_energy_rate](../../src/physics/thermal_laws_2d.f90#L98) | A/I / stage 1 |
-| `PORE_PRESSURE_DISSIPATION` | [eval_pore_pressure_diffusion_source](../../src/physics/pore_pressure_laws_2d.f90#L56) | A/I / stage 2 |
+| `THERMAL_RADIATIVE_COOLING` | [eval_rheology_cooling_energy_rate](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/thermal_laws_2d.f90) | A/I / stage 1 |
+| `THERMAL_CONVECTIVE_COOLING` | [eval_rheology_cooling_energy_rate](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/thermal_laws_2d.f90) | A/I / stage 1 |
+| `PORE_PRESSURE_DISSIPATION` | [eval_pore_pressure_diffusion_source](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/pore_pressure_laws_2d.f90) | A/I / stage 2 |
 | `BOTTOM_CIRCULAR_INJECTION` | [eval_expl_terms](../../src/physics/equation_terms_2d.f90#L109) | EX / stage 4 |
 | `BOTTOM_FISSURAL_INJECTION` | [eval_expl_terms](../../src/physics/equation_terms_2d.f90#L109) | EX / stage 4 |
 | `RADIAL_INJECTION` | [eval_expl_terms](../../src/physics/equation_terms_2d.f90#L109) | EX / stage 4 |
 | `GEOMETRY_CURVATURE` | [eval_curvature_momentum_source](../../src/physics/equation_terms_2d.f90#L1517) | EX / stage 4 |
 | `BOUNDARY_INJECTION` | [eval_source_bdry](../../src/physics/equation_terms_2d.f90#L1169) | B / stage 4 |
-| `MASS_EXCHANGE_EROSION` | [eval_erosion_rates](../../src/physics/mass_exchange_laws_2d.f90#L235) | M / step 1 |
-| `MASS_EXCHANGE_DEPOSITION` | [eval_solid_deposition_rate](../../src/physics/mass_exchange_laws_2d.f90#L146) | M / step 1 |
+| `MASS_EXCHANGE_EROSION` | [eval_erosion_rates](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/mass_exchange_laws_2d.f90) | M / step 1 |
+| `MASS_EXCHANGE_DEPOSITION` | [eval_solid_deposition_rate](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/mass_exchange_laws_2d.f90) | M / step 1 |
 | `MASS_EXCHANGE_CARRIER_LIQUID_LOSS` | [eval_mass_exchange_terms](../../src/physics/equation_terms_2d.f90#L843) | M / step 1 |
 | `MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS` | [eval_mass_exchange_terms](../../src/physics/equation_terms_2d.f90#L843) | M / step 1 |
-| `MASS_EXCHANGE_CARRIER_DARCY_LOSS` | [eval_pore_pressure_gas_loss](../../src/physics/pore_pressure_laws_2d.f90#L200) | M / step 1 |
-| `MASS_EXCHANGE_ENTRAINMENT` | [eval_air_entrainment_rate](../../src/physics/mass_exchange_laws_2d.f90#L304) | M / step 1 |
-| `MASS_EXCHANGE_VAPORIZATION` | [eval_vaporization_mass_rate](../../src/physics/thermal_laws_2d.f90#L294) | M / step 1 |
-| `INLET_THERMAL_COUPLING` | [eval_inlet_thermal_energy_source](../../src/physics/thermal_laws_2d.f90#L46) | D / parent |
-| `INLET_PORE_COUPLING` | [eval_pore_pressure_inlet_source](../../src/physics/pore_pressure_laws_2d.f90#L329) | D / parent |
-| `MASS_PORE_COUPLING` | [eval_pore_pressure_mass_exchange_source](../../src/physics/pore_pressure_laws_2d.f90#L355) | D / parent |
+| `MASS_EXCHANGE_CARRIER_DARCY_LOSS` | [eval_pore_pressure_gas_loss](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/pore_pressure_laws_2d.f90) | M / step 1 |
+| `MASS_EXCHANGE_ENTRAINMENT` | [eval_air_entrainment_rate](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/mass_exchange_laws_2d.f90) | M / step 1 |
+| `MASS_EXCHANGE_VAPORIZATION` | [eval_vaporization_mass_rate](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/thermal_laws_2d.f90) | M / step 1 |
+| `INLET_THERMAL_COUPLING` | [eval_inlet_thermal_energy_source](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/thermal_laws_2d.f90) | D / parent |
+| `INLET_PORE_COUPLING` | [eval_pore_pressure_inlet_source](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/pore_pressure_laws_2d.f90) | D / parent |
+| `MASS_PORE_COUPLING` | [eval_pore_pressure_mass_exchange_source](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/physics/pore_pressure_laws_2d.f90) | D / parent |
 | `MASS_STOCHASTIC_COUPLING` | [eval_mass_exchange_terms](../../src/physics/equation_terms_2d.f90#L843) | D / parent |
 
 ## Numerical and API contracts

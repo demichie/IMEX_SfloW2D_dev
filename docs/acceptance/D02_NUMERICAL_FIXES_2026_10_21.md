@@ -6,7 +6,7 @@ failure counts remain historical evidence. This follow-up records production
 corrections and the additional regression checks needed before D03.
 
 Status: **LOCAL ACCEPTANCE COMPLETE**. Focused checks and the full local regression matrix passed.
-Machine-readable evidence: [results](results_d02_numerical_fixes_2026_10_21.json).
+Machine-readable evidence: [results](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_d02_numerical_fixes_2026_10_21.json).
 Reproduction commands: [suite README](../../TESTS/TEST_RHEOLOGY_CELL_LOCAL/README.md).
 
 ## Corrections and explicit contracts

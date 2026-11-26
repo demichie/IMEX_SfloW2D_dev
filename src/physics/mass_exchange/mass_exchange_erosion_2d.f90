@@ -2,12 +2,14 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_erosion_2d
-    USE parameters_2d, ONLY : wp, n_solid, erodible_deposit_flag,                                                      &
+    USE parameters_2d, ONLY : wp, n_solid, gas_flag,                                                          &
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract,                           &
-            alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
+    USE constitutive_parameters_2d, ONLY : alphastot_min, rho_l, pres, sp_gas_const_a
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s
+    USE substrate_parameters_2d, ONLY : substrate, erodible_fract
     IMPLICIT NONE
     PRIVATE
 
@@ -25,28 +27,36 @@ CONTAINS
         !> @param[in] erodible Available erodible solid inventory by species [m].
         !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_explicit(state,erodible,dt,r)
+        !> @param[in] mass_config Immutable layer erosion parameters.
+    SUBROUTINE eval_mass_exchange_erosion_explicit(mass_config,state,erodible,dt,r)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: erodible(n_solid), dt
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-            REAL(wp) :: normal_speed, substrate_temperature, alpha
+            REAL(wp) :: normal_speed, substrate_temperature, alpha, rho_c_sub
 
             CALL reset_mass_exchange_rates(r)
             alpha=SUM(state%alphas)
             IF (alpha<=alphastot_min) RETURN
+            IF (gas_flag) THEN
+                rho_c_sub=pres/(sp_gas_const_a*substrate%T_ground)
+            ELSE
+                rho_c_sub=rho_l
+            END IF
             normal_speed=state%mod_vel
 
             ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
-            CALL eval_erosion_volume_kernel(state%h, normal_speed, alpha, erodible, dt, r%solid_erosion_rate,          &
+            CALL eval_erosion_volume_kernel(mass_config,state%h,normal_speed,alpha,erodible,dt, &
+                r%solid_erosion_rate, &
                 r%carrier_erosion_rate)
             r%solid_mass_rate=rho_s*r%solid_erosion_rate
             r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%carrier_erosion_rate
-            substrate_temperature=T_erodible
-            IF (erodible_deposit_flag) substrate_temperature=state%T
+            substrate_temperature=substrate%T_ground
+            IF (substrate%erodible_deposit_flag) substrate_temperature=state%T
             r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+                                     &
                         rho_c_sub*state%cp_c*r%carrier_erosion_rate)
-            r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
+            r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-substrate%erodible_porosity)
     END SUBROUTINE eval_mass_exchange_erosion_explicit
 
         !> @brief Reject unsupported semi-implicit treatment for erosion.
@@ -98,22 +108,26 @@ CONTAINS
     END SUBROUTINE solve_mass_exchange_erosion_analytic
 
         !> @brief Compute erosion volumes under the finite erodible-bed inventory constraint.
-        !> @param[in] r_h Mobile flow thickness [m].
-        !> @param[in] mod_vel Slope-corrected flow speed [m/s].
-        !> @param[in] alphas_tot Total solid volume fraction.
-        !> @param[in] erodible Available erodible solid inventory by species [m].
-        !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+        !> @param[in] flow_depth Mobile flow thickness [m].
+        !> @param[in] speed Slope-corrected flow speed [m/s].
+        !> @param[in] total_solid_fraction Total solid volume fraction.
+        !> @param[in] erodible_inventory Available erodible solid inventory by species [m].
+        !> @param[in] time_step Physical step duration [s]; must be positive where used as a divisor.
         !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
         !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
-    SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, erosion_rate,                    &
+        !> @param[in] mass_config Immutable layer erosion parameters.
+    SUBROUTINE eval_erosion_volume_kernel(mass_config,flow_depth,speed,total_solid_fraction,erodible_inventory, &
+            time_step,erosion_rate, &
             carrier_erosion_rate)
 
-            REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+            REAL(wp), INTENT(IN) :: flow_depth, speed, total_solid_fraction, erodible_inventory(n_solid), time_step
             REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), carrier_erosion_rate
 
-            IF (erosion_coeff .GT. 0.0_wp) THEN
-                    CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff, erodible_porosity,                &
-                        erodible_fract(1:n_solid), erodible(1:n_solid), dt, erosion_rate(1:n_solid),                   &
+            IF (mass_config%erosion%coefficient .GT. 0.0_wp) THEN
+                    CALL eval_erosion_rates(flow_depth,speed,total_solid_fraction,mass_config%erosion%coefficient, &
+                        substrate%erodible_porosity, &
+                        erodible_fract(1:n_solid), erodible_inventory(1:n_solid), time_step, erosion_rate(1:n_solid),  &
                         carrier_erosion_rate)
 
             ELSE

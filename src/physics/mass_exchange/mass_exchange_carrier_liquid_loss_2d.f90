@@ -4,7 +4,7 @@
 MODULE mass_exchange_carrier_liquid_loss_2d
     USE parameters_2d, ONLY : wp, liquid_flag, mass_exchange_rates_type,                                               &
             reset_mass_exchange_rates
-    USE constitutive_parameters_2d, ONLY : loss_rate
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
 
@@ -21,15 +21,17 @@ CONTAINS
         !> @brief Evaluate explicit prescribed liquid-carrier loss.
         !> @param[in] state Local real physical state.
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit(state,r)
+        !> @param[in] mass_config Immutable layer carrier-liquid-loss configuration.
+    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit(mass_config,state,r)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
 
-            IF (liquid_flag .AND. ALLOCATED(loss_rate)) THEN
-                r%carrier_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
+            IF (liquid_flag) THEN
+                r%carrier_withdrawal_volume_rate=MAX(0.0_wp,mass_config%carrier_liquid_loss%loss_rate)
 
                 ! The liquid is the only carrier in this configuration.
                 r%mixture_mass_rate=-state%rho_c*r%carrier_withdrawal_volume_rate

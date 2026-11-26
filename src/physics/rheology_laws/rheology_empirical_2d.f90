@@ -29,9 +29,6 @@ CONTAINS
     !> \details Assemble the real-valued momentum source from the model's supported physical
     !> treatment contributions; unused model inputs are retained for the shared dispatch
     !> interface.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate Conservative horizontal momentum source vector.
     SUBROUTINE eval_rheology_empirical_explicit(state, rate)
         TYPE(physical_state_real), INTENT(IN) :: state
@@ -69,9 +66,6 @@ CONTAINS
     !> the
     !> implicit treatment. Complex-valued arguments retain complex-step sensitivities where
     !> implemented; zero-valued implementations intentionally contribute no term.
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_empirical_implicit(state,rate_x,rate_y)
@@ -83,6 +77,10 @@ CONTAINS
     END SUBROUTINE eval_rheology_empirical_implicit
 
     !> Evaluate the shared implicit-law formula in REAL for explicit assembly.
+    !> @brief eval rheology empirical implicit real operation.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
     SUBROUTINE eval_rheology_empirical_implicit_real(state,rate_x,rate_y)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate_x,rate_y

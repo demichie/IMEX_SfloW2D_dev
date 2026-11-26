@@ -20,7 +20,7 @@ This example sets up multiple pyroclastic-avalanche simulations at Etna, samples
 | Parameter | Value |
 | --- | --- |
 | Site | Mount Etna |
-| Input DEM | `DEM/Etna2014_crop.zip` |
+| Input DEM | Canonical archive: `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip` |
 | Parameter sampling | `create_ensemble.py` |
 | Case generation | `create_inputfiles.py` |
 | Parallel launch | `launch_jobs.py`, configurable `max_processes` |
@@ -33,13 +33,13 @@ Requires Python 3 and the IMEX_SfloW2D executable. NumPy and pandas are used for
 ## How to run
 
 Perform these operations in order from the
-`EXAMPLES/EXAMPLE_ENSEMBLE_ETNA` directory. The shared DEM and
+`EXAMPLES/EXAMPLE_ENSEMBLE_ETNA` directory. The shared DEM (copied from `EXAMPLE_ETNA/DEM`, not tracked twice) and
 template executable link must exist before generating any ensemble
 member.
 
 ### 1. Prepare the shared DEM and executable link
 
-The suggested directory organization is:
+The canonical archive is kept only in `EXAMPLE_ETNA/DEM`; see [DEM/README.md](DEM/README.md) for the copy or extraction alternatives. The suggested local directory organization is:
 
 ```text
 EXAMPLE_ENSEMBLE_ETNA/
@@ -67,6 +67,7 @@ cd DEM
 ```
 
 ```bash
+cp ../../EXAMPLE_ETNA/DEM/Etna2014_crop.zip .
 unzip Etna2014_crop.zip
 ```
 
@@ -108,7 +109,7 @@ The original README specifies substitution tokens in the form `ENSEMBLE_xyz` and
 /
 ```
 
-`templatedir/run.sh` orchestrates the ellipsoidal-volume preprocessing and solver execution. Its optional per-run plotting command is commented out by default; enable it *before* copying the template folder to run the overlay postprocessor for each realization. The original documentation skips step 7 in its numbering and contains the misspellings `ENSAMBLE` and `create_ensamble.py`; these are documentation errors, not names to adopt as new conventions.
+`templatedir/run.sh` orchestrates the ellipsoidal-volume preprocessing and solver execution. Its optional per-run plotting command is commented out by default. After a realization finishes, invoke the shared `UTILS/plot_overlay.py` with that realization's `OUTPUT/<RUN_NAME>` directory. No copy of the postprocessor is retained in the template. The original documentation skips step 7 in its numbering and contains the misspellings `ENSAMBLE` and `create_ensamble.py`; these are documentation errors, not names to adopt as new conventions.
 
 ### 2. Generate ensemble members and run simulations
 
@@ -169,9 +170,9 @@ Each realization writes solver output beneath `ensemble.xxxxx/OUTPUT/<RUN_NAME>/
 The template currently sets `RUN_NAME="exampleEtna"`, so the default output root for each member is `ensemble.xxxxx/OUTPUT/exampleEtna/`.
 
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are retained here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Documentation verification note
 

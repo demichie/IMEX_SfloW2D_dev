@@ -7,21 +7,22 @@ MODULE mass_exchange_2d
                     idx_stochEqn, idx_poreEqn,                                                                         &
                     idx_solidEqn_first, idx_solidEqn_last,                                                             &
                     idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                                    &
-                    pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                                &
+                    mass_exchange_rates_type,                                &
                     reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                         &
-        SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                      &
+    USE source_catalog_2d, ONLY : SOURCE_ID_EXCHANGE_EROSION, SOURCE_ID_EXCHANGE_DEPOSITION,                           &
+        SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS, SOURCE_ID_EXCHANGE_ENTRAINMENT,                                        &
         SOURCE_ID_EXCHANGE_VAPORIZATION, SOURCE_ID_EXCHANGE_LAVA_DEPOSITION
-    USE constitutive_parameters_2d, ONLY : maximum_solid_packing
+    USE solid_transport_parameters_2d, ONLY : maximum_solid_packing
     USE state_types, ONLY : physical_state_real, physical_state_complex
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
     USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
     USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
-    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                                                 &
-            eval_mass_exchange_lava_deposition_explicit
+    USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
 
     IMPLICIT NONE
     PRIVATE
@@ -40,20 +41,33 @@ CONTAINS
         !> @brief Assemble explicit cell-local exchange rates with shared inventory limiters.
         !> @details The coordinator preserves the four-treatment contract;
         !>          unsupported treatments terminate with a diagnostic.
+        !> @param[in] config Layer rheology closure.
+        !> @param[in] mass_config Layer combined mass-exchange closure.
         !> @param[in] physical_state Local frozen physical state.
         !> @param[in] B_zone Substrate zone selecting eligible processes.
         !> @param[in] erodible Available erodible solid thickness by class.
         !> @param[in] dt Positive source integration interval [s].
-        !> @param[in] selected_names Canonical selected mass-exchange process names.
         !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
         !> @param[out] eqns_term Conservative source vector [equations/s].
-    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,source_mask,total_rates,eqns_term,     &
-            scratch)
+        !> @param[in] transport_stochastic Selected layer stochastic transport.
+        !> @param[in] pore_enabled Selected layer pore pressure.
+        !> @param[in] terrain_exposed True when this layer contacts the substrate.
+        !> @param[in] atmosphere_exposed True when this layer contacts the atmosphere.
+        !> @param[in] static_deposition_allowed True only for L1; independent of geometric contact.
+    !> @param[in] source_mask Bitmask of active mass-exchange processes.
+    !> @param[in,out] scratch Reusable local exchange workspace.
+    SUBROUTINE eval_mass_exchange_explicit(config,mass_config,physical_state,B_zone,erodible,dt,source_mask, &
+            total_rates,eqns_term, &
+            scratch,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed,static_deposition_allowed)
 
+            TYPE(rheology_config_type), INTENT(IN) :: config
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: physical_state
             REAL(wp), INTENT(IN) :: erodible(n_solid),dt
             INTEGER, INTENT(IN) :: B_zone
             INTEGER, INTENT(IN) :: source_mask
+            LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed
+            LOGICAL, INTENT(IN) :: static_deposition_allowed
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
             REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
             TYPE(mass_exchange_scratch_type), TARGET, INTENT(INOUT), OPTIONAL :: scratch
@@ -67,14 +81,21 @@ CONTAINS
 
             work=>local_scratch
             IF (PRESENT(scratch)) work=>scratch
-            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                    &
+            ASSOCIATE(process_rates=>work%process_rates, deposition_rates=>work%deposition_rates,                      &
                 liquid_loss_rates=>work%liquid_loss_rates)
-            do_erosion=BTEST(source_mask,SOURCE_ID_EXCHANGE_EROSION-1)
-            do_deposition=BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
-            do_liquid_loss=BTEST(source_mask,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
-            do_entrainment=BTEST(source_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
-            do_vaporization=BTEST(source_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
-            do_lava=BTEST(source_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1)
+            ! Contact eligibility applies only to external exchanges.
+            ! Geometric terrain contact alone does not authorize static
+            ! deposition: only L1 can deposit into the substrate. L2 settling
+            ! must first transfer material to L1, even when L1 starts dry.
+            do_erosion=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_EROSION-1)
+            do_deposition=terrain_exposed .AND. static_deposition_allowed .AND. &
+                BTEST(source_mask,SOURCE_ID_EXCHANGE_DEPOSITION-1)
+            do_liquid_loss=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS-1)
+            do_entrainment=atmosphere_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_ENTRAINMENT-1)
+            ! Steam generation is coupled to the actual substrate deposition.
+            do_vaporization=terrain_exposed .AND. static_deposition_allowed .AND. &
+                BTEST(source_mask,SOURCE_ID_EXCHANGE_VAPORIZATION-1)
+            do_lava=terrain_exposed .AND. BTEST(source_mask,SOURCE_ID_EXCHANGE_LAVA_DEPOSITION-1)
             IF (do_vaporization .AND. .NOT.do_deposition)                                                              &
                     CALL fatal_error('mass_exchange: vaporization requires same-group deposition')
             CALL reset_mass_exchange_rates(total_rates)
@@ -86,7 +107,7 @@ CONTAINS
             IF (gas_flag .OR. liquid_flag) THEN
                 alpha=SUM(physical_state%alphas)
                 CALL reset_mass_exchange_rates(process_rates)
-                IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(physical_state,erodible,                      &
+                IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(mass_config,physical_state,erodible, &
                                 dt,process_rates)
                 ! Erosion can increase packing by importing a solid-rich substrate.
                 ! Limit it before accumulating any conservative or bed contribution.
@@ -102,9 +123,11 @@ CONTAINS
 
                 CALL reset_mass_exchange_rates(deposition_rates)
                 CALL reset_mass_exchange_rates(liquid_loss_rates)
-                IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
+                IF (do_deposition)                                                                                     &
+                    CALL eval_mass_exchange_deposition_explicit(config,mass_config,physical_state,dt,deposition_rates)
                 IF (do_liquid_loss)                                                                                    &
-                        CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
+                        CALL eval_mass_exchange_carrier_liquid_loss_explicit( &
+                            mass_config,physical_state,liquid_loss_rates)
 
                 ! Deposition and liquid carrier loss share the exchange inventory.
                 ! Darcy gas loss is owned exclusively by the pore-pressure family.
@@ -136,28 +159,28 @@ CONTAINS
                 CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
 
                 IF (do_entrainment) THEN
-                        CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
+                        CALL eval_mass_exchange_entrainment_explicit(mass_config,physical_state,process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
                 END IF
 
                 IF (do_vaporization) THEN
-                        CALL eval_mass_exchange_vaporization_explicit(physical_state, B_zone,                          &
+                        CALL eval_mass_exchange_vaporization_explicit(mass_config,physical_state,B_zone, &
                             deposition_rates%solid_deposition_rate, process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
                 END IF
 
                 ! Scalar transport and pore-pressure sources inherit the net mass exchange.
-                IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
-                IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                                        &
+                IF (transport_stochastic) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
+                IF (pore_enabled) eqns_term(idx_poreEqn)=                                                        &
                                 eqns_term(idx_totMassEqn)*physical_state%exc_pore_pres
 
             END IF  ! gas_flag .OR. liquid_flag
 
             ! Lava deposition follows the same process_rates-rate accumulation contract.
-            IF (do_lava .AND. lava_deposition_flag) THEN
-                CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
+            IF (do_lava .AND. mass_config%lava_deposition%flag) THEN
+                CALL eval_mass_exchange_lava_deposition_explicit(config,mass_config,physical_state,dt,process_rates)
                 CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
             END IF
@@ -218,12 +241,6 @@ CONTAINS
         !> @details A single gas or liquid carrier inventory is constrained before conservative
         !> assembly.
         !> Positive sources never cancel gross withdrawals in a shared inventory.
-        !> @param[in] qp Local primitive flow state; component order follows model configuration.
-        !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] erodible Available erodible solid inventory by species [m].
-        !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
-        !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
-        !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
 
 
         ! Limit simultaneous withdrawal demands from one physical inventory.
@@ -308,10 +325,9 @@ CONTAINS
         !> @brief Add one process contribution to conserved equations and diagnostic rate totals.
         !> @details Sink momentum is advected with the local horizontal velocity.
         !> @param[in] p Rates produced by one mass-exchange process.
-        !> @param[in] u Horizontal x velocity of the mobile material [m/s].
-        !> @param[in] v Horizontal y velocity of the mobile material [m/s].
         !> @param[in,out] total Accumulated mass-exchange rates for the cell.
         !> @param[in,out] eqns_term Conservative mass, momentum, energy and species source vector.
+    !> @param[in] state Local physical state.
     SUBROUTINE accumulate_process(p,state,total,eqns_term)
 
             TYPE(mass_exchange_rates_type), INTENT(IN) :: p

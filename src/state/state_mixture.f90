@@ -7,10 +7,12 @@ MODULE state_mixture
     USE parameters_2d, ONLY : wp, gas_flag
     USE parameters_2d, ONLY : n_solid, n_add_gas, n_vars, idx_h, idx_T,                                                &
         idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last
-    USE constitutive_parameters_2d, ONLY : sp_heat_a, sp_heat_g, sp_heat_s, sp_heat_l
+    USE constitutive_parameters_2d, ONLY : sp_heat_a, sp_heat_g, sp_heat_l
+    USE solid_transport_parameters_2d, ONLY : sp_heat_s
     USE constitutive_parameters_2d, ONLY : sp_gas_const_a, sp_gas_const_g
     USE constitutive_parameters_2d, ONLY : inv_pres, pres, rho_l, inv_rho_l
-    USE constitutive_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s, rho_a_amb, grav
+    USE constitutive_parameters_2d, ONLY : rho_a_amb, grav
+    USE solid_transport_parameters_2d, ONLY : inv_rho_s, diam_s, rho_s
     USE state_composition, ONLY : normalize_face_composition
 
     IMPLICIT NONE
@@ -208,18 +210,18 @@ CONTAINS
     !> @param[in] alphag Additional-gas phase volume fractions, with n_add_gas entries.
     !> @param[inout] alphas Solid phase volume fractions, with n_solid entries.
     !> @param[out] rho_m Bulk mixture density (kg/m3).
-    !> @param[out] inv_rhom Reciprocal mixture density (m3/kg).
+    !> @param[out] inv_rho_m Reciprocal mixture density (m3/kg).
     !> @param[out] rho_c Carrier-phase density (kg/m3).
     !> @param[out] xs Solid mass fractions, with n_solid entries; may be clipped or normalized.
     !> @param[out] xg Additional-gas mass fractions, with n_add_gas entries; may be normalized.
     !> @param[out] xc Total carrier mass fraction, including additional gases.
     !> @param[out] cp_c Carrier heat capacity (J/kg/K).
     !> @param[out] cp_m Mass-specific mixture heat capacity (J/kg/K).
-    SUBROUTINE evaluate_mixture_from_volume(T,alphag,alphas,rho_m,inv_rhom,                                            &
+    SUBROUTINE evaluate_mixture_from_volume(T,alphag,alphas,rho_m,inv_rho_m,                                           &
             rho_c,xs,xg,xc,cp_c,cp_m)
         REAL(wp), INTENT(IN) :: T,alphag(n_add_gas)
         REAL(wp), INTENT(INOUT) :: alphas(n_solid)
-        REAL(wp), INTENT(OUT) :: rho_m,inv_rhom,rho_c
+        REAL(wp), INTENT(OUT) :: rho_m,inv_rho_m,rho_c
         REAL(wp), INTENT(OUT) :: xs(n_solid),xg(n_add_gas),xc,cp_c,cp_m
         REAL(wp) :: alphas_tot,alphac,alpha_air,rho_a,rho_g(n_add_gas)
         REAL(wp) :: rho_from_volume,inv_rho_c,phase_alphas(n_solid),phase_alphag(n_add_gas)
@@ -249,7 +251,7 @@ CONTAINS
         xs=alphas*rho_s/rho_from_volume
         xg=alphag*rho_g/rho_from_volume
 
-        CALL evaluate_mixture(T,xs,xg,rho_m,inv_rhom,rho_c,inv_rho_c,                                                  &
+        CALL evaluate_mixture(T,xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,                                                 &
             cp_m,cp_c,phase_alphas,phase_alphag)
         xc=1.0_wp-SUM(xs)
     END SUBROUTINE evaluate_mixture_from_volume
@@ -262,7 +264,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: alphas(n_solid),alphag(n_add_gas)
         REAL(wp) :: xs(n_solid),xg(n_add_gas)
-        REAL(wp) :: rho_m,inv_rhom,rho_c,inv_rho_c
+        REAL(wp) :: rho_m,inv_rho_m,rho_c,inv_rho_c
 
         alphas=0.0_wp
         alphag=0.0_wp
@@ -271,7 +273,7 @@ CONTAINS
         xg=qp(idx_add_gas_first:idx_add_gas_last)
         IF (.NOT.normalize_face_composition(xs,xg))                                                                    &
             ERROR STOP 'Invalid primitive composition in volume conversion'
-        CALL evaluate_mixture_phase_properties(qp(idx_T),xs,xg,rho_m,inv_rhom,rho_c,inv_rho_c,                         &
+        CALL evaluate_mixture_phase_properties(qp(idx_T),xs,xg,rho_m,inv_rho_m,rho_c,inv_rho_c,                        &
             alphas,alphag)
     END SUBROUTINE primitive_to_volume_fractions
 

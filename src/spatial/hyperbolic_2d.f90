@@ -30,6 +30,8 @@ MODULE hyperbolic_2d
 
     PRIVATE
 
+    PUBLIC :: add_interlayer_terms, eval_total_depth_face_speed_bounds
+
     !> \brief Persistent wave speeds, oriented face contributions and cell paths.
     !> \details Face arrays distinguish the contribution seen by either adjacent
     !>          cell; hydrostatic pressure belongs to the path terms, not the
@@ -50,6 +52,8 @@ MODULE hyperbolic_2d
         REAL(wp), ALLOCATABLE :: G_interface_yT(:,:,:)
         REAL(wp), ALLOCATABLE :: P_cell_x(:,:,:)
         REAL(wp), ALLOCATABLE :: P_cell_y(:,:,:)
+        !> For L2 only, suppress negative reduced gravity in hydrostatic pressure.
+        LOGICAL :: clamp_buoyant_pressure=.FALSE.
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_reconstruction=0.0_wp,profile_flux=0.0_wp,profile_assembly=0.0_wp
@@ -58,10 +62,315 @@ MODULE hyperbolic_2d
         PROCEDURE :: finalize => finalize_hyperbolic
         PROCEDURE :: evaluate_terms => eval_hyperbolic_terms
         PROCEDURE :: evaluate_speeds => eval_speeds
+        PROCEDURE :: evaluate_total_depth_speeds => eval_total_depth_speeds
         PROCEDURE :: diagnose_cell => diagnose_hyperbolic_cell
     END TYPE hyperbolic_workspace_type
 
 CONTAINS
+
+    !> @brief Estimate a shared two-layer wave envelope using the total depth.
+    !> @details Each physically present layer uses the single-layer local-speed
+    !> kernel with h=h1+h2. This recovers the single-layer speeds for equal
+    !> material and velocity and encloses real gravitational speeds only under
+    !> the stable-density assumptions of docs/TWO_LAYER_HYPERBOLICITY.md.
+    !> Complex roots cannot be detected or repaired by this envelope.
+    !> @param[in] q1_left Lower-layer primitive trace at the negative face endpoint.
+    !> @param[in] q2_left Upper-layer primitive trace at the negative face endpoint.
+    !> @param[in] q1_right Lower-layer primitive trace at the positive face endpoint.
+    !> @param[in] q2_right Upper-layer primitive trace at the positive face endpoint.
+    !> @param[in] metric Large-slope gravity factor at the shared face.
+    !> @param[in] normal Normal velocity index (idx_u or idx_v).
+    !> @param[out] a_minus Lower shared characteristic-speed envelope.
+    !> @param[out] a_plus Upper shared characteristic-speed envelope.
+    SUBROUTINE eval_total_depth_face_speed_bounds(q1_left,q2_left,q1_right,q2_right, &
+        metric,normal,a_minus,a_plus)
+        USE equation_terms_2d, ONLY : eval_local_speeds_direction
+        REAL(wp), INTENT(IN) :: q1_left(n_vars),q2_left(n_vars),q1_right(n_vars),q2_right(n_vars)
+        REAL(wp), INTENT(IN) :: metric
+        INTEGER, INTENT(IN) :: normal
+        REAL(wp), INTENT(OUT) :: a_minus,a_plus
+        REAL(wp) :: q(n_vars),depth,lo,hi
+        INTEGER :: endpoint,layer
+
+        a_minus=0.0_wp
+        a_plus=0.0_wp
+
+        DO endpoint=1,2
+            IF (endpoint==1) THEN
+                depth=q1_left(1)+q2_left(1)
+            ELSE
+                depth=q1_right(1)+q2_right(1)
+            END IF
+
+            IF (depth<=dry_thickness_tolerance) CYCLE
+
+            DO layer=1,2
+                IF (endpoint==1) THEN
+                    IF (layer==1) THEN
+                        q=q1_left
+                    ELSE
+                        q=q2_left
+                    END IF
+                ELSE
+                    IF (layer==1) THEN
+                        q=q1_right
+                    ELSE
+                        q=q2_right
+                    END IF
+                END IF
+
+                ! A dry layer cannot contribute an independent wave.
+                IF (q(1)<=dry_thickness_tolerance) CYCLE
+                q(1)=depth
+                CALL eval_local_speeds_direction(q,metric,normal,lo,hi)
+                a_minus=MIN(a_minus,lo)
+                a_plus=MAX(a_plus,hi)
+            END DO
+        END DO
+    END SUBROUTINE eval_total_depth_face_speed_bounds
+
+    !> @brief Populate canonical face-speed storage using the total-depth envelope.
+    !> @details Both reconstruction workspaces must be current on the shared OR
+    !> face workset. The single-layer path remains unchanged. See
+    !> docs/TWO_LAYER_HYPERBOLICITY.md for the conditional speed bound.
+    !> @param[in,out] this Existing HP-PCCU face-speed workspace.
+    !> @param[in] lower Prepared lower-layer reconstruction workspace.
+    !> @param[in] upper Prepared upper-layer reconstruction workspace.
+    !> @param[in] nxfaces Number of active x-direction faces.
+    !> @param[in] jx X-direction face column indices.
+    !> @param[in] kx X-direction face row indices.
+    !> @param[in] nyfaces Number of active y-direction faces.
+    !> @param[in] jy Y-direction face column indices.
+    !> @param[in] ky Y-direction face row indices.
+    SUBROUTINE eval_total_depth_speeds(this,lower,upper,nxfaces,jx,kx,nyfaces,jy,ky)
+        CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+        CLASS(reconstruction_workspace_type), INTENT(IN) :: lower,upper
+        INTEGER, INTENT(IN) :: nxfaces,nyfaces,jx(:),kx(:),jy(:),ky(:)
+        REAL(wp) :: q1a(n_vars),q1b(n_vars),q2a(n_vars),q2b(n_vars)
+        INTEGER :: l,j,k
+
+        IF (lower%layer/=1 .OR. upper%layer/=2) &
+            ERROR STOP 'Total-depth bounds require both prepared layer reconstructions'
+
+        IF (comp_cells_x>1) THEN
+            !$OMP PARALLEL DO PRIVATE(l,j,k,q1a,q1b,q2a,q2b)
+            DO l=1,nxfaces
+                j=jx(l)
+                k=kx(l)
+                q1a=lower%qp_adv_interfaceL(:,j,k)
+                q1b=lower%qp_adv_interfaceR(:,j,k)
+                q2a=upper%qp_adv_interfaceL(:,j,k)
+                q2b=upper%qp_adv_interfaceR(:,j,k)
+                q1a(1)=lower%h_selected_interfaceL(j,k)
+                q1b(1)=lower%h_selected_interfaceR(j,k)
+                q2a(1)=upper%h_selected_interfaceL(j,k)
+                q2b(1)=upper%h_selected_interfaceR(j,k)
+                CALL eval_total_depth_face_speed_bounds(q1a,q2a,q1b,q2b, &
+                    grav_coeff_stag_x(j,k),idx_u, &
+                    this%a_interface_xNeg(j,k),this%a_interface_xPos(j,k))
+            END DO
+            !$OMP END PARALLEL DO
+        END IF
+
+        IF (comp_cells_y>1) THEN
+            !$OMP PARALLEL DO PRIVATE(l,j,k,q1a,q1b,q2a,q2b)
+            DO l=1,nyfaces
+                j=jy(l)
+                k=ky(l)
+                q1a=lower%qp_adv_interfaceB(:,j,k)
+                q1b=lower%qp_adv_interfaceT(:,j,k)
+                q2a=upper%qp_adv_interfaceB(:,j,k)
+                q2b=upper%qp_adv_interfaceT(:,j,k)
+                q1a(1)=lower%h_selected_interfaceB(j,k)
+                q1b(1)=lower%h_selected_interfaceT(j,k)
+                q2a(1)=upper%h_selected_interfaceB(j,k)
+                q2b(1)=upper%h_selected_interfaceT(j,k)
+                CALL eval_total_depth_face_speed_bounds(q1a,q2a,q1b,q2b, &
+                    grav_coeff_stag_y(j,k),idx_v, &
+                    this%a_interface_yNeg(j,k),this%a_interface_yPos(j,k))
+            END DO
+            !$OMP END PARALLEL DO
+        END IF
+    END SUBROUTINE eval_total_depth_speeds
+
+    !> @brief Accumulate coupled interlayer face and within-cell pressure in both residuals.
+    !> @details Reuses the common pressure kernel and shared total-depth face-speed
+    !> envelope on the OR workset. Subtract within-cell paths with
+    !> the exact Gamma2 selected by the existing L2 hydrostatic cell kernel.
+    !> @param[in] l1,l2 Reconstructed layer traces on the shared workset.
+    !> @param[in] hp2 Upper-layer pressure coefficients from the same traces.
+    !> @param[in,out] r1,r2 Existing layer spatial residuals.
+    !> @param[in] active Shared active-cell mask.
+    !> @param[in] nc,jc,kc Shared active cell count and coordinates.
+    !> @param[in] qp2 Upper-layer primitive state for dry-cell treatment.
+    !> @param[in] nx,ny Shared face counts by Cartesian direction.
+    !> @param[in] jx,kx,jy,ky Shared compact face coordinates.
+    !> @param[in] axn,axp,ayn,ayp Shared total-depth face-speed bounds.
+    !> @param[in] l1 l1 argument of add_interlayer_terms.
+    !> @param[in] l2 l2 argument of add_interlayer_terms.
+    !> @param[in,out] r1 r1 argument of add_interlayer_terms.
+    !> @param[in,out] r2 r2 argument of add_interlayer_terms.
+    !> @param[in] nc nc argument of add_interlayer_terms.
+    !> @param[in] jc jc argument of add_interlayer_terms.
+    !> @param[in] kc kc argument of add_interlayer_terms.
+    !> @param[in] nx nx argument of add_interlayer_terms.
+    !> @param[in] jx jx argument of add_interlayer_terms.
+    !> @param[in] kx kx argument of add_interlayer_terms.
+    !> @param[in] ny ny argument of add_interlayer_terms.
+    !> @param[in] jy jy argument of add_interlayer_terms.
+    !> @param[in] ky ky argument of add_interlayer_terms.
+    !> @param[in] axn axn argument of add_interlayer_terms.
+    !> @param[in] axp axp argument of add_interlayer_terms.
+    !> @param[in] ayn ayn argument of add_interlayer_terms.
+    !> @param[in] ayp ayp argument of add_interlayer_terms.
+    SUBROUTINE add_interlayer_terms(l1,l2,hp2,r1,r2,active,nc,jc,kc,qp2, &
+        nx,jx,kx,ny,jy,ky,axn,axp,ayn,ayp)
+        USE nonconservative_2d, ONLY : PATH_DIR_X,PATH_DIR_Y
+        USE pccu_2d, ONLY : eval_interlayer_oriented_face,eval_interlayer_pressure_correction
+        CLASS(reconstruction_workspace_type), INTENT(IN) :: l1,l2
+        CLASS(hyperbolic_workspace_type), INTENT(IN) :: hp2
+        REAL(wp), INTENT(INOUT) :: r1(n_eqns,comp_cells_x,comp_cells_y),r2(n_eqns,comp_cells_x,comp_cells_y)
+        LOGICAL, INTENT(IN) :: active(comp_cells_x,comp_cells_y)
+        INTEGER, INTENT(IN) :: nc,jc(:),kc(:)
+        REAL(wp), INTENT(IN) :: qp2(n_vars,comp_cells_x,comp_cells_y)
+        INTEGER, INTENT(IN) :: nx,ny,jx(:),kx(:),jy(:),ky(:)
+        REAL(wp), INTENT(IN) :: axn(:,:),axp(:,:),ayn(:,:),ayp(:,:)
+        REAL(wp) :: fl1(n_eqns),fr1(n_eqns),fl2(n_eqns),fr2(n_eqns)
+        REAL(wp) :: path1(n_eqns),path2(n_eqns),hydro_path(n_eqns)
+        REAL(wp) :: qp_a(n_vars),qp_b(n_vars)
+        REAL(wp) :: h1a,h1b,h2a,h2b,gamma_a,gamma_b,eta_a,eta_b,metric,am,ap,spacing
+        REAL(wp) :: metric_a,metric_b,selected_a,selected_b,cached_a,cached_b
+        INTEGER :: direction,l,j,k,prev_j,prev_k,nfaces
+
+        IF (l1%layer/=1 .OR. l2%layer/=2) ERROR STOP 'Invalid interlayer face ordering'
+        IF (.NOT.hp2%clamp_buoyant_pressure) ERROR STOP 'Interlayer face requires L2 pressure'
+
+        DO direction=PATH_DIR_X,PATH_DIR_Y
+            nfaces=nx
+            spacing=one_by_dx
+            IF (direction==PATH_DIR_Y) THEN
+                nfaces=ny
+                spacing=one_by_dy
+            END IF
+
+            DO l=1,nfaces
+                IF (direction==PATH_DIR_X) THEN
+                    j=jx(l)
+                    k=kx(l)
+                    h1a=l1%h_selected_interfaceL(j,k)
+                    h1b=l1%h_selected_interfaceR(j,k)
+                    h2a=l2%h_selected_interfaceL(j,k)
+                    h2b=l2%h_selected_interfaceR(j,k)
+                    gamma_a=hp2%gamma_interface_xL(j,k)
+                    gamma_b=hp2%gamma_interface_xR(j,k)
+                    eta_a=l2%eta_interfaceL(j,k)
+                    eta_b=l2%eta_interfaceR(j,k)
+                    metric=grav_coeff_stag_x(j,k)
+                    am=axn(j,k)
+                    ap=axp(j,k)
+                    prev_j=j-1
+                    prev_k=k
+                ELSE
+                    j=jy(l)
+                    k=ky(l)
+                    h1a=l1%h_selected_interfaceB(j,k)
+                    h1b=l1%h_selected_interfaceT(j,k)
+                    h2a=l2%h_selected_interfaceB(j,k)
+                    h2b=l2%h_selected_interfaceT(j,k)
+                    gamma_a=hp2%gamma_interface_yB(j,k)
+                    gamma_b=hp2%gamma_interface_yT(j,k)
+                    eta_a=l2%eta_interfaceB(j,k)
+                    eta_b=l2%eta_interfaceT(j,k)
+                    metric=grav_coeff_stag_y(j,k)
+                    am=ayn(j,k)
+                    ap=ayp(j,k)
+                    prev_j=j
+                    prev_k=k-1
+                END IF
+
+                CALL eval_interlayer_oriented_face(direction,h1a,h2a,gamma_a,eta_a, &
+                    h1b,h2b,gamma_b,eta_b,metric,am,ap,fl1,fr1,fl2,fr2)
+                IF (prev_j>=1 .AND. prev_k>=1) THEN
+                    IF (active(prev_j,prev_k)) THEN
+                        r1(:,prev_j,prev_k)=r1(:,prev_j,prev_k)+fl1*spacing
+                        r2(:,prev_j,prev_k)=r2(:,prev_j,prev_k)+fl2*spacing
+                    END IF
+                END IF
+                IF (j<=comp_cells_x .AND. k<=comp_cells_y) THEN
+                    IF (active(j,k)) THEN
+                        r1(:,j,k)=r1(:,j,k)-fr1*spacing
+                        r2(:,j,k)=r2(:,j,k)-fr2*spacing
+                    END IF
+                END IF
+            END DO
+        END DO
+
+        ! Keep the same west/east and south/north endpoint ordering as P_cell.
+        ! The Gamma2 outputs include the L2 dry-endpoint regularization.
+        DO l=1,nc
+            j=jc(l)
+            k=kc(l)
+
+            IF (.NOT.active(j,k)) ERROR STOP 'Interlayer cell outside shared workset'
+            IF (qp2(1,j,k)<=dry_thickness_tolerance) CYCLE
+
+            DO direction=PATH_DIR_X,PATH_DIR_Y
+                IF (direction==PATH_DIR_X .AND. comp_cells_x<=1) CYCLE
+                IF (direction==PATH_DIR_Y .AND. comp_cells_y<=1) CYCLE
+
+                IF (direction==PATH_DIR_X) THEN
+                    h1a=MAX(l1%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
+                    h1b=MAX(l1%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
+                    h2a=MAX(l2%eta_cellW(j,k)-l1%eta_cellW(j,k),0.0_wp)
+                    h2b=MAX(l2%eta_cellE(j,k)-l1%eta_cellE(j,k),0.0_wp)
+                    eta_a=l2%eta_cellW(j,k)
+                    eta_b=l2%eta_cellE(j,k)
+                    metric_a=grav_coeff_stag_x(j,k)
+                    metric_b=grav_coeff_stag_x(j+1,k)
+                    selected_a=l2%h_selected_interfaceR(j,k)
+                    selected_b=l2%h_selected_interfaceL(j+1,k)
+                    gamma_a=hp2%gamma_interface_xR(j,k)
+                    gamma_b=hp2%gamma_interface_xL(j+1,k)
+                    qp_a=l2%qp_adv_interfaceR(:,j,k)
+                    qp_b=l2%qp_adv_interfaceL(:,j+1,k)
+                    spacing=one_by_dx
+                ELSE
+                    h1a=MAX(l1%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
+                    h1b=MAX(l1%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
+                    h2a=MAX(l2%eta_cellS(j,k)-l1%eta_cellS(j,k),0.0_wp)
+                    h2b=MAX(l2%eta_cellN(j,k)-l1%eta_cellN(j,k),0.0_wp)
+                    eta_a=l2%eta_cellS(j,k)
+                    eta_b=l2%eta_cellN(j,k)
+                    metric_a=grav_coeff_stag_y(j,k)
+                    metric_b=grav_coeff_stag_y(j,k+1)
+                    selected_a=l2%h_selected_interfaceT(j,k)
+                    selected_b=l2%h_selected_interfaceB(j,k+1)
+                    gamma_a=hp2%gamma_interface_yT(j,k)
+                    gamma_b=hp2%gamma_interface_yB(j,k+1)
+                    qp_a=l2%qp_adv_interfaceT(:,j,k)
+                    qp_b=l2%qp_adv_interfaceB(:,j,k+1)
+                    spacing=one_by_dy
+                END IF
+
+                qp_a(1)=h2a
+                qp_b(1)=h2b
+                IF (h2a<=dry_thickness_tolerance) qp_a(2:3)=0.0_wp
+                IF (h2b<=dry_thickness_tolerance) qp_b(2:3)=0.0_wp
+
+                ! Return exactly the pressure coefficients used by the L2 path.
+                cached_a=gamma_a
+                cached_b=gamma_b
+                CALL eval_cell_hydrostatic_path(qp_a,eta_a,metric_a,qp_b,eta_b,metric_b, &
+                    direction,hydro_path,cached_a,selected_a,cached_b,selected_b, &
+                    hp2%clamp_buoyant_pressure,gamma_minus_out=gamma_a,gamma_plus_out=gamma_b)
+                CALL eval_interlayer_pressure_correction(direction, &
+                    h1a,h2a,gamma_a,eta_a,metric_a, &
+                    h1b,h2b,gamma_b,eta_b,metric_b,path1,path2)
+                r1(:,j,k)=r1(:,j,k)-path1*spacing
+                r2(:,j,k)=r2(:,j,k)-path2*spacing
+            END DO
+        END DO
+    END SUBROUTINE add_interlayer_terms
 
     !> @brief Report the resolved face contributions to one conservative residual.
     !> @param[in] this Face-oriented HP-PCCU workspace.
@@ -112,10 +421,12 @@ CONTAINS
     !> \brief Allocate and zero wave-speed and oriented KT work arrays.
     !>
     !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+    !> @param[in] clamp_buoyant_pressure Suppress negative hydrostatic pressure for the dilute upper layer.
 
-    SUBROUTINE initialize_hyperbolic( this )
+    SUBROUTINE initialize_hyperbolic( this, clamp_buoyant_pressure )
 
         CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+        LOGICAL, INTENT(IN), OPTIONAL :: clamp_buoyant_pressure
 
         BLOCK
             CHARACTER(LEN=8) :: value
@@ -124,6 +435,8 @@ CONTAINS
             CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',value,STATUS=status)
             this%profile_enabled=status==0 .AND. TRIM(value)=='1'
         END BLOCK
+        this%clamp_buoyant_pressure=.FALSE.
+        IF (PRESENT(clamp_buoyant_pressure)) this%clamp_buoyant_pressure=clamp_buoyant_pressure
         ALLOCATE( this%a_interface_xNeg(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_xPos(comp_interfaces_x,comp_cells_y) )
         ALLOCATE( this%a_interface_yNeg(comp_cells_x,comp_interfaces_y) )
@@ -178,10 +491,13 @@ CONTAINS
     !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
     !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
 
+    !> @param[in] reuse_cfl_traces Flag allowing reuse of CFL reconstruction traces.
+    !> @param[in] lower_recon Lower-layer reconstruction.
+    !> @param[in] h_lower Lower-layer depth.
     SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                                                            &
             divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,                                           &
             j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y,                                                &
-            source_boundary_enabled,reuse_cfl_traces )
+            source_boundary_enabled,reuse_cfl_traces,lower_recon,h_lower )
 
     IMPLICIT NONE
 
@@ -196,6 +512,8 @@ CONTAINS
         INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
         INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
         LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled,reuse_cfl_traces
+        CLASS(reconstruction_workspace_type), INTENT(IN), OPTIONAL :: lower_recon
+        REAL(wp), INTENT(IN), OPTIONAL :: h_lower(:,:)
         LOGICAL :: use_cached_traces
 
         INTEGER :: l , i, j, k      !< loop counters
@@ -209,10 +527,21 @@ CONTAINS
         ! evaluated these face speeds. Only production explicitly opts in.
         use_cached_traces=.FALSE.
         IF (PRESENT(reuse_cfl_traces)) use_cached_traces=reuse_cfl_traces
+        IF (PRESENT(lower_recon) .NEQV. PRESENT(h_lower)) &
+            ERROR STOP 'L2 residual requires lower reconstruction and thickness'
+        IF (PRESENT(lower_recon)) THEN
+            IF (recon%layer/=2 .OR. lower_recon%layer/=1) ERROR STOP 'Invalid L1/L2 HP pairing'
+        END IF
         IF (.NOT.use_cached_traces) THEN
-            CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE.,                                       &
-                source_boundary_enabled=source_boundary_enabled )
-            CALL recon%reconstruct_kt_eta(qp_expl)
+            IF (PRESENT(lower_recon)) THEN
+                CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE., &
+                    source_boundary_enabled=source_boundary_enabled,lower_recon=lower_recon,h_lower=h_lower)
+                CALL recon%reconstruct_kt_eta(qp_expl,lower_recon=lower_recon)
+            ELSE
+                CALL recon%reconstruct(qp_expl,t,solve_cells,j_cent,k_cent,.TRUE.,                                       &
+                    source_boundary_enabled=source_boundary_enabled )
+                CALL recon%reconstruct_kt_eta(qp_expl)
+            END IF
             CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,                                            &
                 k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
         END IF
@@ -226,10 +555,10 @@ CONTAINS
         CALL eval_flux_PCCU( this, recon, qp_expl,                                                                     &
             .TRUE., t,                                                                                                 &
             solve_interfaces_x, j_stag_x,                                                                              &
-            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
+            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y, lower_recon )
 
         CALL eval_cell_hydrostatic_paths( this, recon, qp_expl,                                                        &
-            .TRUE., solve_cells, j_cent, k_cent )
+            .TRUE., solve_cells, j_cent, k_cent, lower_recon )
 
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
@@ -333,6 +662,7 @@ CONTAINS
     !> \param[in] k Cell y index.
     !> \param[in] axis One for x momentum, two for y momentum.
     !> \param[in,out] residual Assembled normal-momentum spatial term.
+    !> @param[in] this Owning object.
     SUBROUTINE cancel_resting_roundoff(this,recon,j,k,axis,residual)
         CLASS(hyperbolic_workspace_type), INTENT(IN) :: this
         CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
@@ -350,31 +680,39 @@ CONTAINS
             scale = MAX(                                                                                               &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j,k),                                           &
                 recon%eta_interfaceL(j,k),grav_coeff_stag_x(j,k),                                                     &
-                this%gamma_interface_xL(j,k),recon%h_selected_interfaceL(j,k)),                                       &
+                this%gamma_interface_xL(j,k),recon%h_selected_interfaceL(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j,k),                                           &
                 recon%eta_interfaceR(j,k),grav_coeff_stag_x(j,k),                                                     &
-                this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k)),                                       &
+                this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j+1,k),                                         &
                 recon%eta_interfaceL(j+1,k),grav_coeff_stag_x(j+1,k),                                                 &
-                this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k)),                                   &
+                this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k),                                     &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j+1,k),                                         &
                 recon%eta_interfaceR(j+1,k),grav_coeff_stag_x(j+1,k),                                                 &
-                this%gamma_interface_xR(j+1,k),recon%h_selected_interfaceR(j+1,k)) )
+                this%gamma_interface_xR(j+1,k),recon%h_selected_interfaceR(j+1,k),                                     &
+                this%clamp_buoyant_pressure) )
             inverse_spacing = one_by_dx
         ELSE
             scale = MAX(                                                                                               &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k),                                           &
                 recon%eta_interfaceB(j,k),grav_coeff_stag_y(j,k),                                                     &
-                this%gamma_interface_yB(j,k),recon%h_selected_interfaceB(j,k)),                                       &
+                this%gamma_interface_yB(j,k),recon%h_selected_interfaceB(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k),                                           &
                 recon%eta_interfaceT(j,k),grav_coeff_stag_y(j,k),                                                     &
-                this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k)),                                       &
+                this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k),                                         &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k+1),                                         &
                 recon%eta_interfaceB(j,k+1),grav_coeff_stag_y(j,k+1),                                                 &
-                this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1)),                                   &
+                this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1),                                     &
+                this%clamp_buoyant_pressure),                                                                          &
                 hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k+1),                                         &
                 recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1),                                                 &
-                this%gamma_interface_yT(j,k+1),recon%h_selected_interfaceT(j,k+1)) )
+                this%gamma_interface_yT(j,k+1),recon%h_selected_interfaceT(j,k+1),                                     &
+                this%clamp_buoyant_pressure) )
             inverse_spacing = one_by_dy
 
         END IF
@@ -387,9 +725,19 @@ CONTAINS
     !> The cached coefficient comes from the selected-depth CFL trace and uses
     !> identical temperature and mass fractions. Only the depth can differ.
     !> If it changes the wet/dry branch, retain the original evaluation.
-    FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h) RESULT(scale)
+    !> @param[in] qp_face Final primitive face state.
+    !> @param[in] eta Reconstructed free-surface elevation.
+    !> @param[in] gravity_factor Terrain large-slope metric.
+    !> @param[in] cached_gamma Hydrostatic coefficient from the CFL face trace.
+    !> @param[in] selected_h Depth at which cached_gamma was evaluated.
+    !> @param[in] clamp_buoyant_pressure Apply the upper-layer nonnegative-pressure condition.
+    !> @return Absolute pressure scale used only for stationary-roundoff cancellation.
+    !> @brief hydrostatic arithmetic scale operation.
+    FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h,                          &
+        clamp_buoyant_pressure) RESULT(scale)
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
         REAL(wp), INTENT(IN) :: qp_face(:),eta,gravity_factor,cached_gamma,selected_h
+        LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         REAL(wp) :: scale,gamma,reduced_gravity,h
 
         h = MAX(0.0_wp,qp_face(1))
@@ -402,6 +750,7 @@ CONTAINS
         ELSE
             CALL eval_hydrostatic_coefficient(qp_face,reduced_gravity,gamma)
         END IF
+        IF (clamp_buoyant_pressure) gamma=MAX(gamma,0.0_wp)
         scale = ABS(gravity_factor*gamma)*h*MAX(h,ABS(eta))
     END FUNCTION hydrostatic_arithmetic_scale
 
@@ -426,19 +775,9 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Evaluate oriented PCCU numerical fluxes for active faces.
-    !> @param[in,out] this Hyperbolic workspace receiving face fluxes.
-    !> @param[in] recon Accepted reconstructed interface traces.
-    !> @param[in] qp_center Cell-centered physical state arrays.
-    !> @param[in] use_dry_donor Select dry-donor face treatment.
-    !> @param[in] t Physical evaluation time [s].
-    !> @param[in] solve_interfaces_x Number of active x faces.
-    !> @param[in] j_stag_x X indices of active x faces.
-    !> @param[in] k_stag_x Y indices of active x faces.
-    !> @param[in] solve_interfaces_y Number of active y faces.
-    !> @param[in] j_stag_y X indices of active y faces.
-    !> @param[in] k_stag_y Y indices of active y faces.
+    !> @param[in] lower_recon Lower-layer reconstruction.
     SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t, solve_interfaces_x, j_stag_x,                 &
-            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
+            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y, lower_recon )
 
     USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -452,16 +791,25 @@ CONTAINS
         INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
         INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
         INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
+        CLASS(reconstruction_workspace_type), INTENT(IN), OPTIONAL :: lower_recon
 
         REAL(wp) :: a_minus, a_plus
         REAL(wp) :: source_inflow, other_inflow, face_inflow
-        LOGICAL :: dry_donor_left,dry_donor_right
+        LOGICAL :: dry_donor_left,dry_donor_right,front_trace_enabled,trace_front_face
         INTEGER :: j, k, l, diagnostic_status
         CHARACTER(LEN=1) :: diagnostic_flag
 
+        diagnostic_flag=''
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_FRONT_MASS_DIAGNOSTICS',diagnostic_flag,STATUS=diagnostic_status)
+        front_trace_enabled=diagnostic_status==0 .AND. diagnostic_flag=='1'
+
+        ! X- and Y-face kernels write disjoint oriented arrays. Keep one
+        ! OpenMP team and let workers begin Y faces as soon as X work ends.
+        !$OMP PARALLEL IF(comp_cells_x>1 .OR. comp_cells_y>1) &
+        !$OMP& PRIVATE(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right,trace_front_face)
         IF ( comp_cells_x .GT. 1 ) THEN
 
-            !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right)
+            !$OMP DO
             DO l = 1, solve_interfaces_x
 
                 j = j_stag_x(l)
@@ -475,7 +823,19 @@ CONTAINS
                     qp_center(1,j-1,k) .LE. dry_thickness_tolerance
                 IF ( j .LE. comp_cells_x ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
-                CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
+                trace_front_face=.FALSE.
+                IF (front_trace_enabled .AND. recon%layer==1) THEN
+                    IF (j>1 .AND. j<=comp_cells_x) THEN
+                        trace_front_face=qp_center(1,j-1,k)>dry_thickness_tolerance .AND. &
+                            qp_center(1,j,k)<=dry_thickness_tolerance
+                    END IF
+                END IF
+                IF (trace_front_face) THEN
+                    WRITE(*,'(A,2(I0,1X),A,ES24.16)') &
+                        'FRONT_KERNEL enter face(j,k)=',j,k,' t=',t
+                END IF
+                IF (PRESENT(lower_recon)) THEN
+                    CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
                         recon%h_selected_interfaceL(j,k),                                                              &
                         recon%h_selected_interfaceR(j,k),                                                              &
                     recon%qp_adv_interfaceL(:,j,k),                                                                    &
@@ -483,7 +843,25 @@ CONTAINS
                     a_minus, a_plus, this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),                      &
                     PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
-                    this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
+                    this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k), &
+                    bed_face_left=lower_recon%eta_interfaceL(j,k), &
+                    bed_face_right=lower_recon%eta_interfaceR(j,k),diagnose_front=trace_front_face )
+                ELSE
+                    CALL eval_pccu_interface( recon%eta_interfaceL(j,k), recon%eta_interfaceR(j,k), B_face_x(j,k),         &
+                        recon%h_selected_interfaceL(j,k),                                                              &
+                        recon%h_selected_interfaceR(j,k),                                                              &
+                    recon%qp_adv_interfaceL(:,j,k),                                                                    &
+                    recon%qp_adv_interfaceR(:,j,k), grav_coeff_stag_x(j,k),                                            &
+                    a_minus, a_plus, this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),                      &
+                    PATH_DIR_X, 2, j, k, use_dry_donor,                                               &
+                    dry_donor_left,dry_donor_right,t,                                                                  &
+                    this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k), &
+                    diagnose_front=trace_front_face )
+                END IF
+                IF (trace_front_face) THEN
+                    WRITE(*,'(A,2(ES24.16,1X))') 'FRONT_KERNEL exit left,right=', &
+                        this%G_interface_xL(1,j,k),this%G_interface_xR(1,j,k)
+                END IF
 
                 ! Apply the boundary's one-way condition to the final numerical flux.
                 ! V2 limited the reconstructed normal momentum to outward-only values
@@ -494,7 +872,7 @@ CONTAINS
                 ! are exempt, as in the legacy reconstruction.
                 IF ( ( j .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                      &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcW(2)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcW(2,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_xL(1,j,k) .GT. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
@@ -502,8 +880,8 @@ CONTAINS
                     this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
                 ELSEIF ( ( j .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                  &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcW(2)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcW(2)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcW(2,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcW(2,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
                     this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
@@ -511,7 +889,7 @@ CONTAINS
                 ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                                                            &
                     ( source_cell(MAX(1,MIN(j-1,SIZE(source_cell,1))),                                                 &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcE(2)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcE(2,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_xL(1,j,k) .LT. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
@@ -520,8 +898,8 @@ CONTAINS
                 ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                                                            &
                     ( source_cell(MAX(1,MIN(j-1,SIZE(source_cell,1))),                                                 &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcE(2)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcE(2)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcE(2,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcE(2,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_xL(1,j,k) = 0.0_wp
                     this%G_interface_xR(1,j,k) = 0.0_wp
                     this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
@@ -530,13 +908,13 @@ CONTAINS
                 END IF
 
             END DO
-            !$OMP END PARALLEL DO
+            !$OMP END DO NOWAIT
 
         END IF
 
         IF ( comp_cells_y .GT. 1 ) THEN
 
-            !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus,dry_donor_left,dry_donor_right)
+            !$OMP DO
             DO l = 1, solve_interfaces_y
 
                 j = j_stag_y(l)
@@ -550,7 +928,20 @@ CONTAINS
                     qp_center(1,j,k-1) .LE. dry_thickness_tolerance
                 IF ( k .LE. comp_cells_y ) dry_donor_right =                                                           &
                     qp_center(1,j,k) .LE. dry_thickness_tolerance
-                CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
+                IF (PRESENT(lower_recon)) THEN
+                    CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
+                        recon%h_selected_interfaceB(j,k),                                                              &
+                        recon%h_selected_interfaceT(j,k),                                                              &
+                    recon%qp_adv_interfaceB(:,j,k),                                                                    &
+                    recon%qp_adv_interfaceT(:,j,k), grav_coeff_stag_y(j,k),                                            &
+                    a_minus, a_plus, this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k),                      &
+                    PATH_DIR_Y, 3, j, k, use_dry_donor,                                               &
+                    dry_donor_left,dry_donor_right,t,                                                                  &
+                    this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k), &
+                    bed_face_left=lower_recon%eta_interfaceB(j,k), &
+                    bed_face_right=lower_recon%eta_interfaceT(j,k) )
+                ELSE
+                    CALL eval_pccu_interface( recon%eta_interfaceB(j,k), recon%eta_interfaceT(j,k), B_face_y(j,k),         &
                         recon%h_selected_interfaceB(j,k),                                                              &
                         recon%h_selected_interfaceT(j,k),                                                              &
                     recon%qp_adv_interfaceB(:,j,k),                                                                    &
@@ -559,10 +950,11 @@ CONTAINS
                     PATH_DIR_Y, 3, j, k, use_dry_donor,                                               &
                     dry_donor_left,dry_donor_right,t,                                                                  &
                     this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
+                END IF
 
                 IF ( ( k .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                      &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcS(3)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcS(3,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_yB(1,j,k) .GT. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
@@ -570,8 +962,8 @@ CONTAINS
                     this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
                 ELSEIF ( ( k .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),                                  &
                     MIN(k,SIZE(source_cell,2))) .NE. 2 ) .AND.                                                         &
-                    ( bcS(3)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcS(3)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcS(3,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcS(3,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
                     this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
@@ -579,7 +971,7 @@ CONTAINS
                 ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                                                            &
                     ( source_cell(MIN(j,SIZE(source_cell,1)),                                                          &
                     MAX(1,MIN(k-1,SIZE(source_cell,2)))) .NE. 2 ) .AND.                                                &
-                    ( bcN(3)%flag .NE. 0 ) .AND.                                                                       &
+                    ( bcN(3,recon%layer)%flag .NE. 0 ) .AND.                                                           &
                     ( this%G_interface_yB(1,j,k) .LT. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
@@ -588,8 +980,8 @@ CONTAINS
                 ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                                                            &
                     ( source_cell(MIN(j,SIZE(source_cell,1)),                                                          &
                     MAX(1,MIN(k-1,SIZE(source_cell,2)))) .NE. 2 ) .AND.                                                &
-                    ( bcN(3)%flag .EQ. 0 ) .AND.                                                                       &
-                    ( bcN(3)%value .EQ. 0.0_wp ) ) THEN
+                    ( bcN(3,recon%layer)%flag .EQ. 0 ) .AND.                                                           &
+                    ( bcN(3,recon%layer)%value .EQ. 0.0_wp ) ) THEN
                     this%G_interface_yB(1:2,j,k) = 0.0_wp
                     this%G_interface_yT(1:2,j,k) = 0.0_wp
                     this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
@@ -598,9 +990,10 @@ CONTAINS
                 END IF
 
             END DO
-            !$OMP END PARALLEL DO
+            !$OMP END DO
 
         END IF
+        !$OMP END PARALLEL
 
         ! Optional stage-level boundary budget for source-mass CI diagnostics.
         ! The oriented mass contributions are measured on the interior side of
@@ -686,10 +1079,6 @@ CONTAINS
     !> \param[in] bed_face Unique bed elevation shared by both states at this face.
     !> \param[in] qp_adv_left Physical face state, including advective velocities.
     !> \param[in] qp_adv_right Physical face state, including advective velocities.
-    !> \param[in] h_minmod_left Minmod-reconstructed depth on the negative side.
-    !> \param[in] h_minmod_right Minmod-reconstructed depth on the positive side.
-    !> \param[in] h_froude_left Froude-blend depth on the negative side.
-    !> \param[in] h_froude_right Froude-blend depth on the positive side.
     !> \param[in] grav_coeff Large-slope gravity factor at the interface.
     !> \param[in] a_minus Negative face speed bound.
     !> \param[in] a_plus Positive face speed bound.
@@ -702,13 +1091,20 @@ CONTAINS
     !> \param[in] dry_donor_right Whether the positive side uses a dry-donor trace.
     !> \param[in] t Current simulation or stage time [s].
     !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
+    !> @param[in] diagnose_front Enable opt-in diagnostic for a wet-to-dry x-face.
     !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
+    !> @param[in] h_selected_left h selected left argument of eval_pccu_interface.
+    !> @param[in] h_selected_right h selected right argument of eval_pccu_interface.
+    !> @param[in] gamma_left_cached gamma left cached argument of eval_pccu_interface.
+    !> @param[in] gamma_right_cached gamma right cached argument of eval_pccu_interface.
+    !> @param[in] bed_face_left bed face left argument of eval_pccu_interface.
+    !> @param[in] bed_face_right bed face right argument of eval_pccu_interface.
     SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face, h_selected_left,h_selected_right,                      &
             qp_adv_left,qp_adv_right,                                                                                  &
             grav_coeff,a_minus,a_plus,gamma_left_cached,gamma_right_cached,                                          &
             direction,normal_momentum_index,face_i,                                                                    &
             face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                                                     &
-            value_left,value_right)
+            value_left,value_right,bed_face_left,bed_face_right,diagnose_front)
 
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : limit_component_mass_flux
@@ -722,6 +1118,7 @@ CONTAINS
     IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: eta_left, eta_right, bed_face
+        REAL(wp), INTENT(IN), OPTIONAL :: bed_face_left,bed_face_right
         REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
         REAL(wp), INTENT(IN) :: qp_adv_left(n_vars), qp_adv_right(n_vars)
         REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
@@ -730,6 +1127,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: face_i, face_j
         LOGICAL, INTENT(IN) :: use_dry_donor
         LOGICAL, INTENT(IN) :: dry_donor_left,dry_donor_right
+        LOGICAL, INTENT(IN), OPTIONAL :: diagnose_front
         REAL(wp), INTENT(IN) :: t
         REAL(wp), INTENT(OUT) :: value_left(n_eqns), value_right(n_eqns)
 
@@ -744,8 +1142,11 @@ CONTAINS
         REAL(wp) :: eta_path_left, eta_path_right
         REAL(wp) :: h_eta_left,h_eta_right
         LOGICAL :: source_trace_left,source_trace_right
-        LOGICAL :: face_conversion_ok
+        LOGICAL :: face_conversion_ok,trace_front
         ! Source-side flags remain necessary for hydrostatic path endpoints.
+
+        trace_front=.FALSE.
+        IF (PRESENT(diagnose_front)) trace_front=diagnose_front
 
         qp_adv_left_use=qp_adv_left
         qp_adv_right_use=qp_adv_right
@@ -808,8 +1209,18 @@ CONTAINS
 
         CALL eval_pccu_advective_flux(a_minus,a_plus,u_normal_left,u_normal_right,                                  &
             q_adv_left_use,q_adv_right_use,flux_left,flux_right,interface_flux)
+        IF (trace_front) THEN
+            WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_KERNEL input qL,qR,uL,uR=', &
+                q_adv_left_use(1),q_adv_right_use(1),u_normal_left,u_normal_right
+            WRITE(*,'(A,4(ES24.16,1X))') 'FRONT_KERNEL speeds,endpoint_fluxL,fluxR=', &
+                a_minus,a_plus,flux_left(1),flux_right(1)
+            WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL after_pccu=',interface_flux(1)
+            WRITE(*,'(A,3(L1,1X))') 'FRONT_KERNEL dry_flags enable,left,right=', &
+                use_dry_donor,dry_donor_left,dry_donor_right
+        END IF
 
         CALL limit_component_mass_flux(interface_flux)
+        IF (trace_front) WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL after_component_limiter=',interface_flux(1)
 
         ! Positivity guard: when the total mass flux points out of a dry donor,
         ! suppress the complete inertial flux vector, not only the mass equation.
@@ -818,15 +1229,19 @@ CONTAINS
             IF ( (interface_flux(1) .GT. 0.0_wp) .AND.                                                                 &
                 (dry_donor_left .OR.                                                                                   &
                 (qp_adv_left_use(1) .LE. dry_thickness_tolerance)) ) THEN
+                IF (trace_front) WRITE(*,'(A)') 'FRONT_KERNEL suppressed_by_dry_left'
                 interface_flux=0.0_wp
             ELSEIF ( (interface_flux(1) .LT. 0.0_wp) .AND.                                                             &
                 (dry_donor_right .OR.                                                                                  &
                 (qp_adv_right_use(1) .LE. dry_thickness_tolerance)) ) THEN
+                IF (trace_front) WRITE(*,'(A)') 'FRONT_KERNEL suppressed_by_dry_right'
                 interface_flux=0.0_wp
 
             END IF
 
         END IF
+
+        IF (trace_front) WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL after_dry_guard=',interface_flux(1)
 
         ! Suppress only the roundoff-level mass diffusion of a hydrostatic rest
         ! state. Zero normal velocity alone is not enough: on a flat bed, for
@@ -839,29 +1254,51 @@ CONTAINS
         IF ( ( qp_adv_left(normal_momentum_index) .EQ. 0.0_wp ) .AND.                                                  &
             ( qp_adv_right(normal_momentum_index) .EQ. 0.0_wp ) .AND.                                                  &
             ( ABS(eta_left-eta_right) .LE. eta_roundoff ) ) THEN
+            IF (trace_front) WRITE(*,'(A)') 'FRONT_KERNEL suppressed_by_rest_guard'
             interface_flux(1) = 0.0_wp
             interface_flux(4:n_vars) = 0.0_wp
 
+        END IF
+
+        IF (trace_front) THEN
+            WRITE(*,'(A,3(ES24.16,1X))') 'FRONT_KERNEL after_rest_guard,eta_diff,tolerance=', &
+                interface_flux(1),eta_left-eta_right,eta_roundoff
         END IF
 
         qp_path_left=qp_adv_left_use
         qp_path_right=qp_adv_right_use
         eta_path_left=eta_left
         eta_path_right=eta_right
-        IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
-        IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
+        IF (PRESENT(bed_face_left)) THEN
+            IF (source_trace_left) eta_path_left=bed_face_left+h_eta_left
+        ELSE
+            IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
+        END IF
+        IF (PRESENT(bed_face_right)) THEN
+            IF (source_trace_right) eta_path_right=bed_face_right+h_eta_right
+        ELSE
+            IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
+        END IF
 
         IF ( use_dry_donor ) THEN
 
             IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) THEN
                 qp_path_left(1)=0.0_wp
-                eta_path_left=bed_face
+                IF (PRESENT(bed_face_left)) THEN
+                    eta_path_left=bed_face_left
+                ELSE
+                    eta_path_left=bed_face
+                END IF
 
             END IF
 
             IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) THEN
                 qp_path_right(1)=0.0_wp
-                eta_path_right=bed_face
+                IF (PRESENT(bed_face_right)) THEN
+                    eta_path_right=bed_face_right
+                ELSE
+                    eta_path_right=bed_face
+                END IF
 
             END IF
 
@@ -881,6 +1318,11 @@ CONTAINS
             path_contribution)
 
         CALL eval_oriented_pccu_pair(interface_flux,path_contribution,a_minus, a_plus,value_left,value_right)
+        IF (trace_front) THEN
+            WRITE(*,'(A,3(ES24.16,1X))') 'FRONT_KERNEL oriented flux,path,left=', &
+                interface_flux(1),path_contribution(1),value_left(1)
+            WRITE(*,'(A,ES24.16)') 'FRONT_KERNEL oriented_right=',value_right(1)
+        END IF
 
         ! A dry adjacent column receives no share of the nonconservative path;
         ! the wet side retains its own oriented contribution.
@@ -888,6 +1330,9 @@ CONTAINS
             IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) value_left=interface_flux
             IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) value_right=interface_flux
 
+        END IF
+        IF (trace_front) THEN
+            WRITE(*,'(A,2(ES24.16,1X))') 'FRONT_KERNEL final left,right=',value_left(1),value_right(1)
         END IF
 
     END SUBROUTINE eval_pccu_interface
@@ -912,10 +1357,6 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Extend the wet-side hydrostatic coefficient across a dry interface.
-    !> @param[in] h_left Depth at the negative-side face state [m].
-    !> @param[in,out] gamma_left Hydrostatic coefficient at the negative-side face state.
-    !> @param[in] h_right Depth at the positive-side face state [m].
-    !> @param[in,out] gamma_right Hydrostatic coefficient at the positive-side face state.
     PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
         REAL(wp), INTENT(IN) :: h_left,h_right
         REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
@@ -977,14 +1418,9 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Integrate within-cell nonconservative hydrostatic paths.
-    !> @param[in,out] this Hyperbolic workspace receiving path integrals.
-    !> @param[in] recon Prepared reconstruction state and traces.
-    !> @param[in] qp_expl Cell-centered primitive flow states.
-    !> @param[in] use_dry_donor Enable dry-state donor treatment.
-    !> @param[in] solve_cells Number of active cells.
-    !> @param[in] j_cent X indices of active cells.
-    !> @param[in] k_cent Y indices of active cells.
-    SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent )
+    !> @param[in] lower_recon Lower-layer reconstruction.
+    SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor, solve_cells, j_cent, k_cent, &
+        lower_recon )
 
     USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -996,6 +1432,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_dry_donor
         INTEGER, INTENT(IN) :: solve_cells
         INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
+        CLASS(reconstruction_workspace_type), INTENT(IN), OPTIONAL :: lower_recon
 
         INTEGER :: j, k, l
         REAL(wp) :: qp_path_minus(n_vars), qp_path_plus(n_vars)
@@ -1016,30 +1453,48 @@ CONTAINS
             IF ( comp_cells_x .GT. 1 ) THEN
                 qp_path_minus=recon%qp_adv_interfaceR(:,j,k)
                 qp_path_plus=recon%qp_adv_interfaceL(:,j+1,k)
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-lower_recon%eta_cellW(j,k),0.0_wp)
+                ELSE
                 qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
+                END IF
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-lower_recon%eta_cellE(j,k),0.0_wp)
+                ELSE
                 qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
+                END IF
                 IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),           &
                     qp_path_plus,recon%eta_cellE(j,k),                                                                 &
                     grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k),                                      &
                     this%gamma_interface_xR(j,k),recon%h_selected_interfaceR(j,k),                                   &
-                    this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k) )
+                    this%gamma_interface_xL(j+1,k),recon%h_selected_interfaceL(j+1,k),                            &
+                    this%clamp_buoyant_pressure )
 
             END IF
 
             IF ( comp_cells_y .GT. 1 ) THEN
                 qp_path_minus=recon%qp_adv_interfaceT(:,j,k)
                 qp_path_plus=recon%qp_adv_interfaceB(:,j,k+1)
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-lower_recon%eta_cellS(j,k),0.0_wp)
+                ELSE
                 qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
+                END IF
+                IF (PRESENT(lower_recon)) THEN
+                    qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-lower_recon%eta_cellN(j,k),0.0_wp)
+                ELSE
                 qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
+                END IF
                 IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
                 IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
                 CALL eval_cell_hydrostatic_path( qp_path_minus, recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),           &
                     qp_path_plus,recon%eta_cellN(j,k),                                                                 &
                     grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k),                                      &
                     this%gamma_interface_yT(j,k),recon%h_selected_interfaceT(j,k),                                   &
-                    this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1) )
+                    this%gamma_interface_yB(j,k+1),recon%h_selected_interfaceB(j,k+1),                            &
+                    this%clamp_buoyant_pressure )
 
             END IF
 
@@ -1061,8 +1516,17 @@ CONTAINS
     !> \param[in] grav_plus Large-slope gravity factor at the positive endpoint.
     !> \param[in] direction Cartesian path orientation.
     !> \param[out] path Hydrostatic path contribution across the cell.
+    !> @param[in] cached_gamma_minus Face pressure coefficient from the CFL pass.
+    !> @param[in] selected_h_minus Final face depth used for its cached coefficient.
+    !> @param[in] cached_gamma_plus Corresponding positive-side pressure coefficient.
+    !> @param[in] selected_h_plus Final face depth of the positive side.
+    !> @param[in] clamp_buoyant_pressure Suppress negative pressure at buoyant L2 endpoints.
+    !> @param[out] gamma_minus_out,gamma_plus_out Optional resolved pressure coefficients.
+    !> @param[out] gamma_minus_out gamma minus out argument of eval_cell_hydrostatic_path.
+    !> @param[out] gamma_plus_out gamma plus out argument of eval_cell_hydrostatic_path.
     SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path, &
-        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus)
+        cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus,clamp_buoyant_pressure, &
+        gamma_minus_out,gamma_plus_out)
 
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE pccu_2d, ONLY : eval_hydrostatic_path
@@ -1072,8 +1536,10 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp_minus(:),eta_minus,grav_minus
         REAL(wp), INTENT(IN) :: qp_plus(:),eta_plus,grav_plus
         REAL(wp), INTENT(IN) :: cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus
+        LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(OUT) :: path(:)
+        REAL(wp), INTENT(OUT), OPTIONAL :: gamma_minus_out,gamma_plus_out
 
         REAL(wp) :: gamma_minus,gamma_plus
         REAL(wp) :: reduced_gravity_minus,reduced_gravity_plus
@@ -1093,7 +1559,13 @@ CONTAINS
         ELSE
             CALL eval_hydrostatic_coefficient(qp_plus,reduced_gravity_plus,gamma_plus)
         END IF
+        IF (clamp_buoyant_pressure) THEN
+            gamma_minus=MAX(gamma_minus,0.0_wp)
+            gamma_plus=MAX(gamma_plus,0.0_wp)
+        END IF
         CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1), gamma_plus)
+        IF (PRESENT(gamma_minus_out)) gamma_minus_out=gamma_minus
+        IF (PRESENT(gamma_plus_out)) gamma_plus_out=gamma_plus
         CALL eval_hydrostatic_path(direction,qp_minus(1),gamma_minus,eta_minus,                                        &
             grav_minus,qp_plus(1),gamma_plus,eta_plus,grav_plus,path)
 
@@ -1144,14 +1616,6 @@ CONTAINS
     !******************************************************************************
 
     !> @brief Compute characteristic wave-speed bounds at reconstructed faces.
-    !> @param[in,out] this Hyperbolic workspace receiving speed bounds.
-    !> @param[in] recon Reconstructed left and right states.
-    !> @param[in] solve_interfaces_x Number of active x-oriented interfaces.
-    !> @param[in] j_stag_x X indices of active x interfaces.
-    !> @param[in] k_stag_x Y indices of active x interfaces.
-    !> @param[in] solve_interfaces_y Number of active y-oriented interfaces.
-    !> @param[in] j_stag_y X indices of active y interfaces.
-    !> @param[in] k_stag_y Y indices of active y interfaces.
     SUBROUTINE eval_speeds( this, recon, solve_interfaces_x, j_stag_x,                                                 &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
@@ -1197,7 +1661,7 @@ CONTAINS
 
 
                 CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,grav_coeff_stag_x(j,k),idx_u,min_r,max_r, &
-                    this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k))
+                    this%gamma_interface_xL(j,k),this%gamma_interface_xR(j,k),this%clamp_buoyant_pressure)
 
                 this%a_interface_xNeg(j,k) = min_r
                 this%a_interface_xPos(j,k) = max_r
@@ -1231,7 +1695,7 @@ CONTAINS
 
 
                 CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,grav_coeff_stag_y(j,k),idx_v,min_r,max_r, &
-                    this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k))
+                    this%gamma_interface_yB(j,k),this%gamma_interface_yT(j,k),this%clamp_buoyant_pressure)
 
                 this%a_interface_yNeg(j,k) = min_r
                 this%a_interface_yPos(j,k) = max_r
@@ -1262,14 +1726,11 @@ CONTAINS
 
 
     !> @brief Combine endpoint characteristic bounds for one oriented interface.
-    !> @param[in] qp_minus Primitive state on the negative side.
-    !> @param[in] qp_plus Primitive state on the positive side.
-    !> @param[in] grav_coeff Effective gravitational coefficient.
-    !> @param[in] normal_velocity_index Primitive normal-velocity component index.
-    !> @param[out] speed_minus Lower characteristic bound.
-    !> @param[out] speed_plus Upper characteristic bound.
+    !> @param[out] gamma_minus Hydrostatic coefficient of the negative trace.
+    !> @param[out] gamma_plus Hydrostatic coefficient of the positive trace.
+    !> @param[in] clamp_buoyant_pressure Suppress negative L2 hydrostatic coefficients.
     SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff, normal_velocity_index,speed_minus,speed_plus,  &
-        gamma_minus,gamma_plus)
+        gamma_minus,gamma_plus,clamp_buoyant_pressure)
 
     USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
@@ -1279,10 +1740,18 @@ CONTAINS
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: speed_minus,speed_plus
         REAL(wp), INTENT(OUT) :: gamma_minus,gamma_plus
+        LOGICAL, INTENT(IN) :: clamp_buoyant_pressure
         REAL(wp) :: minus_min,minus_max,plus_min,plus_max
 
         CALL eval_local_speeds_direction(qp_minus,grav_coeff,normal_velocity_index,minus_min,minus_max,gamma_minus)
         CALL eval_local_speeds_direction(qp_plus,grav_coeff,normal_velocity_index,plus_min,plus_max,gamma_plus)
+
+        ! The celerity already vanishes for negative g'; the cached pressure
+        ! coefficient must obey the same L2 clamp at both face and cell paths.
+        IF (clamp_buoyant_pressure) THEN
+            gamma_minus=MAX(gamma_minus,0.0_wp)
+            gamma_plus=MAX(gamma_plus,0.0_wp)
+        END IF
 
         speed_minus = MIN(minus_min,plus_min,0.0_wp)
         speed_plus = MAX(minus_max,plus_max,0.0_wp)

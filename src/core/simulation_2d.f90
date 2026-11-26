@@ -4,8 +4,9 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, domain, layout, source registry and numerical workspaces. Initialization
-!> follows their dependency order; finalization releases their storage.
+!> Owns state, runtime, one shared active-cell domain, layout and numerical
+!> workspaces. A temporary source registry validates groups before the
+!> executor takes ownership; finalization releases the persistent storage.
 !********************************************************************************
 
 MODULE simulation_2d
@@ -16,11 +17,16 @@ MODULE simulation_2d
     USE source_configuration_2d, ONLY : initialize_configured_sources
     USE diagnostics_2d, ONLY : fatal_error
 
+    USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
+    USE thermal_parameters_2d, ONLY : thermal_l1,thermal_l2
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2, &
+        pore_pressure_cache_l1,pore_pressure_cache_l2
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1,mass_exchange_l2
     USE model_layout_2d, ONLY : model_layout_type
+    USE layer_physics_2d, ONLY : layer_physics_type
 
-    USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
-            n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag,                                         &
-            configure_canonical_state_indices
+    USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas, &
+            n_stoch_vars, n_pore_vars, rheology_flag, configure_canonical_state_indices
 
 
     USE runtime_2d, ONLY : runtime_state_type
@@ -28,7 +34,7 @@ MODULE simulation_2d
     USE domain_2d, ONLY : domain_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE time_integration_2d, ONLY : time_integration_workspace_type
-    USE stochastic_module, ONLY : stochastic_workspace_type
+    USE stochastic_module, ONLY : stochastic_workspace_type,stochastic_l1,stochastic_l2
 
     IMPLICIT NONE
 
@@ -64,12 +70,12 @@ MODULE simulation_2d
 
         TYPE(runtime_state_type) :: runtime
         TYPE(model_layout_type) :: model_layout
-        TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
+        TYPE(layer_physics_type), ALLOCATABLE :: layer_physics(:) !< Validated before worker allocation.
         TYPE(state_type) :: state
-        TYPE(domain_type) :: domain
-        TYPE(spatial_operator_type) :: spatial_operator
+        TYPE(domain_type) :: domain !< Shared OR active cell and face workset for all layer slots.
+        TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
         TYPE(time_integration_workspace_type) :: time_integration
-        TYPE(stochastic_workspace_type) :: stochastic
+        TYPE(stochastic_workspace_type), ALLOCATABLE :: stochastic(:) !< Independent OU workspace for each layer.
 
     CONTAINS
 
@@ -93,6 +99,8 @@ CONTAINS
         CLASS(simulation_context_type), INTENT(INOUT) :: this
 
         CHARACTER(LEN=256) :: source_error
+        TYPE(source_registry_type) :: source_registry !< Temporary validated source groups for executor setup.
+        INTEGER :: layer
 
         ! Canonical state indices must be available before any initial-condition
         ! conversion, including collapsing-volume initialization.
@@ -101,17 +109,50 @@ CONTAINS
         CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,                                          &
             n_add_gas, n_stoch_vars, n_pore_vars )
 
-        CALL initialize_configured_sources(this%source_registry,source_error)
+        ! Validate phase/rheology and bind canonical thermal configuration before
+        ! source, state and OpenMP workspace initialization. The thermal pointer
+        ! is non-owning; this descriptor never caches another coefficient copy.
+        IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
+        ALLOCATE(this%layer_physics(this%model_layout%n_layers))
+        CALL this%layer_physics(1)%initialize(rheology_flag,rheology_l1,thermal_l1, &
+            pore_pressure_l1,mass_exchange_l1,source_error)
+        IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
+
+        IF (this%model_layout%n_layers==2) THEN
+            CALL this%layer_physics(2)%initialize(rheology_flag,rheology_l2,thermal_l2, &
+                pore_pressure_l2,mass_exchange_l2,source_error)
+            IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
+            CALL initialize_configured_sources(source_registry,source_error, &
+                rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+                rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+        ELSE
+            CALL initialize_configured_sources(source_registry,source_error, &
+                rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1)
+        END IF
         IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
         CALL this%state%initialize( this%model_layout )
 
-        CALL this%spatial_operator%initialize
+        ! Each layer owns its reconstruction, face fluxes and CFL scratch.
+        ! Allocate the spatial workspaces for the requested structural layer count.
+        ALLOCATE(this%spatial_operators(this%model_layout%n_layers))
+
+        DO layer=1,SIZE(this%spatial_operators)
+            CALL this%spatial_operators(layer)%initialize(layer)
+        END DO
+
+        ! One canonical active-cell/face workset covers the union of L1/L2.
+        ! Per-layer HP and flux data remain owned by spatial_operators.
         CALL this%domain%initialize
 
-        CALL this%time_integration%initialize(this%source_registry)
+        CALL this%time_integration%initialize(source_registry)
+        ! The Lie executor now owns the operational group metadata.
+        CALL source_registry%finalize()
 
-        CALL this%stochastic%initialize
+        ALLOCATE(this%stochastic(this%model_layout%n_layers))
+        CALL this%stochastic(1)%initialize(stochastic_l1,rheology_l1,layer=1)
+        IF (this%model_layout%n_layers==2) &
+            CALL this%stochastic(2)%initialize(stochastic_l2,rheology_l2,layer=2)
 
         WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
 
@@ -121,11 +162,13 @@ CONTAINS
     !> \details Preserves the fractional-step ordering: source-window averages,
     !>          OU preparation, full Lie spatial/source advancement, then one clock advance.
     !> \param[in,out] this Initialized simulation context.
-    !> \param[in] observer Optional test hook called after each completed phase.
-    SUBROUTINE advance_simulation_timestep(this,observer,pre_spatial_primitives_ready)
+    !> @param[in] observer Optional test hook called after each completed phase.
+    !> @param[in] pre_spatial_primitives_ready Optional primitive cache readiness.
+    !> @param[in] spatial_residual_ready The pre-step residual is ready for the Lie update.
+    SUBROUTINE advance_simulation_timestep(this,observer,pre_spatial_primitives_ready,spatial_residual_ready)
         CLASS(simulation_context_type), INTENT(INOUT) :: this
         PROCEDURE(timestep_event_observer), OPTIONAL :: observer
-        LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready
+        LOGICAL, INTENT(IN), OPTIONAL :: pre_spatial_primitives_ready,spatial_residual_ready
         REAL(wp) :: step_start,step_length
 
         step_start=this%runtime%t
@@ -138,13 +181,19 @@ CONTAINS
         ! Lie sources, inside the integrator's unpublished trial transaction.
         IF (PRESENT(observer)) THEN
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operator,                                                      &
-                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                              &
-                stochastic_prepared_hook=notify_stochastic_prepared)
+                this%stochastic,this%domain,this%spatial_operators,                                              &
+                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                      &
+                spatial_residual_ready=spatial_residual_ready, &
+                stochastic_prepared_hook=notify_stochastic_prepared,                                                   &
+                layer_physics=this%layer_physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
         ELSE
             CALL this%time_integration%advance(this%state,step_start,step_length,                                      &
-                this%stochastic,this%domain,this%spatial_operator,                                                      &
-                pre_spatial_primitives_ready=pre_spatial_primitives_ready)
+                this%stochastic,this%domain,this%spatial_operators,                                              &
+                pre_spatial_primitives_ready=pre_spatial_primitives_ready,                                            &
+                spatial_residual_ready=spatial_residual_ready, &
+                layer_physics=this%layer_physics, &
+                pore_caches=[pore_pressure_cache_l1,pore_pressure_cache_l2])
         END IF
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 
@@ -152,6 +201,7 @@ CONTAINS
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED,                                            &
             this%runtime%t,step_length)
     CONTAINS
+        !> @brief notify stochastic prepared operation.
         SUBROUTINE notify_stochastic_prepared()
             ! Report the new phase at its actual point, after spatial.
             CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED,step_start,step_length)
@@ -166,17 +216,30 @@ CONTAINS
     SUBROUTINE finalize_simulation(this)
 
         CLASS(simulation_context_type), INTENT(INOUT) :: this
+        INTEGER :: layer
 
         CALL this%domain%finalize
         CALL this%time_integration%finalize
-        CALL this%spatial_operator%finalize
+
+        IF (ALLOCATED(this%spatial_operators)) THEN
+            DO layer=1,SIZE(this%spatial_operators)
+                CALL this%spatial_operators(layer)%finalize
+            END DO
+
+            DEALLOCATE(this%spatial_operators)
+        END IF
 
         CALL this%state%finalize
 
 
-        CALL this%source_registry%finalize()
+        IF (ALLOCATED(this%layer_physics)) DEALLOCATE(this%layer_physics)
         CALL this%model_layout%finalize
-        CALL this%stochastic%finalize
+        IF (ALLOCATED(this%stochastic)) THEN
+            DO layer=1,SIZE(this%stochastic)
+                CALL this%stochastic(layer)%finalize
+            END DO
+            DEALLOCATE(this%stochastic)
+        END IF
 
     END SUBROUTINE finalize_simulation
 

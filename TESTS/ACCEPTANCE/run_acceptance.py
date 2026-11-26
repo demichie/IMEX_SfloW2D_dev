@@ -314,6 +314,8 @@ def main():
         relevant = [r for name in criterion["tests"] for r in by_name.get(name, [])]
         criterion["execution_status"] = (
             "fail" if any(r["status"] == "fail" for r in relevant)
+            else "partial_current_coverage" if relevant and
+            criterion.get("closure_status") == "historical_only_pending_current_revalidation"
             else "pass_for_tested_scope" if relevant else "not_executed")
     manifest["finished_utc"] = datetime.now(timezone.utc).isoformat()
     failures = [r for r in manifest["tests"] if r["status"] == "fail"]

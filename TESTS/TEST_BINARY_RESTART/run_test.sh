@@ -43,9 +43,9 @@ prepare_solver_input "$resumed_dir"
 # same output boundary used to write the intermediate restart, so both paths
 # have identical step clipping and exercise B_vertex restart fidelity.
 sed -i.bak -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
-    -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
+    -e 's/^    SUBSTRATE%TOPO_CHANGE_FLAG = F,/    SUBSTRATE%TOPO_CHANGE_FLAG = T,/' \
     "$reference_dir/IMEX_SfloW2D.inp"
-sed -i.bak -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
+sed -i.bak -e 's/^    SUBSTRATE%TOPO_CHANGE_FLAG = F,/    SUBSTRATE%TOPO_CHANGE_FLAG = T,/' \
     "$resumed_dir/IMEX_SfloW2D.inp"
 (
     cd "$reference_dir"
@@ -124,8 +124,8 @@ prepare_solver_input "$external_case"
             printf " OUTPUT_BASE_DIRECTORY=\"%s\",\n", output_base
             next
         }
-        /^ TOPO_CHANGE_FLAG =/ {
-            print " TOPO_CHANGE_FLAG = T,"
+        /^    SUBSTRATE%TOPO_CHANGE_FLAG =/ {
+            print "    SUBSTRATE%TOPO_CHANGE_FLAG = T,"
             next
         }
         { print }

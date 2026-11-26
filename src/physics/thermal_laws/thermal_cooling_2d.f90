@@ -54,6 +54,12 @@ CONTAINS
     END SUBROUTINE eval_thermal_cooling_implicit
 
     !> Evaluate exactly the same implicit contribution in REAL for explicit assembly.
+    !> @brief eval thermal cooling implicit real operation.
+    !> @param[in] state Local physical state.
+    !> @param[in] radiative Radiative cooling coefficient.
+    !> @param[in] convective Convective cooling coefficient.
+    !> @param[in] ambient Ambient temperature.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_thermal_cooling_implicit_real(state,radiative,convective,ambient,rate)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -66,12 +72,24 @@ CONTAINS
 
     !> Evaluate the identical cooling law from temperature alone, so thermal-
     !> only Newton groups do not construct a full REAL or COMPLEX physical state.
+    !> @brief eval thermal cooling from temperature real operation.
+    !> @param[in] temperature Flow temperature.
+    !> @param[in] radiative Radiative cooling coefficient.
+    !> @param[in] convective Convective cooling coefficient.
+    !> @param[in] ambient Ambient temperature.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_thermal_cooling_from_temperature_real(temperature,radiative,convective,ambient,rate)
         REAL(wp), INTENT(IN) :: temperature,radiative,convective,ambient
         REAL(wp), INTENT(OUT) :: rate
         INCLUDE 'thermal_cooling_rate.inc'
     END SUBROUTINE eval_thermal_cooling_from_temperature_real
 
+    !> @brief eval thermal cooling from temperature complex operation.
+    !> @param[in] temperature Flow temperature.
+    !> @param[in] radiative Radiative cooling coefficient.
+    !> @param[in] convective Convective cooling coefficient.
+    !> @param[in] ambient Ambient temperature.
+    !> @param[out] rate Source contribution to energy or temperature.
     SUBROUTINE eval_thermal_cooling_from_temperature_complex(temperature,radiative,convective,ambient,rate)
         COMPLEX(wp), INTENT(IN) :: temperature
         REAL(wp), INTENT(IN) :: radiative,convective,ambient

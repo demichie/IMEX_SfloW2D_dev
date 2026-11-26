@@ -9,6 +9,8 @@ MODULE source_terms_2d
     USE mass_injection_coefficients_2d, ONLY : injection_material_set_type
     USE mass_injection_coefficients_2d
     USE parameters_2d
+    USE thermal_parameters_2d, ONLY : thermal_config_type
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type, pore_pressure_cache_type
     USE constitutive_parameters_2d
     USE state_types, ONLY : physical_state_real, physical_state_complex,                                           &
         initialize_physical_state_real, initialize_physical_state_complex
@@ -18,6 +20,8 @@ MODULE source_terms_2d
             eval_thermal_implicit_real, eval_thermal_analytic, eval_thermal_implicit_temperature
     USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit,mass_exchange_scratch_type
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic,                                            &
             eval_rheology_implicit_id, eval_rheology_semi_implicit_id,                                                 &
             eval_rheology_implicit_real_id, eval_rheology_explicit
@@ -25,7 +29,7 @@ MODULE source_terms_2d
     USE state_composition, ONLY : conservative_mass_admissible
     USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
-    USE source_registry_2d, ONLY : source_group_type
+    USE source_registry_2d, ONLY : source_group_type, SOURCE_SCOPE_L1
     USE source_catalog_2d, ONLY : SOURCE_ID_GEOMETRY_CURVATURE, SOURCE_ID_BOTTOM_CIRCULAR_INJECTION,                   &
         SOURCE_ID_BOTTOM_FISSURAL_INJECTION, SOURCE_ID_RADIAL_INJECTION, SOURCE_ID_THERMAL_COOLING
     IMPLICIT NONE
@@ -49,8 +53,10 @@ MODULE source_terms_2d
     END TYPE source_cell_context_type
 CONTAINS
 
-
-    !> Apply a uniform physical factor to all coupled exchange rates.
+    !> @brief Scale every coupled substrate/mass-exchange rate by the same accepted factor.
+    !> @details Apply a uniform physical factor to all coupled exchange rates.
+    !> @param[in,out] transfer Collected mass, carrier, solid, thermal and bed-rate workspace.
+    !> @param[in] scale Common multiplicative factor applied to every physical component.
     SUBROUTINE scale_mass_exchange_transfer(transfer,scale)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
         REAL(wp), INTENT(IN) :: scale
@@ -67,23 +73,64 @@ CONTAINS
         transfer%dB_dt=scale*transfer%dB_dt
     END SUBROUTINE scale_mass_exchange_transfer
 
-    !> Assemble and limit a complete explicit Lie group, without committing state.
+    !> @brief Assemble and limit one explicit Lie source group without committing state.
+    !> @details Assemble and limit a complete explicit Lie group, without committing state.
+    !> @param[in] qp_eval Primitive source-evaluation snapshot for this cell.
+    !> @param[in] q_recipient Current conservative state providing admissibility bounds.
+    !> @param[in] dt Positive Lie substep duration [s].
+    !> @param[in] t Simulation time used by time-dependent injection laws [s].
+    !> @param[in] group Registered Lie source group being evaluated.
+    !> @param[in] inventory Erodible substrate solid mass/volume inventory by class.
+    !> @param[out] rate Accepted conservative rate for the complete group.
+    !> @param[in,out] transfer Coupled substrate exchange rates associated with this candidate.
+    !> @param[out] has_exchange True if a physical terrain/atmosphere exchange was assembled.
+    !> @param[out] valid False when a proposed source violates availability or admissibility.
+    !> @param[in] stochastic_value Cell-local stochastic rheology coefficient.
+    !> @param[in] B_zone_cell Substrate zone identifier at this cell.
+    !> @param[in] context Immutable geometric and gravity data for source evaluation.
+    !> @param[in] cell_fract Fraction covered by the lateral injection sector.
+    !> @param[in] cell_fissure_fract Per-fissure cell coverage fractions.
+    !> @param[in] arc_perim Exposed lateral arc perimeter for boundary injection.
+    !> @param[in] arc_n_x Horizontal x component of exposed lateral normal.
+    !> @param[in] arc_n_y Horizontal y component of exposed lateral normal.
+    !> @param[in] cell_area Horizontal cell area [m2].
+    !> @param[in] non_exchange_mask Mask of sources that do not exchange with terrain or air.
+    !> @param[in] exchange_selected Whether group metadata activates mass exchange.
+    !> @param[in,out] physical_scratch Optional caller-owned physical state workspace.
+    !> @param[in,out] exchange_scratch Optional caller-owned mass-exchange workspace.
+    !> @param[in] q_preexisting Optional pre-source conservative state for donor limits.
+    !> @param[in] materials Prepared material data for prescribed injection sources.
+    !> @param[in] thermal Immutable thermal source configuration.
+    !> @param[in] rheology Immutable rheology source configuration.
+    !> @param[in] mass_config Immutable terrain/atmosphere exchange configuration.
+    !> @param[in] transport_stochastic Whether the stochastic scalar follows mass transfer.
+    !> @param[in] pore_enabled Whether pore-pressure scalar transport is active.
+    !> @param[in] stochastic_enabled Whether stochastic rheology is active.
+    !> @param[in] terrain_exposed True if this layer can exchange with the ground.
+    !> @param[in] atmosphere_exposed True if this layer contacts ambient air.
     SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group,                                       &
             inventory,rate,transfer,has_exchange,valid,stochastic_value,                                               &
             B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area,                     &
-            non_exchange_group,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials)
+            non_exchange_mask,exchange_selected,physical_scratch,exchange_scratch,q_preexisting,materials, &
+            thermal,rheology,mass_config,transport_stochastic,pore_enabled,stochastic_enabled, &
+            terrain_exposed,atmosphere_exposed)
         INTEGER, INTENT(IN) :: B_zone_cell
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: arc_perim,arc_n_x,arc_n_y,cell_area
         REAL(wp), INTENT(IN) :: qp_eval(n_vars),q_recipient(n_eqns),dt,t
         TYPE(source_group_type), INTENT(IN) :: group
-        ! Prepartitioned immutable metadata supplied by the Lie executor.
-        TYPE(source_group_type), INTENT(IN) :: non_exchange_group
+        ! The Lie executor precomputes the exchange-free mask during initialization.
+        INTEGER, INTENT(IN) :: non_exchange_mask
         LOGICAL, INTENT(IN) :: exchange_selected
         TYPE(physical_state_real), INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         TYPE(injection_material_set_type), INTENT(IN) :: materials
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,stochastic_enabled
+        LOGICAL, INTENT(IN) :: terrain_exposed,atmosphere_exposed
         ! Inventory at the beginning of the timestep: exchange cannot consume
         ! source mass introduced by preceding groups during this same step.
         REAL(wp), INTENT(IN), OPTIONAL :: q_preexisting(n_eqns)
@@ -102,18 +149,23 @@ CONTAINS
         physical_ready=.FALSE.
         ! Partitioned immutable metadata comes from the Lie registry/executor.
         ! Never copy allocatable group members or PACK source names inside cells.
-        IF (non_exchange_group%source_mask/=0) THEN
+        IF (non_exchange_mask/=0) THEN
             CALL eval_source_explicit(context%Bprime_x,context%Bprime_y,                                               &
                 context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,                                              &
                 context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract,                                   &
-                arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange_group,stochastic_value,physical_scratch,              &
-                physical_ready,materials)
+                arc_perim,arc_n_x,arc_n_y,cell_area,group,stochastic_value,physical_scratch,              &
+                physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled,                            &
+                non_exchange_mask=non_exchange_mask)
         END IF
 
         IF (has_exchange) THEN
+            ! The registry already identifies L1; no second contact representation
+            ! is needed to restrict static substrate deposition to that layer.
             CALL eval_source_explicit(qp_eval,B_zone_cell,                                                             &
                 context%Bprime_x,context%Bprime_y,inventory,dt,                                                        &
-                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready)
+                group%source_mask,transfer,exchange,physical_scratch,exchange_scratch,physical_ready,rheology, &
+                mass_config,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed, &
+                group%scope==SOURCE_SCOPE_L1)
 
             IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                 coverage=1.0_wp-cell_fract
@@ -141,9 +193,18 @@ CONTAINS
         IF (has_exchange) CALL scale_mass_exchange_transfer(transfer,scale)
     END SUBROUTINE assemble_lie_explicit_transaction
 
-    !> Scale a complete cell-local physical source transaction only after
-    !> assembling all explicit source rates. Reference inventories belong to
-    !> the post-spatial Lie state; group zero rate evaluation stays at q^n.
+    !> @brief Limit the complete explicit source using the current conservative inventories.
+    !> @details Scale a complete cell-local physical source transaction only after
+    !> @details assembling all explicit source rates. Reference inventories belong to
+    !> @details the post-spatial Lie state; group zero rate evaluation stays at q^n.
+    !> @param[in] q_reference Conservative recipient state for nonnegativity bounds.
+    !> @param[in] inventory Available erodible substrate inventory by solid class.
+    !> @param[in] dt Lie substep duration [s].
+    !> @param[in] rate Proposed conservative source-rate vector.
+    !> @param[in] solid_erosion_rate Proposed substrate withdrawal per solid class.
+    !> @param[out] limiter Largest admissible common source scaling factor in [0,1].
+    !> @param[out] valid True only when the limited conservative candidate is admissible.
+    !> @param[in] q_preexisting Optional pre-source state used for paired withdrawal protection.
     SUBROUTINE limit_explicit_source_rates(q_reference,inventory,dt,rate,                                              &
             solid_erosion_rate,limiter,valid,q_preexisting)
         REAL(wp), INTENT(IN) :: q_reference(n_eqns),inventory(:),dt
@@ -176,8 +237,17 @@ CONTAINS
         END DO
 
         DO i=1,SIZE(inventory)
-            IF (solid_erosion_rate(i)>0.0_wp) limiter=MIN(limiter,                                                     &
-                MAX(0.0_wp,inventory(i)/(dt*solid_erosion_rate(i))))
+            IF (solid_erosion_rate(i)>0.0_wp) THEN
+                withdrawal=dt*solid_erosion_rate(i)
+                limiter=MIN(limiter,MAX(0.0_wp,inventory(i)/withdrawal))
+                ! A fully depleted erodible species can round the limiting
+                ! quotient to 1.0 even though the fused substrate update is
+                ! slightly negative. Enter the existing rate safety margin,
+                ! without clipping the substrate or changing the erosion law.
+                IF (limiter==1.0_wp .AND. &
+                    inventory(i)<=withdrawal*(1.0_wp+64.0_wp*EPSILON(1.0_wp))) &
+                    limiter=NEAREST(limiter,-1.0_wp)
+            END IF
 
         END DO
 
@@ -206,8 +276,8 @@ CONTAINS
             IF (carrier_consumption>0.0_wp) limiter=MIN(limiter, &
                 MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
         END IF
-        ! When one or more species balances are saturated, reserve a small
-        ! relative buffer before the floating-point candidate check. A bound
+        ! When one or more mobile or substrate species balances are saturated,
+        ! reserve a small relative buffer before the floating-point candidate check. A bound
         ! with zero remaining species is susceptible to reassociation/FMA
         ! differences between this routine and the caller (observed in TAAL
         ! as -1.4293E-20 kg/m2 after the rate was reported admissible).
@@ -239,7 +309,15 @@ CONTAINS
         IF (limiter>=0.0_wp .AND. limiter<=1.0_wp) THEN
             DO i=1,256
                 candidate=q_reference+dt*(limiter*rate)
-                IF (conservative_mass_admissible(candidate)) EXIT
+                ! A wet conservative state requires strictly positive energy.
+                ! Complete carrier depletion can round the energy to exactly
+                ! zero while leaving a representable wet mass (Etna lava D19).
+                ! Back off the *coupled rate*, never clip q or invent energy.
+                IF (conservative_mass_admissible(candidate)) THEN
+                    IF (q_reference(idx_engyEqn)<=0.0_wp .OR. rate(idx_engyEqn)>=0.0_wp) EXIT
+                    IF (candidate(idx_totMassEqn)<=EPSILON(1.0_wp)) EXIT
+                    IF (candidate(idx_engyEqn)>0.0_wp) EXIT
+                END IF
                 IF (limiter<=0.0_wp) EXIT
                 limiter=NEAREST(limiter,-1.0_wp)
             END DO
@@ -247,17 +325,41 @@ CONTAINS
         END IF
         valid=limiter>=0.0_wp .AND. limiter<=1.0_wp
         IF (valid) valid=conservative_mass_admissible(candidate)
+        IF (valid .AND. q_reference(idx_engyEqn)>0.0_wp .AND. rate(idx_engyEqn)<0.0_wp) THEN
+            IF (candidate(idx_totMassEqn)>EPSILON(1.0_wp)) &
+                valid=candidate(idx_engyEqn)>0.0_wp
+        END IF
     END SUBROUTINE limit_explicit_source_rates
 
-    !> Return the conservative equivalent rate of the exact source substep.
-    !> The interval is supplied by the selected Lie group operator.
-    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch)
+    !> @brief Return a conservative mean rate from an exact analytic Lie substep.
+    !> @details Return the conservative equivalent rate of the exact source substep.
+    !> @details The interval is supplied by the selected Lie group operator.
+    !> @param[in] group Resolved Lie group describing the active analytic sources.
+    !> @param[in] q_before Conservative state before the analytic substep.
+    !> @param[in] context Local geometry and gravity coefficients.
+    !> @param[in] interval Duration over which the exact state change is divided [s].
+    !> @param[out] rate Mean conservative rate from the exact state increment.
+    !> @param[out] status Zero on success; nonzero for rejected or unsupported states.
+    !> @param[in,out] physical_scratch Optional physical-state workspace owned by the caller.
+    !> @param[in] thermal Immutable thermal source configuration.
+    !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] pore_pressure Immutable layer Darcy configuration.
+    !> @param[in] pore_cache Derived Darcy pressure coefficients for the layer.
+    !> @param[in] pore_enabled Whether Darcy or pore-pressure corrections are enabled.
+    !> @param[in] stochastic_enabled Whether stochastic rheology coefficients are enabled.
+    SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status,physical_scratch,thermal,rheology, &
+            pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         REAL(wp) :: q_after(n_vars)
         rate=0.0_wp
 
@@ -273,18 +375,39 @@ CONTAINS
 
         END IF
 
-        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
+        CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
+            thermal,rheology,pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
         IF (status/=0) RETURN
         rate(1:n_vars)=(q_after-q_before)/interval
     END SUBROUTINE eval_source_analytic
 
-    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch)
+    !> @brief Integrate an analytic source group and return its conservative final state.
+    !> @param[in] group Resolved analytic Lie group to integrate.
+    !> @param[in] q_before Conservative state at the start of the source substep.
+    !> @param[in] context Local topographic and gravitational coefficients.
+    !> @param[in] interval Analytic Lie substep duration [s].
+    !> @param[out] q_after Conservative candidate resulting from the analytic substep.
+    !> @param[out] status Zero when the candidate state is accepted.
+    !> @param[in,out] physical_scratch Optional caller-owned physical-state workspace.
+    !> @param[in] thermal Canonical thermal source configuration.
+    !> @param[in] rheology Canonical layer rheology configuration.
+    !> @param[in] pore_pressure Canonical layer pore-pressure configuration.
+    !> @param[in] pore_cache Derived immutable Darcy coefficients.
+    !> @param[in] pore_enabled Whether Darcy stress correction is active.
+    !> @param[in] stochastic_enabled Whether stochastic rheology coefficients are active.
+    SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status,physical_scratch, &
+            thermal,rheology,pore_pressure,pore_cache,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_before(n_vars),interval
         TYPE(source_cell_context_type), INTENT(IN) :: context
         REAL(wp), INTENT(OUT) :: q_after(n_vars)
         INTEGER, INTENT(OUT) :: status
         TYPE(physical_state_real), OPTIONAL, TARGET, INTENT(INOUT) :: physical_scratch
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(pore_pressure_config_type), INTENT(IN) :: pore_pressure
+        TYPE(pore_pressure_cache_type), INTENT(IN) :: pore_cache
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
@@ -306,7 +429,7 @@ CONTAINS
         ! cp_m, which determines T from conservative energy. Keep the old dry
         ! branch to preserve its ambient-temperature and rejection semantics.
         needs_physical_state=INDEX(selected_model_name,'rheology_')==1 .OR.                                            &
-            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp) .OR.                            &
+            (selected_model_name=='pore_pressure_dissipation' .AND. q_before(1)>0.0_wp) .OR. &
             (selected_model_name=='thermal_cooling' .AND. q_before(1)<=0.0_wp)
         IF (needs_physical_state) THEN
             physical_state=>local_state
@@ -334,9 +457,9 @@ CONTAINS
 
             END IF
 
-            CALL eval_rheology_analytic([selected_model_name], interval, physical_state,                               &
-                    speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag,                              &
-                    stochastic_flag, context%Zij, velocity_after, supported,                                           &
+            CALL eval_rheology_analytic(rheology,[selected_model_name], interval, physical_state, &
+                    speed_ratio, context%grav_coeff, curvature_accel, pore_enabled,                              &
+                    stochastic_enabled, context%Zij, velocity_after, supported, &
                     context%Bprime_x, context%Bprime_y, context%Bsecond_xx,                                            &
                     context%Bsecond_xy, context%Bsecond_yy)
 
@@ -368,14 +491,13 @@ CONTAINS
             ! frozen heat capacity used by the exact cooling integrator.
             heat_capacity=q_before(4)/temperature_before
             CALL eval_thermal_analytic(['thermal_cooling'],temperature_before,interval,                               &
-                    heat_capacity,radiative_term_coeff,convective_term_coeff,                                          &
-                    T_env,temperature_after)
+                    heat_capacity,thermal,T_ambient,temperature_after)
             q_after(4)=heat_capacity*temperature_after
             status=0
 
         ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
             IF (q_before(1)>0.0_wp) THEN
-                CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],                                              &
+                CALL eval_pore_pressure_analytic(pore_pressure,pore_cache,['pore_pressure_darcy'], &
                         physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
 
                 IF (.NOT.pore_ok) THEN
@@ -395,16 +517,29 @@ CONTAINS
         END IF
     END SUBROUTINE eval_source_analytic_state
 
-
-    !> Evaluate the frozen semi-implicit contribution of one Newton Lie group.
-    !> All inputs refer to one cell; no domain indices or shared-state writes.
+    !> @brief Evaluate frozen real-valued rheology rates for a Newton Lie group.
+    !> @details Evaluate the frozen semi-implicit contribution of one Newton Lie group.
+    !> @details All inputs refer to one cell; no domain indices or shared-state writes.
+    !> @param[in] group Configured Newton source group and resolved rheology identifier.
+    !> @param[in] q_cell Conservative cell state at the current Newton iteration.
+    !> @param[in] Bprime_x Terrain x-slope used to construct the physical state.
+    !> @param[in] Bprime_y Terrain y-slope used to construct the physical state.
+    !> @param[in] grav_correction Topographic gravity correction for rheology.
+    !> @param[in] stochastic_value Frozen stochastic rheology coefficient.
+    !> @param[out] rate Real-valued conservative source-rate vector.
+    !> @param[in,out] physical_scratch Optional caller-owned real physical workspace.
+    !> @param[in] rheology Layer-specific rheology closure.
+    !> @param[in] pore_enabled Enable effective-stress pore correction.
+    !> @param[in] stochastic_enabled Enable stochastic rheology coefficients.
     SUBROUTINE eval_source_semi_implicit(group,q_cell,Bprime_x,Bprime_y,                                               &
-            grav_correction,stochastic_value,rate,physical_scratch)
+            grav_correction,stochastic_value,rate,physical_scratch,rheology,pore_enabled,stochastic_enabled)
         TYPE(source_group_type), INTENT(IN) :: group
         REAL(wp), INTENT(IN) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(physical_state_real), TARGET, OPTIONAL, INTENT(INOUT) :: physical_scratch
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: physical_state
 
@@ -423,13 +558,26 @@ CONTAINS
         END IF
         CALL build_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y,                                      &
             0.0_wp,0.0_wp,0.0_wp)
-        CALL eval_rheology_semi_implicit_id(group%rheology_id,physical_state,                                          &
-            grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
+        CALL eval_rheology_semi_implicit_id(rheology,group%rheology_id,physical_state, &
+            grav_correction,pore_enabled,stochastic_enabled,stochastic_value,rate(2:3))
     END SUBROUTINE eval_source_semi_implicit
 
-    !> Evaluate the REAL implicit source directly for Newton residuals.
-    !> The source formulas are identical to those used by COMPLEX Jacobians.
-    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted)
+    !> @brief Evaluate the real residual-rate counterpart of a Newton source group.
+    !> @details Evaluate the REAL implicit source directly for Newton residuals.
+    !> @details The source formulas are identical to those used by COMPLEX Jacobians.
+    !> @param[in] Bprime_x Terrain x-slope at this cell.
+    !> @param[in] Bprime_y Terrain y-slope at this cell.
+    !> @param[in] Zij Frozen cell stochastic coefficient.
+    !> @param[in] q_cell Real conservative state at the Newton evaluation point.
+    !> @param[out] rate Real source-rate vector for rheology and thermal processes.
+    !> @param[in] group Resolved implicit Lie source group.
+    !> @param[in,out] physical_scratch Optional caller-owned real physical workspace.
+    !> @param[out] accepted Optional flag indicating physical-state conversion succeeded.
+    !> @param[in] thermal Layer thermal source configuration.
+    !> @param[in] rheology Layer rheology source configuration.
+    !> @param[in] stochastic_enabled Whether the stochastic rheology term is active.
+    SUBROUTINE eval_source_implicit_real(Bprime_x,Bprime_y,Zij,q_cell,rate,group,physical_scratch,accepted, &
+            thermal,rheology,stochastic_enabled)
         REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,Zij,q_cell(n_vars)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(source_group_type), INTENT(IN) :: group
@@ -438,6 +586,9 @@ CONTAINS
         TYPE(physical_state_real), POINTER :: physical_state
         REAL(wp) :: temperature
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -451,8 +602,9 @@ CONTAINS
                 IF (PRESENT(accepted)) accepted=.FALSE.
                 RETURN
             END IF
-            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
-                radiative_term_coeff,convective_term_coeff,T_env,rate(4))
+            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature, &
+                thermal, &
+                T_ambient,rate(4))
             RETURN
         END IF
         physical_state=>local_state
@@ -468,18 +620,32 @@ CONTAINS
             RETURN
         END IF
         IF (group%rheology_implicit) THEN
-            CALL eval_rheology_implicit_real_id(group%rheology_id,physical_state, &
-                stochastic_flag,Zij,rate(2:3))
+            CALL eval_rheology_implicit_real_id(rheology,group%rheology_id,physical_state, &
+                stochastic_enabled,Zij,rate(2:3))
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit_real(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                radiative_term_coeff,convective_term_coeff,T_env,rate(4))
+                thermal, &
+                T_ambient,rate(4))
         END IF
     END SUBROUTINE eval_source_implicit_real
 
-    !> Evaluate the COMPLEX implicit rate for Newton complex-step Jacobians.
-    !> The real residual uses the distinct eval_source_implicit_real contract.
-    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted)
+    !> @brief Evaluate complex implicit rates for Newton complex-step differentiation.
+    !> @details Evaluate the COMPLEX implicit rate for Newton complex-step Jacobians.
+    !> @details The real residual uses the distinct eval_source_implicit_real contract.
+    !> @param[in] Bprimej_x Terrain x-slope at the complex evaluation cell.
+    !> @param[in] Bprimej_y Terrain y-slope at the complex evaluation cell.
+    !> @param[in] Zij Frozen stochastic coefficient for this cell.
+    !> @param[in] c_qj Complex conservative state for Jacobian differentiation.
+    !> @param[out] c_nh_term_impl Complex conservative source-rate vector.
+    !> @param[in] group Implicit Lie source group to evaluate.
+    !> @param[in,out] physical_scratch Optional caller-owned complex physical workspace.
+    !> @param[out] accepted Optional flag for complex state admissibility.
+    !> @param[in] thermal Immutable thermal source configuration.
+    !> @param[in] rheology Immutable layer rheology configuration.
+    !> @param[in] stochastic_enabled Whether stochastic rheology is enabled.
+    SUBROUTINE eval_source_implicit(Bprimej_x,Bprimej_y,Zij,c_qj,c_nh_term_impl,group,physical_scratch,accepted, &
+            thermal,rheology,stochastic_enabled)
         REAL(wp), INTENT(IN) :: Bprimej_x,Bprimej_y,Zij
         COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
         COMPLEX(wp), INTENT(OUT) :: c_nh_term_impl(n_eqns)
@@ -489,6 +655,9 @@ CONTAINS
         TYPE(physical_state_complex), POINTER :: physical_state
         COMPLEX(wp) :: temperature
         LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: stochastic_enabled
         LOGICAL :: state_ok
 
         IF (group%method/=SOURCE_METHOD_NEWTON) &
@@ -502,8 +671,9 @@ CONTAINS
                 IF (PRESENT(accepted)) accepted=.FALSE.
                 RETURN
             END IF
-            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature,                               &
-                radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
+            CALL eval_thermal_implicit_temperature(SOURCE_ID_THERMAL_COOLING,temperature, &
+                thermal, &
+                T_ambient,c_nh_term_impl(4))
             RETURN
         END IF
 
@@ -520,27 +690,47 @@ CONTAINS
             RETURN
         END IF
         IF (group%rheology_implicit) THEN
-            CALL eval_rheology_implicit_id(group%rheology_id,physical_state, &
-                stochastic_flag,Zij,c_nh_term_impl(2:3))
+            CALL eval_rheology_implicit_id(rheology,group%rheology_id,physical_state, &
+                stochastic_enabled,Zij,c_nh_term_impl(2:3))
         END IF
         IF (group%thermal_active) THEN
             CALL eval_thermal_implicit(SOURCE_ID_THERMAL_COOLING,physical_state, &
-                radiative_term_coeff,convective_term_coeff,T_env,c_nh_term_impl(4))
+                thermal,                  &
+                T_ambient,c_nh_term_impl(4))
         END IF
     END SUBROUTINE eval_source_implicit
 
-
-
-
+    !> @brief Assemble explicit geometry and prescribed-injection source rates at one cell.
+    !> @param[in] Bprimej_x Terrain x-slope used by geometric source terms.
+    !> @param[in] Bprimej_y Terrain y-slope used by geometric source terms.
+    !> @param[in] Bsecondj_xx Terrain second x derivative.
+    !> @param[in] Bsecondj_xy Terrain mixed second derivative.
+    !> @param[in] Bsecondj_yy Terrain second y derivative.
+    !> @param[in] grav_coeff Gravity correction evaluated at this cell.
+    !> @param[in] qpj Current cell primitive state.
+    !> @param[out] expl_term Conservative explicit source-rate contribution.
+    !> @param[in] time Simulation time for prescribed injections [s].
+    !> @param[in] cell_fract_jk Fraction of cell covered by lateral injection.
+    !> @param[in] cell_fissure_fract Per-fissure cell overlap factors.
+    !> @param[in] lat_arc_perim_jk Arc length of lateral injection boundary.
+    !> @param[in] lat_n_x_jk X component of lateral injection normal.
+    !> @param[in] lat_n_y_jk Y component of lateral injection normal.
+    !> @param[in] cell_area_jk Cell horizontal area [m2].
+    !> @param[in] group Registered Lie group with canonical identity and dispatch metadata.
+    !> @param[in] stochastic_value Local stochastic rheology coefficient.
+    !> @param[in,out] physical_scratch Optional caller-owned physical-state workspace.
+    !> @param[out] physical_ready Optional flag for reusable local physical-state conversion.
+    !> @param[in] materials Prepared injected-material properties for active sources.
+    !> @param[in] thermal Immutable layer thermal source configuration.
+    !> @param[in] rheology Immutable layer rheology source configuration.
+    !> @param[in] pore_enabled Whether pore-pressure effective stress is enabled.
+    !> @param[in] stochastic_enabled Whether stochastic rheology is enabled.
+    !> @param[in] non_exchange_mask Optional filtered mask for non-exchange source evaluation.
     SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy ,                   &
             Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,                                              &
             cell_fissure_fract,                                                                                        &
             lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value,physical_scratch,          &
-            physical_ready,materials )
-
-    USE parameters_2d, ONLY : pore_pressure_flag
-
-
+            physical_ready,materials,thermal,rheology,pore_enabled,stochastic_enabled,non_exchange_mask )
 
     IMPLICIT NONE
 
@@ -569,6 +759,12 @@ CONTAINS
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         LOGICAL, INTENT(OUT), OPTIONAL :: physical_ready
         TYPE(injection_material_set_type), INTENT(IN) :: materials
+        TYPE(thermal_config_type), INTENT(IN) :: thermal
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        LOGICAL, INTENT(IN) :: pore_enabled,stochastic_enabled
+        ! Optional exchange-free mask; standalone callers use the group's full mask.
+        INTEGER, INTENT(IN), OPTIONAL :: non_exchange_mask
+        INTEGER :: active_mask
 
         REAL(wp) :: r_h          !< real-value flow thickness
         REAL(wp) :: r_u          !< real-value x-velocity
@@ -587,6 +783,8 @@ CONTAINS
         REAL(wp) :: injection_rate(n_eqns)
 
 
+        active_mask=group%source_mask
+        IF (PRESENT(non_exchange_mask)) active_mask=non_exchange_mask
         expl_term(1:n_eqns) = 0.0_wp
         IF (PRESENT(physical_ready)) physical_ready=.FALSE.
 
@@ -619,7 +817,7 @@ CONTAINS
 
             q1 = r_h * r_rho_m
 
-            IF ( BTEST(group%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1) .AND.                                         &
+            IF ( BTEST(active_mask,SOURCE_ID_GEOMETRY_CURVATURE-1) .AND.                                         &
                 r_h .GT. dry_thickness_tolerance ) THEN
 
                 ! Hydrostatic pressure and the ordinary bed-slope source are already
@@ -640,16 +838,17 @@ CONTAINS
             ! Source rates are evaluated at the same unmodified stage state.
             ! The construction of EXPLICIT stays inside each physical module.
             IF (group%rheology_id>0 .AND. r_h>dry_thickness_tolerance) THEN
-                CALL eval_rheology_explicit(group%rheology_id,physical_state,                                          &
-                    grav_coeff, pore_pressure_flag,                                                                    &
-                    stochastic_flag, stochastic_value, rheology_rate)
+                CALL eval_rheology_explicit(rheology,group%rheology_id,physical_state, &
+                    grav_coeff, pore_enabled,                                                                    &
+                    stochastic_enabled, stochastic_value, rheology_rate)
                 expl_term(2:3)=expl_term(2:3)+rheology_rate
 
             END IF
 
             IF (group%thermal_active) THEN
                 CALL eval_thermal_explicit(SOURCE_ID_THERMAL_COOLING,physical_state,                                   &
-                    radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
+                    thermal, &
+                    T_ambient,thermal_rate)
                 expl_term(4)=expl_term(4)+thermal_rate
 
             END IF
@@ -658,25 +857,27 @@ CONTAINS
 
         CALL eval_mass_injection_explicit(physical_state,time,cell_fract_jk,                                           &
             cell_fissure_fract,lat_arc_perim_jk,lat_n_x_jk,lat_n_y_jk,cell_area_jk,                                    &
-            BTEST(group%source_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                            &
-            BTEST(group%source_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                            &
-            BTEST(group%source_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials)
+            BTEST(active_mask,SOURCE_ID_BOTTOM_CIRCULAR_INJECTION-1),                                            &
+            BTEST(active_mask,SOURCE_ID_BOTTOM_FISSURAL_INJECTION-1),                                            &
+            BTEST(active_mask,SOURCE_ID_RADIAL_INJECTION-1),injection_rate,materials,pore_enabled)
         expl_term=expl_term+injection_rate
 
         RETURN
 
     END SUBROUTINE eval_geometry_cell_source_explicit
 
-
-
-
-
-
-
-
-
-
-
+    !> @brief Evaluate geometric momentum sources from terrain curvature.
+    !> @param[in] Bprime_x Terrain x-slope multiplying curvature acceleration.
+    !> @param[in] Bprime_y Terrain y-slope multiplying curvature acceleration.
+    !> @param[in] Bsecond_xx Terrain second x derivative.
+    !> @param[in] Bsecond_xy Terrain mixed second derivative.
+    !> @param[in] Bsecond_yy Terrain second y derivative.
+    !> @param[in] grav_coefficient Topographic gravity coefficient.
+    !> @param[in] mixture_mass Current flow mass per horizontal area.
+    !> @param[in] velocity_x Horizontal x velocity [m/s].
+    !> @param[in] velocity_y Horizontal y velocity [m/s].
+    !> @param[out] source_x Curvature-driven x momentum rate.
+    !> @param[out] source_y Curvature-driven y momentum rate.
     PURE SUBROUTINE eval_geometry_curvature_explicit( Bprime_x, Bprime_y,                                              &
             Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient,                                                      &
             mixture_mass, velocity_x, velocity_y, source_x, source_y )
@@ -695,25 +896,31 @@ CONTAINS
 
     END SUBROUTINE eval_geometry_curvature_explicit
 
-
-
-
-    !> \brief Evaluate the atomic explicit mass-exchange rate.
-    !> \details Returns rates only; it never mutates conservative state, bed or inventory.
-    !> \param[in] qpj Cell-local primitive state.
-    !> \param[in] B_zone Connected-water-region indicator.
-    !> \param[in] B_prime_x Filtered bed x derivative.
-    !> \param[in] B_prime_y Filtered bed y derivative.
-    !> \param[in] erodible Per-class available substrate inventory.
-    !> \param[in] dt Time-step length.
-    !> \param[out] erosion_term Per-class substrate erosion rate.
-    !> \param[out] deposition_term Per-class deposition rate.
-    !> \param[out] carrier_erosion_term Carrier entrainment rate.
-    !> \param[out] carrier_loss_term Limited carrier loss rate.
-    !> \param[out] eqns_term Conservative equation source-rate vector.
-    !> \param[out] topo_term Proposed bed-elevation rate.
+    !> @brief Evaluate terrain/atmosphere exchange without modifying the conservative state.
+    !> @details \details Returns rates only; it never mutates conservative state, bed or inventory.
+    !> @param[in] qpj Primitive cell state used for mass-transfer physics.
+    !> @param[in] B_zone Substrate material-zone identifier.
+    !> @param[in] B_prime_x Terrain x-slope.
+    !> @param[in] B_prime_y Terrain y-slope.
+    !> @param[in] erodible Available substrate inventory for each solid class.
+    !> @param[in] dt Explicit source integration duration [s].
+    !> @param[in] source_mask Registry mask of enabled physical exchange families.
+    !> @param[in,out] rates Paired mass/energy/bed-rate workspace filled by exchange physics.
+    !> @param[out] eqns_term Conservative source vector assembled for this cell.
+    !> @param[in,out] physical_scratch Optional cached physical state for this cell.
+    !> @param[in,out] exchange_scratch Optional caller-owned exchange kernel scratch.
+    !> @param[in] physical_ready Optional flag indicating cached physical state is valid.
+    !> @param[in] rheology Layer rheology controlling settling and erosion law.
+    !> @param[in] mass_config Layer-specific mass-exchange configuration.
+    !> @param[in] transport_stochastic Whether stochastic scalar follows mass exchange.
+    !> @param[in] pore_enabled Whether pore pressure scalar follows mass exchange.
+    !> @param[in] terrain_exposed True for a layer touching the substrate.
+    !> @param[in] atmosphere_exposed True for a layer exposed to ambient air.
+    !> @param[in] static_deposition_allowed True only for L1 substrate deposition.
     SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y,                                      &
-            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready)
+            erodible,dt,source_mask,rates,eqns_term,physical_scratch,exchange_scratch,physical_ready,rheology, &
+            mass_config,transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed, &
+            static_deposition_allowed)
         REAL(wp), INTENT(IN) :: qpj(n_vars),B_prime_x,B_prime_y
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -723,6 +930,10 @@ CONTAINS
         TYPE(physical_state_real), TARGET, INTENT(INOUT), OPTIONAL :: physical_scratch
         TYPE(mass_exchange_scratch_type), INTENT(INOUT), OPTIONAL :: exchange_scratch
         LOGICAL, INTENT(IN), OPTIONAL :: physical_ready
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
+        LOGICAL, INTENT(IN) :: transport_stochastic,pore_enabled,terrain_exposed,atmosphere_exposed
+        LOGICAL, INTENT(IN) :: static_deposition_allowed
         TYPE(physical_state_real), TARGET :: local_state
         TYPE(physical_state_real), POINTER :: exchange_state
         LOGICAL :: reuse_prepared_state
@@ -741,7 +952,8 @@ CONTAINS
         ! worker-local scratch. Standalone exchange calls still build normally.
         IF (.NOT.reuse_prepared_state) &
             CALL build_physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
-        CALL eval_mass_exchange_explicit(exchange_state,B_zone,                                                        &
-            erodible,dt,source_mask,rates,eqns_term,exchange_scratch)
+        CALL eval_mass_exchange_explicit(rheology,mass_config,exchange_state,B_zone, &
+            erodible,dt,source_mask,rates,eqns_term,exchange_scratch,transport_stochastic,pore_enabled, &
+            terrain_exposed,atmosphere_exposed,static_deposition_allowed)
     END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d

@@ -16,7 +16,7 @@ MODULE stochastic_random_2d
     PRIVATE
 
     !> Configured RNG seed; negative values select compiler-dependent initialization.
-    INTEGER, PUBLIC :: stochastic_seed = -1
+    ! The canonical layer configuration supplies the seed explicitly.
 
     PUBLIC :: initialize_stochastic_rng
     PUBLIC :: gaussian_noise
@@ -27,10 +27,13 @@ CONTAINS
     !> @details Updates process-wide intrinsic RNG state; call outside parallel
     !>          cell loops to preserve deterministic scheduling of random draws.
     !>
-    !> \note Reads stochastic_seed and changes the intrinsic RNG state. A negative seed requests
+    !> @param[in] stochastic_seed Selected layer seed (negative uses a random seed).
+    !> \note Takes stochastic_seed and changes the intrinsic RNG state. A negative seed requests
     !>       processor-dependent initialization.
 
-    SUBROUTINE initialize_stochastic_rng
+    SUBROUTINE initialize_stochastic_rng(stochastic_seed)
+
+        INTEGER, INTENT(IN) :: stochastic_seed
 
         INTEGER :: i
         INTEGER :: seed_size

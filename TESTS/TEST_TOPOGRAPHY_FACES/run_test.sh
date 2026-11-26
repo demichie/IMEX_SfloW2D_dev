@@ -10,11 +10,12 @@ cd "$build_dir"
 
 gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp -c \
     "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/physics/mass_exchange/mass_exchange_parameters_2d.f90" \
     "$repo_dir/src/geometry/geometry_2d.f90" \
     "$test_dir/test_topography_faces.f90"
 
 gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp \
-    parameters_2d.o geometry_2d.o test_topography_faces.o \
+    parameters_2d.o mass_exchange_parameters_2d.o geometry_2d.o test_topography_faces.o \
     -llapack -o test_topography_faces
 
 OMP_NUM_THREADS=1 ./test_topography_faces

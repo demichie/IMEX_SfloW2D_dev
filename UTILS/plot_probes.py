@@ -1,87 +1,68 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import sys
-import os.path
+#!/usr/bin/env python3
+"""Plot each time series from a solver probe CSV, optionally with its derivative."""
+import argparse
+import csv
 from pathlib import Path
 
-if len(sys.argv) == 2:
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 
-    prb_file = sys.argv[1]
-    os.path.isfile(prb_file)
-    rate = False
 
-elif len(sys.argv) == 3:
+def plot(path, rate=False):
+    path = Path(path)
+    with path.open(newline="", encoding="utf-8") as stream:
+        reader = csv.reader(stream)
+        coordinates = next(reader, None)
+        names = next(reader, None)
+        units = next(reader, None)
+        if not coordinates or not names or not units or len(names) != len(units):
+            raise ValueError(f"Invalid probe CSV headers: {path}")
+        rows = [row for row in reader if any(part.strip() for part in row)]
+    if not rows:
+        raise ValueError(f"No probe samples in {path}")
+    data = np.atleast_2d(np.asarray([[float(v) for v in row] for row in rows]))
+    if data.shape[1] != len(names):
+        raise ValueError(f"Unexpected number of probe columns: {path}")
+    time = data[:, 0]
+    if not np.all(np.isfinite(time)) or np.any(np.diff(time) <= 0):
+        raise ValueError("Probe times must be finite and strictly increasing")
+    outputs = []
+    for col in range(1, data.shape[1]):
+        name = names[col].strip()
+        unit = units[col].strip()
+        safe_name = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in name)
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(time, data[:, col])
+        ax.set(xlabel="Time (s)", ylabel=f"{name} {unit}")
+        target = path.with_name(f"{path.stem}_{safe_name}.pdf")
+        fig.tight_layout()
+        fig.savefig(target)
+        outputs.append(target)
+        if rate:
+            if len(time) < 2:
+                raise ValueError("Two or more samples required for a rate plot")
+            slope = np.diff(data[:, col]) / np.diff(time)
+            second = ax.twinx()
+            second.plot(0.5 * (time[1:] + time[:-1]), slope, "C1--")
+            second.set_ylabel(f"Rate of {name} ({unit}/s)")
+            rate_target = path.with_name(f"{path.stem}_{safe_name}_rate.pdf")
+            fig.tight_layout()
+            fig.savefig(rate_target)
+            outputs.append(rate_target)
+        plt.close(fig)
+    return outputs
 
-    prb_file = sys.argv[1]
-    os.path.isfile(prb_file)
 
-    if sys.argv[2] == 'True':
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("probe_csv", type=Path)
+    parser.add_argument("--rate", action="store_true")
+    args = parser.parse_args()
+    for output in plot(args.probe_csv, args.rate):
+        print(output)
 
-        rate = True
 
-    else:
-
-        rate = False
-
-else:
-
-    print('Please provide file name (*.csv)\n')
-    sys.exit()
-
-data = np.genfromtxt(prb_file, delimiter=',', skip_header=3)
-# print(data.shape)
-
-# read the content of the file opened
-file = open(prb_file)
-content = file.readlines()
-
-# read 10th line from the file
-# print("variable names line")
-
-vars = content[1].split(',')[:]
-
-# print('vars',vars)
-
-# print("variable units line")
-
-units = content[2].split(',')[:]
-print()
-
-for i in range(len(vars) - 1):
-
-    # print(i,vars[i+1])
-
-    plt.rcParams.update({'font.size': 14})
-    fig, ax1 = plt.subplots(figsize=(10, 4))
-    ax1.plot(data[:, 0], data[:, i + 1])
-    ax1.set_xlim((np.amin(data[:, 0]), np.amax(data[:, 0])))
-
-    ax1.set_xlabel('Time (s)')
-    ax1.set_ylabel(vars[i + 1].strip() + ' ' + units[i + 1].strip())
-
-    plt.tight_layout()
-
-    prb_path = Path(prb_file)
-    variable_name = vars[i + 1].strip().replace('.', '_')
-    fig_name = prb_path.with_name(f'{prb_path.stem}_{variable_name}.pdf')
-    plt.savefig(fig_name)
-
-    if rate:
-
-        ax2 = ax1.twinx()
-        dx = np.diff(data[:, 0])
-        dy = np.diff(data[:, i + 1])
-        x_half = 0.5 * (data[:-1, 0] + data[1:, 0])
-        dy_dx = dy / dx
-
-        ax2.plot(x_half, dy_dx, 'C1--')
-        label = 'Rate ' + units[i + 1].strip().replace(')',
-                                                       '') + r'$\cdot s^{-1}$)'
-        ax2.set_ylabel(label)
-        ax2.tick_params(axis='y', color='C1', labelcolor='C1')
-
-        fig_name = fig_name.with_name(f'{fig_name.stem}_B.pdf')
-        plt.tight_layout()
-        plt.savefig(fig_name)
-
-# plt.show()
+if __name__ == "__main__":
+    main()

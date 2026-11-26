@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static D19 regression guard for Lie state admissibility and atomic publication."""
+"""Static D19/D20 guard for admissible cell candidates and atomic Lie publication."""
 from pathlib import Path
 import re
 
@@ -11,9 +11,8 @@ def load(path):
 
 
 def body(text, name):
-    # Use anchored lines: END SUBROUTINE may omit the routine name.
     opening = re.search(
-        rf"(?im)^[ \t]*subroutine[ \t]+{re.escape(name)}[ \t]*\(",
+        rf"(?im)^[ \t]*(?:pure[ \t]+)?subroutine[ \t]+{re.escape(name)}[ \t]*\(",
         text)
     assert opening, f"missing routine {name}"
     closing = re.search(
@@ -24,78 +23,73 @@ def body(text, name):
 
 
 def ordered(code, patterns):
-    offsets = []
+    positions = []
     for pattern in patterns:
         match = re.search(pattern, code, re.I | re.S)
         assert match, f"missing invariant: {pattern}"
-        offsets.append(match.start())
-    assert offsets == sorted(offsets), "Lie publication order is incorrect"
+        positions.append(match.start())
+    assert positions == sorted(positions), "Lie execution or publication order is incorrect"
 
 
 def check():
-    state = load("src/state/state_2d.f90")
-    time = body(load("src/numerics/time_integration_2d.f90"), "advance_lie")
+    composition = load("src/state/state_composition.f90")
+    integrator_source = load("src/numerics/time_integration_2d.f90")
+    time = body(integrator_source, "advance_lie")
+    spatial_cell = body(integrator_source, "update_spatial_cell")
     executor = body(load("src/numerics/lie_source_executor_2d.f90"),
                     "execute_lie_source_groups")
+
     conservative = re.search(
         r"(?is)logical\s+function\s+conservative_mass_admissible\b.*?"
-        r"end\s+function\s+conservative_mass_admissible", state)
+        r"end\s+function\s+conservative_mass_admissible", composition)
     assert conservative, "missing conservative mass admissibility guard"
     assert "idx_add_gas_first:idx_add_gas_last" in conservative.group(0)
     assert "idx_solidEqn_first:idx_solidEqn_last" in conservative.group(0)
+    assert "SUM(q_cell(idx_add_gas_first:idx_add_gas_last))" in conservative.group(0)
 
-    # The authoritative q/qp remains unchanged throughout the transaction.
-    # No whole-domain fluid snapshot or publication is allowed in normal runs.
-    assert "this%q_before" not in time
-    assert "this%q_trial=state%q" not in time
-    assert "this%qp_trial=state%qp" not in time
-    assert "state%q=this%q_trial" not in time
-    assert "state%qp=this%qp_trial" not in time
-    assert "qp_pre=>state%qp" in time
-    assert "qp_pre=>this%qp_before" in time
-    assert "this%qp_before=state%qp" in time
+    # Spatial candidates are validated before entering the Lie source sweep.
+    assert re.search(
+        r"conservative_mass_admissible\(q_candidate\(1:n_eqns\)\)",
+        spatial_cell, re.I)
+    assert "CALL initialize_dry_physical_cell(qp_candidate)" in spatial_cell
+    assert "qp_pre_all=>state%qp" in time
+    assert "qp_pre_all=>this%qp_before" in time
     assert "this%cell_status(l)=0" in time
-    assert "CALL initialize_dry_physical_cell(this%qp_before(:,j,k))" in time
-    assert "CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))" in time
 
+    # There is no redundant full-domain conservative snapshot or retry rollback.
+    for obsolete in ("this%q_before", "this%q_trial=state%q",
+                     "this%qp_trial=state%qp", "state%q=this%q_trial",
+                     "state%qp=this%qp_trial", "rollback_geometry_transaction",
+                     "restore_substrate"):
+        assert obsolete not in time, f"retired transaction path: {obsolete}"
+
+    # The fatal failure check must precede authoritative publication.
     ordered(time, [
-        r"qp_pre=>state%qp",
-        r"call\s+spatial_operator%evaluate",
-        r"this%q_trial\(1:n_eqns,j,k\)\s*=",
-        r"conservative_mass_admissible\(this%q_trial",
-        r"call\s+state%snapshot_substrate",
-        r"call\s+begin_geometry_transaction",
-        r"call\s+execute_lie_source_groups",
-        r"if\s*\(source_step_failed\)",
-        r"state%q\(:,j,k\)\s*=\s*this%q_trial\(:,j,k\)",
-        r"state%qp\(:,j,k\)\s*=\s*this%qp_trial\(:,j,k\)",
+        r"call\s+execute_lie_source_groups\(",
+        r"if\s*\(source_step_failed\)\s*call\s+fatal_error",
+        r"state%q\(:,:,j,k\)\s*=\s*this%q_trial\(:,:,j,k\)",
+        r"state%qp\(:,:,j,k\)\s*=\s*this%qp_trial\(:,:,j,k\)",
         r"call\s+commit_geometry_transaction",
     ])
-    # Substrate snapshots belong to the integration workspace and are restored
-    # only for steps whose configured sources can modify substrate inventories.
-    assert re.search(
-        r"if\s*\(needs_substrate_snapshot\)\s*call\s+state%restore_substrate"
-        r"\(this%substrate_before\)", time, re.I), (
-        "missing conditional workspace-owned substrate rollback")
-    assert "CALL rollback_geometry_transaction" in time
-    assert "state%q==q_authoritative" in time
-    assert "state%qp==qp_authoritative" in time
+    assert "IF (needs_geometry_update) CALL begin_geometry_transaction" in time
 
-    # Source groups still operate locally, and source failure is checked
-    # before any authoritative fluid candidate is published.
+    # Each OpenMP worklist cell owns the candidates of its configured layers.
+    for fragment in ("q_layers=q(:,:,j,k)", "qp_layers=qp(:,:,j,k)",
+                     "qpentry=qp_original(:,layer,j,k)",
+                     "q_local=q_candidate", "qp_local=qp_candidate"):
+        assert fragment.lower() in executor.lower(), f"missing cell-local Lie contract: {fragment}"
     ordered(executor, [
         r"cell_loop:\s*do",
         r"group_loop:\s*do",
         r"if\s*\(cell_error==0\)",
-        r"q\(:,j,k\)\s*=\s*q_local",
-        r"qp\(:,j,k\)\s*=\s*qp_local",
+        r"q\(:,:,j,k\)\s*=\s*q_layers",
+        r"qp\(:,:,j,k\)\s*=\s*qp_layers",
         r"if\s*\(first_failure/=huge\(0\)\)",
-        r"call\s+assign_topography_vertices",
+        r"call\s+apply_local_bed_rate",
         r"call\s+state%refresh_substrate_totals",
     ])
     assert "CALL initialize_dry_physical_cell(qp_candidate)" in executor
-    assert "q_original(idx_totMassEqn,j,k)" in executor
-    print("PASS: D19 Lie post-spatial guards, group publication and rollback")
+    print("PASS: D19/D20 layer-local Lie guards, fatal rejection and atomic publication")
 
 
 if __name__ == "__main__":

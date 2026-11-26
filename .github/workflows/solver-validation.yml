@@ -7,6 +7,11 @@ on:
         description: 'Also compare complete solver outputs with 1, 2 and 4 OpenMP threads'
         type: boolean
         required: false
+        default: true
+      two_layer_extended:
+        description: 'Run extended Etna conservation, restart and 1/2/4 OpenMP checks'
+        type: boolean
+        required: false
         default: false
 
 permissions:
@@ -23,13 +28,16 @@ jobs:
         include:
           - profile: optimized
             threads: '4'
+            case_timeout: '20m'
           - profile: strict-debug
             threads: '1'
+            case_timeout: '30m'
     env:
       FC: gfortran
       OMP_NUM_THREADS: ${{ matrix.threads }}
       OMP_DYNAMIC: 'FALSE'
       OPENBLAS_NUM_THREADS: '1'
+      IMEX_TEST_CASE_TIMEOUT: ${{ matrix.case_timeout }}
     steps:
       - uses: actions/checkout@v4
       - name: Install compiler and test dependencies
@@ -50,13 +58,32 @@ jobs:
           make -j4
           test -x src/IMEX_SfloW2D
       - name: Run integration test suite
-        run: make check
+        shell: bash
+        env:
+          IMEX_TEST_LOG_DIR: ${{ runner.temp }}/imex-integration-logs
+        run: |
+          set -euo pipefail
+          sh -n TESTS/run_tests.sh
+          make check
+      - name: Upload per-case solver logs and timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-${{ matrix.profile }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/imex-integration-logs/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify binary and stochastic restarts
         shell: bash
         run: |
           set -euo pipefail
           sh TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
           sh TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
+      - name: Verify canonical two-layer structural integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh TESTS/TEST_SPATIAL_OPERATOR/run_test.sh
       - name: Verify source mass budgets and HP-PCCU Gate H
         shell: bash
         env:
@@ -100,5 +127,64 @@ jobs:
         with:
           name: openmp-comparison-${{ github.run_id }}
           path: evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+  two-layer-smoke:
+    name: Two-layer Etna integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    env:
+      FC: gfortran
+      OMP_NUM_THREADS: '1'
+      OMP_DYNAMIC: 'FALSE'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler and example preparation dependencies
+        run: |
+          bash .github/scripts/install-ubuntu-deps.sh \
+            autoconf automake gfortran make liblapack-dev libnetcdff-dev \
+            python3-numpy python3-pandas unzip
+      - name: Build strict/debug solver
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --with-netcdf=/usr --enable-strict-debug
+          make -j4
+      - name: Extract the canonical Etna DEM for the standalone example
+        run: |
+          set -euo pipefail
+          dem_dir=EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/DEM
+          unzip -q -o -j EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip -d "$dem_dir"
+          test -s "$dem_dir/Etna2014_crop.asc"
+      - name: Run short Etna two-layer integration test
+        working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
+        run: |
+          python3 run_validation.py \
+            --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
+            --workdir "$GITHUB_WORKSPACE/two-layer-smoke-evidence" \
+            --timeout 900
+      - name: Validate two-layer Python evidence checkers
+        if: ${{ inputs.two_layer_extended }}
+        working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
+        run: |
+          python3 -m unittest discover -s . -p 'test_*.py'
+      - name: Run extended two-layer conservation, restart and OpenMP checks
+        if: ${{ inputs.two_layer_extended }}
+        working-directory: EXAMPLES/EXAMPLE_ETNA_TWO_LAYER
+        run: |
+          python3 extended_validation.py \
+            --solver "$GITHUB_WORKSPACE/src/IMEX_SfloW2D" \
+            --workdir "$GITHUB_WORKSPACE/two-layer-extended-evidence" \
+            --timeout 900
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: two-layer-smoke-${{ github.run_id }}
+          path: |
+            two-layer-smoke-evidence/
+            two-layer-extended-evidence/
           if-no-files-found: warn
           retention-days: 30

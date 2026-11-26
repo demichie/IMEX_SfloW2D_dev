@@ -5,14 +5,14 @@ test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/.." && pwd)
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-    echo "Usage: $0 /path/to/IMEX_SfloW2D [TEST_DYNAMIC_FINH]" >&2
+    echo "Usage: $0 /path/to/IMEX_SfloW2D [TEST_CF|TEST_TAAL|TEST_DYNAMIC_FINH|TEST_OFF_FINH|TEST_STATIC_FINH|TEST_STEP_FINH]" >&2
     exit 2
 fi
 
 executable=$1
 selected_case=${2:-}
 case "$selected_case" in
-    ""|TEST_DYNAMIC_FINH) ;;
+    ""|TEST_CF|TEST_TAAL|TEST_DYNAMIC_FINH|TEST_OFF_FINH|TEST_STATIC_FINH|TEST_STEP_FINH) ;;
     *)
         echo "Unsupported focused integration case: $selected_case" >&2
         exit 2
@@ -47,8 +47,14 @@ work_dir=$(mktemp -d "${TMPDIR:-/tmp}/imex-integration-tests.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 
 if [ -n "$selected_case" ]; then
-    copy_writable_fixture "$test_dir/TEST_DAMBREAK/$selected_case" \
-        "$work_dir/$selected_case"
+    case "$selected_case" in
+        TEST_CF|TEST_TAAL)
+            copy_writable_fixture "$test_dir/$selected_case" "$work_dir/$selected_case"
+            ;;
+        *)
+            copy_writable_fixture "$test_dir/TEST_DAMBREAK/$selected_case" "$work_dir/$selected_case"
+            ;;
+    esac
 else
     for test_name in TEST_2D TEST_BOX TEST_BW TEST_CF TEST_TAAL TEST_DAMBREAK; do
         copy_writable_fixture "$test_dir/$test_name" "$work_dir/$test_name"
@@ -64,24 +70,31 @@ run_case() {
         sh ./cleanFolder.sh
         case "$fixture" in
             cf)
-                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_CF/topo.zip"
+                mkdir -p DEM
+                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_CF/DEM/topo.zip" -d DEM
                 ;;
             taal)
-                cp "$repo_dir/EXAMPLES/EXAMPLE_TAAL/topography_dem.asc" .
+                mkdir -p DEM
+                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_TAAL/DEM/topography_dem.zip" -d DEM
+                ;;
+        esac
+        case_name=$(basename "$case_dir")
+        case "$case_name" in
+            TEST_*_FINH)
+                IMEX_TIMESTEP_DIAGNOSTICS=1
+                export IMEX_TIMESTEP_DIAGNOSTICS
                 ;;
         esac
         solver_log=solver.log
         if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
             mkdir -p "$IMEX_TEST_LOG_DIR"
-            case_name=$(basename "$case_dir")
             solver_log="$IMEX_TEST_LOG_DIR/$case_name.solver.log"
         fi
-
+        run_started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        run_started_epoch=$(date +%s)
+        printf 'START: %s UTC=%s timeout=%s\n' "$case_name" "$run_started_utc" \
+            "${IMEX_TEST_CASE_TIMEOUT:-disabled}"
         solver_status=0
-        if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
-            run_started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            run_started_epoch=$(date +%s)
-        fi
         if [ "${IMEX_DEBUG_TEST_CF:-0}" = 1 ] && [ "$(basename "$case_dir")" = TEST_CF ]; then
             # Run the failing fixture under GDB, not post-mortem: GitHub
             # runners may pipe core dumps away from the working directory.
@@ -98,28 +111,59 @@ run_case() {
                 solver_status=139
             fi
         elif [ -n "${IMEX_TEST_CASE_TIMEOUT:-}" ]; then
-            if timeout --signal=TERM --kill-after=30s \
-                "$IMEX_TEST_CASE_TIMEOUT" "$executable" > "$solver_log" 2>&1; then
+            # A heartbeat stays visible even when Fortran output is buffered.
+            # Each case has a shorter timeout than the enclosing CI job.
+            timeout --verbose --signal=TERM --kill-after=15s \
+                "$IMEX_TEST_CASE_TIMEOUT" "$executable" > "$solver_log" 2>&1 &
+            solver_pid=$!
+            (
+                while kill -0 "$solver_pid" 2>/dev/null; do
+                    sleep 60
+                    kill -0 "$solver_pid" 2>/dev/null || break
+                    progress=$(grep '^t =' "$solver_log" | tail -n 1 || true)
+                    printf 'HEARTBEAT: %s elapsed=%ss last_step=%s\n' \
+                        "$case_name" "$(($(date +%s) - run_started_epoch))" \
+                        "${progress:-not yet flushed}"
+                done
+            ) &
+            heartbeat_pid=$!
+            if wait "$solver_pid"; then
                 :
             else
                 solver_status=$?
             fi
+            kill "$heartbeat_pid" 2>/dev/null || true
+            wait "$heartbeat_pid" 2>/dev/null || true
         elif "$executable" > "$solver_log" 2>&1; then
             :
         else
             solver_status=$?
         fi
+        run_finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        run_finished_epoch=$(date +%s)
+        elapsed_seconds=$((run_finished_epoch - run_started_epoch))
+        last_progress=$(grep '^t =' "$solver_log" | tail -n 1 || true)
+        last_timestep=$(grep '^TIMESTEP_DIAG' "$solver_log" | tail -n 1 || true)
+        printf 'END: %s status=%s elapsed=%ss last_step=%s\n' \
+            "$case_name" "$solver_status" "$elapsed_seconds" "${last_progress:-not available}"
+        if [ -n "$last_timestep" ]; then
+            printf '%s LAST_TIMESTEP: %s\n' "$case_name" "$last_timestep"
+        fi
         if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
-            run_finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            run_finished_epoch=$(date +%s)
-            printf 'started_utc=%s\nfinished_utc=%s\nelapsed_seconds=%s\n' \
-                "$run_started_utc" "$run_finished_utc" \
-                "$((run_finished_epoch - run_started_epoch))" \
+            printf 'started_utc=%s\nfinished_utc=%s\nelapsed_seconds=%s\nexit_code=%s\nlast_step=%s\n' \
+                "$run_started_utc" "$run_finished_utc" "$elapsed_seconds" \
+                "$solver_status" "${last_progress:-not available}" \
                 > "$IMEX_TEST_LOG_DIR/$case_name.timing.txt"
+            printf 'last_timestep=%s\n' "${last_timestep:-not available}" \
+                >> "$IMEX_TEST_LOG_DIR/$case_name.timing.txt"
         fi
         if [ "$solver_status" -ne 0 ]; then
-            echo "FAIL: solver exited unsuccessfully in $case_dir" >&2
-            cat "$solver_log" >&2
+            if [ "$solver_status" -eq 124 ] || [ "$solver_status" -eq 137 ]; then
+                echo "TIMEOUT: $case_name exceeded ${IMEX_TEST_CASE_TIMEOUT:-unknown}" >&2
+            fi
+            echo "FAIL: solver exited unsuccessfully in $case_dir (status $solver_status)" >&2
+            # Full logs are retained as CI artifacts; console output stays bounded.
+            tail -n 160 "$solver_log" >&2
             # Preserve the first-failure stack in CI without rerunning a costly
             # simulation or changing the numerical configuration.
             core_file=$(find . -maxdepth 1 -type f -name 'core*' -print -quit)
@@ -189,7 +233,11 @@ run_case() {
 }
 
 if [ -n "$selected_case" ]; then
-    run_case "$work_dir/$selected_case" "dambreak2D"
+    case "$selected_case" in
+        TEST_CF) run_case "$work_dir/TEST_CF" "TEST_CF" cf ;;
+        TEST_TAAL) run_case "$work_dir/TEST_TAAL" "TEST_TAAL" taal ;;
+        *) run_case "$work_dir/$selected_case" "dambreak2D" ;;
+    esac
     exit 0
 fi
 
@@ -381,4 +429,4 @@ for case_dir in "$work_dir"/TEST_DAMBREAK/*/; do
     run_case "$case_dir" "dambreak2D"
 done
 
-echo "PASS: legacy solver integration tests"
+echo "PASS: solver integration tests"

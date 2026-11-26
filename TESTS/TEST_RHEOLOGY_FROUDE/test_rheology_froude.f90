@@ -3,7 +3,8 @@ PROGRAM test_rheology_froude
 
   USE parameters_2d
   USE constitutive_parameters_2d
-  USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
+  USE solid_transport_parameters_2d
+  USE rheology_parameters_2d, ONLY : rheology_config_type
   USE state_types, ONLY : physical_state_real, physical_state_complex, &
        initialize_physical_state_real, promote_physical_state
   USE state_physical, ONLY : build_physical_state_from_qp
@@ -12,6 +13,8 @@ PROGRAM test_rheology_froude
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
+
+  TYPE(rheology_config_type) :: rheo_config
 
   REAL(wp) :: qp(6), source(6), expected(6)
   COMPLEX(wp) :: complex_source(6)
@@ -37,7 +40,7 @@ PROGRAM test_rheology_froude
   rho_a_amb = rho_m
 
   DO mode = 0, 1
-     stochastic_flag = mode == 1
+     rheo_config%stochastic_rheology_flag = mode == 1
      CALL make_state(1.0_wp, T_ambient, 0.0_wp, 3.0_wp, -4.0_wp)
      CALL assert_zero_source('moving neutral gas', 0.0_wp, 0.0_wp)
 
@@ -77,7 +80,7 @@ PROGRAM test_rheology_froude
   IF (g_reduced <= 0.0_wp) ERROR STOP 'dense fixture has no buoyancy load'
   DO mode = 0, 5
      slope_correction_flag = MOD(mode, 2) == 1
-     stochastic_flag = mode >= 2
+     rheo_config%stochastic_rheology_flag = mode >= 2
      slope_x = 0.35_wp
      slope_y = -0.22_wp
      G = 1.0_wp
@@ -89,14 +92,14 @@ PROGRAM test_rheology_froude
      z = 0.2_wp
      IF (mode >= 4) z = -100.0_wp
      Fr = speed/SQRT(g_reduced*qp(1))
-     IF (stochastic_flag) Fr = MAX(0.0_wp, Fr + z)
+     IF (rheo_config%stochastic_rheology_flag) Fr = MAX(0.0_wp, Fr + z)
      friction = rho_m*qp(1)*G*g_reduced                              &
-          * (mu_inf + (mu_0 - mu_inf)*EXP(-Fr/Fr_0))
+          * (rheo_config%mu_inf + (rheo_config%mu_0 - rheo_config%mu_inf)*EXP(-Fr/rheo_config%Fr_0))
      expected = 0.0_wp
      expected(2:3) = -friction*[3.0_wp, -4.0_wp]/5.0_wp
      source=0.0_wp
      CALL build_physical_state_from_qp(qp,local_state,slope_x,slope_y,0.0_wp,0.0_wp,0.0_wp)
-     CALL eval_rheology_froude_semi_implicit(local_state,G,stochastic_flag,z, &
+     CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,G,rheo_config%stochastic_rheology_flag,z, &
           source(2),source(3))
      CALL assert_finite(source)
      IF (MAXVAL(ABS(source-expected)) >                             &
@@ -137,14 +140,12 @@ CONTAINS
     gas_flag = .TRUE.
     liquid_flag = .FALSE.
     rheology_flag = .TRUE.
-    rheology_model='froude'
+    rheo_config%rheology_model='froude'
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
-    pore_pressure_flag = .FALSE.
-    stoch_transport_flag = .TRUE.
-    mu_0 = 0.1_wp
-    mu_inf = 0.5_wp
-    Fr_0 = 1.0_wp
+    rheo_config%mu_0 = 0.1_wp
+    rheo_config%mu_inf = 0.5_wp
+    rheo_config%Fr_0 = 1.0_wp
   END SUBROUTINE initialize_properties
 
   !> \brief Populate the canonical primitive state and cached velocities.
@@ -170,7 +171,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: bx, by
     source=0.0_wp
     CALL build_physical_state_from_qp(qp,local_state,bx,by,0.0_wp,0.0_wp,0.0_wp)
-    CALL eval_rheology_froude_semi_implicit(local_state,1.0_wp,stochastic_flag, &
+    CALL eval_rheology_froude_semi_implicit(rheo_config,local_state,1.0_wp,rheo_config%stochastic_rheology_flag, &
          0.2_wp,source(2),source(3))
     CALL assert_finite(source)
     IF (ANY(source /= 0.0_wp)) THEN
@@ -182,7 +183,7 @@ CONTAINS
     CALL promote_physical_state(local_state,complex_state)
     complex_state%u=complex_state%u+CMPLX(0.0_wp,1.0E-20_wp,wp)
     complex_source=CMPLX(0.0_wp,0.0_wp,wp)
-    CALL eval_rheology_froude_implicit(complex_state,complex_source(2),complex_source(3))
+    CALL eval_rheology_froude_implicit(rheo_config,complex_state,complex_source(2),complex_source(3))
     CALL assert_finite(REAL(complex_source,wp))
     CALL assert_finite(AIMAG(complex_source))
     IF (ANY(complex_source /= CMPLX(0.0_wp,0.0_wp,wp))) &

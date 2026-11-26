@@ -75,19 +75,25 @@ def prepare(repo, root, name, cells=32, horizon='2.0E-2'):
                            exchange + "&GAS_TRANSPORT_PARAMETERS")
     if name == "EXAMPLE_2D_NEWTON":
         # Force the actual production backward-Euler Newton group.
-        text = replace_one(text, r"^\s*RHEOLOGY_MODEL\s*=.*$",
-                           " RHEOLOGY_MODEL='quadratic',\n RHEOLOGY_METHOD='NEWTON',\n RHEOLOGY_GROUP=2,")
+        # The canonical single-layer NAMELIST owns one rheology object.
+        # Change its existing settings rather than adding obsolete scalars.
+        text = replace_one(text, r"^\s*RHEOLOGY%RHEOLOGY_MODEL\s*=.*$",
+                           " RHEOLOGY%RHEOLOGY_MODEL='quadratic',")
+        text = replace_one(text, r"^\s*RHEOLOGY%RHEOLOGY_METHOD\s*=.*$",
+                           " RHEOLOGY%RHEOLOGY_METHOD='NEWTON',")
+        text = replace_one(text, r"^\s*RHEOLOGY%RHEOLOGY_GROUP\s*=.*$",
+                           " RHEOLOGY%RHEOLOGY_GROUP=2,")
     if name == "EXAMPLE_2D_TOPO":
-        text = replace_one(text, r"^\s*TOPO_CHANGE_FLAG\s*=.*$",
-                           " TOPO_CHANGE_FLAG=T,")
+        text = replace_one(text, r"^\s*SUBSTRATE%TOPO_CHANGE_FLAG\s*=.*$",
+                           " SUBSTRATE%TOPO_CHANGE_FLAG=T,")
         # Dedicated active-settling fixture. A coarse solid diameter makes
         # deposition measurable against the finite-precision bed elevation;
         # disabling entrainment removes an unrelated competing mass-transfer
         # process. The ordinary EXAMPLE_2D regression remains unchanged.
         text = replace_one(text, r"^\s*DIAM_S\s*=.*$",
                            " DIAM_S=2.0E-3,")
-        text = replace_one(text, r"^\s*ENTRAINMENT_FLAG\s*=.*$",
-                           " ENTRAINMENT_FLAG=F,")
+        text = replace_one(text, r"^\s*MASS_EXCHANGE%ENTRAINMENT%FLAG\s*=.*$",
+                           " MASS_EXCHANGE%ENTRAINMENT%FLAG=F,")
     input_path.write_text(text)
     return fixture
 
@@ -123,6 +129,8 @@ def run_case(solver, fixture, root, case, threads, evidence):
     env = os.environ.copy()
     env.update(OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
                OPENBLAS_NUM_THREADS="1")
+    if case == "EXAMPLE_2D":
+        env["IMEX_PROFILE_LIE"] = "1"
     if case == "EXAMPLE_2D_NEWTON":
         env["IMEX_NEWTON_WITNESS"] = "1"
     if case == "EXAMPLE_2D_TOPO":
@@ -146,6 +154,11 @@ def run_case(solver, fixture, root, case, threads, evidence):
     if actual != threads:
         raise AssertionError(f"{case}/{threads}: actual OpenMP team {actual} "
                              f"!= requested {threads}; log={log_path}; tail:\\n{tail}")
+    if case == "EXAMPLE_2D":
+        balance = re.search(r"LIE_SOURCE_DETAIL cell_balance_efficiency=\s*([0-9.Ee+-]+)",
+                            result.stdout)
+        if balance is None or not 0.0 <= float(balance.group(1)) <= 1.0 + 1e-12:
+            raise AssertionError(f"{case}/{threads}: invalid Lie cell balance metric; log={log_path}")
     if case == "EXAMPLE_2D_NEWTON":
         witnesses = re.findall(
             r"D20_NEWTON_WITNESS group=([0-9]+) solved_cells=([0-9]+) total_iterations=([0-9]+)",
@@ -167,9 +180,9 @@ def run_case(solver, fixture, root, case, threads, evidence):
     return read_fields(target)
 
 
-def verify_full_step_rollback(solver, fixture, root, threads, evidence):
-    """Require an actual production Lie rollback after a committed bed-changing group."""
-    target = root / "rollback" / str(threads)
+def verify_late_lie_fatal_stop(solver, fixture, root, threads, evidence):
+    """Require fatal termination after a late bed-changing Lie group."""
+    target = root / "fatal_lie" / str(threads)
     shutil.copytree(fixture, target)
     env = os.environ.copy()
     env.update(OMP_NUM_THREADS=str(threads), OMP_DYNAMIC="FALSE",
@@ -178,19 +191,19 @@ def verify_full_step_rollback(solver, fixture, root, threads, evidence):
     result = subprocess.run([str(solver)], cwd=target, env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=240)
-    log_path = evidence / f"rollback-threads-{threads}.log"
+    log_path = evidence / f"fatal-lie-threads-{threads}.log"
     log_path.write_text(result.stdout)
     if result.returncode == 0:
-        raise AssertionError(f"rollback/{threads}: injected failure unexpectedly accepted")
-    expected = ("D20_FULL_STEP_ROLLBACK_PASS", "D20_INJECTED_LATE_LIE_FAILURE")
+        raise AssertionError(f"fatal_lie/{threads}: injected failure unexpectedly accepted")
+    expected = ("Lie timestep failed:", "D20_INJECTED_LATE_LIE_FAILURE")
     if not all(token in result.stdout for token in expected):
-        raise AssertionError(f"rollback/{threads}: no exact full-step rollback witness; "
+        raise AssertionError(f"fatal_lie/{threads}: no fatal stop witness; "
                              f"log={log_path}; tail:\n" +
                              "\n".join(result.stdout.splitlines()[-35:]))
     if not re.search(r"Parallel run:\s*number of threads used\s+"
                      + str(threads) + r"\b", result.stdout):
-        raise AssertionError(f"rollback/{threads}: actual OpenMP team not demonstrated")
-    print(f"PASS full-step injected rollback with {threads} threads")
+        raise AssertionError(f"fatal_lie/{threads}: actual OpenMP team not demonstrated")
+    print(f"PASS fatal Lie stop with {threads} threads")
 
 
 def compare(case, baseline, candidate, threads):
@@ -241,9 +254,9 @@ def main():
                                          "comparisons": results}
                 print(f"PASS {case}: {len(baseline)} fields, teams 1/2/4")
             for threads in THREADS:
-                verify_full_step_rollback(solver, root / "fixtures" / "EXAMPLE_2D_TOPO",
+                verify_late_lie_fatal_stop(solver, root / "fixtures" / "EXAMPLE_2D_TOPO",
                                           root, threads, evidence)
-            report["rollback"] = {"verified_threads": THREADS,
+            report["fatal_lie"] = {"verified_threads": THREADS,
                                   "injected_after_group": 4}
     except Exception as error:
         report["failure"] = str(error)

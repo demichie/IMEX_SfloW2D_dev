@@ -1,3 +1,6 @@
+!> @file rheology_lahar_drag.inc
+!> @brief Shared lahar viscous and turbulent momentum-resistance source.
+!> @details Combines the configured viscosity with Manning-like turbulent resistance and depth regularization.
 ! Viscous and turbulent lahar drag, with frozen state, in either arithmetic kind.
 rate_x=0.0_wp
 rate_y=0.0_wp
@@ -7,16 +10,16 @@ ELSE
     depth_threshold=1.0E-20_wp
 END IF
 
-fluid_viscosity=eval_lahar_fluid_viscosity(state%T,SUM(state%alphas))
+fluid_viscosity=eval_lahar_fluid_viscosity(config,state%T,SUM(state%alphas))
 IF (REAL(state%h,wp)>depth_threshold) THEN
     inverse_depth=1.0_wp/state%h
-    viscous_slope=Kappa*fluid_viscosity*state%mod_vel*0.125_wp &
-        *state%inv_rhom*inv_grav*inverse_depth**2
-    turbulent_slope=n_td2*state%mod_vel**2*inverse_depth**four_thirds
+    viscous_slope=config%Kappa*fluid_viscosity*state%mod_vel*0.125_wp &
+        *state%inv_rho_m*inv_grav*inverse_depth**2
+    turbulent_slope=(config%n_td**2)*state%mod_vel**2*inverse_depth**four_thirds
 ELSE
-    viscous_slope=Kappa*fluid_viscosity*state%mod_vel &
+    viscous_slope=config%Kappa*fluid_viscosity*state%mod_vel &
         /(8.0_wp*state%rho_m*grav*depth_threshold**2)
-    turbulent_slope=n_td2*state%mod_vel**2*depth_threshold**neg_four_thirds
+    turbulent_slope=(config%n_td**2)*state%mod_vel**2*depth_threshold**neg_four_thirds
 END IF
 
 total_slope=viscous_slope+turbulent_slope

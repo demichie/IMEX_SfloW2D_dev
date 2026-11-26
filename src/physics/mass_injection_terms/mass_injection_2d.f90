@@ -32,31 +32,36 @@ CONTAINS
     !> @param[in] use_fissural Enable bottom fissural injection.
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
+    !> @param[in] pore_pressure_flag Activate pore-pressure injection for this layer.
+    !> @param[in] materials Injection material collection.
     SUBROUTINE eval_mass_injection_explicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
-        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate,materials)
+        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate,materials,pore_pressure_flag)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
-        LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial
+        LOGICAL, INTENT(IN) :: use_circular,use_fissural,use_radial,pore_pressure_flag
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(injection_material_set_type), INTENT(IN) :: materials
         REAL(wp) :: process_rate(n_eqns)
         rate=0.0_wp
 
         IF (use_circular) THEN
-        CALL eval_bottom_circular_injection_explicit(state,time,cell_fract,process_rate,materials%common)
+        CALL eval_bottom_circular_injection_explicit(state,time,cell_fract,process_rate, &
+            materials%common,pore_pressure_flag)
         rate=rate+process_rate
 
         END IF
 
         IF (use_fissural) THEN
-        CALL eval_bottom_fissural_injection_explicit(state,time,cell_fissure_fract,process_rate,materials%fissure)
+        CALL eval_bottom_fissural_injection_explicit(state,time,cell_fissure_fract,process_rate, &
+            materials%fissure,pore_pressure_flag)
         rate=rate+process_rate
 
         END IF
 
         IF (use_radial) THEN
-        CALL eval_radial_injection_explicit(state,time,lat_arc_perim,lat_n_x,lat_n_y,cell_area,process_rate,materials%common)
+        CALL eval_radial_injection_explicit(state,time,lat_arc_perim,lat_n_x,lat_n_y,cell_area, &
+            process_rate,materials%common,pore_pressure_flag)
         rate=rate+process_rate
 
         END IF

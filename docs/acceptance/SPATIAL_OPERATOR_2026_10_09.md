@@ -19,7 +19,7 @@ the public production `spatial_operator_type` API, actual domain worksets and
 the production curvature-source evaluator. The Python comparator imports the
 unmodified 1-D/2-D cores from the September 26 drySafe reference archive. Their
 SHA-256 fingerprints are checked before import and retained in the
-[evidence artifact](results_spatial_operator_2026_10_09.json). Neither reference
+[evidence artifact](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_spatial_operator_2026_10_09.json). Neither reference
 formulas nor production kernels are patched to obtain agreement.
 
 Eight fixtures comprise four lakes at rest (flat, smooth, seeded rough and

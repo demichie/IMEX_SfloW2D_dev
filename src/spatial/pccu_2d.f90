@@ -11,7 +11,7 @@
 
 MODULE pccu_2d
 
-    USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp, dry_thickness_tolerance
     USE nonconservative_2d, ONLY : eval_path_contribution
     USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
@@ -23,6 +23,9 @@ MODULE pccu_2d
     REAL(wp), PARAMETER, PUBLIC :: pccu_speed_tolerance = 1.0E-14_wp
 
     PUBLIC :: eval_hydrostatic_path
+    PUBLIC :: eval_interlayer_pressure_path
+    PUBLIC :: eval_interlayer_pressure_correction
+    PUBLIC :: eval_interlayer_oriented_face
     PUBLIC :: eval_central_upwind_flux
     PUBLIC :: eval_pccu_advective_flux
     PUBLIC :: eval_oriented_pccu_pair
@@ -73,6 +76,234 @@ CONTAINS
             hydrostatic_integrand, path_contribution, n_quad=3 )
 
     END SUBROUTINE eval_hydrostatic_path
+
+    !> @brief Integrate the two interlayer pressure products on the same spatial path.
+    !> @details The inputs are the lower-layer depth h1, upper-layer load
+    !> L=rho_m2*gprime2*h2 and shared bed-slope metric G at each endpoint.
+    !> Along a straight path, the two contributions are
+    !> S1=-G*h1*dL and S2=-L*d(G*h1). The common quadrature preserves
+    !> S1+S2=-d(G*h1*L) in the absence of buoyancy clamping.
+    !> The caller supplies the already selected load; this kernel does not
+    !> choose a buoyancy regularization or inspect global layer states.
+    !> @param[in] direction Cartesian path direction.
+    !> @param[in] h1_left,h1_right Lower-layer depths [m].
+    !> @param[in] load_left,load_right Upper-layer loads [Pa].
+    !> @param[in] metric_left,metric_right Shared large-slope factors G.
+    !> @param[out] path_l1,path_l2 Full nonconservative momentum paths by layer.
+    !> @param[out] path_l2_metric Optional -h1*L*dG path. When the L2 hydrostatic
+    !>             operator uses eta2=B+h1+h2, its -G*L*dh1 term is already present;
+    !>             only this metric component can be added without double counting.
+    !>             This decomposition assumes a common straight path in (h1,L,G).
+    !> @param[in] h1_left h1 left argument of eval_interlayer_pressure_path.
+    !> @param[in] load_left load left argument of eval_interlayer_pressure_path.
+    !> @param[in] metric_left metric left argument of eval_interlayer_pressure_path.
+    !> @param[in] h1_right h1 right argument of eval_interlayer_pressure_path.
+    !> @param[in] load_right load right argument of eval_interlayer_pressure_path.
+    !> @param[in] metric_right metric right argument of eval_interlayer_pressure_path.
+    !> @param[out] path_l1 path l1 argument of eval_interlayer_pressure_path.
+    !> @param[out] path_l2 path l2 argument of eval_interlayer_pressure_path.
+    SUBROUTINE eval_interlayer_pressure_path(direction,h1_left,load_left,metric_left, &
+        h1_right,load_right,metric_right,path_l1,path_l2,path_l2_metric)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: h1_left,load_left,metric_left
+        REAL(wp), INTENT(IN) :: h1_right,load_right,metric_right
+        REAL(wp), INTENT(OUT) :: path_l1(:),path_l2(:)
+        REAL(wp), INTENT(OUT), OPTIONAL :: path_l2_metric(:)
+        REAL(wp) :: state_left(3),state_right(3),contribution(3)
+        INTEGER :: normal_momentum
+
+        SELECT CASE(direction)
+        CASE(PATH_DIR_X)
+            normal_momentum=2
+        CASE(PATH_DIR_Y)
+            normal_momentum=3
+        CASE DEFAULT
+            ERROR STOP 'eval_interlayer_pressure_path: invalid direction'
+        END SELECT
+
+        IF (SIZE(path_l1)<normal_momentum .OR. SIZE(path_l2)<normal_momentum) &
+            ERROR STOP 'eval_interlayer_pressure_path: missing momentum component'
+        IF (PRESENT(path_l2_metric)) THEN
+            IF (SIZE(path_l2_metric)<normal_momentum) &
+                ERROR STOP 'eval_interlayer_pressure_path: missing metric path component'
+        END IF
+
+        state_left=[h1_left,load_left,metric_left]
+        state_right=[h1_right,load_right,metric_right]
+        CALL eval_path_contribution(direction,state_left,state_right, &
+            interlayer_pressure_integrand,contribution,n_quad=3)
+
+        path_l1=0.0_wp
+        path_l2=0.0_wp
+        path_l1(normal_momentum)=contribution(1)
+        path_l2(normal_momentum)=contribution(2)
+        IF (PRESENT(path_l2_metric)) THEN
+            path_l2_metric=0.0_wp
+            path_l2_metric(normal_momentum)=contribution(3)
+        END IF
+    END SUBROUTINE eval_interlayer_pressure_path
+
+    !> @brief Return the interlayer paths to add when L2 already uses eta2=B+h1+h2.
+    !> @details The existing L2 hydrostatic path already contains the pressure
+    !> from the variation of h1 in eta2. Its exact discrete contribution is
+    !> computed by evaluating that SAME hydrostatic path with and without h1
+    !> in eta, using unchanged endpoint h2,Gamma2,G. Subtracting it from the
+    !> full S_inter2 avoids double counting even when Gamma2 varies along the
+    !> straight hydrostatic path differently from the linearly interpolated
+    !> interlayer load L=Gamma2*h2.
+    !> @param[in] direction Cartesian direction.
+    !> @param[in] h1_left,h1_right Lower-layer endpoint depths.
+    !> @param[in] h2_left,h2_right Upper-layer endpoint depths.
+    !> @param[in] gamma_left,gamma_right Upper hydrostatic coefficients.
+    !> @param[in] eta2_left,eta2_right Upper-surface endpoint elevations.
+    !> @param[in] metric_left,metric_right Shared large-slope factors.
+    !> @param[out] path_l1 Full L1 interlayer contribution.
+    !> @param[out] correction_l2 L2 contribution not already in hydrostatic path.
+    !> @param[in] h1_left h1 left argument of eval_interlayer_pressure_correction.
+    !> @param[in] h2_left h2 left argument of eval_interlayer_pressure_correction.
+    !> @param[in] gamma_left gamma left argument of eval_interlayer_pressure_correction.
+    !> @param[in] eta2_left eta2 left argument of eval_interlayer_pressure_correction.
+    !> @param[in] metric_left metric left argument of eval_interlayer_pressure_correction.
+    !> @param[in] h1_right h1 right argument of eval_interlayer_pressure_correction.
+    !> @param[in] h2_right h2 right argument of eval_interlayer_pressure_correction.
+    !> @param[in] gamma_right gamma right argument of eval_interlayer_pressure_correction.
+    !> @param[in] eta2_right eta2 right argument of eval_interlayer_pressure_correction.
+    !> @param[in] metric_right metric right argument of eval_interlayer_pressure_correction.
+    SUBROUTINE eval_interlayer_pressure_correction(direction, &
+        h1_left,h2_left,gamma_left,eta2_left,metric_left, &
+        h1_right,h2_right,gamma_right,eta2_right,metric_right, &
+        path_l1,correction_l2)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: h1_left,h2_left,gamma_left,eta2_left,metric_left
+        REAL(wp), INTENT(IN) :: h1_right,h2_right,gamma_right,eta2_right,metric_right
+        REAL(wp), INTENT(OUT) :: path_l1(:),correction_l2(:)
+        REAL(wp) :: full_l2(SIZE(correction_l2))
+        REAL(wp) :: hydro_total(SIZE(correction_l2)),hydro_without_h1(SIZE(correction_l2))
+
+        CALL eval_interlayer_pressure_path(direction, &
+            h1_left,gamma_left*h2_left,metric_left, &
+            h1_right,gamma_right*h2_right,metric_right,path_l1,full_l2)
+
+        CALL eval_hydrostatic_path(direction,h2_left,gamma_left,eta2_left,metric_left, &
+            h2_right,gamma_right,eta2_right,metric_right,hydro_total)
+        CALL eval_hydrostatic_path(direction,h2_left,gamma_left,eta2_left-h1_left,metric_left, &
+            h2_right,gamma_right,eta2_right-h1_right,metric_right,hydro_without_h1)
+        correction_l2=full_l2-(hydro_total-hydro_without_h1)
+    END SUBROUTINE eval_interlayer_pressure_correction
+
+    !> @brief Evaluate the two layer-specific interlayer pressure contributions at one face.
+    !> @details The two oriented PCCU pairs share explicit characteristic bounds.
+    !> These must be supplied by the coupled solver: isolated-layer wave speeds
+    !> are not a valid replacement. The L2 correction excludes the pressure
+    !> already embedded in its eta2=B+h1+h2 hydrostatic path.
+    !> The conservative numerical flux remains owned by each layer's HP operator.
+    !> @param[in] direction Cartesian face normal.
+    !> @param[in] h1_left,h1_right Lower-layer depths at face endpoints.
+    !> @param[in] h2_left,h2_right Upper-layer depths at face endpoints.
+    !> @param[in] gamma_left,gamma_right Upper-layer pressure coefficients.
+    !> @param[in] eta2_left,eta2_right Reconstructed upper free-surface traces.
+    !> @param[in] metric Shared bed-slope metric at the face.
+    !> @param[in] a_minus,a_plus Validated coupled characteristic bounds.
+    !> @param[out] left_l1,right_l1 Oriented lower-layer pressure contributions.
+    !> @param[out] left_l2,right_l2 Oriented upper-layer correction contributions.
+    !> @param[in] h1_left h1 left argument of eval_interlayer_oriented_face.
+    !> @param[in] h2_left h2 left argument of eval_interlayer_oriented_face.
+    !> @param[in] gamma_left gamma left argument of eval_interlayer_oriented_face.
+    !> @param[in] eta2_left eta2 left argument of eval_interlayer_oriented_face.
+    !> @param[in] h1_right h1 right argument of eval_interlayer_oriented_face.
+    !> @param[in] h2_right h2 right argument of eval_interlayer_oriented_face.
+    !> @param[in] gamma_right gamma right argument of eval_interlayer_oriented_face.
+    !> @param[in] eta2_right eta2 right argument of eval_interlayer_oriented_face.
+    !> @param[in] a_minus a minus argument of eval_interlayer_oriented_face.
+    !> @param[in] a_plus a plus argument of eval_interlayer_oriented_face.
+    !> @param[out] left_l1 left l1 argument of eval_interlayer_oriented_face.
+    !> @param[out] right_l1 right l1 argument of eval_interlayer_oriented_face.
+    !> @param[out] left_l2 left l2 argument of eval_interlayer_oriented_face.
+    !> @param[out] right_l2 right l2 argument of eval_interlayer_oriented_face.
+    SUBROUTINE eval_interlayer_oriented_face(direction, &
+        h1_left,h2_left,gamma_left,eta2_left, &
+        h1_right,h2_right,gamma_right,eta2_right,metric, &
+        a_minus,a_plus,left_l1,right_l1,left_l2,right_l2)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: h1_left,h2_left,gamma_left,eta2_left
+        REAL(wp), INTENT(IN) :: h1_right,h2_right,gamma_right,eta2_right,metric
+        REAL(wp), INTENT(IN) :: a_minus,a_plus
+        REAL(wp), INTENT(OUT) :: left_l1(:),right_l1(:),left_l2(:),right_l2(:)
+        REAL(wp) :: path_l1(SIZE(left_l1)),path_l2(SIZE(left_l2))
+        REAL(wp) :: zero_l1(SIZE(left_l1)),zero_l2(SIZE(left_l2))
+
+        IF (SIZE(left_l1)/=SIZE(right_l1) .OR. SIZE(left_l2)/=SIZE(right_l2)) &
+            ERROR STOP 'Interlayer face oriented sizes differ'
+        IF (a_minus>0.0_wp .OR. a_plus<0.0_wp) &
+            ERROR STOP 'Interlayer face needs signed coupled characteristic bounds'
+        zero_l1=0.0_wp
+        zero_l2=0.0_wp
+        CALL eval_interlayer_pressure_correction(direction, &
+            h1_left,h2_left,gamma_left,eta2_left,metric, &
+            h1_right,h2_right,gamma_right,eta2_right,metric,path_l1,path_l2)
+
+        ! The coupled speed envelope skips each layer whose reconstructed
+        ! depth is dry, even if their summed depth slightly exceeds the
+        ! threshold. Use the same layer-wise criterion here: neither layer
+        ! can generate a wave at an all-dry face, while tiny reconstructed
+        ! depths can still produce a roundoff pressure path.
+        IF (a_plus-a_minus<=pccu_speed_tolerance) THEN
+            IF (MAX(h1_left,h2_left)<=dry_thickness_tolerance .AND. &
+                MAX(h1_right,h2_right)<=dry_thickness_tolerance) THEN
+                left_l1=0.0_wp
+                right_l1=0.0_wp
+                left_l2=0.0_wp
+                right_l2=0.0_wp
+                RETURN
+            END IF
+            ! Retain the fatal check for a genuinely wet face without valid
+            ! coupled characteristic bounds; no artificial speed is added.
+            IF (ANY(path_l1/=0.0_wp) .OR. ANY(path_l2/=0.0_wp)) THEN
+                WRITE(*,'(A,I0,A,3(ES24.16,1X))') 'INTERLAYER_DEGENERATE direction=',direction, &
+                    ' a_minus,a_plus,tolerance=',a_minus,a_plus,pccu_speed_tolerance
+                WRITE(*,'(A,4(ES24.16,1X))') 'INTERLAYER_DEGENERATE depths h1L,h2L,h1R,h2R=', &
+                    h1_left,h2_left,h1_right,h2_right
+                WRITE(*,'(A,4(ES24.16,1X))') 'INTERLAYER_DEGENERATE gammaL,gammaR,eta2L,eta2R=', &
+                    gamma_left,gamma_right,eta2_left,eta2_right
+                WRITE(*,'(A,ES24.16)') 'INTERLAYER_DEGENERATE gravity_metric=',metric
+                WRITE(*,'(A,*(ES24.16,1X))') 'INTERLAYER_DEGENERATE path_L1=',path_l1
+                WRITE(*,'(A,*(ES24.16,1X))') 'INTERLAYER_DEGENERATE path_L2=',path_l2
+                ERROR STOP 'Nonzero interlayer pressure with degenerate characteristic bounds'
+            END IF
+            left_l1=0.0_wp
+            right_l1=0.0_wp
+            left_l2=0.0_wp
+            right_l2=0.0_wp
+            RETURN
+        END IF
+
+        CALL eval_oriented_pccu_pair(zero_l1,path_l1,a_minus,a_plus,left_l1,right_l1)
+        CALL eval_oriented_pccu_pair(zero_l2,path_l2,a_minus,a_plus,left_l2,right_l2)
+    END SUBROUTINE eval_interlayer_oriented_face
+
+    !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
+    !> @param[in] direction direction argument of interlayer_pressure_integrand.
+    !> @param[in] path_state path state argument of interlayer_pressure_integrand.
+    !> @param[in] dstate_ds dstate ds argument of interlayer_pressure_integrand.
+    !> @param[out] integrand integrand argument of interlayer_pressure_integrand.
+    SUBROUTINE interlayer_pressure_integrand(direction,path_state,dstate_ds,integrand)
+        INTEGER, INTENT(IN) :: direction
+        REAL(wp), INTENT(IN) :: path_state(:),dstate_ds(:)
+        REAL(wp), INTENT(OUT) :: integrand(:)
+        REAL(wp) :: h1,load,metric
+
+        IF (direction/=PATH_DIR_X .AND. direction/=PATH_DIR_Y) &
+            ERROR STOP 'interlayer_pressure_integrand: invalid direction'
+        IF (SIZE(path_state)/=3 .OR. SIZE(dstate_ds)/=3 .OR. SIZE(integrand)/=3) &
+            ERROR STOP 'interlayer_pressure_integrand: inconsistent path sizes'
+
+        h1=path_state(1)
+        load=path_state(2)
+        metric=path_state(3)
+        integrand(1)=-metric*h1*dstate_ds(2)
+        integrand(2)=-load*(metric*dstate_ds(1)+h1*dstate_ds(3))
+        integrand(3)=-load*h1*dstate_ds(3)
+    END SUBROUTINE interlayer_pressure_integrand
 
     !******************************************************************************
     !> @brief Split a numerical flux and path jump into the two cell-facing values.
@@ -159,6 +390,15 @@ CONTAINS
     !> @brief Compute factored PCCU transport, preserving one-sided upwind limits.
     !> @details This is the transport expression used by the production HP-PCCU
     !>          interface before component and dry-donor flux guards.
+    !> @param[in] a_minus a minus argument of eval_pccu_advective_flux.
+    !> @param[in] a_plus a plus argument of eval_pccu_advective_flux.
+    !> @param[in] u_left u left argument of eval_pccu_advective_flux.
+    !> @param[in] u_right u right argument of eval_pccu_advective_flux.
+    !> @param[in] q_left q left argument of eval_pccu_advective_flux.
+    !> @param[in] q_right q right argument of eval_pccu_advective_flux.
+    !> @param[in] flux_left flux left argument of eval_pccu_advective_flux.
+    !> @param[in] flux_right flux right argument of eval_pccu_advective_flux.
+    !> @param[out] flux flux argument of eval_pccu_advective_flux.
     SUBROUTINE eval_pccu_advective_flux(a_minus,a_plus,u_left,u_right, &
             q_left,q_right,flux_left,flux_right,flux)
         REAL(wp), INTENT(IN) :: a_minus,a_plus,u_left,u_right

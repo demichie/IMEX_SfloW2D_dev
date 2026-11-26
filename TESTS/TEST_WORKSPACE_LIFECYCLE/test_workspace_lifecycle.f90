@@ -3,7 +3,8 @@ PROGRAM test_workspace_lifecycle
   USE parameters_2d, ONLY : wp, n_vars, n_eqns, verbose_level,             &
        radial_source_flag, lateral_source_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, n_fissures, slope_correction_flag,      &
-       curvature_term_flag, liquid_vaporization_flag
+       curvature_term_flag, lava_flag, n_solid
+  USE mass_exchange_parameters_2d, ONLY : mass_exchange_l1
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, x0, y0,   &
        topography_profile, nodata_topo, init_grid, B_vertex,                &
        sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x, &
@@ -11,15 +12,19 @@ PROGRAM test_workspace_lifecycle
        begin_geometry_transaction, rollback_geometry_transaction, &
        commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
-  USE state_fields, ONLY : state_type, substrate_snapshot_type
+  USE state_fields, ONLY : state_type
+  USE substrate_parameters_2d, ONLY : substrate
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+    USE domain_2d, ONLY : domain_type
+    USE spatial_operator_2d, ONLY : spatial_operator_type
   IMPLICIT NONE
 
   TYPE(state_type) :: state
-  TYPE(substrate_snapshot_type) :: substrate_before
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
+    TYPE(spatial_operator_type), ALLOCATABLE :: spatial_slots(:) !< Independent slot-local workspaces.
+    TYPE(domain_type), ALLOCATABLE :: domain_slots(:) !< Independent per-layer active worksets.
   INTEGER :: j, k
   REAL(wp), ALLOCATABLE :: bed_before(:,:), center_before(:,:), &
        face_before(:,:), slope_before(:,:), gravity_before(:,:)
@@ -38,7 +43,7 @@ PROGRAM test_workspace_lifecycle
   bottom_fissural_source_flag = .FALSE.
   slope_correction_flag = .FALSE.
   curvature_term_flag = .FALSE.
-  liquid_vaporization_flag = .FALSE.
+  mass_exchange_l1%vaporization%liquid_vaporization_flag = .FALSE.
   n_fissures = 0
   nodata_topo = -9999.0_wp
 
@@ -55,34 +60,41 @@ PROGRAM test_workspace_lifecycle
        .NOT.ALLOCATED(sourceE_vect_x) .AND. .NOT.ALLOCATED(sourceW_vect_x) &
        .AND. .NOT.ALLOCATED(sourceS_vect_x) .AND. .NOT.ALLOCATED(sourceN_vect_x))
 
-  ! Verify that the authoritative physical inventories and their aggregate
-  ! maps are restored exactly after a simulated rejected transaction.
+  ! Initialize authoritative inventories for granular and lava aggregation checks.
   ALLOCATE(state%deposit(comp_cells_x,comp_cells_y,1))
   ALLOCATE(state%erosion(comp_cells_x,comp_cells_y,1))
   ALLOCATE(state%erodible(1,comp_cells_x,comp_cells_y))
-  ALLOCATE(state%lava_deposit(comp_cells_x,comp_cells_y))
   ALLOCATE(state%deposit_tot(comp_cells_x,comp_cells_y))
   ALLOCATE(state%erosion_tot(comp_cells_x,comp_cells_y))
   state%deposit=1.0_wp
   state%erosion=2.0_wp
   state%erodible=3.0_wp
-  state%lava_deposit=4.0_wp
   state%deposit_tot=5.0_wp
   state%erosion_tot=6.0_wp
-  CALL state%snapshot_substrate(substrate_before)
-  state%deposit=-11.0_wp
-  state%erosion=-12.0_wp
-  state%erodible=-13.0_wp
-  state%lava_deposit=-14.0_wp
-  state%deposit_tot=-15.0_wp
-  state%erosion_tot=-16.0_wp
-  CALL state%restore_substrate(substrate_before)
-  CALL assert_true('rollback restores deposition', ALL(state%deposit==1.0_wp))
-  CALL assert_true('rollback restores erosion', ALL(state%erosion==2.0_wp))
-  CALL assert_true('rollback restores erodible inventory', ALL(state%erodible==3.0_wp))
-  CALL assert_true('rollback restores lava', ALL(state%lava_deposit==4.0_wp))
-  CALL assert_true('rollback restores deposit totals', ALL(state%deposit_tot==5.0_wp))
-  CALL assert_true('rollback restores erosion totals', ALL(state%erosion_tot==6.0_wp))
+
+  ! Canonical lava deposit must survive a refresh even with no solid classes,
+  ! without consulting the (deliberately invalid) granular porosity.
+  lava_flag=.TRUE.
+  n_solid=0
+  substrate%erodible_porosity=1.0_wp
+  state%deposit_tot=2.5_wp
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('lava deposit survives n_solid=0 refresh', ALL(state%deposit_tot==2.5_wp))
+  CALL assert_true('lava has no granular erosion total', ALL(state%erosion_tot==0.0_wp))
+  ! Switching back to a zero-class granular carrier must clear the
+  ! aggregate instead of interpreting the lava thickness as sediment.
+  lava_flag=.FALSE.
+  n_solid=0
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('granular zero-class refresh clears thickness', &
+       ALL(state%deposit_tot==0.0_wp))
+  CALL assert_true('granular zero-class refresh clears erosion', &
+       ALL(state%erosion_tot==0.0_wp))
+  lava_flag=.FALSE.
+  n_solid=1
+  substrate%erodible_porosity=0.25_wp
+  CALL state%refresh_substrate_totals()
+  CALL assert_true('granular deposit uses porosity', ALL(ABS(state%deposit_tot-4.0_wp/3.0_wp)<1.0E-12_wp))
 
   ! Exercise the production geometry transaction: all fields must recover
   ! exactly, including cached centre/face elevation and derived coefficients.
@@ -127,6 +139,29 @@ PROGRAM test_workspace_lifecycle
      CALL assert_true('speed bounds released', .NOT.ALLOCATED(hyperbolic%a_interface_xNeg))
      CALL assert_true('HP scratch released', .NOT.ALLOCATED(reconstruction%hp_eta_mask))
   END DO
+
+    ! The simulation owns one independent HP-PCCU workspace per material slot.
+    ! Check allocation, finalization and repeated setup without enabling L2.
+    DO j=1,2
+        ALLOCATE(spatial_slots(2),domain_slots(2))
+
+        DO k=1,SIZE(spatial_slots)
+            CALL spatial_slots(k)%initialize
+            CALL domain_slots(k)%initialize
+        END DO
+
+        domain_slots(2)%solve_mask_time=25.0_wp
+        CALL assert_true('domain slots own separate masks',ALL(domain_slots(1)%solve_mask_time==0.0_wp))
+
+        DO k=1,SIZE(spatial_slots)
+            CALL spatial_slots(k)%finalize
+            CALL domain_slots(k)%finalize
+        END DO
+
+        DEALLOCATE(spatial_slots,domain_slots)
+        CALL assert_true('slot workspaces released', &
+            .NOT.ALLOCATED(spatial_slots) .AND. .NOT.ALLOCATED(domain_slots))
+    END DO
 
   PRINT *, 'PASS: workspace lifecycle and geometry transaction rollback verified'
 

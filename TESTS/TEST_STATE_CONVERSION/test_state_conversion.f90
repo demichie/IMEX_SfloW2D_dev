@@ -2,6 +2,7 @@ PROGRAM test_state_conversion
 
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE solid_transport_parameters_2d
   USE state_conversion_2d
   USE equation_terms_2d, ONLY : eval_inertial_flux, limit_component_mass_flux
   USE mass_boundary_injection_2d, ONLY : eval_boundary_injection_explicit
@@ -87,8 +88,8 @@ CONTAINS
        CALL assert_close_scalar('shared state T', from_qp%T, from_complex%T, 2.0E-12_wp)
        CALL assert_close_scalar('shared state density', from_qp%rho_m, &
             from_complex%rho_m, 2.0E-12_wp)
-       CALL assert_close_scalar('shared state inverse density', from_qp%inv_rhom, &
-            from_complex%inv_rhom, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state inverse density', from_qp%inv_rho_m, &
+            from_complex%inv_rho_m, 2.0E-12_wp)
        CALL assert_close_scalar('shared state reduced gravity', from_qp%red_grav, &
             from_complex%red_grav, 2.0E-12_wp)
        CALL assert_close_scalar('shared state stochastic', from_qp%Zs, &
@@ -141,9 +142,6 @@ CONTAINS
     rheology_flag = .FALSE.
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
-    stochastic_flag = .TRUE.
-    stoch_transport_flag = .TRUE.
-    pore_pressure_flag = .TRUE.
     gas_flag = .TRUE.
 
   END SUBROUTINE initialize_test_properties
@@ -598,10 +596,10 @@ CONTAINS
 
     COMPLEX(wp), INTENT(IN) :: q(n_vars)
     COMPLEX(wp), INTENT(OUT) :: outputs(5)
-    COMPLEX(wp) :: h, u, v, T, rho_m, inv_rhom, Zs, pore
+    COMPLEX(wp) :: h, u, v, T, rho_m, inv_rho_m, Zs, pore
     COMPLEX(wp) :: alphas(n_solid), alphag(n_add_gas)
 
-    CALL c_phys_var(q, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs, pore)
+    CALL c_phys_var(q, h, u, v, T, rho_m, alphas, alphag, inv_rho_m, Zs, pore)
     outputs = [h, u, v, T, rho_m]
 
   END SUBROUTINE complex_conversion_outputs

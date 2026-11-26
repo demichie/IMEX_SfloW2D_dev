@@ -16,7 +16,7 @@ has been changed. The existing stage test driver gains optional D02 fixtures;
 its default behavior is preserved. Standalone checks are included in the
 source distribution, without adding a known-failing gate to CI or `make check`.
 
-The [summary JSON](results_d02_cell_local_2026_10_21.json) records provenance,
+The [summary JSON](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_d02_cell_local_2026_10_21.json) records provenance,
 counts, failures and representative measurements. The [test README](../../TESTS/TEST_RHEOLOGY_CELL_LOCAL/README.md)
 documents exact commands, dependencies, norms and tolerances. Full per-case
 namelists, logs and JSON results are retained locally under `build-local/d02/`.

@@ -1,3 +1,7 @@
+> Historical source links: retired paths below now lead to their Git history,
+> not to a current production module. Line numbers from the original audit
+> must not be interpreted as current source positions.
+
 # N8 mass exchange and evolving bed validation
 
 The [N7/N8 closure checklist](N7_N8_CLOSURE_2026_10_10.md) reconciles these
@@ -18,7 +22,7 @@ At the time of this acceptance snapshot, the changes were confined to
 [`equation_terms_2d.f90`](../../src/physics/equation_terms_2d.f90) and
 `mass_exchange_2d.f90`. The latter module was retired in D16.10; the current
 post-IMEX transaction coordinator is
-[`apply_mass_exchange_step`](../../src/numerics/mass_exchange_step_2d.f90),
+[`apply_mass_exchange_step`](https://github.com/demichie/IMEX_SfloW2D_dev/commits/d91843a0faf8c8491cf50c240cdd50a7cd006407/src/numerics/mass_exchange_step_2d.f90),
 while the geometry update is owned by
 [`geometry_2d.f90`](../../src/geometry/geometry_2d.f90).
 
@@ -105,7 +109,7 @@ The tested sources are an uncommitted working-tree snapshot based on
 these corrections. The actual source files are in
 `/Users/demichie/Codes/GIT/IMEX_SfloW2D_dev`.
 
-[`results_n8_mass_exchange_2026_10_09.json`](results_n8_mass_exchange_2026_10_09.json)
+[[results_n8_mass_exchange_2026_10_09.json](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n8_mass_exchange_2026_10_09.json)](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n8_mass_exchange_2026_10_09.json)
 retains source/test/tool hashes, build flags, original/effective input hashes,
 output fingerprints, actual teams, the 48 diagnostic records, pre-fix assertion
 failures and comparison with the

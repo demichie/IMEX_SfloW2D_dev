@@ -26,7 +26,7 @@ MODULE state_types
         !> Thickness (m), horizontal velocity (m/s) and temperature (K).
         REAL(wp) :: h=0.0_wp, u=0.0_wp, v=0.0_wp, T=0.0_wp
         !> Bulk density and its inverse (kg/m3 and m3/kg).
-        REAL(wp) :: rho_m=0.0_wp, inv_rhom=0.0_wp
+        REAL(wp) :: rho_m=0.0_wp, inv_rho_m=0.0_wp
         !> Carrier density and its inverse (kg/m3 and m3/kg).
         REAL(wp) :: rho_c=0.0_wp, inv_rho_c=0.0_wp
         !> Mixture/carrier heat capacity (J/kg/K).
@@ -48,7 +48,7 @@ MODULE state_types
         LOGICAL :: layout_valid=.FALSE.
         COMPLEX(wp) :: h=(0.0_wp,0.0_wp), u=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: v=(0.0_wp,0.0_wp), T=(0.0_wp,0.0_wp)
-        COMPLEX(wp) :: rho_m=(0.0_wp,0.0_wp), inv_rhom=(0.0_wp,0.0_wp)
+        COMPLEX(wp) :: rho_m=(0.0_wp,0.0_wp), inv_rho_m=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: rho_c=(0.0_wp,0.0_wp), inv_rho_c=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: cp_m=(0.0_wp,0.0_wp), cp_c=(0.0_wp,0.0_wp)
         COMPLEX(wp) :: red_grav=(0.0_wp,0.0_wp), Ri=(0.0_wp,0.0_wp)
@@ -127,7 +127,7 @@ CONTAINS
         LOGICAL :: layout_valid
         layout_valid=state%layout_valid
         state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp; state%T=0.0_wp
-        state%rho_m=0.0_wp; state%inv_rhom=0.0_wp; state%rho_c=0.0_wp; state%inv_rho_c=0.0_wp
+        state%rho_m=0.0_wp; state%inv_rho_m=0.0_wp; state%rho_c=0.0_wp; state%inv_rho_c=0.0_wp
         state%cp_m=0.0_wp; state%cp_c=0.0_wp; state%red_grav=0.0_wp; state%Ri=0.0_wp
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp; state%w=0.0_wp
         state%mod_vel_hor=0.0_wp; state%mod_vel2=0.0_wp; state%mod_vel=0.0_wp
@@ -146,7 +146,7 @@ CONTAINS
         LOGICAL :: layout_valid
         layout_valid=state%layout_valid
         state%h=0.0_wp; state%u=0.0_wp; state%v=0.0_wp; state%T=0.0_wp
-        state%rho_m=0.0_wp; state%inv_rhom=0.0_wp; state%rho_c=0.0_wp; state%inv_rho_c=0.0_wp
+        state%rho_m=0.0_wp; state%inv_rho_m=0.0_wp; state%rho_c=0.0_wp; state%inv_rho_c=0.0_wp
         state%cp_m=0.0_wp; state%cp_c=0.0_wp; state%red_grav=0.0_wp; state%Ri=0.0_wp
         state%Zs=0.0_wp; state%exc_pore_pres=0.0_wp; state%w=0.0_wp
         state%mod_vel_hor=0.0_wp; state%mod_vel2=0.0_wp; state%mod_vel=0.0_wp
@@ -174,7 +174,7 @@ CONTAINS
         target%v=CMPLX(source%v,0.0_wp,wp)
         target%T=CMPLX(source%T,0.0_wp,wp)
         target%rho_m=CMPLX(source%rho_m,0.0_wp,wp)
-        target%inv_rhom=CMPLX(source%inv_rhom,0.0_wp,wp)
+        target%inv_rho_m=CMPLX(source%inv_rho_m,0.0_wp,wp)
         target%rho_c=CMPLX(source%rho_c,0.0_wp,wp)
         target%inv_rho_c=CMPLX(source%inv_rho_c,0.0_wp,wp)
         target%cp_m=CMPLX(source%cp_m,0.0_wp,wp)

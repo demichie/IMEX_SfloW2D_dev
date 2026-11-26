@@ -97,3 +97,9 @@ The original README points to [the ETNA_LAVA validation report](../../docs/accep
 ## Additional original README details
 
 The DEM source raster is **3000 × 2000 pixels at 1 m** and the computational grid lies within its extent. The preparation script verifies SHA-256 checksums, and accepts an existing DEM only if identical; it does not overwrite differing existing inputs/DEMs. The solver imports the original terrain to the computational grid. Files generated during the example run are ignored by Git but not deleted. The documented N9 mass check uses saved output only up to 3180 s, the last snapshot before domain-boundary contact; the complete field and restart tests continue to 3600 s.
+
+## Shared DEM archive
+
+The Etna source archive is tracked only under `../EXAMPLE_ETNA/DEM/`.
+Use `python prepare.py` to populate the local `DEM/` directory; the
+script checks the original checksums and avoids duplicate committed terrain.

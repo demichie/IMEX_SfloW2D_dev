@@ -92,7 +92,7 @@ CONTAINS
         REAL(wp) :: qp_init(n_vars) ,  qp0_init(n_vars)
         REAL(wp) :: xs_collapse(n_solid), xg_collapse(n_add_gas)
         REAL(wp) :: alphas_local(n_solid)
-        REAL(wp) :: rho_m, inv_rhom, rho_c, xc, sp_heat_c, sp_heat_mix
+        REAL(wp) :: rho_m, inv_rho_m, rho_c, xc, sp_heat_c, sp_heat_mix
 
         REAL(wp), ALLOCATABLE :: cell_fract(:,:)
 
@@ -122,7 +122,7 @@ CONTAINS
 
         alphas_local = alphas_collapse(1:n_solid)
         CALL evaluate_mixture_from_volume(T_collapse, alphag_collapse(1:n_add_gas), alphas_local,     &
-            rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse, xc, sp_heat_c, sp_heat_mix)
+            rho_m, inv_rho_m, rho_c, xs_collapse, xg_collapse, xc, sp_heat_c, sp_heat_mix)
 
         qp_init(5:4+n_solid) = xs_collapse
         qp_init(4+n_solid+1:4+n_solid+n_add_gas) = xg_collapse
@@ -141,12 +141,12 @@ CONTAINS
                     qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas                                       &
                         +n_stoch_vars+n_pore_vars) = 1.0_wp
 
-                    CALL primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    CALL primitive_to_conservative(qp_init(1:n_vars),state%q(1:n_vars,1,j,k),converted)
                     IF (.NOT.converted) CALL fatal_error('Invalid collapsing-volume initial composition')
 
                 ELSE
 
-                    CALL primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,j,k),converted)
+                    CALL primitive_to_conservative(qp0_init(1:n_vars),state%q(1:n_vars,1,j,k),converted)
                     IF (.NOT.converted) CALL fatal_error('Invalid dry initial composition')
 
                 END IF

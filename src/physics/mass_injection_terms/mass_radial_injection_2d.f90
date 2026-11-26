@@ -26,12 +26,16 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate,material)
+    !> @param[in] pore_pressure_flag Selected layer activation of pore-pressure injection.
+    !> @param[in] material Material properties of injected fluid.
+    SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, &
+        lat_n_y_jk, cell_area_jk, rate,material,pore_pressure_flag)
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(injection_material_type), INTENT(IN) :: material
+        LOGICAL, INTENT(IN) :: pore_pressure_flag
         REAL(wp) :: t_rem, t_coeff, h_dot
         REAL(wp) :: r_rho_m, r_red_grav
         REAL(wp) :: source_xs(n_solid), source_xg(n_add_gas)

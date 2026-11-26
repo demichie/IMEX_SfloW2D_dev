@@ -26,7 +26,7 @@ MODULE rheology_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE rheology_parameters_2d, ONLY : xi
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow,                                                 &
                 EXACT_FLOW_QUADRATIC_POLYNOMIAL
@@ -37,8 +37,6 @@ MODULE rheology_voellmy_2d
     PUBLIC :: eval_rheology_voellmy_implicit
     PUBLIC :: eval_rheology_voellmy_implicit_real
     PUBLIC :: eval_rheology_voellmy_analytic
-    PUBLIC :: mu
-    REAL(wp) :: mu
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (complex for the implicit contribution).
@@ -47,16 +45,15 @@ CONTAINS
     !> resistance
     !> law, using the treatment-specific velocity and effective-stress inputs. Outputs are
     !> conservative x/y momentum source rates.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
-    !> \param[in] moving True for a moving local state.
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic,                   &
+    !> @param[in] config Model parameter configuration.
+    SUBROUTINE eval_rheology_voellmy_explicit(config, state, grav_coeff, use_pore_pressure, use_stochastic,            &
             stochastic_value, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -64,8 +61,8 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx,sy,ix,iy
 
-        CALL eval_rheology_voellmy_semi_implicit(state,grav_coeff,use_pore_pressure,sx,sy)
-        CALL eval_rheology_voellmy_implicit_real(state,use_stochastic,stochastic_value,ix,iy)
+        CALL eval_rheology_voellmy_semi_implicit(config,state,grav_coeff,use_pore_pressure,sx,sy)
+        CALL eval_rheology_voellmy_implicit_real(config,state,use_stochastic,stochastic_value,ix,iy)
         rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_voellmy_explicit
 
@@ -74,12 +71,13 @@ CONTAINS
     !> \details Return the contribution assigned to the semi-implicit treatment. This
     !> implementation
     !> supplies a zero source when the model has no term in this treatment.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
+    !> @param[in] config Model parameter configuration.
+    SUBROUTINE eval_rheology_voellmy_semi_implicit(config, state, grav_coeff, use_pore_pressure, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
@@ -98,12 +96,12 @@ CONTAINS
         rate_y = 0.0_wp
         IF (state%mod_vel .LE. 0.0_wp) RETURN
 
-        friction_stress = mu * rhom *                                                                                  &
+        friction_stress = config%mu * rhom *                                                                           &
                     (red_grav + state%curvature_acceleration) * h                                                      &
                     * SQRT(grav_coeff)
         friction_stress = MAX(0.0_wp, friction_stress)
         IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress                                           &
-                    - mu * SQRT(grav_coeff) * exc_pore_pres)
+                    - config%mu * SQRT(grav_coeff) * exc_pore_pres)
         rate_x = -friction_stress * u / state%mod_vel
         rate_y = -friction_stress * v / state%mod_vel
 
@@ -114,32 +112,41 @@ CONTAINS
     !> \brief Evaluate the implicit voellmy contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation
     !> supplies a zero source when the model has no term in this treatment.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
-    !> \param[in] moving True for a moving local state.
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+    !> @param[in] config Model parameter configuration.
+    SUBROUTINE eval_rheology_voellmy_implicit(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
-        REAL(wp) :: xi_effective
+        REAL(wp) :: xi_effective, xi_parameter
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: turbulent_stress
 
+        xi_parameter=config%xi
         INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_voellmy_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    SUBROUTINE eval_rheology_voellmy_implicit_real(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+    !> @brief eval rheology voellmy implicit real operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[in] use_stochastic_xi Enable stochastic friction coefficient.
+    !> @param[in] stochastic_value Local stochastic field value.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
+    SUBROUTINE eval_rheology_voellmy_implicit_real(config, state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
-        REAL(wp) :: xi_effective,turbulent_stress
+        REAL(wp) :: xi_effective, xi_parameter, turbulent_stress
 
+        xi_parameter=config%xi
         INCLUDE 'rheology_voellmy_turbulent.inc'
     END SUBROUTINE eval_rheology_voellmy_implicit_real
 
@@ -158,8 +165,10 @@ CONTAINS
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration,              &
+    !> @param[in] config Model parameter configuration.
+    SUBROUTINE eval_rheology_voellmy_analytic(config, dt, state, speed_ratio, grav_coeff, curvature_acceleration,      &
             use_pore_pressure, use_stochastic_xi, stochastic_xi_value, velocity_after)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration
@@ -194,22 +203,22 @@ CONTAINS
 
         END IF
 
-        xi_effective = xi
+        xi_effective = config%xi
 
         IF (use_stochastic_xi) THEN
-            xi_effective = xi + stochastic_xi_value
+            xi_effective = config%xi + stochastic_xi_value
             xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
 
         ELSEIF (xi_effective .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive config%xi in Voellmy analytic solver')
 
         END IF
 
-        coulomb_stress = mu * rhom * (red_grav +                                                                       &
+        coulomb_stress = config%mu * rhom * (red_grav +                                                                &
                     curvature_acceleration) * h * SQRT(grav_coeff)
         coulomb_stress = MAX(0.0_wp, coulomb_stress)
         IF (use_pore_pressure) coulomb_stress = MAX(0.0_wp, coulomb_stress -                                           &
-                    mu * SQRT(grav_coeff) * exc_pore_pres)
+                    config%mu * SQRT(grav_coeff) * exc_pore_pres)
         constant_drag = coulomb_stress / (rhom * h * speed_ratio)
         quadratic_drag = red_grav * speed_ratio / (xi_effective*h)
         CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                                                &

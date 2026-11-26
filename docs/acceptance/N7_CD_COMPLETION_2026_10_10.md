@@ -6,7 +6,7 @@ and all six full-solver cross-thread comparisons. N7 remains open only for
 the separate CFL interpretation, and N9 scientific baseline approval remains
 open. Neither milestone is silently closed by passing this package.
 
-The [machine-readable evidence](results_n7_cd_2026_10_10.json) pins all
+The [machine-readable evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_n7_cd_2026_10_10.json) pins all
 production sources, versioned contracts, fixture hashes, case inventories,
 reference errors and observer fingerprints. The base revision is `aed31540`;
 the candidate is identified by its source hashes, not by that historical commit.

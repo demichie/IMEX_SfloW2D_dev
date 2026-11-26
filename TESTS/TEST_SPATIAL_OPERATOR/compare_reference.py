@@ -16,11 +16,13 @@ import sys
 
 import numpy as np
 
+from coupled_characteristic_audit import run as audit_coupled_characteristics
+
 REFERENCE = Path(__file__).parent / "reference"
 CORE_HASHES = {
     "hp_pccu_1d_core.py": "c35f8ec13f1b0c8e93eb1e31c02e6308bcf679bf182bd00eb265ca3f54ee7f38",
     "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
-    "kt_python_2d_core.py": "a6e88b4845d753bfef6200a67bee78d85995be3a9014c34000d419ae484d8936",
+    "kt_python_2d_core.py": "880923deb7361ab016822b01c31705d1e768e9f71b45644d071650db23702ded",
 }
 for filename, checksum in CORE_HASHES.items():
     if hashlib.sha256((REFERENCE / filename).read_bytes()).hexdigest() != checksum:
@@ -287,6 +289,7 @@ def negative_controls(fields, q, vertices, bed, params):
 
 
 def main():
+    audit_coupled_characteristics()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path)
     parser.add_argument("profile")
@@ -315,8 +318,19 @@ def main():
                     run = subprocess.run([str(args.executable), str(threads)], cwd=directory,
                                          env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=90)
                 if run.returncode:
-                    raise AssertionError(f"{tag}, threads={threads}: exit {run.returncode}\n"
-                                         +(directory/"solver.log").read_text())
+                    log_path = directory/"solver.log"
+                    lines = log_path.read_text().splitlines()
+                    witnesses = [line for line in lines
+                                 if "TL07_INTERLAYER_REJECT" in line
+                                 or "TL07_INTERLAYER_FIRST_FAILURE" in line]
+                    detail = "\n".join(witnesses)
+                    tail = "\n".join(lines[-90:])
+                    raise AssertionError(
+                        f"{tag}, threads={threads}: exit {run.returncode}; full log: {log_path}\n"
+                        f"LAST 90 LOG LINES:\n{tail}\n"
+                        f"INTERLAYER FAILURE WITNESS (diagnostic values):\n"
+                        f"{detail or '(no TL07 witness found)'}"
+                    )
                 paths.append(directory/"result.bin")
                 record = compare(read_payload(paths[-1]), q, vertices, bed, params, name)
                 policy_steps=np.fromfile(directory/"cfl_policies.bin",dtype=np.float64)
@@ -333,7 +347,32 @@ def main():
                 if threads == 1:
                     payloads[(name, slope, curvature)] = read_payload(paths[-1])
             if paths[0].read_bytes() != paths[1].read_bytes():
-                raise AssertionError(f"{tag}: production 1/4-thread payloads differ")
+                first = read_payload(paths[0])
+                second = read_payload(paths[1])
+                differing = [key for key in first if first[key].tobytes() != second[key].tobytes()]
+                details = []
+                for key in differing:
+                    left, right = first[key], second[key]
+                    positions = np.argwhere(left.view(np.uint64) != right.view(np.uint64))
+                    position = tuple(int(i) for i in positions[0])
+                    details.append(f"{key}{position}: 1-thread={left[position]!r}, 4-thread={right[position]!r}")
+                raise AssertionError(f"{tag}: production 1/4-thread payloads differ: "
+                                     + "; ".join(details))
+            integrated = [Path(tag)/f"threads-{threads}"/"integrated_lie.bin" for threads in (1, 4)]
+            if not integrated[0].is_file() or not integrated[1].is_file():
+                raise AssertionError(f"{tag}: missing integrated two-layer Lie timestep payload")
+            if integrated[0].read_bytes() != integrated[1].read_bytes():
+                raise AssertionError(f"{tag}: integrated two-layer Lie state differs between 1 and 4 threads")
+            optional = [Path(tag)/f"threads-{threads}"/"optional_lie.bin" for threads in (1, 4)]
+            if not optional[0].is_file() or not optional[1].is_file():
+                raise AssertionError(f"{tag}: missing optional-layer Lie timestep payload")
+            if optional[0].read_bytes() != optional[1].read_bytes():
+                raise AssertionError(f"{tag}: optional Darcy/OU/thermal Lie state differs between 1 and 4 threads")
+            spatial_bc = [Path(tag)/f"threads-{threads}"/"coupled_bc_wetdry.bin" for threads in (1, 4)]
+            if not spatial_bc[0].is_file() or not spatial_bc[1].is_file():
+                raise AssertionError(f"{tag}: missing coupled four-side BC and wet/dry payload")
+            if spatial_bc[0].read_bytes() != spatial_bc[1].read_bytes():
+                raise AssertionError(f"{tag}: coupled BC/wet/dry/CFL differs between 1 and 4 threads")
             print(f"PASS: {args.profile} {tag}, complete residual/geometry/traces/directional CFL, actual 1/4 threads", flush=True)
             for record in results:
                 print("N7_SPATIAL_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)

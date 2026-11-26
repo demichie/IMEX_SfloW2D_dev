@@ -12,7 +12,7 @@ tags:
 
 ## Overview
 
-A 2-D radial flow with basal friction, sedimentation and entrainment above sloping terrain, based on Bursik and Woods (1996). In contrast to a conventional radial inlet, mixture enters vertically from the bottom of a circular region without horizontal momentum; sedimentation and entrainment are disabled within the source area. At steady state the outward mass flux matches the bottom input flux. Retained thermal-energy transport is enabled; topography is fixed by `TOPO_CHANGE_FLAG=F`.
+A 2-D radial flow with basal friction, sedimentation and entrainment above sloping terrain, based on Bursik and Woods (1996). In contrast to a conventional radial inlet, mixture enters vertically from the bottom of a circular region without horizontal momentum; sedimentation and entrainment are disabled within the source area. At steady state the outward mass flux matches the bottom input flux. Retained thermal-energy transport is enabled; topography is fixed by `SUBSTRATE%TOPO_CHANGE_FLAG=F`.
 
 ## Main parameters
 
@@ -93,10 +93,16 @@ Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, viewable in Pa
 
 1. Bursik, M. I., and Woods, A. W. (1996). The dynamics and thermodynamics of large ash flows. *Bulletin of Volcanology*, 58, 175–193.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Differences in historical commands or parameters are documented here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Documentation verification note
 
 **Source timing.** The documented invocation supplies **eight** arguments. The template-generated `TIME_PARAM = 600, 100, 50, 50` describes a 600 s period, a 100 s active window, a 50 s linear ramp and a 50 s phase offset. The contradictory 30/20 s prose is historical, not the active configuration.
+
+## Topography files
+
+Run `python create_example.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` and the `DEM/` directory when needed. The input
+references that location; do not place generated terrain in the example root.

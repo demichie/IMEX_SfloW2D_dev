@@ -1,8 +1,5 @@
-# this is example-file: Makefile.am
-
-# the subdirectories of the project to go into
-SUBDIRS =   \
-            src
+# Build the solver in its source subdirectory.
+SUBDIRS = src
 
 # Test fixtures keep one lowercase input file; test copies use the solver's
 # required uppercase filename to avoid case-only aliases in Git.
@@ -12,6 +9,10 @@ EXTRA_DIST = \
   CONTRIBUTING.md \
   README.md \
   TESTS/run_tests.sh \
+  TESTS/INTEGRATION_CI.md \
+  TESTS/FINH_TIMESTEP_DIAGNOSTICS.md \
+  TESTS/compare_finh_timestep.py \
+  TESTS/test_compare_finh_timestep.py \
   TESTS/TEST_SOURCE_REGISTRY/README.md \
   TESTS/TEST_SOURCE_REGISTRY/run_test.sh \
   TESTS/TEST_SOURCE_REGISTRY/test_source_registry.f90 \
@@ -62,8 +63,21 @@ EXTRA_DIST = \
   TESTS/TEST_DAMBREAK/TEST_STEP_FINH/cleanFolder.sh \
   TESTS/TEST_DAMBREAK/TEST_STEP_FINH/example_2D_0000.q_2d \
   TESTS/TEST_DAMBREAK/TEST_STEP_FINH/topography_dem.asc \
-  EXAMPLES/EXAMPLE_CF/topo.zip \
-  EXAMPLES/EXAMPLE_TAAL/topography_dem.asc \
+  EXAMPLES/EXAMPLE_CF/DEM/topo.zip \
+  EXAMPLES/EXAMPLE_TAAL/DEM/topography_dem.zip \
+  EXAMPLES/EXAMPLE_ETNA/IMEX_SfloW2D.inp \
+  EXAMPLES/EXAMPLE_ETNA/create_input_ellipsoid.py \
+  EXAMPLES/EXAMPLE_ETNA/input_ellipsoid.py \
+  EXAMPLES/EXAMPLE_ETNA/DEM/Etna2014_crop.zip \
+  EXAMPLES/EXAMPLE_ETNA/DEM/README.md \
+  EXAMPLES/EXAMPLE_ETNA/README.md \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/.gitignore \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/README.md \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/IMEX_SfloW2D.inp \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/prepare.py \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/test_prepare.py \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/DEM/README.md \
+  EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/INITIAL_CONDITIONS/README.md \
   TESTS/DIAGNOSTICS/README.md \
   TESTS/DIAGNOSTICS/HP_PCCU_1D/README.md \
   TESTS/DIAGNOSTICS/HP_PCCU_1D/hp_pccu_1d_core.py \
@@ -80,6 +94,8 @@ EXTRA_DIST = \
   TESTS/DIAGNOSTICS/ARCHIVE/kt_ritter_1d.f90
 
 check-local:
+	python3 -m unittest discover -s $(top_srcdir)/TESTS -p 'test_compare_finh_timestep.py'
+	python3 -m unittest discover -s $(top_srcdir)/EXAMPLES/EXAMPLE_ETNA_TWO_LAYER -p 'test_*.py'
 	$(SHELL) $(top_srcdir)/TESTS/TEST_OUTPUT_PATHS/run_test.sh \
 	  "$(FC)" "$(OPENMP_FCFLAGS)" "$(abs_top_builddir)/src"
 	$(SHELL) $(top_srcdir)/TESTS/run_tests.sh \

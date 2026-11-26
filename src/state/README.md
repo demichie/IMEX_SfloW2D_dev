@@ -1,5 +1,11 @@
 # State: canonical representation of the solver state
 
+## Shared REAL/COMPLEX kernels
+
+The [`inc/` subdirectory](inc/README.md) documents each included cell-local
+mathematical formula shared by the REAL and COMPLEX physical-state paths.
+These files are implementation kernels, not alternative state ownership.
+
 ## Purpose and role in IMEX-SfloW2D
 
 The `state` directory provides the **canonical representation of the evolving

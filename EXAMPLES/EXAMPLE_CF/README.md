@@ -24,7 +24,7 @@ Dilute gas–particle mixture collapsing over the Campi Flegrei area. Initial co
 | Collapse radius | 500 m |
 | Collapse height | 400 m |
 | Initial solid volume fraction | 0.015 |
-| Topography | `topo.zip` |
+| Topography | `DEM/topo.zip` |
 
 ## How to run
 
@@ -33,8 +33,10 @@ From this example directory, execute the following commands in order:
 **Extract the topography archive:**
 
 ```bash
-unzip topo.zip
+unzip DEM/topo.zip -d DEM
 ```
+
+The input uses `DEM/topography_dem.asc`; unpack the archive only into `DEM/`.
 
 **Run the solver:**
 
@@ -51,6 +53,6 @@ The committed input enables native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<R
 
 1. Esposti Ongaro, T., Orsucci, S., and Cornolti, F. A fast, calibrated model for pyroclastic density currents kinematics and hazard. *Journal of Volcanology and Geothermal Research*, 327, 257–272.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Differences in historical commands or parameters are documented here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).

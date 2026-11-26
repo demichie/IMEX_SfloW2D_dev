@@ -62,7 +62,7 @@ logs. Its partial results are not counted as a completed acceptance audit.
 
 ## Validation status
 
-The [pinned completion evidence](results_cfl_policy_2026_10_11.json) records:
+The [pinned completion evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_cfl_policy_2026_10_11.json) records:
 
 - **45/45 full-audit groups pass**, with eight passing cross-thread pairs.
 - All 16 preceding full-solver groups retain bitwise-identical canonical

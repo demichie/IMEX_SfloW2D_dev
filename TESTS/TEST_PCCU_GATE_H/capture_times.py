@@ -13,8 +13,10 @@ def capture(executable, case):
     """Copy only initial inputs, then verify the I/O hook is numerically inert."""
     directory = case/"accepted-time-observer"
     directory.mkdir()
-    for name in ("IMEX_SfloW2D.inp", "topography_dem.asc", "gateH_0000.q_2d"):
+    for name in ("IMEX_SfloW2D.inp", "gateH_0000.q_2d"):
         shutil.copyfile(case/name, directory/name)
+    (directory/"DEM").mkdir()
+    shutil.copyfile(case/"DEM/topography_dem.asc", directory/"DEM/topography_dem.asc")
     with (directory/"run.log").open("w") as stream:
         subprocess.run([str(executable.resolve())], cwd=directory,
                        env=os.environ.copy(), stdout=stream, stderr=subprocess.STDOUT,
@@ -49,10 +51,16 @@ def capture(executable, case):
     if actual != requested:
         raise AssertionError(f"observational OpenMP team {actual} != requested {requested}")
     shutil.copyfile(directory/"accepted_times.bin", case/"accepted_times.bin")
+    recorded_states = directory/"accepted_states.bin"
+    if recorded_states.exists():
+        shutil.copyfile(recorded_states, case/"accepted_states.bin")
     evidence = {"canonical_output_byte_identical": True, "actual_threads": actual,
                 "canonical_output_sha256": hashlib.sha256(original).hexdigest(),
                 "accepted_times_sha256": hashlib.sha256((case/"accepted_times.bin").read_bytes()).hexdigest(),
                 "numerical_modules_instrumented": False}
+    if (case/"accepted_states.bin").exists():
+        evidence["accepted_states_sha256"] = hashlib.sha256(
+            (case/"accepted_states.bin").read_bytes()).hexdigest()
     (case/"accepted_time_evidence.json").write_text(json.dumps(evidence, indent=2)+"\n")
 
 

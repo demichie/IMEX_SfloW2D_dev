@@ -13,15 +13,37 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Verify source dependencies and module boundaries
-        run: python3 .github/scripts/check_fortran_dependencies.py
-      - name: Verify mandatory Fortran formatting and Doxygen contracts
-        run: sh TESTS/TEST_SOURCE_DOCUMENTATION/run_test.sh
-      - name: Verify source registry interfaces
-        run: python3 TESTS/ACCEPTANCE/test_d17_physical_interfaces.py
-      - name: Verify state-index and source-finalization contracts
+      - name: Execute every independent static audit and report all failures
+        shell: bash
         run: |
-          python3 TESTS/ACCEPTANCE/test_state_index_contract.py
-          python3 tools/d17/check_canonical_indices.py
-          python3 TESTS/ACCEPTANCE/test_d17_state_finalization.py
-          python3 TESTS/TEST_STATE/check_legacy_boundary.py
+          set -uo pipefail
+          failed=0
+          run_check() {
+            echo "::group::$*"
+            if "$@"; then
+              echo "PASS: $*"
+            else
+              echo "FAIL: $*"
+              failed=1
+            fi
+            echo "::endgroup::"
+          }
+          run_check python3 -m py_compile \
+            .github/scripts/check_fortran_dependencies.py \
+            tools/docs/check_fortran_style.py \
+            TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py \
+            TESTS/ACCEPTANCE/test_d17_physical_interfaces.py \
+            TESTS/ACCEPTANCE/test_d17_state_finalization.py \
+            TESTS/ACCEPTANCE/test_plan_inventory.py \
+            TESTS/ACCEPTANCE/test_state_index_contract.py \
+            TESTS/TEST_STATE/check_legacy_boundary.py \
+            tools/d17/check_canonical_indices.py
+          run_check python3 .github/scripts/check_fortran_dependencies.py
+          run_check sh TESTS/TEST_SOURCE_DOCUMENTATION/run_test.sh
+          run_check python3 TESTS/ACCEPTANCE/test_d17_physical_interfaces.py
+          run_check python3 TESTS/ACCEPTANCE/test_state_index_contract.py
+          run_check python3 tools/d17/check_canonical_indices.py
+          run_check python3 TESTS/ACCEPTANCE/test_d17_state_finalization.py
+          run_check python3 TESTS/ACCEPTANCE/test_plan_inventory.py
+          run_check python3 TESTS/TEST_STATE/check_legacy_boundary.py
+          exit "$failed"

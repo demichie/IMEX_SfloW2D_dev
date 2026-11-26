@@ -57,7 +57,7 @@ The resulting input uses the specified continuous, vertex-aligned Q1 bed geometr
 python3 create_example.py 120 --plot
 ```
 
-The generator writes `topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`,
+The generator writes `DEM/topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`,
 `IMEX_SfloW2D.inp`, `initial_condition_reference.npz`,
 and, when plotting is requested, `initial_thickness.png` and
 `initial_centerline.png`.
@@ -73,7 +73,7 @@ and, when plotting is requested, `initial_thickness.png` and
 
 ## Expected output
 
-`create_example.py` produces `topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`, `IMEX_SfloW2D.inp`, `initial_condition_reference.npz`, and (with `--plot`) `initial_thickness.png` and `initial_centerline.png`.
+`create_example.py` produces `DEM/topography_dem.asc`, `inclined_excavation_2D_0000.q_2d`, `IMEX_SfloW2D.inp`, `initial_condition_reference.npz`, and (with `--plot`) `initial_thickness.png` and `initial_centerline.png`.
 
 ## Geometry and Q1 consistency
 
@@ -93,6 +93,12 @@ The Q1 shared-face bed and positivity-limited `η−B` reconstruction produce ze
 
 The original README proposes the following integral measures: `M_uphill` for `x<10 m`; `M_downhill` for `x≥20 m`; `M_south` for `y<−5 m` and `10≤x<20`; `M_north` for `y≥5 m` and `10≤x<20`. Before physically driven overtopping, uphill and lateral masses should remain zero up to roundoff, while downhill mass grows only after eastern overtopping.
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are retained here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
+
+## Topography files
+
+Run `python create_example.py` from this example directory. The generator creates
+`DEM/topography_dem.asc` and the `DEM/` directory when needed. The input
+references that location; do not place generated terrain in the example root.

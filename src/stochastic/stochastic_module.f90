@@ -14,46 +14,41 @@
 !********************************************************************************
 
 MODULE stochastic_module
-    USE parameters_2d, ONLY : idx_totMassEqn, wp, rheology_model, idx_stoch, idx_u, idx_v
+    USE parameters_2d, ONLY : idx_totMassEqn, wp, idx_stoch, idx_u, idx_v
     USE parameters_2d, ONLY : idx_h
+    USE rheology_parameters_2d, ONLY : rheology_config_type
 
     USE domain_2d, ONLY: domain_type
     USE state_fields, ONLY: state_type
-    USE parameters_2d, ONLY : length_spatial_corr,                                                                     &
-            stochastic_flag, stoch_transport_flag
     USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
     USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
 
     ! Parameters controlling the Ornstein-Uhlenbeck process.
 
-    !LOGICAL :: sym_noise_flag ! use symmetric noise or not
+    !> Canonical OU parameters, transformation and transport selection for one layer.
+    TYPE :: stochastic_config_type
+        REAL(wp) :: sym_noise=0.0_wp !< Effective-fluctuation sign transform.
+        REAL(wp) :: tau_stochastic=-1.0_wp !< OU correlation time [s].
+        REAL(wp) :: std_max=-1.0_wp, std_min=-1.0_wp !< OU intensity bounds.
+        REAL(wp) :: std_slope_factor=-1.0_wp !< Velocity-squared transition scale.
+        REAL(wp) :: noise_activation_velocity=-1.0_wp !< Intensity transition speed.
+        REAL(wp) :: noise_pow_val=-1.0_wp !< Effective-noise exponent.
+        REAL(wp) :: length_spatial_corr=0.0_wp !< Gaussian correlation scale [m].
+        INTEGER :: stochastic_seed=-1 !< Negative selects processor seed.
+        LOGICAL :: stochastic_transport_flag=.FALSE. !< Transport M*Z for this layer.
+    END TYPE stochastic_config_type
 
-    !> Noise parameter:\n
-    !> - 0    => the noise will be simmetric
-    !> 1      => abs val is taken
-    !> -1     => -abs val is taken
-    !> .
-    REAL(wp) :: sym_noise
-
-    !> Ornstein-Uhlenbeck correlation time [s].
-    REAL(wp) :: tau_stochastic
-
-    !> Upper and lower standard-deviation bounds for the noise amplitude.
-    REAL(wp) :: std_max, std_min
-
-    !> Froude-dependent standard-deviation slope factor.
-    REAL(wp) :: std_slope_factor ! Fr_0_stochastic
-
-    !> Velocity scale u_0 in the stochastic intensity law.
-    REAL(wp) :: noise_activation_velocity
-
-    REAL(wp) :: noise_pow_val !(|Z|^power)
-
+    TYPE(stochastic_config_type), TARGET :: stochastic_l1,stochastic_l2
 
     !> \brief Gaussian OU state, friction-only transformation and correlation kernel.
     !> \details Z and effective_Z are cell maps; only Z is conservatively transported
     !>          and checkpointed. Friction receives the separately derived effective_Z.
     TYPE :: stochastic_workspace_type
+        !> Non-owning canonical OU and matched rheology configurations.
+        TYPE(stochastic_config_type), POINTER :: config=>NULL()
+        TYPE(rheology_config_type), POINTER :: rheology=>NULL()
+        INTEGER :: layer=1 !< State layer slot owned by this workspace.
+        INTEGER, ALLOCATABLE :: rng_state(:) !< Independent L2 RNG; L1 uses the legacy global stream.
 
         !> Stochastic field at cell centers
         REAL(wp), ALLOCATABLE :: Z(:,:)
@@ -82,11 +77,24 @@ CONTAINS
     !> \brief Allocate OU/friction fields and seed the generator when stochastic physics is enabled.
     !>
     !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+    !> @param[in] config Stable-lifetime canonical OU configuration for this layer.
+    !> @param[in] rheology Stable-lifetime canonical rheology for the same layer.
+    !> @param[in] layer Optional state layer slot, defaults to L1 for direct calls.
 
-    SUBROUTINE initialize_stochastic_workspace(this)
+    SUBROUTINE initialize_stochastic_workspace(this,config,rheology,layer)
 
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+        TYPE(stochastic_config_type), TARGET, INTENT(IN) :: config
+        TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology
+        INTEGER, INTENT(IN), OPTIONAL :: layer
+        INTEGER :: seed_size
+        INTEGER, ALLOCATABLE :: global_rng(:)
 
+        this%layer=1
+        IF (PRESENT(layer)) this%layer=layer
+        IF (this%layer<1 .OR. this%layer>2) ERROR STOP 'Invalid stochastic layer slot'
+        this%config=>config
+        this%rheology=>rheology
         IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
         ALLOCATE(this%Z(comp_cells_x,comp_cells_y))
         this%Z = 0.0_wp
@@ -95,7 +103,21 @@ CONTAINS
         ALLOCATE(this%effective_Z(comp_cells_x,comp_cells_y))
         this%effective_Z = 0.0_wp
 
-        IF (stochastic_flag) CALL initialize_stochastic_rng
+        IF (ALLOCATED(this%rng_state)) DEALLOCATE(this%rng_state)
+        IF (rheology%stochastic_rheology_flag .OR. config%stochastic_transport_flag) THEN
+            ! The process-wide generator remains the canonical L1 stream,
+            ! including the state recorded by legacy binary restart files.
+            IF (this%layer==2) THEN
+                CALL random_seed(SIZE=seed_size)
+                ALLOCATE(global_rng(seed_size),this%rng_state(seed_size))
+                CALL random_seed(GET=global_rng)
+            END IF
+            CALL initialize_stochastic_rng(config%stochastic_seed)
+            IF (this%layer==2) THEN
+                CALL random_seed(GET=this%rng_state)
+                CALL random_seed(PUT=global_rng)
+            END IF
+        END IF
 
     END SUBROUTINE initialize_stochastic_workspace
 
@@ -110,6 +132,9 @@ CONTAINS
         IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
         IF ( ALLOCATED(this%effective_Z) ) DEALLOCATE(this%effective_Z)
         IF ( ALLOCATED(this%conv_kernel) ) DEALLOCATE(this%conv_kernel)
+        IF (ALLOCATED(this%rng_state)) DEALLOCATE(this%rng_state)
+        this%layer=1
+        NULLIFY(this%config,this%rheology)
 
     END SUBROUTINE finalize_stochastic_workspace
 
@@ -120,17 +145,19 @@ CONTAINS
     !> burn-in
     !>                      when transport is enabled.
     !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+    !> \param[in] transport_enabled Selected layer stochastic transport activation.
     !>
     !> \note This is a finite burn-in, not a proof of statistical stationarity when the
     !>       velocity-dependent noise intensity changes.
 
-    SUBROUTINE getSteadyStateZ(this, state, domain)
+    SUBROUTINE getSteadyStateZ(this, state, domain, transport_enabled)
     ! should find a better way to understand when the process is stable.
     ! Since sigma is varing in space and time, the process may never be stable.
     IMPLICIT none
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         CLASS(domain_type), INTENT(IN) :: domain
+        LOGICAL, INTENT(IN) :: transport_enabled
         INTEGER :: j, k , l
         INTEGER :: i, n_iter
         REAL(wp) :: dt
@@ -140,12 +167,12 @@ CONTAINS
         this%Z = 0.0_wp
 
         ! Define how many iteration to do for the burn in
-        t_steady = 10_wp * tau_stochastic
-        dt = 0.1_wp * tau_stochastic
+        t_steady = 10_wp * this%config%tau_stochastic
+        dt = 0.1_wp * this%config%tau_stochastic
         n_iter = CEILING(t_steady/dt)
 
         ! Allocate and compute convolution kernel if needed (will be keept in memory)
-        IF (length_spatial_corr > 0.0_wp) THEN
+        IF (this%config%length_spatial_corr > 0.0_wp) THEN
             CALL this%generate_kernel()
 
         END IF
@@ -156,7 +183,7 @@ CONTAINS
 
         END DO
 
-        IF (stoch_transport_flag) THEN
+        IF (transport_enabled) THEN
 
             !$OMP PARALLEL DO private(j,k)
 
@@ -165,8 +192,8 @@ CONTAINS
                 j = domain%j_cent(l)
                 k = domain%k_cent(l)
 
-                state%qp(idx_stoch,j,k) = this%Z(j,k)
-                state%q(idx_stoch,j,k) = state%q(idx_totMassEqn,j,k) *                                                 &
+                state%qp(idx_stoch,this%layer,j,k) = this%Z(j,k)
+                state%q(idx_stoch,this%layer,j,k) = state%q(idx_totMassEqn,this%layer,j,k) *                           &
                     this%Z(j,k)
 
             END DO
@@ -174,6 +201,10 @@ CONTAINS
             !$OMP END PARALLEL DO
 
             WRITE(*,*) 'end stochastic initialization'
+
+        ELSEIF (idx_stoch>0) THEN
+            state%q(idx_stoch,this%layer,:,:)=0.0_wp
+            state%qp(idx_stoch,this%layer,:,:)=0.0_wp
 
         END IF
 
@@ -196,7 +227,7 @@ CONTAINS
 
         ! The thesis defines length_spatial_corr as l and the kernel bandwidth
         ! as l/2 (Eq. D.32).
-        bandwidth = 0.5_wp * length_spatial_corr
+        bandwidth = 0.5_wp * this%config%length_spatial_corr
         ! Four bandwidths on either side retain all but a negligible Gaussian tail.
         half_width = MAX(1, CEILING(4.0_wp * bandwidth / cell_size))
         n_nodes_per_dim = 2 * half_width + 1
@@ -212,7 +243,7 @@ CONTAINS
             DO x_index = 1, n_nodes_per_dim
                 x = cell_size * REAL(x_index - half_width - 1, wp)
                 y = cell_size * REAL(y_index - half_width - 1, wp)
-                this%conv_kernel(x_index, y_index) = evalGaussian2d(x, y)
+                this%conv_kernel(x_index, y_index) = evalGaussian2d(x, y, this%config)
 
             END DO
 
@@ -231,13 +262,15 @@ CONTAINS
     !>
     !> \note Uses standard deviation length_spatial_corr/2; called for positive correlation length.
 
-    REAL(wp) FUNCTION evalGaussian2d(x, y)
+    !> @param[in] config Canonical layer Gaussian-correlation parameters.
+    REAL(wp) FUNCTION evalGaussian2d(x, y, config)
         ! Sample the centered isotropic Gaussian kernel Q^(1/2).
     IMPLICIT none
         REAL(wp), INTENT(IN) :: x, y
+        TYPE(stochastic_config_type), INTENT(IN) :: config
         REAL(wp) :: s, PI
 
-        s = 0.5_wp * length_spatial_corr
+        s = 0.5_wp * config%length_spatial_corr
         PI = ACOS(-1.0_wp)
         evalGaussian2d = EXP(-0.5_wp * (((x/s)**2) + ((y/s)**2))) /                                                    &
                                 (2.0_wp * PI * s**2)
@@ -250,6 +283,9 @@ CONTAINS
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] dt Time increment [s].
 
+    !> @param[in] trial_q Trial conservative state.
+    !> @param[in] trial_qp Trial primitive state.
+    !> @param[in] domain Computational domain.
     SUBROUTINE update_stochastic_variable(this, state, dt, trial_q, trial_qp, domain)
         ! OU evolution is a fractional step distinct from conservative transport.
     IMPLICIT NONE
@@ -259,6 +295,7 @@ CONTAINS
         CLASS(domain_type), INTENT(IN), OPTIONAL :: domain
         INTEGER :: j,k
         INTEGER :: noise_size
+        INTEGER, ALLOCATABLE :: global_rng(:)
         REAL(wp), INTENT(IN) :: dt
         REAL(wp) :: sigma_noise
         REAL(wp):: noise(comp_cells_x, comp_cells_y)
@@ -268,11 +305,22 @@ CONTAINS
         ! must not change the random stream associated with a fixed seed.
         ! Generate standard Gaussian noise over the entire domain: N(0,1).
         noise_size = comp_cells_x*comp_cells_y
+        ! Restore and advance only this layer's stream. The Gaussian draws
+        ! remain serial and independent of OpenMP cell scheduling.
+        IF (ALLOCATED(this%rng_state)) THEN
+            ALLOCATE(global_rng(SIZE(this%rng_state)))
+            CALL random_seed(GET=global_rng)
+            CALL random_seed(PUT=this%rng_state)
+        END IF
         noise = RESHAPE(gaussian_noise(noise_size),                                                                    &
             [comp_cells_x, comp_cells_y])
+        IF (ALLOCATED(this%rng_state)) THEN
+            CALL random_seed(GET=this%rng_state)
+            CALL random_seed(PUT=global_rng)
+        END IF
 
         ! Convolve the gaussian noise to introduce spatial correlation if needed
-        IF (length_spatial_corr > 0.0_wp) THEN
+        IF (this%config%length_spatial_corr > 0.0_wp) THEN
             ! (for convenience, the conv_kernel is generated only once before the burn in)
             CALL convolve_2d(noise, this%conv_kernel, conv_result)
             noise = conv_result
@@ -290,15 +338,15 @@ CONTAINS
                 IF (PRESENT(trial_q) .AND. PRESENT(trial_qp) .AND. PRESENT(domain)) THEN
                     IF (domain%solve_mask(j,k)) THEN
                         sigma_noise=getSigmaNoise_from_values(trial_q(idx_totMassEqn,j,k),                            &
-                            trial_qp(idx_u,j,k)**2+trial_qp(idx_v,j,k)**2)
+                            trial_qp(idx_u,j,k)**2+trial_qp(idx_v,j,k)**2,this%config,this%rheology)
                     ELSE
-                        sigma_noise=getSigmaNoise(state,j,k)
+                        sigma_noise=getSigmaNoise(state,j,k,this%config,this%rheology,this%layer)
                     END IF
                 ELSE
-                    sigma_noise=getSigmaNoise(state,j,k)
+                    sigma_noise=getSigmaNoise(state,j,k,this%config,this%rheology,this%layer)
                 END IF
                 this%Z(j,k) = EulerMaruyamaScheme(                                                                     &
-                    this%Z(j,k), dt, sigma_noise, noise(j,k))
+                    this%Z(j,k), dt, sigma_noise, noise(j,k),this%config)
 
             END DO
 
@@ -318,24 +366,29 @@ CONTAINS
     !> after
     !>                      the OU step.
     !> \param[in] dt Time increment [s].
+    !> \param[in] transport_enabled Selected layer stochastic transport activation.
 
-    SUBROUTINE prepare_stochastic_timestep(this,state,dt,trial_q,trial_qp,domain)
+    !> @param[in,out] trial_q Trial conservative state.
+    !> @param[in,out] trial_qp Trial primitive state.
+    !> @param[in] domain Computational domain.
+    SUBROUTINE prepare_stochastic_timestep(this,state,dt,transport_enabled,trial_q,trial_qp,domain)
         ! In the production Lie path, evolve OU after the spatial transport,
         ! using post-spatial candidates without publishing the fluid state.
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
         CLASS(state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: dt
+        LOGICAL, INTENT(IN) :: transport_enabled
         REAL(wp), INTENT(INOUT), OPTIONAL :: trial_q(:,:,:),trial_qp(:,:,:)
         CLASS(domain_type), INTENT(IN), OPTIONAL :: domain
         INTEGER :: l,j,k
         LOGICAL :: use_trial
 
         use_trial=PRESENT(trial_q) .AND. PRESENT(trial_qp) .AND. PRESENT(domain)
-        IF (stoch_transport_flag) THEN
+        IF (transport_enabled) THEN
             ! The transported conservative scalar determines Z in wet cells.
             ! Outside the active solve set its published state is authoritative.
-            WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
-                this%Z=state%q(idx_stoch,:,:)/state%q(idx_totMassEqn,:,:)
+            WHERE (state%q(idx_totMassEqn,this%layer,:,:) > EPSILON(1.0_wp))
+                this%Z=state%q(idx_stoch,this%layer,:,:)/state%q(idx_totMassEqn,this%layer,:,:)
             END WHERE
             IF (use_trial) THEN
                 DO l=1,domain%solve_cells
@@ -353,7 +406,7 @@ CONTAINS
             CALL this%update(state,dt)
         END IF
 
-        IF (stoch_transport_flag) THEN
+        IF (transport_enabled) THEN
             IF (use_trial) THEN
                 ! Modify only candidate cells, not the published state.
                 DO l=1,domain%solve_cells
@@ -369,13 +422,26 @@ CONTAINS
                 END DO
             ELSE
                 ! Legacy/direct callers retain their published-state contract.
-                WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
-                    state%q(idx_stoch,:,:)=state%q(idx_totMassEqn,:,:)*this%Z
-                    state%qp(idx_stoch,:,:)=this%Z
+                WHERE (state%q(idx_totMassEqn,this%layer,:,:) > EPSILON(1.0_wp))
+                    state%q(idx_stoch,this%layer,:,:)=state%q(idx_totMassEqn,this%layer,:,:)*this%Z
+                    state%qp(idx_stoch,this%layer,:,:)=this%Z
                 ELSEWHERE
-                    state%q(idx_stoch,:,:)=0.0_wp
-                    state%qp(idx_stoch,:,:)=0.0_wp
+                    state%q(idx_stoch,this%layer,:,:)=0.0_wp
+                    state%qp(idx_stoch,this%layer,:,:)=0.0_wp
                 END WHERE
+            END IF
+        ELSEIF (idx_stoch>0) THEN
+            ! An allocated optional component remains zero without layer transport.
+            IF (use_trial) THEN
+                DO l=1,domain%solve_cells
+                    j=domain%j_cent(l)
+                    k=domain%k_cent(l)
+                    trial_q(idx_stoch,j,k)=0.0_wp
+                    trial_qp(idx_stoch,j,k)=0.0_wp
+                END DO
+            ELSE
+                state%q(idx_stoch,this%layer,:,:)=0.0_wp
+                state%qp(idx_stoch,this%layer,:,:)=0.0_wp
             END IF
         END IF
     END SUBROUTINE prepare_stochastic_timestep
@@ -391,10 +457,10 @@ CONTAINS
         !> Derive the fluctuation used by friction without modifying the OU state.
         CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
 
-        IF (sym_noise > 0.0_wp) THEN
-            this%effective_Z = ABS(this%Z)**noise_pow_val
-        ELSEIF (sym_noise < 0.0_wp) THEN
-            this%effective_Z = -(ABS(this%Z)**noise_pow_val)
+        IF (this%config%sym_noise > 0.0_wp) THEN
+            this%effective_Z = ABS(this%Z)**this%config%noise_pow_val
+        ELSEIF (this%config%sym_noise < 0.0_wp) THEN
+            this%effective_Z = -(ABS(this%Z)**this%config%noise_pow_val)
         ELSE
             this%effective_Z = this%Z
 
@@ -407,18 +473,23 @@ CONTAINS
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] j X index of the current computational cell.
     !> \param[in] k Y index of the current computational cell.
+    !> @param[in] layer Optional material layer slot, defaults to L1.
     !> \return Squared speed [m^2 s^-2], or zero when the cell mass is negligible.
 
-    REAL(wp) FUNCTION VelocitySquared(state,j,k)
+    REAL(wp) FUNCTION VelocitySquared(state,j,k,layer)
     !> Compute |u|^2 at the cell center.
     IMPLICIT NONE
     CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
+    INTEGER, INTENT(IN), OPTIONAL :: layer
+    INTEGER :: selected_layer
 
-    IF (state%q(idx_totMassEqn,j,k) > EPSILON(1.0_wp)) THEN
+    selected_layer=1
+    IF (PRESENT(layer)) selected_layer=layer
+    IF (state%q(idx_totMassEqn,selected_layer,j,k) > EPSILON(1.0_wp)) THEN
         ! qp already stores the physical velocities associated with q. Reusing
         ! them avoids repeating the full thermodynamic conversion in every cell.
-        VelocitySquared = state%qp(idx_u,j,k)**2 + state%qp(idx_v,j,k)**2
+        VelocitySquared = state%qp(idx_u,selected_layer,j,k)**2 + state%qp(idx_v,selected_layer,j,k)**2
     ELSE
         VelocitySquared = 0.0_wp
 
@@ -431,24 +502,42 @@ END FUNCTION VelocitySquared
     !> \param[in] state Simulation cell states and accumulated diagnostics.
     !> \param[in] j X index of the current computational cell.
     !> \param[in] k Y index of the current computational cell.
+    !> @param[in] layer Optional state layer slot, defaults to L1.
     !> \return Local OU noise intensity; dry cells use std_max.
 
-    REAL(wp) FUNCTION getSigmaNoise(state,j,k)
+    !> @param[in] config Canonical OU configuration for this layer.
+    !> @param[in] rheology Canonical rheology for the same layer.
+    REAL(wp) FUNCTION getSigmaNoise(state,j,k,config,rheology,layer)
         CLASS(state_type), INTENT(IN) :: state
         INTEGER, INTENT(IN) :: j,k
-        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,j,k),VelocitySquared(state,j,k))
+        TYPE(stochastic_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
+        INTEGER, INTENT(IN), OPTIONAL :: layer
+        INTEGER :: selected_layer
+
+        selected_layer=1
+        IF (PRESENT(layer)) selected_layer=layer
+        getSigmaNoise=getSigmaNoise_from_values(state%q(idx_totMassEqn,selected_layer,j,k), &
+            VelocitySquared(state,j,k,selected_layer),config,rheology)
     END FUNCTION getSigmaNoise
 
-    !> OU forcing intensity for one selected conservative/primitive candidate.
-    !> Worklist ownership and staging remain outside this local calculation.
-    REAL(wp) FUNCTION getSigmaNoise_from_values(mass,velocity_squared)
+    !> @brief Return the OU noise intensity of a cell-local candidate.
+    !> @details Worklist ownership and staging remain outside this local calculation.
+    !> @param[in] mass Mixture mass per unit area [kg/m2].
+    !> @param[in] velocity_squared Squared flow speed [m2/s2].
+    !> @return Local OU forcing standard deviation.
+    !> @param[in] config Canonical OU parameters for this layer.
+    !> @param[in] rheology Canonical rheology for the same layer.
+    REAL(wp) FUNCTION getSigmaNoise_from_values(mass,velocity_squared,config,rheology)
         REAL(wp), INTENT(IN) :: mass,velocity_squared
+        TYPE(stochastic_config_type), INTENT(IN) :: config
+        TYPE(rheology_config_type), INTENT(IN) :: rheology
         IF (mass<=EPSILON(1.0_wp)) THEN
-            getSigmaNoise_from_values=std_max
-        ELSEIF (TRIM(rheology_model)=='froude' .OR. TRIM(rheology_model)=='lucas') THEN
-            getSigmaNoise_from_values=expFormNoise(velocity_squared)
+            getSigmaNoise_from_values=config%std_max
+        ELSEIF (TRIM(rheology%rheology_model)=='froude' .OR. TRIM(rheology%rheology_model)=='lucas') THEN
+            getSigmaNoise_from_values=expFormNoise(velocity_squared,config)
         ELSE
-            getSigmaNoise_from_values=std_max
+            getSigmaNoise_from_values=config%std_max
         END IF
     END FUNCTION getSigmaNoise_from_values
 
@@ -457,11 +546,14 @@ END FUNCTION VelocitySquared
     !> \param[in] val Squared velocity entering the noise-intensity transition [m^2 s^-2].
     !> \return Noise intensity std_max+(std_min-std_max)*exp(-val/std_slope_factor).
 
-    REAL(wp) FUNCTION expFormNoise(val)
+    !> @param[in] config Canonical OU noise-intensity parameters.
+    REAL(wp) FUNCTION expFormNoise(val,config)
         ! Compute the bounded intensity of the noise of the stochastic process
     IMPLICIT NONE
         REAL(wp), INTENT(IN) :: val
-        expFormNoise = std_max + ( std_min - std_max) * exp(- val / std_slope_factor )
+        TYPE(stochastic_config_type), INTENT(IN) :: config
+        expFormNoise = config%std_max + (config%std_min - config%std_max) * &
+            exp(-val / config%std_slope_factor)
     END FUNCTION expFormNoise
 
     !> \brief Apply one Euler-Maruyama step to a scalar Ornstein-Uhlenbeck state.
@@ -474,11 +566,13 @@ END FUNCTION VelocitySquared
     !> \param[in] noise_ij Standard-normal forcing sample for the current cell.
     !> \return Updated Gaussian OU state after damping and stochastic forcing.
 
-    REAL(wp) FUNCTION EulerMaruyamaScheme(Zij, dt, sigma, noise_ij)
+    !> @param[in] config Canonical OU damping time.
+    REAL(wp) FUNCTION EulerMaruyamaScheme(Zij, dt, sigma, noise_ij,config)
     IMPLICIT NONE
         REAL(wp), INTENT(IN) :: Zij, dt, sigma, noise_ij
-        EulerMaruyamaScheme = Zij - (dt / tau_stochastic) * Zij +                                                      &
-                sigma * SQRT(2.0_wp * (dt / tau_stochastic)) * noise_ij
+        TYPE(stochastic_config_type), INTENT(IN) :: config
+        EulerMaruyamaScheme = Zij - (dt / config%tau_stochastic) * Zij + &
+                sigma * SQRT(2.0_wp * (dt / config%tau_stochastic)) * noise_ij
     END FUNCTION
 
 !> \brief Convolve a cell-centered signal using a centred kernel and zero padding.

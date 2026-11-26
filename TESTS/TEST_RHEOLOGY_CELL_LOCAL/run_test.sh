@@ -40,6 +40,14 @@ for profile in strict optimized; do
     model_objects="$objects"
     "$compiler" $common $model_objects test_model_names.o -llapack $netcdf_flibs $netcdf_clibs -o test_model_names
     ./test_model_names
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_rheology_namelist_alias.f90"
+    "$compiler" $common $objects test_rheology_namelist_alias.o -llapack $netcdf_flibs $netcdf_clibs \
+        -o test_rheology_namelist_alias
+    ./test_rheology_namelist_alias
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_pore_pressure_namelist_alias.f90"
+    "$compiler" $common $objects test_pore_pressure_namelist_alias.o -llapack $netcdf_flibs $netcdf_clibs \
+        -o test_pore_pressure_namelist_alias
+    ./test_pore_pressure_namelist_alias
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_source_modules.f90"
     "$compiler" $common $objects test_source_modules.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_source_modules
@@ -54,7 +62,7 @@ for profile in strict optimized; do
     ./test_shared_implicit_kernels
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_lava_cooling.f90"
     "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_cooling_2d.o \
-        thermal_laws_2d.o test_lava_cooling.o -o test_lava_cooling
+        test_lava_cooling.o -o test_lava_cooling
     ./test_lava_cooling
     "$compiler" -O0 -g -fcheck=all $common -c \
         "$test_dir/test_pore_pressure_diffusion.f90"

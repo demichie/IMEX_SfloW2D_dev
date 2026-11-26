@@ -24,3 +24,25 @@ logs and compiled objects under D17_WORK_DIR (or a temporary directory).
 New physical source families should be added to the canonical catalog and
 covered by relevant numerical tests; do not introduce numeric physics IDs
 or alternative source configuration paths.
+
+## Paired interlayer sources (block 4)
+
+The same runner builds and executes `test_interlayer_mass_exchange`,
+`test_interlayer_lie_transaction`, and
+`test_interlayer_momentum_exchange` with strict and optimized profiles.
+
+The cell-local mass-exchange test covers the four layer-presence cases,
+two simultaneous gross solid streams, both carrier modes, distinct
+settling/elutriation limit factors, independent upward-carrier limiting
+in `ALLOW_CONCENTRATED`, and different donor/recipient carrier densities.
+It checks both final packing constraints, per-class donor caps,
+antisymmetric mass, momentum and thermal energy, and additional gas
+species transport.
+
+The transaction test exercises the actual Lie-group entry point with
+group-zero snapshots and later-group candidates, verifies atomic rejection,
+then applies analytic Chezy drag to the accepted mass-exchange candidates.
+It also checks that optional Darcy and OU conservative components remain
+local to their respective layers. These tests do not enable the
+production `N_LAYERS=2` gate. OpenMP integrated coverage remains in
+`TEST_SPATIAL_OPERATOR`.

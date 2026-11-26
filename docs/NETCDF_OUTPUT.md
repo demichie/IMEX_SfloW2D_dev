@@ -1,54 +1,79 @@
-# Native NetCDF output
+# NetCDF physical fields for visualization
 
-Set `OUTPUT_NETCDF_FLAG = T` in `RUN_PARAMETERS` to write the scientific
-solution directly to `<run_name>.nc`. NetCDF is the only multidimensional
-physical-solution format produced by the solver.
+Set `OUTPUT_NETCDF_FLAG=T` under `RUN_PARAMETERS` to write
+`OUTPUT/<run_name>/fields/<run_name>.nc`.
 
-The conservative `.q_2d` files remain available through `OUTPUT_CONS_FLAG`.
-They have a distinct purpose: restart and conservative-state diagnostics.
-ESRI rasters, probes, runout, mass-centre and other specialized outputs are
-also unchanged.
+The output is a single schema of scalar physical fields with Fortran dimensions
+`(x,y,time)`, readable as arrays in ParaView. The internal conservative `q`
+and primitive `qp` arrays are **not** copied as multidimensional NetCDF
+tensors. They remain authoritative in memory and in the binary checkpoint.
 
-## Legacy `.p_2d` field audit
+For one layer the field names are unsuffixed. With `N_LAYERS=2`, layer-specific
+fields have suffix `_l1` or `_l2`; both layers share the same field convention.
 
-The following matrix records the migration of every field in the former
-formatted physical output. Coordinates are one-dimensional NetCDF coordinate
-variables; all physical fields have dimensions `(x, y, time)`.
+| Variable (single layer) | Meaning | Units |
+| --- | --- | --- |
+| `h`, `u`, `v` | Depth and horizontal velocity components | m, m/s, m/s |
+| `T` | Temperature | K |
+| `mass` | Layer mass per unit area | kg/m² |
+| `rho_m` | Bulk density, computed as mass/depth in wet cells; zero in dry cells | kg/m³ |
+| `solid_fraction` | Total solid volume fraction (when solids are configured) | 1 |
+| `solid_mass_fraction` | Total solid mass fraction (when solids are configured) | 1 |
+| `pore_pressure` | Excess pore pressure (only when its state component is configured) | Pa |
+| `stochastic` | Transported stochastic state (when configured) | 1 |
 
-| Former `.p_2d` field | Native NetCDF variable |
-| --- | --- |
-| `x`, `y` | `x`, `y` |
-| flow thickness | `h` |
-| bed and free surface | `b`, `eta` |
-| velocity components | `u`, `v`, `w` |
-| solid fractions | `solid_frac_XX` |
-| additional-gas fractions | `add_gas_frac_XX` |
-| dispersed-liquid fraction (removed) | not emitted; no dispersed-liquid conservative component in the current state |
-| temperature | `T` |
-| mixture density | `rhomix` |
-| reduced gravity | `red grav` |
-| deposit per solid class | `deposit__XX` |
-| erosion per solid class | `erosion_XX` |
-| total available erodible thickness | `erodible` |
-| basal shear velocity | `shear_velocity` |
-| Richardson number | `Ri` |
-| Rouse number per solid class | `Rouse_XX` |
-| stochastic variables | `Zs_XX` |
-| absolute pore pressures | `PorePres_XX` |
-| effective friction coefficient | `mu eff` |
-| maximum flow thickness | `hMax` |
-| maximum dynamic pressure | `pDynMax` |
-| maximum velocity magnitude | `modVelMax` |
-| granular inertial number | `inertial_number` |
+For multiple solid classes, `solid_fraction_class1`, `solid_fraction_class2`,
+etc. expose individual **volume** fractions, while
+`solid_mass_fraction_class1`, `solid_mass_fraction_class2`, etc. expose
+individual **mass** fractions. Additional gas species similarly use
+`gas_fraction_class1` (volume) and `gas_mass_fraction_class1` (mass),
+with corresponding fields for each class. Shared solid inventories are
+`deposit_class1`, `erosion_class1`, `erodible_class1`, etc.
+Each is a separate `(x,y,time)` field; no extra `component`, `layer`
+or `solid_class` dimensions occur in visualization variables.
 
-`XX` is the one-based, zero-padded class or variable index. Fields that are
-not active for a selected physical model are retained in the schema and
-written as zero, matching the former fixed-column output behavior.
+The shared fields `b`, `h_total`, `eta_top`, `mass_total`,
+`deposit_tot`, `hMax`, `pDynMax`, `modVelMax` retain their
+previous meanings and units. Coordinates are `x`, `y`, and `time`.
 
-The free-surface elevation is `eta = b + h`. The vertical velocity `w` is
-computed at cell centers as `u * db/dx + v * db/dy` from the horizontal
-velocity and the bed-slope fields.
+Volume fractions are computed from the authoritative primitive state using
+`primitive_to_volume_fractions`, which also returns zero for dry cells.
+Mass fractions come directly from the primitive composition. For a single
+solid class, `solid_fraction` and `solid_mass_fraction` are the respective
+class fractions as well as the totals; separate class fields are emitted
+only when multiple classes are configured. All layer-specific fields use
+`_l1`/`_l2` when there are two layers.
 
-NetCDF files written with the previous schema, where `w` stored free-surface
-elevation, cannot be appended to with the current schema. Use a new output
-filename when continuing a run from one of those files.
+**Schema change:** Existing NetCDF files created before this change have
+`solid_fraction` values that contain mass fractions despite being described
+as volume fractions. They do not have the new mass-fraction variables.
+Regenerate old visualization files before appending; binary checkpoints
+remain authoritative.
+
+The binary checkpoint remains the **only** restart state file. It preserves the
+complete authoritative conservative arrays and all restart metadata; NetCDF is
+for visualization and analysis only. Restart continuation appends records to
+an existing file that already uses the current visualization schema; there is
+no compatibility path for pre-migration NetCDF histories. Regenerate those
+outputs with the development solver.
+
+The dam-break `height_summary_nc.py` reads the physical `h` variable.
+
+## Verification
+
+The structural two-layer `TEST_SPATIAL_OPERATOR` test checks scalar fields
+in both layers, volume fractions against conservative solid inventories,
+separate mass fractions, absent obsolete tensors, and appended time records. Run the relevant actions and a single-layer dam-break example to
+verify the full output chain in the current environment.
+
+## Degenerate spatial axes (1D simulations)
+
+When `COMP_CELLS_X=1` or `COMP_CELLS_Y=1`, native NetCDF visualization
+uses two samples on that axis. Every physical field is duplicated along the
+missing dimension, without changing the computational cells, state, budgets,
+or binary restart. The second visualization coordinate is offset by 4% of
+the physical span along the other axis, matching the v2 Python converter;
+a 1-by-1 computational grid uses its cell spacing as a fallback. NetCDF
+history continuation validates the *visualization* dimensions, not the
+computational dimensions. Regenerate files created with the previous
+single-sample NetCDF schema before appending.

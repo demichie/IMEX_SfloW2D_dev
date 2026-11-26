@@ -85,8 +85,11 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
  N_SOLID=0, N_ADD_GAS=0,
  RHEOLOGY_FLAG=F, GAS_FLAG=F, LIQUID_FLAG=T,
  RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F,
- TOPO_CHANGE_FLAG=F, SLOPE_CORRECTION_FLAG={'T' if slope_correction else 'F'},
+ SLOPE_CORRECTION_FLAG={'T' if slope_correction else 'F'},
  CURVATURE_TERM_FLAG={'T' if curvature else 'F'},
+ /
+&SUBSTRATE_PARAMETERS
+ SUBSTRATE%TOPO_CHANGE_FLAG=F,
  /
 &RESTART_PARAMETERS
  RESTART_FILES="lake_rest_0000.q_2d",
@@ -127,7 +130,7 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
  GRAV=9.81D0,
  /
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL = 'none',
+ RHEOLOGY%RHEOLOGY_MODEL = 'none',
  /
 &GAS_TRANSPORT_PARAMETERS
  SP_HEAT_A=998.0D0, SP_GAS_CONST_A=287.051D0,
@@ -139,7 +142,8 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
  KIN_VISC_L=1.0D-6,
  /
 &MASS_EXCHANGE_PARAMETERS
- ENTRAINMENT_FLAG=F, LOSS_RATE=0.0D0,
+ MASS_EXCHANGE%ENTRAINMENT%FLAG=F,
+ MASS_EXCHANGE%CARRIER_LIQUID_LOSS%LOSS_RATE=0.0D0,
  /
 """)
 

@@ -1,5 +1,7 @@
-doc/html/
-plume_mom.doxy
+# Generated documentation and local build trees.
+/doc/html/
+/build/
+/plume_mom.doxy
 
 # Regenerate Autotools outputs in a checkout with `autoreconf -fi`.
 /aclocal.m4
@@ -21,7 +23,12 @@ plume_mom.doxy
 /test-driver
 /build-local/
 
-# Local build products and Python diagnostic caches.
+# Local build products and generated Python/macOS files.
+# These can appear in tests, examples, scripts and documentation alike.
+**/__pycache__/
+*.py[cod]
+.DS_Store
+
 /src/IMEX_SfloW2D
 /src/**/*.o
 /src/**/*.mod

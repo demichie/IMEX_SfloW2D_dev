@@ -28,7 +28,7 @@ copied, overwritten or removed.
 
 ## Full duration execution checks
 
-The [execution evidence](results_etna_lava_example_2026_10_11.json) records four
+The [execution evidence](https://github.com/demichie/IMEX_SfloW2D_dev/blob/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs/acceptance/results_etna_lava_example_2026_10_11.json) records four
 complete runs to 3600 s: strict/debug and optimized builds, each with actual
 one/four-thread teams. All four pass the example validation checks. The
 executables are those from the completed CFL audit; their production-source

@@ -1,27 +1,30 @@
 !> Verify the single REAL/COMPLEX implicit formula used by seven rheologies.
 PROGRAM test_shared_implicit_kernels
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas
-    USE constitutive_parameters_2d, ONLY : diam_s, rho_s, grav, inv_grav
-    USE rheology_parameters_2d, ONLY : xi, I_0, mu_2, mu_s, muI_inf, T_ref
+    USE constitutive_parameters_2d, ONLY : grav, inv_grav
+    USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_2d, ONLY : eval_rheology_implicit_real_id
-    USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, eval_rheology_newmodel_implicit_real
     USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
-    USE rheology_voellmy_2d, ONLY : voellmy_mu=>mu, &
+    USE rheology_voellmy_2d, ONLY : &
         eval_rheology_voellmy_explicit, eval_rheology_voellmy_semi_implicit, eval_rheology_voellmy_implicit
     USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_explicit, &
         eval_rheology_mui_voellmy_semi_implicit, eval_rheology_mui_voellmy_implicit
-    USE rheology_lava_2d, ONLY : tau0, nu_ref, visc_par, &
+    USE rheology_lava_2d, ONLY : &
         eval_rheology_lava_explicit, eval_rheology_lava_semi_implicit, eval_rheology_lava_implicit
-    USE rheology_plastic_2d, ONLY : tau, &
+    USE rheology_plastic_2d, ONLY : &
         eval_rheology_plastic_explicit, eval_rheology_plastic_semi_implicit, eval_rheology_plastic_implicit
-    USE rheology_quadratic_2d, ONLY : friction_factor, &
+    USE rheology_quadratic_2d, ONLY : &
         eval_rheology_quadratic_explicit, eval_rheology_quadratic_semi_implicit, eval_rheology_quadratic_implicit
     USE rheology_empirical_2d, ONLY : eval_rheology_empirical_explicit, &
         eval_rheology_empirical_semi_implicit, eval_rheology_empirical_implicit
-    USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td2, &
+    USE rheology_lahar_2d, ONLY : &
         eval_rheology_lahar_explicit, eval_rheology_lahar_semi_implicit, eval_rheology_lahar_implicit
     IMPLICIT NONE
+
+    TYPE(rheology_config_type) :: quadratic_config
+    REAL(wp) :: friction_factor
 
     REAL(wp), PARAMETER :: eps_cs=1.0E-20_wp, fd_step=1.0E-6_wp
     TYPE(physical_state_real) :: state,shifted
@@ -39,30 +42,31 @@ PROGRAM test_shared_implicit_kernels
     rho_s=2500.0_wp
     grav=9.81_wp
     inv_grav=1.0_wp/grav
-    xi=100.0_wp
-    I_0=0.3_wp
-    mu_s=0.35_wp
-    mu_2=0.6_wp
-    muI_inf=0.0_wp
-    T_ref=300.0_wp
-    voellmy_mu=0.2_wp
-    tau0=150.0_wp
-    nu_ref=1.0E-4_wp
-    visc_par=0.002_wp
-    tau=0.15_wp
+    quadratic_config%xi =100.0_wp
+    quadratic_config%I_0 =0.3_wp
+    quadratic_config%mu_s =0.35_wp
+    quadratic_config%mu_2 =0.6_wp
+    quadratic_config%muI_inf =0.0_wp
+    quadratic_config%T_ref = 300.0_wp
+    quadratic_config%mu=0.2_wp
+    quadratic_config%tau0 = 150.0_wp
+    quadratic_config%nu_ref = 1.0E-4_wp
+    quadratic_config%visc_par = 0.002_wp
+    quadratic_config%tau=0.15_wp
     friction_factor=0.01_wp
-    alpha2=150.0_wp
-    beta2=2.0_wp
-    alpha1_coeff=1.0_wp
-    beta1=0.2_wp
-    Kappa=2.0_wp
-    n_td2=0.005_wp
+    quadratic_config%friction_factor=friction_factor
+    quadratic_config%alpha2 = 150.0_wp
+    quadratic_config%beta2 = 2.0_wp
+    quadratic_config%alpha1_coeff = 1.0_wp
+    quadratic_config%beta1 = 0.2_wp
+    quadratic_config%Kappa = 2.0_wp
+    quadratic_config%n_td = SQRT(0.005_wp)
 
     CALL initialize_physical_state_real(state)
     state%h=2.0_wp
     state%T=320.0_wp
     state%rho_m=1800.0_wp
-    state%inv_rhom=1.0_wp/state%rho_m
+    state%inv_rho_m=1.0_wp/state%rho_m
     state%red_grav=5.0_wp
     state%alphas=0.15_wp
     state%curvature_acceleration=0.0_wp
@@ -73,7 +77,7 @@ PROGRAM test_shared_implicit_kernels
         CALL evaluate_real(model,state,explicit_rate,semi_rate)
         CALL promote_physical_state(state,complex_state)
         CALL evaluate_complex(model,complex_state,implicit_rate)
-        CALL eval_rheology_implicit_real_id(model_ids(model),state,.FALSE.,0.0_wp,implicit_real)
+        CALL eval_rheology_implicit_real_id(quadratic_config,model_ids(model),state,.FALSE.,0.0_wp,implicit_real)
         CALL assert_rate(implicit_real,REAL(implicit_rate,wp),1.0E-12_wp,model,-3)
         CALL assert_rate(explicit_rate,semi_rate+REAL(implicit_rate,wp),1.0E-12_wp,model,0)
 
@@ -117,11 +121,6 @@ PROGRAM test_shared_implicit_kernels
         CALL set_real_velocity(state,[3.0_wp,4.0_wp])
     END DO
 
-    ! The Newton-only linear fixture also has identical REAL/COMPLEX kernels.
-    CALL promote_physical_state(state,complex_state)
-    CALL eval_rheology_newmodel_implicit_real(state,implicit_real(1),implicit_real(2))
-    CALL eval_rheology_newmodel_implicit(complex_state,implicit_rate(1),implicit_rate(2))
-    CALL assert_rate(implicit_real,REAL(implicit_rate,wp),1.0E-12_wp,8,0)
     PRINT *, 'PASS: shared implicit rheology REAL/COMPLEX, complex-step and zero speed'
 CONTAINS
     SUBROUTINE set_real_velocity(s,v)
@@ -141,26 +140,26 @@ CONTAINS
         REAL(wp) :: sx,sy
         SELECT CASE(model)
         CASE(1)
-            CALL eval_rheology_voellmy_explicit(s,1.0_wp,.FALSE.,.FALSE.,0.0_wp,explicit_part)
-            CALL eval_rheology_voellmy_semi_implicit(s,1.0_wp,.FALSE.,sx,sy)
+            CALL eval_rheology_voellmy_explicit(quadratic_config,s,1.0_wp,.FALSE.,.FALSE.,0.0_wp,explicit_part)
+            CALL eval_rheology_voellmy_semi_implicit(quadratic_config,s,1.0_wp,.FALSE.,sx,sy)
         CASE(2)
-            CALL eval_rheology_mui_voellmy_explicit(s,1.0_wp,.FALSE.,.FALSE.,0.0_wp,explicit_part)
-            CALL eval_rheology_mui_voellmy_semi_implicit(s,1.0_wp,.FALSE.,sx,sy)
+            CALL eval_rheology_mui_voellmy_explicit(quadratic_config,s,1.0_wp,.FALSE.,.FALSE.,0.0_wp,explicit_part)
+            CALL eval_rheology_mui_voellmy_semi_implicit(quadratic_config,s,1.0_wp,.FALSE.,sx,sy)
         CASE(3)
-            CALL eval_rheology_lava_explicit(s,explicit_part)
-            CALL eval_rheology_lava_semi_implicit(s,sx,sy)
+            CALL eval_rheology_lava_explicit(quadratic_config,s,explicit_part)
+            CALL eval_rheology_lava_semi_implicit(quadratic_config,s,sx,sy)
         CASE(4)
-            CALL eval_rheology_plastic_explicit(s,explicit_part)
-            CALL eval_rheology_plastic_semi_implicit(s,sx,sy)
+            CALL eval_rheology_plastic_explicit(quadratic_config,s,explicit_part)
+            CALL eval_rheology_plastic_semi_implicit(quadratic_config,s,sx,sy)
         CASE(5)
-            CALL eval_rheology_quadratic_explicit(s,explicit_part)
-            CALL eval_rheology_quadratic_semi_implicit(s,sx,sy)
+            CALL eval_rheology_quadratic_explicit(quadratic_config,s,explicit_part)
+            CALL eval_rheology_quadratic_semi_implicit(quadratic_config,s,sx,sy)
         CASE(6)
             CALL eval_rheology_empirical_explicit(s,explicit_part)
             CALL eval_rheology_empirical_semi_implicit(s,sx,sy)
         CASE(7)
-            CALL eval_rheology_lahar_explicit(s,explicit_part)
-            CALL eval_rheology_lahar_semi_implicit(s,sx,sy)
+            CALL eval_rheology_lahar_explicit(quadratic_config,s,explicit_part)
+            CALL eval_rheology_lahar_semi_implicit(quadratic_config,s,sx,sy)
         CASE DEFAULT
             ERROR STOP 'Unknown test rheology'
         END SELECT
@@ -173,19 +172,19 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: implicit_part(2)
         SELECT CASE(model)
         CASE(1)
-            CALL eval_rheology_voellmy_implicit(s,.FALSE.,0.0_wp,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_voellmy_implicit(quadratic_config,s,.FALSE.,0.0_wp,implicit_part(1),implicit_part(2))
         CASE(2)
-            CALL eval_rheology_mui_voellmy_implicit(s,.FALSE.,0.0_wp,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_mui_voellmy_implicit(quadratic_config,s,.FALSE.,0.0_wp,implicit_part(1),implicit_part(2))
         CASE(3)
-            CALL eval_rheology_lava_implicit(s,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_lava_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE(4)
-            CALL eval_rheology_plastic_implicit(s,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_plastic_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE(5)
-            CALL eval_rheology_quadratic_implicit(s,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_quadratic_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE(6)
             CALL eval_rheology_empirical_implicit(s,implicit_part(1),implicit_part(2))
         CASE(7)
-            CALL eval_rheology_lahar_implicit(s,implicit_part(1),implicit_part(2))
+            CALL eval_rheology_lahar_implicit(quadratic_config,s,implicit_part(1),implicit_part(2))
         CASE DEFAULT
             ERROR STOP 'Unknown test rheology'
         END SELECT

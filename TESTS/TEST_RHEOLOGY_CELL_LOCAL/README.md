@@ -116,19 +116,24 @@ select `froude_blend`. No production tableau or rheology selector is changed.
 `check_inputs.py` uses a fresh source-mass fixture and the real solver parser.
 It distinguishes input rejection text from the process exit code: plain Fortran
 STOP can return zero. Valid control runs must reach the end of a short run.
-The 32 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
+The 37 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
 name handling, rejection of unknown names and legacy numeric IDs, missing/
 zero/negative denominators, valid zero Coulomb coefficients, nonfinite
 coefficients and ambient cooling configuration. Generated fixtures allow
 overwrite only inside their supplied output directory. Lava uses `h_x`; other
 cases use `froude_blend`.
 
+The parser verifies legacy TEMPERATURE_PARAMETERS and the equivalent L1 spelling,
+including the qualified T_GROUND component, and rejects the retired unqualified T_GROUND entry.
+rejects duplicate or missing temperature namelists and rejects L2 input in single-layer mode.
 The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
 and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection
 validates IEEE binary32/64 inputs under `-Ofast` without NaN comparisons.
-Cooling uses the configured positive finite `T_env`, defaulting to 300 K when
-omitted. The test reads its startup diagnostic because the historical backup
-writer omits the temperature namelist.
+Cooling uses the explicitly supplied finite positive `T_ambient` from
+`GAS_TRANSPORT_PARAMETERS` (including lava and liquid-only configurations).
+The parser rejects missing, zero, NaN and infinite ambient temperatures.
+The test reads its startup diagnostic because the historical backup writer
+omits the temperature namelist.
 
 ## Acceptance boundary
 
@@ -160,3 +165,16 @@ This suite remains a standalone check, distributed with the project. Scientific
 formula changes, ownership migration, model-8 removal and broader compiler or
 platform acceptance belong to separately validated follow-ups. No test tolerance
 has been increased to close the initial findings.
+
+## Explicit mu(I) source stopping
+
+For positive Lie groups containing only `rheology_mui` with the
+`EXPLICIT` method, the executor uses the existing
+`limit_rheology_momentum_reversal` routine to prevent an isolated
+friction update from reversing its recipient momentum. Group zero is
+excluded because it evaluates its sources on the pre-spatial state and
+updates a different post-spatial recipient; mixed-source groups are
+excluded so non-friction forcing remains unchanged. The existing
+mass/source limiter and all physical drag formulas are retained.
+The analytic-velocity test also checks that an overshooting explicit
+friction update stops and a nonovershooting update is untouched.

@@ -9,5 +9,5 @@
     q(idx_engyEqn)=mass*cp_m*qp(idx_T)
     q(idx_solid_first:idx_solid_last)=mass*xs
     q(idx_add_gas_first:idx_add_gas_last)=mass*xg
-    IF (stoch_transport_flag) q(idx_stoch)=mass*qp(idx_stoch)
-    IF (pore_pressure_flag) q(idx_pore)=mass*qp(idx_pore)
+    IF (idx_stoch>0) q(idx_stoch)=mass*qp(idx_stoch)
+    IF (idx_pore>0) q(idx_pore)=mass*qp(idx_pore)

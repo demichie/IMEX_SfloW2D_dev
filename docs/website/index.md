@@ -11,14 +11,15 @@ IMEX_SfloW2D combines physical flow models with high-resolution spatial discreti
 ## Documentation
 
 - **[Getting started](getting-started/index.md)** — build prerequisites and first simulation.
+- **[Visualization](getting-started/visualization.md)** — step-by-step ParaView and QGIS procedures.
 - **[Model](model/index.md)** — physical and numerical formulation overview.
 - **[Examples](examples/index.md)** — automatically discovered simulation cases, with input parameters and execution instructions.
 - **[Development](development/index.md)** — testing and development guidance.
 - **[Doxygen](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/)** — generated Fortran source-code documentation.
 - **[References](references/index.md)** — publication and repository links.
 
-!!! info "Automatically published releases"
-    The documentation is built on demand or when a tag or release is published. Example pages are regenerated from the README.md files in `EXAMPLES/` at the selected revision.
+!!! info "Manually published documentation"
+    Documentation publication is started manually from GitHub Actions. Example pages are regenerated from the README.md files in `EXAMPLES/` at the selected revision.
 
 !!! warning "GitHub-generated source snapshots"
     GitHub's automatic **Source code (zip/tar.gz)** downloads are snapshots of

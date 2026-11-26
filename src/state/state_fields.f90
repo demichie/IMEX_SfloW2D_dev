@@ -13,14 +13,15 @@ MODULE state_fields
     USE parameters_2d, ONLY : idx_h, idx_T,                                                                            &
             idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
-    USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity
+    USE constitutive_parameters_2d, ONLY : T_ambient
+    USE substrate_parameters_2d, ONLY : substrate
 
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE model_layout_2d, ONLY : model_layout_type
 
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
-    USE parameters_2d, ONLY : wp,n_solid
+    USE parameters_2d, ONLY : wp,n_solid,lava_flag
     USE parameters_2d, ONLY : n_thickness_levels, n_dyn_pres_levels
 
     IMPLICIT NONE
@@ -28,34 +29,21 @@ MODULE state_fields
     PRIVATE
     PUBLIC :: initialize_dry_physical_cell
     PUBLIC :: physical_cell_state_finite, finite_real_value
-    PUBLIC :: substrate_snapshot_type
-
-    !> Pre-step substrate inventory snapshot for transactional time integration.
-    !> @brief Snapshot of substrate inventories for transactional rollback.
-    TYPE :: substrate_snapshot_type
-        !> Per-solid deposited, eroded and erodible inventories in grid cells.
-        REAL(wp), ALLOCATABLE :: deposit(:,:,:),erosion(:,:,:),erodible(:,:,:)
-        !> Cellwise lava-deposit inventory.
-        REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
-        !> Total deposited and eroded thickness fields for rollback.
-        REAL(wp), ALLOCATABLE :: deposit_tot(:,:),erosion_tot(:,:)
-    END TYPE substrate_snapshot_type
-
     !> \brief Owned cell states and diagnostics for one simulation.
-    !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
+    !> \details Fluid arrays use (component,layer,x-cell,y-cell); diagnostic maps use
     !>          (x-cell,y-cell). The model layout fixes component counts and indices.
     TYPE, PUBLIC :: state_type
 
         !> Conservative variables: M=rho_m*h, M*u, M*v, M*cp*T, then transported masses.
-        REAL(wp), ALLOCATABLE :: q(:,:,:)
+        REAL(wp), ALLOCATABLE :: q(:,:,:,:)
 
         !> Primitive variables: h, u, v, T, then transported mass fractions and scalars.
-        REAL(wp), ALLOCATABLE :: qp(:,:,:)
+        REAL(wp), ALLOCATABLE :: qp(:,:,:,:)
 
         !> Physical substrate inventories owned by the same simulation state as q and qp.
         REAL(wp), ALLOCATABLE :: deposit(:,:,:),deposit_tot(:,:)
         REAL(wp), ALLOCATABLE :: erosion(:,:,:),erosion_tot(:,:)
-        REAL(wp), ALLOCATABLE :: erodible(:,:,:),lava_deposit(:,:)
+        REAL(wp), ALLOCATABLE :: erodible(:,:,:)
 
         !> Map of positive thickness
         LOGICAL, ALLOCATABLE :: hpos(:,:)
@@ -80,8 +68,6 @@ MODULE state_fields
         PROCEDURE :: initialize => initialize_state
         PROCEDURE :: finalize => finalize_state
         PROCEDURE :: refresh_substrate_totals => refresh_substrate_totals
-        PROCEDURE :: snapshot_substrate => snapshot_substrate
-        PROCEDURE :: restore_substrate => restore_substrate
 
     END TYPE state_type
 
@@ -101,29 +87,27 @@ CONTAINS
 
         END IF
 
-        ALLOCATE( this%q(model_layout%n_variables,comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%q(model_layout%n_vars,model_layout%n_layers,comp_cells_x,comp_cells_y) )
 
         ALLOCATE( this%hpos(comp_cells_x,comp_cells_y),                                                                &
             this%hpos_old(comp_cells_x,comp_cells_y) )
 
-        ALLOCATE( this%qp(model_layout%n_physical_variables,comp_cells_x,                                              &
+        ALLOCATE( this%qp(model_layout%n_vars,model_layout%n_layers,comp_cells_x,                     &
             comp_cells_y) )
 
         ALLOCATE(this%deposit(comp_cells_x,comp_cells_y,n_solid))
         ALLOCATE(this%erosion(comp_cells_x,comp_cells_y,n_solid))
         ALLOCATE(this%erodible(n_solid,comp_cells_x,comp_cells_y))
-        ALLOCATE(this%lava_deposit(comp_cells_x,comp_cells_y))
         ALLOCATE(this%deposit_tot(comp_cells_x,comp_cells_y))
         ALLOCATE(this%erosion_tot(comp_cells_x,comp_cells_y))
         this%deposit=0.0_wp
         this%erosion=0.0_wp
         this%erodible=0.0_wp
-        this%lava_deposit=0.0_wp
         this%deposit_tot=0.0_wp
         this%erosion_tot=0.0_wp
         this%q = 0.0_wp
         this%qp = 0.0_wp
-        this%qp(model_layout%idx_energy,1:comp_cells_x,1:comp_cells_y) = T_ambient
+        this%qp(model_layout%idx_T,1:model_layout%n_layers,1:comp_cells_x,1:comp_cells_y) = T_ambient
 
         ALLOCATE( this%hmax(comp_cells_x,comp_cells_y) )
         ALLOCATE( this%pdynmax(comp_cells_x,comp_cells_y) )
@@ -158,7 +142,7 @@ CONTAINS
 
 
         DEALLOCATE(this%deposit,this%deposit_tot,this%erosion,this%erosion_tot,                                        &
-            this%erodible,this%lava_deposit)
+            this%erodible)
         DEALLOCATE( this%qp )
 
     END SUBROUTINE finalize_state
@@ -171,48 +155,23 @@ CONTAINS
         qp_cell(idx_T) = T_ambient
     END SUBROUTINE initialize_dry_physical_cell
 
-    !> @brief Capture substrate fields into reusable rollback storage.
-    !> @details The destination is INTENT(INOUT) so its allocatable buffers can be reused.
-    !> @param[in] this Authoritative simulation state owning grid arrays and substrate inventories.
-    !> @param[inout] snapshot Independent, reusable substrate inventory snapshot for rollback.
-    SUBROUTINE snapshot_substrate(this,snapshot)
-        CLASS(state_type), INTENT(IN) :: this
-        ! Keep all substrate fields in the snapshot: exchange groups can update
-        ! inventories and their diagnostic totals before a later Lie group fails.
-        ! Partial snapshots need a separate write-set audit and rollback tests.
-        ! Reuse allocated rollback buffers across Lie steps. INTENT(OUT)
-        ! would deallocate allocatable snapshot components on every entry.
-        TYPE(substrate_snapshot_type), INTENT(INOUT) :: snapshot
-        snapshot%deposit=this%deposit
-        snapshot%erosion=this%erosion
-        snapshot%erodible=this%erodible
-        snapshot%lava_deposit=this%lava_deposit
-        snapshot%deposit_tot=this%deposit_tot
-        snapshot%erosion_tot=this%erosion_tot
-    END SUBROUTINE snapshot_substrate
-
-    !> @brief Restore substrate fields from a previously captured snapshot.
+    !> @brief Refresh substrate totals without replacing the authoritative lava deposit.
+    !> @details For lava deposit_tot is accumulated immobilized thickness; for
+    !>          granular flows it is derived from class inventories and porosity.
     !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
     !> inventories.
-    !> @param[in] snapshot Independent, reusable substrate inventory snapshot for rollback.
-    SUBROUTINE restore_substrate(this,snapshot)
+    !> @param[in] active_j Optional x indices of cells changed by the current Lie step.
+    !> @param[in] active_k Optional y indices, paired with active_j.
+    SUBROUTINE refresh_substrate_totals(this,active_j,active_k)
         CLASS(state_type), INTENT(INOUT) :: this
-        TYPE(substrate_snapshot_type), INTENT(IN) :: snapshot
-        this%deposit=snapshot%deposit
-        this%erosion=snapshot%erosion
-        this%erodible=snapshot%erodible
-        this%lava_deposit=snapshot%lava_deposit
-        this%deposit_tot=snapshot%deposit_tot
-        this%erosion_tot=snapshot%erosion_tot
-    END SUBROUTINE restore_substrate
-
-    !> @brief Recompute deposited and eroded thickness from solid inventories.
-    !> @details No solids produces zero totals; an invalid substrate porosity is fatal.
-    !> @param[inout] this Authoritative simulation state owning grid arrays and substrate
-    !> inventories.
-    SUBROUTINE refresh_substrate_totals(this)
-        CLASS(state_type), INTENT(INOUT) :: this
-        ! No solids: there is no solid bed layer to convert into thickness.
+        INTEGER, INTENT(IN), OPTIONAL :: active_j(:),active_k(:)
+        INTEGER :: j,k,cell,ncells
+        ! Lava deposit_tot is authoritative; never reset it or use granular porosity.
+        IF (lava_flag) THEN
+            this%erosion_tot=0.0_wp
+            RETURN
+        END IF
+        ! No granular solids: there is no solid bed layer to convert into thickness.
         IF (n_solid==0) THEN
             this%deposit_tot=0.0_wp
             this%erosion_tot=0.0_wp
@@ -220,11 +179,30 @@ CONTAINS
         END IF
         ! Totals include the carrier-filled pore volume of the deposited/eroded layer.
         ! A zero-solid-volume substrate (porosity=1) cannot define this conversion.
-        IF (.NOT.ieee_is_finite(erodible_porosity) .OR.                                                                &
-            erodible_porosity<0.0_wp .OR. erodible_porosity>=1.0_wp)                                                   &
+        IF (.NOT.ieee_is_finite(substrate%erodible_porosity) .OR. &
+            substrate%erodible_porosity<0.0_wp .OR. substrate%erodible_porosity>=1.0_wp) &
             ERROR STOP 'Invalid substrate porosity for aggregate thickness'
-        this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-erodible_porosity)
-        this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
+        ! Initial/restart refreshes cover the full grid; a Lie step only changes active cells.
+        IF (PRESENT(active_j) .NEQV. PRESENT(active_k)) &
+            ERROR STOP 'Substrate refresh requires paired active indices'
+        ncells=comp_cells_x*comp_cells_y
+        IF (PRESENT(active_j)) THEN
+            IF (SIZE(active_j)/=SIZE(active_k)) ERROR STOP 'Mismatched substrate active indices'
+            ncells=SIZE(active_j)
+        END IF
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(cell,j,k) SCHEDULE(STATIC)
+        DO cell=1,ncells
+            IF (PRESENT(active_j)) THEN
+                j=active_j(cell)
+                k=active_k(cell)
+            ELSE
+                j=MOD(cell-1,comp_cells_x)+1
+                k=(cell-1)/comp_cells_x+1
+            END IF
+            this%deposit_tot(j,k)=SUM(this%deposit(j,k,:))/(1.0_wp-substrate%erodible_porosity)
+            this%erosion_tot(j,k)=SUM(this%erosion(j,k,:))/(1.0_wp-substrate%erodible_porosity)
+        END DO
+        !$OMP END PARALLEL DO
     END SUBROUTINE refresh_substrate_totals
 
     !> @brief Test finiteness of all primitive components in one cell.

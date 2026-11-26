@@ -2,11 +2,13 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_vaporization_2d
-    USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, liquid_vaporization_flag,                              &
+    USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag,                              &
             mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
+    USE constitutive_parameters_2d, ONLY : sp_heat_g
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE solid_transport_parameters_2d, ONLY : rho_s, sp_heat_s
 
     IMPLICIT NONE
     PRIVATE
@@ -27,23 +29,25 @@ CONTAINS
 
         !> @brief Evaluate explicit steam generation from deposited hot solids.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_vaporization_explicit(state,B_zone,deposition,r)
+        !> @param[in] mass_config Immutable layer vaporization configuration.
+        !> @param[in] state Local physical state.
+    SUBROUTINE eval_mass_exchange_vaporization_explicit(mass_config,state,B_zone,deposition,r)
 
+            TYPE(mass_exchange_config_type), INTENT(IN) :: mass_config
             TYPE(physical_state_real), INTENT(IN) :: state
             INTEGER, INTENT(IN) :: B_zone
             REAL(wp), INTENT(IN) :: deposition(n_solid)
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
-            IF (.NOT.(gas_flag .AND. liquid_vaporization_flag .AND. B_zone/=0)) RETURN
+            IF (.NOT.(gas_flag .AND. mass_config%vaporization%liquid_vaporization_flag .AND. B_zone/=0)) RETURN
             IF (n_add_gas<1) CALL fatal_error('vaporization requires additional gas species')
 
             ! Use already-limited deposition: generated vapor must reflect deposited solids.
             r%mixture_mass_rate=eval_vaporization_mass_rate(state%T,rho_s,sp_heat_s,                                   &
-                        deposition,gamma_steam)
+                        deposition,mass_config%vaporization%gamma_steam)
             r%add_gas_mass_rate(1)=r%mixture_mass_rate
             r%energy_rate=eval_vaporization_energy_rate(r%mixture_mass_rate,sp_heat_g(1))
     END SUBROUTINE
@@ -51,9 +55,9 @@ CONTAINS
         !> @brief Reject unsupported semi-implicit treatment for vaporization.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_vaporization_semi_implicit(state,B_zone,deposition,r)
 
             TYPE(physical_state_real), INTENT(IN) :: state
@@ -69,9 +73,9 @@ CONTAINS
         !> solids.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE eval_mass_exchange_vaporization_implicit(state,B_zone,deposition,r)
 
             TYPE(physical_state_complex), INTENT(IN) :: state
@@ -87,9 +91,9 @@ CONTAINS
         !> solids.
         !> @details This entry point raises fatal_error; the rates are reset first.
         !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-        !> @param[in] T Mobile flow temperature [K].
         !> @param[in] deposition Actual post-limiting solid deposition rates by species [m/s].
         !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
+    !> @param[in] state Local physical state.
     SUBROUTINE solve_mass_exchange_vaporization_analytic(state,B_zone,deposition,r)
 
             TYPE(physical_state_real), INTENT(IN) :: state
@@ -101,6 +105,13 @@ CONTAINS
             CALL fatal_error('vaporization: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_vaporization_analytic
 
+!> @brief eval vaporization mass rate operation.
+!> @param[in] flow_temperature Temperature of flowing mixture.
+!> @param[in] solid_density Solid density.
+!> @param[in] solid_heat_capacity Specific heat capacity of solids.
+!> @param[in] deposition_rate Deposition rate from underlying surface.
+!> @param[in] steam_fraction Steam mass fraction.
+!> @return Evaluated physical rate or coefficient.
 PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,                                             &
             solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
 
@@ -120,6 +131,10 @@ PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,      
 
     END FUNCTION eval_vaporization_mass_rate
 
+!> @brief eval vaporization energy rate operation.
+!> @param[in] vapor_mass_rate Mass rate of vapor production.
+!> @param[in] gas_heat_capacity Specific heat capacity of gaseous phase.
+!> @return Evaluated physical rate or coefficient.
 PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,                                                           &
             gas_heat_capacity) RESULT(rate)
 

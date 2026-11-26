@@ -23,13 +23,17 @@ CONTAINS
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate,materials)
-    USE parameters_2d, ONLY : pore_pressure_flag, pore_pres_fract, bottom_fissural_source_flag, n_fissures,            &
+    !> @param[in] pore_pressure_flag Selected layer activation of pore-pressure injection.
+    !> @param[in] materials Injection material collection.
+    SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate, &
+        materials,pore_pressure_flag)
+    USE parameters_2d, ONLY : pore_pres_fract, bottom_fissural_source_flag, n_fissures,            &
         linear_vel_fissures, T_fissures, time_param_fissures
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         TYPE(injection_material_type), INTENT(IN) :: materials(:)
+        LOGICAL, INTENT(IN) :: pore_pressure_flag
         REAL(wp) :: t_rem, t_coeff, h_dot
         REAL(wp) :: r_rho_m, r_red_grav
         REAL(wp) :: source_xs(n_solid), source_xg(n_add_gas)

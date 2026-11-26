@@ -1,89 +1,60 @@
-# Depth-averaged gas-particles model
+# IMEX-SfloW2D
 
-Shallow water model for multiphase flow (gas+particles) with density of gas
-temperature-dependent.
+IMEX-SfloW2D is a Fortran finite-volume, depth-averaged model for geophysical
+and volcanic flows, using high-resolution spatial discretization and
+implicit-explicit (IMEX) time integration. Supported single-layer carrier
+configurations include gas, liquid and lava, with model-specific physics.
 
-To compile the code you need a Fortran compiler and the NetCDF library for Fortran. You can install both with anaconda, by creating an anaconda environment and activating it:
+The solver supports both `N_LAYERS=1` and `N_LAYERS=2` directly
+through the input file, without an additional activation variable.
+The two-layer formulation has documented scientific limitations,
+particularly for density inversion and interlayer shear; see
+[two-layer hyperbolicity](docs/TWO_LAYER_HYPERBOLICITY.md) and the
+[two-layer architecture](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
+The existing single-layer numerical path remains unchanged.
 
-> conda create -n fortran_env conda-forge::gfortran_linux-64  sysroot_linux-64  make  conda-forge::netcdf-fortran  conda-forge::liblapack  conda-forge::libblas
-> 
-> conda activate fortran_env
+## Build
 
-or, on a osx computer:
+Requirements: a Fortran compiler, Autoconf/Automake, NetCDF-Fortran,
+LAPACK/BLAS and Make. On Ubuntu, equivalent packages include `gfortran`,
+`autoconf`, `automake`, `libnetcdff-dev`, `liblapack-dev` and
+`libblas-dev`. Use libraries built for your selected Fortran compiler.
 
-> conda create -n fortran_env conda-forge::gfortran make conda-forge::netcdf-fortran conda-forge::liblapack conda-forge::libblas
-> 
-> conda activate fortran_env
+```sh
+autoreconf -fi
+./configure --with-netcdf=/usr FC=gfortran
+make -j2
+make check
+```
 
+For a strict/debug build, configure with `--enable-strict-debug`.
+The default build is optimized. Configure-time overrides include `FCFLAGS`,
+`OPENMP_FCFLAGS`, `NETCDF_LIBS` and `LAPACK_LIBS`. For Conda or another
+custom NetCDF-Fortran prefix, set `--with-netcdf=/path/to/prefix`.
+Generated Autotools files are not tracked in Git.
 
-Current source architecture uses exactly one physical phase flag (gas, liquid, or
-lava). The old dispersed-liquid conservative component and its `xl_source`
-input are no longer supported. Mass exchange is assembled by
-`src/physics/mass_exchange/mass_exchange_2d.f90`; the binary checkpoint
-format is v7 and is not compatible with older versions. For the active
-implementation and validation scope see
-[the D18.MX consolidation status](docs/IMEX_SfloW2D_Development_Roadmap.md).
+`make install` installs the compiled executable. Focused numerical, physics,
+restart and OpenMP checks are available under `TESTS/`; see
+[contributing](CONTRIBUTING.md) and the [manual CI workflows](.github/README.md).
+GitHub Actions in this repository run only on manual dispatch.
 
-To compile:
+## Documentation and examples
 
-Generated Autotools files such as `configure` and `Makefile.in` are not tracked
-in Git. Regenerate them from a checkout with:
+- [Developer documentation](docs/README.md)
+- [Documentation website](https://demichie.github.io/IMEX_SfloW2D_dev/)
+- [Example configurations](EXAMPLES/) (each runnable example has its own README)
+- [Etna two-layer granular collapse and dilute upper current](EXAMPLES/EXAMPLE_ETNA_TWO_LAYER/README.md)
+- [Two-layer 1D dam-break with initially dry upper layer](EXAMPLES/EXAMPLE_DAMBREAK_TWO_LAYER_1D/README.md)
+- [Model architecture and implementation status](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
+- [NetCDF fields and binary restart](docs/NETCDF_OUTPUT.md)
+- [Citation metadata](CITATION.cff) and [GPLv3 license](COPYING)
 
-> autoreconf -fi
+## Releases
 
-The build uses the Fortran compiler selected by `FC` and the NetCDF Fortran
-library. For a Conda environment, pass its prefix as `--with-netcdf`:
-
-> ./configure --with-netcdf=/path/to/fortran_env
-
-The historical optimized profile is the default. To enable runtime checks and
-floating-point traps:
-
-> ./configure --with-netcdf=/path/to/fortran_env --enable-strict-debug
-
-`FCFLAGS` supplied by the environment is respected. Non-GNU toolchains can
-override `OPENMP_FCFLAGS`; `NETCDF_LIBS` and `LAPACK_LIBS` can likewise be
-provided when their library names or link dependencies differ from the
-defaults.
-
-> make
-
-> make check
-
-> make install
-
-The executable is copied in the bin folder.
-
-`make check` runs the legacy example integration cases in temporary
-directories, leaving the source fixtures untouched. The manually launched **Solver integration** Action also runs
-binary/stochastic restart and HP-PCCU Gate-H checks in optimized and
-strict-debug builds. The **Build only** Action compiles the manually selected `optimized` or `debug` profile
-without running tests.
-
-The legacy test runner can optionally run the focused `TEST_DYNAMIC_FINH`
-fixture with `TESTS/run_tests.sh /path/to/IMEX_SfloW2D TEST_DYNAMIC_FINH`.
-This focused diagnostic is available from the local test runner; the
-historical Intel ifx diagnostic Action has been retired.
-
-The current manually triggered Actions and their purposes are documented
-in [the Actions guide](.github/README.md).
-
-Several examples can be found in the EXAMPLES folder.
-
-The [Etna lava example](EXAMPLES/EXAMPLE_ETNA_LAVA/README.md) uses two bottom
-fissures and the original Etna DEM before avalanche preprocessing. Together
-with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it replaces
-`EXAMPLE_LAVA_IMO` in that selection without removing the existing IMO example.
-
-## Release downloads
-
-GitHub automatically provides **Source code (zip)** and **Source code
-(tar.gz)** snapshots for tags. These are Git snapshots, not the prepared
-Autotools source distribution; they may not contain generated files such as
-`configure`. When available, use the explicitly named
-`IMEX_SfloW2D-<version>.tar.gz` and
-`IMEX_SfloW2D-<version>-examples.tar.gz` assets attached to a validated
-[release](https://github.com/demichie/IMEX_SfloW2D_dev/releases).
+GitHub automatically supplies source snapshots for tags; these are not
+Autotools-generated distribution archives and may omit `configure`. When
+available, download the separately prepared source and examples archives from
+the [releases page](https://github.com/demichie/IMEX_SfloW2D_dev/releases).
 
 ## Per-run output directories
 
@@ -133,36 +104,24 @@ for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected po
 
 ## Runout and binary continuation
 
-The binary checkpoint format is now **v5**. It preserves the original runout
-origin and initial extents, previous barycentre, diagnostic sampling history,
-maximum runout and steady-stop state together with the physical state.
-Earlier binary formats, including v4, are rejected: they cannot provide an
-exact diagnostic continuation. ASCII initial conditions remain supported and
-are not treated as a binary continuation merely because `RESTART=T`.
+Binary restart is a **single development-only checkpoint schema**. It stores
+the canonical conservative and auxiliary state together with the runtime and
+runout sampling history required for continuation. Checkpoints written by
+superseded development implementations are not accepted; regenerate them
+instead of maintaining a versioned reader.
 
-Runout is written only to `RUN_NAME_runout.csv`; the accompanying barycentre
-and directional extents remain in `RUN_NAME_mass_center.csv`. Their existing
-five-column schemas and formatting are unchanged. `runout.txt` is neither read
-nor written. Existing legacy files are not automatically deleted.
+Runout diagnostics are written to `RUN_NAME_runout.csv` and
+`RUN_NAME_mass_center.csv`. On continuation, their existing headers and
+sampling history must be consistent with the restored checkpoint; incompatible
+histories are rejected without truncation. A missing CSV begins a new output
+segment and cannot reconstruct earlier diagnostic rows.
 
-For a binary continuation, both existing CSVs are checked before either is
-opened for append. Headers, finite ordered records and the exact last row must
-match the restored diagnostic history. The last sample need not occur at the
-checkpoint time. No header or checkpoint-time row is duplicated. A missing
-CSV starts a new segment with a header; its earlier rows cannot be recovered
-from a checkpoint.
-
-Incompatible, incomplete or later CSV histories cause an error without
-truncation or overwriting. Use matching histories or a new execution directory
-to start a segment. Keep the runout origin configuration, `DT_RUNOUT`,
-`ALPHAS_THRESHOLD`, `EPS_STOP` and `OUTPUT_RUNOUT_FLAG` unchanged for an exact
-continuation. Changes to the simulation end time are allowed; an already
-requested steady stop retains its original deadline.
-
-This policy applies to the runout and mass-centre CSVs. Probe CSV handling is
-unchanged by this package. See the
-[restart verification](docs/acceptance/N9_RESTART_V5_2026_10_11.md) for the
-verified cases and remaining acceptance scope.
+Keep the runout origin and relevant diagnostic scheduling parameters unchanged
+for a continuous restart. The dated
+[restart acceptance report](docs/acceptance/N9_RESTART_V5_2026_10_11.md)
+records historical validation evidence, **not** an additional supported
+checkpoint format. Consult [the current output guide](docs/NETCDF_OUTPUT.md)
+for physical-field and restart-file responsibilities.
 
 ## Runtime diagnostics
 
@@ -182,7 +141,7 @@ their diagnostic context.
 
 ## Vertical closure status
 
-The legacy velocity/concentration vertical-profile implementation has been
+The former velocity/concentration vertical-profile implementation has been
 removed. The current solver uses the standard depth-averaged equations, and
 the input options `VERTICAL_PROFILES_FLAG` and
 `VERTICAL_PROFILES_PARAMETERS` are no longer accepted.

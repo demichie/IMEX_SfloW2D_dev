@@ -21,7 +21,7 @@ MODULE rheology_lava_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
     USE state_types, ONLY : physical_state_real, physical_state_complex
-    USE rheology_parameters_2d, ONLY : T_ref
+    USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                                          &
                 fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
     IMPLICIT NONE
@@ -31,27 +31,35 @@ MODULE rheology_lava_2d
     PUBLIC :: eval_rheology_lava_implicit
     PUBLIC :: eval_rheology_lava_implicit_real
     PUBLIC :: eval_rheology_lava_analytic
-    PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
-        REAL(wp) :: nu_ref
-        REAL(wp) :: visc_par
-        REAL(wp) :: tau0
+    PUBLIC :: lava_kinematic_viscosity
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
-    SUBROUTINE eval_rheology_lava_explicit(state, rate)
+    !> @brief eval rheology lava explicit operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate Source contribution to energy or temperature.
+    SUBROUTINE eval_rheology_lava_explicit(config, state, rate)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
 
 
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx,sy,ix,iy
 
-        CALL eval_rheology_lava_semi_implicit(state,sx,sy)
-        CALL eval_rheology_lava_implicit_real(state,ix,iy)
+        CALL eval_rheology_lava_semi_implicit(config,state,sx,sy)
+        CALL eval_rheology_lava_implicit_real(config,state,ix,iy)
         rate=[sx+ix,sy+iy]
     END SUBROUTINE eval_rheology_lava_explicit
 
 
-    SUBROUTINE eval_rheology_lava_semi_implicit(state, rate_x, rate_y)
+    !> @brief eval rheology lava semi implicit operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
+    SUBROUTINE eval_rheology_lava_semi_implicit(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
 
@@ -60,12 +68,18 @@ CONTAINS
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF (state%mod_vel .LE. 0.0_wp) RETURN
-        rate_x = -tau0 * state%u / state%mod_vel
-        rate_y = -tau0 * state%v / state%mod_vel
+        rate_x = -config%tau0 * state%u / state%mod_vel
+        rate_y = -config%tau0 * state%v / state%mod_vel
     END SUBROUTINE eval_rheology_lava_semi_implicit
 
 
-    SUBROUTINE eval_rheology_lava_implicit(state, rate_x, rate_y)
+    !> @brief eval rheology lava implicit operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
+    SUBROUTINE eval_rheology_lava_implicit(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_complex), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: gamma
@@ -75,7 +89,13 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    SUBROUTINE eval_rheology_lava_implicit_real(state, rate_x, rate_y)
+    !> @brief eval rheology lava implicit real operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] state Local physical state.
+    !> @param[out] rate_x Source contribution to x momentum.
+    !> @param[out] rate_y Source contribution to y momentum.
+    SUBROUTINE eval_rheology_lava_implicit_real(config, state, rate_x, rate_y)
+        TYPE(rheology_config_type), INTENT(IN) :: config
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: gamma
@@ -85,7 +105,14 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit_real
 
 
-    SUBROUTINE eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
+    !> @brief eval rheology lava analytic operation.
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] dt dt argument for eval_rheology_lava_analytic.
+    !> @param[in] state Local physical state.
+    !> @param[in] speed_ratio speed ratio argument for eval_rheology_lava_analytic.
+    !> @param[out] velocity_after velocity after argument for eval_rheology_lava_analytic.
+    SUBROUTINE eval_rheology_lava_analytic(config, dt, state, speed_ratio, velocity_after)
+        TYPE(rheology_config_type), INTENT(IN) :: config
 
         TYPE(physical_state_real), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -107,21 +134,24 @@ CONTAINS
         END IF
 
         effective_depth = MAX(state%h, h_threshold)
-        gamma = 3.0_wp * nu_ref / effective_depth *                                                                    &
-                    EXP(-visc_par * (state%T - T_ref))
+        gamma = 3.0_wp * config%nu_ref / effective_depth *                                                             &
+                    EXP(-config%visc_par * (state%T - config%T_ref))
         linear_drag = gamma / state%h
-        yield_drag = tau0 / (state%rho_m * state%h * speed_ratio)
+        yield_drag = config%tau0 / (state%rho_m * state%h * speed_ratio)
         CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE, [yield_drag, linear_drag], dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE eval_rheology_lava_analytic
 
     !> \brief Kinematic viscosity shared by lava rheology and deposition.
     !> \return Kinematic viscosity [m2/s].
-    PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
+    !> @param[in] config Model parameter configuration.
+    !> @param[in] t Local temperature or simulation time.
+    PURE REAL(wp) FUNCTION lava_kinematic_viscosity(config,T) RESULT(nu)
 
+        TYPE(rheology_config_type), INTENT(IN) :: config
         REAL(wp), INTENT(IN) :: T
 
-        nu=nu_ref*EXP(-visc_par*(T-T_ref))
+        nu=config%nu_ref*EXP(-config%visc_par*(T-config%T_ref))
     END FUNCTION lava_kinematic_viscosity
 
     !> \param[in] state Shared physical state (complex for implicit treatment).

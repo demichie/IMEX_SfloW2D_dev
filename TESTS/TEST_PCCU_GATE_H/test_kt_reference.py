@@ -67,6 +67,17 @@ class KTReferenceTests(unittest.TestCase):
         np.testing.assert_allclose(residual[..., 3], fraction*residual[..., 0],
                                    rtol=2e-14, atol=2e-12)
 
+    def test_advance_keeps_small_positive_mass_and_momentum(self):
+        # A thin but positive-mass cell is not conservatively reset by the
+        # Fortran time integrator merely because its reconstructed depth is dry.
+        p = kt.Parameters()
+        q = np.zeros((4, 5, 4))
+        q[..., 0] = 4.0e-8
+        q[..., 1] = 7.0e-9
+        q[..., 2] = -2.0e-9
+        final, _ = kt.advance(q, np.zeros((5, 6)), 0.2, 0.2, [0.0001], p)
+        np.testing.assert_array_equal(final[..., :3], q[..., :3])
+
     def test_reference_rejects_invalid_raw_states(self):
         state = np.zeros((3, 4, 4))
         state[..., 0] = 1000

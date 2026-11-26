@@ -35,6 +35,20 @@ of any single constitutive law and supports wider OpenMP loops, future
 MPI decomposition, GPU-oriented execution, and alternative physical
 evaluators without embedding grid indices in the physical kernels.
 
+## Detailed subdirectory guides
+
+Each physical family documents its own files, implemented equations and
+validation boundaries:
+
+- [Rheological constitutive laws](rheology_laws/README.md)
+- [Mass exchange with bed and atmosphere](mass_exchange/README.md)
+- [Mass injection](mass_injection_terms/README.md)
+- [Interlayer mass transfer](interlayer_mass_exchange/README.md)
+- [Interlayer momentum drag](interlayer_momentum_exchange/README.md)
+- [Pore-pressure laws](pore_pressure/README.md)
+- [Thermal laws](thermal_laws/README.md)
+- [Shared substrate parameters](substrate/README.md)
+
 ## Physical contributions to the equations
 
 The model evolves conservative cell quantities such as mixture mass,
@@ -116,7 +130,7 @@ simulation-wide state.
 
 The broader source workflow is:
 
-1. **Configuration:** `source_configuration_2d.f90` translates
+1. **Configuration:** [`numerics/source_configuration_2d.f90`](../numerics/source_configuration_2d.f90) translates
    physical settings into names and validated source-group metadata.
 2. **Evaluation:** `source_terms_2d.f90` and the specialized
    submodules evaluate one cell's physical rates or analytical result.
@@ -138,7 +152,6 @@ is defined by the `state` layer.
 | File | Responsibility |
 | --- | --- |
 | `equation_terms_2d.f90` | Local inertial transport flux, hydrostatic pressure coefficient, Cartesian characteristic-speed estimates, and component-mass-flux limiting for spatial operators. |
-| `source_configuration_2d.f90` | Convert physical configuration flags and model selections into the validated source metadata used by the numerical source registry; no per-cell rate evaluation. |
 | `source_terms_2d.f90` | Assemble and dispatch physical source contributions, coupled explicit limitations, analytical source updates, REAL Newton residual rates and COMPLEX Jacobian rates. |
 
 ### `rheology_laws/` — momentum sources
@@ -165,13 +178,12 @@ rotation of momentum by a dissipative substep.
 | `rheology_lucas_2d.f90` | Lucas rheology. |
 | `rheology_mui_2d.f90` | \(\mu(I)\)-related rheology. |
 | `rheology_mui_voellmy_2d.f90` | Combined \(\mu(I)\) and Voellmy formulation. |
-| `rheology_newmodel_2d.f90` | Additional selectable rheology model. |
 
 The directory also contains
 `rheology_empirical_drag.inc`,
 `rheology_lahar_drag.inc`,
+`rheology_lahar_viscosity.inc`,
 `rheology_lava_viscous.inc`,
-`rheology_newmodel_linear.inc`,
 `rheology_plastic_yield.inc`,
 `rheology_quadratic_drag.inc`, and
 `rheology_voellmy_turbulent.inc`. These hold shared mathematical

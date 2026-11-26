@@ -10,13 +10,14 @@ cd "$build_dir"
 
 gfortran -O0 -g -fcheck=all -fbacktrace -c \
     "$repo_dir/src/core/parameters_2d.f90" \
+    "$repo_dir/src/physics/mass_exchange/mass_exchange_parameters_2d.f90" \
     "$repo_dir/src/geometry/geometry_2d.f90" \
     "$repo_dir/src/spatial/nonconservative_2d.f90" \
     "$repo_dir/src/spatial/pccu_2d.f90" \
     "$test_dir/test_hydrostatic_path.f90"
 
 gfortran -O0 -g -fcheck=all -fbacktrace \
-    parameters_2d.o geometry_2d.o nonconservative_2d.o pccu_2d.o \
+    parameters_2d.o mass_exchange_parameters_2d.o geometry_2d.o nonconservative_2d.o pccu_2d.o \
     test_hydrostatic_path.o -llapack -o test_hydrostatic_path
 
 ./test_hydrostatic_path

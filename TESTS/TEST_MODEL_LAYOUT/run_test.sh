@@ -23,9 +23,9 @@ gfortran -O0 -g -Wall -Wextra -fcheck=all -fbacktrace \
     -o test_model_layout_reject
 
 if ./test_model_layout_reject >reject.log 2>&1; then
-    echo "FAIL: N_LAYERS=2 was accepted" >&2
+    echo "FAIL: N_LAYERS=3 was accepted" >&2
     exit 1
 fi
 
-grep -q "Only N_LAYERS=1 is currently supported" reject.log
-echo "PASS: unsupported N_LAYERS=2 rejected explicitly"
+grep -q "Model layout requires N_LAYERS=1 or N_LAYERS=2" reject.log
+echo "PASS: unsupported N_LAYERS=3 rejected explicitly"

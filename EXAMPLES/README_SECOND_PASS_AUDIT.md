@@ -1,5 +1,13 @@
 # EXAMPLES README migration — second-pass assessment (2026-10-16)
 
+> **Documentation cleanup (19 November 2026).** The 19 former example
+> `README.txt` files were removed after the section-by-section migration
+> described below. Each example now uses its `README.md` as the single
+> authoritative usage guide. Discrepancies and historical verification remain
+> recorded in this dated audit; references below to retained TXT files describe
+> the October 2026 baseline, **not** the current repository inventory.
+> `EXAMPLE_ETNA_LAVA` and `EXAMPLE_ETNA_TWO_LAYER` already had Markdown-only guides.
+>
 Source repository: `demichie/IMEX_SfloW2D_dev`, baseline commit `7f05b9b2` (current local documentation and packaging changes are not committed).
 
 The Examples tree contains 20 standardized `README.md` files and 19 legacy `README.txt` files. `EXAMPLE_ETNA_LAVA` has no legacy README; no Markdown link points to a missing `README.txt`. The legacy files, scripts, input namelists and DEM data remain preserved.

@@ -1,33 +1,48 @@
 #!/usr/bin/env python3
-"""Check canonical state-index migration invariants without rewriting code."""
+"""Check symbolic state indices in the current canonical state modules."""
 from pathlib import Path
 import re
 import sys
 
-root = Path(__file__).resolve().parents[2]
-required = {
-    "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90": "CALL configure_canonical_state_indices()",
-    "TESTS/TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90": "CALL configure_canonical_state_indices()",
-    "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90": "CALL configure_canonical_state_indices()",
-    "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90": "CALL configure_canonical_state_indices()",
-    "TESTS/ACCEPTANCE/test_d17_state_numeric.f90": "CALL configure_canonical_state_indices()",
-}
-issues = []
-for name, marker in required.items():
-    content = (root / name).read_text()
-    if marker not in content:
-        issues.append(f"{name}: missing canonical fixture configuration")
+ROOT = Path(__file__).resolve().parents[2]
+REQUIRED_FIXTURES = (
+    "TESTS/TEST_STATE/test_state.f90",
+    "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90",
+    "TESTS/TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90",
+    "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90",
+    "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90",
+)
+FIXTURE_CALL = re.compile(r"\bcall\s+configure_canonical_state_indices\s*(?:\(\s*\))?(?!\w)", re.I)
+FIXED_INDEX = re.compile(r"\b(?:qc|qj)\s*\(\s*[1-4]\s*\)", re.I)
 
-state = (root / "src/state")
-for name in ("state_conversion_2d.f90", "state_conversion_phys_var.inc",
-             "velocity_from_conservative.inc"):
-    path = state / name
-    for number, line in enumerate(path.read_text().splitlines(), 1):
-        if line.lstrip().startswith("!"):
-            continue
-        if re.search(r"\b(?:qc|qj)\s*\(\s*[1-4]\s*\)", line, re.I):
-            issues.append(f"{path.relative_to(root)}:{number}: hard-coded conservative index")
-if issues:
-    print("\n".join(issues), file=sys.stderr)
-    sys.exit(1)
-print("PASS: canonical state index migration checks")
+
+def main() -> int:
+    issues = []
+    for name in REQUIRED_FIXTURES:
+        path = ROOT / name
+        if not path.is_file():
+            issues.append(f"{name}: test fixture missing")
+        elif not FIXTURE_CALL.search(path.read_text(encoding="utf-8")):
+            issues.append(f"{name}: missing canonical fixture configuration")
+
+    state_dir = ROOT / "src/state"
+    state_sources = sorted(state_dir.glob("*.f90"))
+    state_includes = sorted((state_dir / "inc").glob("*.inc"))
+    if not state_sources or not state_includes:
+        issues.append("canonical state modules or shared kernels missing")
+    for path in state_sources + state_includes:
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("!"):
+                continue
+            if FIXED_INDEX.search(line.split("!", 1)[0]):
+                issues.append(f"{path.relative_to(ROOT)}:{number}: hard-coded conservative index")
+    if issues:
+        print("\n".join(issues), file=sys.stderr)
+        return 1
+    print(f"PASS: canonical indices in {len(state_sources)} state modules, "
+          f"{len(state_includes)} shared kernels and {len(REQUIRED_FIXTURES)} fixtures")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

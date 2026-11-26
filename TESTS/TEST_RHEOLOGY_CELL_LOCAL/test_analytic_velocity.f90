@@ -1,32 +1,31 @@
 PROGRAM test_analytic_velocity
 
   USE parameters_2d, ONLY : wp, n_solid
-  USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
-  USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
-       Fr_0, U_w, xi, T_ref
+  USE constitutive_parameters_2d, ONLY : grav, inv_grav
+  USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
+  USE rheology_parameters_2d, ONLY : rheology_config_type
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &
        EXACT_FLOW_CONSTANT, EXACT_FLOW_LINEAR, EXACT_FLOW_AFFINE,              &
        EXACT_FLOW_QUADRATIC, EXACT_FLOW_QUADRATIC_POLYNOMIAL,                  &
        EXACT_FLOW_FROUDE, EXACT_FLOW_LUCAS, EXACT_FLOW_MUI,                    &
        EXACT_FLOW_MUI_VOELLMY
-  USE rheology_voellmy_2d, ONLY : voellmy_mu => mu,                          &
+  USE rheology_voellmy_2d, ONLY :                          &
        eval_rheology_voellmy_implicit,                                  &
        eval_rheology_voellmy_semi_implicit,                             &
        eval_rheology_voellmy_analytic
   USE state_types, ONLY : physical_state_real, physical_state_complex
-  USE rheology_plastic_2d, ONLY : tau, eval_rheology_plastic_implicit,  &
+  USE rheology_plastic_2d, ONLY : eval_rheology_plastic_implicit,  &
        eval_rheology_plastic_analytic
-  USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
+  USE rheology_lava_2d, ONLY : &
        eval_rheology_lava_implicit, eval_rheology_lava_semi_implicit, &
        eval_rheology_lava_analytic
-  USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa,   &
-       n_td, n_td2, eval_rheology_lahar_implicit,                       &
+  USE rheology_lahar_2d, ONLY : eval_rheology_lahar_implicit, &
        eval_rheology_lahar_semi_implicit,                               &
        eval_rheology_lahar_analytic
   USE rheology_empirical_2d, ONLY : eval_rheology_empirical_implicit,   &
        eval_rheology_empirical_analytic
-  USE rheology_quadratic_2d, ONLY : friction_factor,                        &
+  USE rheology_quadratic_2d, ONLY :                        &
        eval_rheology_quadratic_implicit, eval_rheology_quadratic_analytic
   USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit,                  &
        eval_rheology_froude_analytic
@@ -35,9 +34,12 @@ PROGRAM test_analytic_velocity
   USE rheology_mui_2d, ONLY : eval_rheology_mui_semi_implicit, eval_rheology_mui_analytic
   USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_semi_implicit,        &
        eval_rheology_mui_voellmy_implicit, eval_rheology_mui_voellmy_analytic
-  USE rheology_2d, ONLY : eval_rheology_analytic
+  USE rheology_2d, ONLY : eval_rheology_analytic, limit_rheology_momentum_reversal
 
   IMPLICIT NONE
+
+  TYPE(rheology_config_type) :: quadratic_config
+  REAL(wp) :: friction_factor
 
   TYPE(physical_state_real) :: rheo_state
   REAL(wp), PARAMETER :: integration_step = 0.01_wp
@@ -78,18 +80,18 @@ PROGRAM test_analytic_velocity
   IF (.NOT. root_found) ERROR STOP 'Cubic one-real-root selection failed'
   CALL assert_close(root, 2.0_wp, 'cubic single real root')
 
-  tau = 1.0_wp
+  quadratic_config%tau = 1.0_wp
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h = flow_depth
     ps%u = velocity_before(1)
     ps%v = velocity_before(2)
-    CALL eval_rheology_plastic_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_plastic_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_plastic', .FALSE., 0.0_wp,       &
        .FALSE., 0.0_wp, velocity_after, 'plastic dispatch')
   expected_speed = MAX(0.0_wp, SQRT(SUM(velocity_before**2)) -              &
-       integration_step*tau/(flow_depth*speed_ratio))
+       integration_step*quadratic_config%tau/(flow_depth*speed_ratio))
   CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
        'plastic exact constant-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
@@ -101,16 +103,16 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_plastic_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_plastic_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,     &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),              &
        REAL(complex_source_y,wp)], 'plastic')
 
-  nu_ref = 0.2_wp
-  visc_par = 0.01_wp
-  tau0 = 100.0_wp
-  T_ref = 300.0_wp
+  quadratic_config%nu_ref = 0.2_wp
+  quadratic_config%visc_par = 0.01_wp
+  quadratic_config%tau0 = 100.0_wp
+  quadratic_config%T_ref = 300.0_wp
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
@@ -118,13 +120,13 @@ PROGRAM test_analytic_velocity
     ps%rho_m=mixture_density
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL eval_rheology_lava_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_lava_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
-  linear_drag = 3.0_wp*nu_ref/flow_depth**2 *                               &
-       EXP(-visc_par*(temperature-T_ref))
-  yield_drag = tau0/(mixture_density*flow_depth*speed_ratio)
+  linear_drag = 3.0_wp*quadratic_config%nu_ref/flow_depth**2 *                               &
+       EXP(-quadratic_config%visc_par*(temperature-quadratic_config%T_ref))
+  yield_drag = quadratic_config%tau0/(mixture_density*flow_depth*speed_ratio)
   expected_speed = MAX(0.0_wp, (SQRT(SUM(velocity_before**2)) +             &
        yield_drag/linear_drag)*EXP(-linear_drag*integration_step) -         &
        yield_drag/linear_drag)
@@ -141,7 +143,7 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_lava_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_lava_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
     TYPE(physical_state_real) :: ps
@@ -150,20 +152,20 @@ PROGRAM test_analytic_velocity
     ps%mod_vel=speed_after
     ps%mod_vel2=ps%mod_vel**2
     ps%mod_vel_hor=horizontal_speed
-    CALL eval_rheology_lava_semi_implicit(ps, source_x, source_y)
+    CALL eval_rheology_lava_semi_implicit(quadratic_config,ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, source, 'lava')
 
-  alpha2 = 100.0_wp
-  beta2 = 2.0_wp
-  alpha1_coeff = 1.0_wp
-  beta1 = 2.0_wp
-  Kappa = 1.0_wp
-  n_td = 0.1_wp
-  n_td2 = 0.01_wp
+  quadratic_config%alpha2 = 100.0_wp
+  quadratic_config%beta2 = 2.0_wp
+  quadratic_config%alpha1_coeff = 1.0_wp
+  quadratic_config%beta1 = 2.0_wp
+  quadratic_config%Kappa = 1.0_wp
+  quadratic_config%n_td = 0.1_wp
+  quadratic_config%n_td = SQRT(0.01_wp)
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
@@ -172,7 +174,7 @@ PROGRAM test_analytic_velocity
     ps%v=velocity_before(2)
     ps%rho_m=mixture_density
     ps%alphas=solid_fraction
-    CALL eval_rheology_lahar_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_lahar_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_lahar', .FALSE., 0.0_wp,          &
        .FALSE., 0.0_wp, velocity_after, 'lahar dispatch')
@@ -185,12 +187,12 @@ PROGRAM test_analytic_velocity
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
-    cs%inv_rhom=CMPLX(1.0_wp/mixture_density,0.0_wp,wp)
+    cs%inv_rho_m=CMPLX(1.0_wp/mixture_density,0.0_wp,wp)
     cs%alphas=CMPLX(solid_fraction,0.0_wp,wp)
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_lahar_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_lahar_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
     TYPE(physical_state_real) :: ps
@@ -202,7 +204,7 @@ PROGRAM test_analytic_velocity
     ps%mod_vel=speed_after
     ps%mod_vel2=ps%mod_vel**2
     ps%mod_vel_hor=horizontal_speed
-    CALL eval_rheology_lahar_semi_implicit(ps, source_x, source_y)
+    CALL eval_rheology_lahar_semi_implicit(quadratic_config,ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
@@ -245,12 +247,13 @@ PROGRAM test_analytic_velocity
        REAL(complex_source_y,wp)], 'empirical')
 
   friction_factor = 0.1_wp
+  quadratic_config%friction_factor=friction_factor
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL eval_rheology_quadratic_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_quadratic_analytic(quadratic_config,integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_quadratic', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'quadratic dispatch')
@@ -269,14 +272,32 @@ PROGRAM test_analytic_velocity
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-    CALL eval_rheology_quadratic_implicit(cs, complex_source_x, complex_source_y)
+    CALL eval_rheology_quadratic_implicit(quadratic_config,cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
        REAL(complex_source_y,wp)], 'quadratic')
 
-  voellmy_mu = 0.3_wp
-  xi = 500.0_wp
+  ! Two independent layer configurations must not exchange the drag coefficient.
+  ! Test the same physical state and interval to isolate the law parameter.
+  BLOCK
+    TYPE(rheology_config_type) :: config_a, config_b
+    TYPE(physical_state_real) :: ps
+    REAL(wp) :: velocity_a(2), velocity_b(2)
+    config_a=quadratic_config
+    config_b=quadratic_config
+    config_b%friction_factor=3.0_wp*config_a%friction_factor
+    ps%h=flow_depth
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL eval_rheology_quadratic_analytic(config_a,integration_step,ps,speed_ratio,velocity_a)
+    CALL eval_rheology_quadratic_analytic(config_b,integration_step,ps,speed_ratio,velocity_b)
+    IF (SUM(velocity_b**2)>=SUM(velocity_a**2)) ERROR STOP 'Quadratic L2 drag isolation'
+    CALL assert_close(config_a%friction_factor,friction_factor,'Quadratic L1 coefficient unchanged')
+  END BLOCK
+
+  quadratic_config%mu = 0.3_wp
+  quadratic_config%xi = 500.0_wp
     BLOCK
     TYPE(physical_state_real) :: rs
     rs%h = flow_depth
@@ -285,7 +306,7 @@ PROGRAM test_analytic_velocity
     rs%rho_m = mixture_density
     rs%red_grav = reduced_gravity
     rs%exc_pore_pres = 0.0_wp
-    CALL eval_rheology_voellmy_analytic(integration_step, rs, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_voellmy_analytic(quadratic_config,integration_step, rs, speed_ratio, gravity_coefficient, &
          0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_voellmy', .FALSE., 0.0_wp,        &
@@ -300,7 +321,7 @@ PROGRAM test_analytic_velocity
     cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
     cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=CMPLX(speed_after**2,0.0_wp,wp)
-    CALL eval_rheology_voellmy_implicit(cs, .FALSE., 0.0_wp, &
+    CALL eval_rheology_voellmy_implicit(quadratic_config,cs, .FALSE., 0.0_wp, &
          complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
@@ -312,7 +333,7 @@ PROGRAM test_analytic_velocity
     rs%red_grav=reduced_gravity
     rs%exc_pore_pres=0.0_wp
     rs%mod_vel=speed_after
-    CALL eval_rheology_voellmy_semi_implicit(rs, gravity_coefficient, .FALSE., source_x, source_y)
+    CALL eval_rheology_voellmy_semi_implicit(quadratic_config,rs, gravity_coefficient, .FALSE., source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
@@ -327,15 +348,16 @@ PROGRAM test_analytic_velocity
   CALL assert_close(lambert_value*EXP(lambert_value), -0.2_wp,                &
        'Lambert W negative identity')
 
-  mu_0 = 0.5_wp
-  mu_inf = 0.2_wp
-  Fr_0 = 0.8_wp
+  quadratic_config%mu_0 = 0.5_wp
+  quadratic_config%mu_inf = 0.2_wp
+  quadratic_config%Fr_0 = 0.8_wp
   rheo_state%h=flow_depth
   rheo_state%u=velocity_before(1)
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(quadratic_config,integration_step,rheo_state, &
+      speed_ratio,gravity_coefficient,0.0_wp,                                                                          &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Froude dispatch')
@@ -348,7 +370,7 @@ PROGRAM test_analytic_velocity
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_froude_semi_implicit(rheo_state, &
+CALL eval_rheology_froude_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .FALSE., &
              stochastic_value, &
@@ -363,7 +385,8 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(quadratic_config,integration_step,rheo_state, &
+      speed_ratio,gravity_coefficient,0.0_wp,                                                                          &
        .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .TRUE., stochastic_value, velocity_after, 'Froude stochastic dispatch')
@@ -376,7 +399,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_froude_semi_implicit(rheo_state, &
+CALL eval_rheology_froude_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .TRUE., &
              stochastic_value, &
@@ -386,29 +409,31 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
        mixture_density*flow_depth, [source_x, source_y], 'Froude clamp')
   stochastic_value = 0.0_wp
 
-  mu_0 = 0.0_wp
-  mu_inf = 0.0_wp
+  quadratic_config%mu_0 = 0.0_wp
+  quadratic_config%mu_inf = 0.0_wp
   rheo_state%h=flow_depth
   rheo_state%u=velocity_before(1)
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(quadratic_config,integration_step,rheo_state, &
+      speed_ratio,gravity_coefficient,0.0_wp,                                                                          &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .FALSE., stochastic_value, velocity_after, 'Froude zero-drag dispatch')
   CALL assert_close(velocity_after(1), velocity_before(1), 'Froude zero-drag x')
   CALL assert_close(velocity_after(2), velocity_before(2), 'Froude zero-drag y')
-  mu_0 = 0.5_wp
-  mu_inf = 0.2_wp
+  quadratic_config%mu_0 = 0.5_wp
+  quadratic_config%mu_inf = 0.2_wp
 
-  U_w = 2.0_wp
+  quadratic_config%U_w = 2.0_wp
   rheo_state%h=flow_depth
   rheo_state%u=velocity_before(1)
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_lucas_analytic(quadratic_config,integration_step,rheo_state, &
+      speed_ratio,gravity_coefficient,0.0_wp,                                                                          &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Lucas dispatch')
@@ -421,7 +446,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_lucas_semi_implicit(rheo_state, &
+CALL eval_rheology_lucas_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .FALSE., &
              stochastic_value, &
@@ -436,7 +461,8 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_lucas_analytic(quadratic_config,integration_step,rheo_state, &
+      speed_ratio,gravity_coefficient,0.0_wp,                                                                          &
        .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .TRUE., stochastic_value, velocity_after, 'Lucas stochastic dispatch')
@@ -449,7 +475,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
   rheo_state%red_grav=reduced_gravity
       rheo_state%mod_vel=speed_after
     rheo_state%mod_vel_hor=horizontal_speed
-CALL eval_rheology_lucas_semi_implicit(rheo_state, &
+CALL eval_rheology_lucas_semi_implicit(quadratic_config,rheo_state, &
              gravity_coefficient, &
              .TRUE., &
              stochastic_value, &
@@ -459,10 +485,10 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
        mixture_density*flow_depth, [source_x, source_y], 'Lucas stochastic branch')
   stochastic_value = 0.0_wp
 
-  I_0 = 0.3_wp
-  mu_s = 0.4_wp
-  mu_2 = 0.7_wp
-  muI_inf = 0.8_wp
+  quadratic_config%I_0 = 0.3_wp
+  quadratic_config%mu_s = 0.4_wp
+  quadratic_config%mu_2 = 0.7_wp
+  quadratic_config%muI_inf = 0.8_wp
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
@@ -472,7 +498,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL eval_rheology_mui_analytic(integration_step, ps, speed_ratio, &
+    CALL eval_rheology_mui_analytic(quadratic_config,integration_step, ps, speed_ratio, &
          gravity_coefficient, 0.0_wp, .FALSE., velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui', .FALSE., 0.0_wp, &
@@ -489,7 +515,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
     ps%exc_pore_pres=0.0_wp
         ps%mod_vel=speed_after
     ps%mod_vel_hor=horizontal_speed
-CALL eval_rheology_mui_semi_implicit(ps, &
+CALL eval_rheology_mui_semi_implicit(quadratic_config,ps, &
              gravity_coefficient, &
              .FALSE., &
              source_x, &
@@ -507,7 +533,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=1000.0_wp
-    CALL eval_rheology_mui_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_mui_analytic(quadratic_config,integration_step, ps, speed_ratio, gravity_coefficient, &
          0.0_wp, .TRUE., velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui', .TRUE., 1000.0_wp,           &
@@ -524,7 +550,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
     ps%exc_pore_pres=1000.0_wp
         ps%mod_vel=speed_after
     ps%mod_vel_hor=horizontal_speed
-CALL eval_rheology_mui_semi_implicit(ps, &
+CALL eval_rheology_mui_semi_implicit(quadratic_config,ps, &
              gravity_coefficient, &
              .TRUE., &
              source_x, &
@@ -533,7 +559,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'mu(I) pore pressure')
 
-  xi = 500.0_wp
+  quadratic_config%xi = 500.0_wp
   BLOCK
     TYPE(physical_state_real) :: ps
     ps%h=flow_depth
@@ -543,7 +569,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL eval_rheology_mui_voellmy_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_mui_voellmy_analytic(quadratic_config,integration_step, ps, speed_ratio, gravity_coefficient, &
          0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui_voellmy', .FALSE., 0.0_wp,     &
@@ -561,7 +587,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
     ps%exc_pore_pres=0.0_wp
         ps%mod_vel=speed_after
     ps%mod_vel_hor=horizontal_speed
-CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
+CALL eval_rheology_mui_voellmy_semi_implicit(quadratic_config,ps, &
              gravity_coefficient, &
              .FALSE., &
              source_x, &
@@ -576,7 +602,7 @@ CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
         cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-CALL eval_rheology_mui_voellmy_implicit(cs, &
+CALL eval_rheology_mui_voellmy_implicit(quadratic_config,cs, &
              .FALSE., &
              0.0_wp, &
              complex_source_x, &
@@ -596,7 +622,7 @@ CALL eval_rheology_mui_voellmy_implicit(cs, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=500.0_wp
-    CALL eval_rheology_mui_voellmy_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_mui_voellmy_analytic(quadratic_config,integration_step, ps, speed_ratio, gravity_coefficient, &
          0.0_wp, .TRUE., .TRUE., 100.0_wp, velocity_after)
   END BLOCK
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
@@ -611,7 +637,7 @@ CALL eval_rheology_mui_voellmy_implicit(cs, &
     ps%exc_pore_pres=500.0_wp
         ps%mod_vel=speed_after
     ps%mod_vel_hor=horizontal_speed
-CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
+CALL eval_rheology_mui_voellmy_semi_implicit(quadratic_config,ps, &
              gravity_coefficient, &
              .TRUE., &
              source_x, &
@@ -626,7 +652,7 @@ CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
         cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
     cs%mod_vel2=cs%mod_vel**2
     cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
-CALL eval_rheology_mui_voellmy_implicit(cs, &
+CALL eval_rheology_mui_voellmy_implicit(quadratic_config,cs, &
              .TRUE., &
              100.0_wp, &
              complex_source_x, &
@@ -659,6 +685,50 @@ CALL eval_rheology_mui_voellmy_implicit(cs, &
   CALL assert_flow_semigroup(EXACT_FLOW_MUI,                               &
        [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp], 0.5_wp,             &
        'mu(I) drag')
+  ! Overshooting explicit mu(I) Euler friction must stop instead of
+  ! reversing momentum; a dissipative stage must remain unchanged.
+  BLOCK
+    REAL(wp) :: before(2), candidate(2)
+    before=[0.5_wp,0.0_wp]
+    candidate=before+1.0_wp*[-2.0_wp,0.0_wp]
+    CALL limit_rheology_momentum_reversal(before,candidate)
+    IF (ANY(candidate/=0.0_wp)) ERROR STOP 'mu(I) explicit stopping projection failed'
+    candidate=[0.25_wp,0.0_wp]
+    CALL limit_rheology_momentum_reversal(before,candidate)
+    IF (ANY(candidate/=[0.25_wp,0.0_wp])) ERROR STOP 'mu(I) dissipative update was modified'
+  END BLOCK
+  ! Regression from the granular dam-break wet/dry front: the original
+  ! adaptive Simpson integration exhausted its recursion depth near u=0.
+  CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
+       [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+        1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+       1.2402500000000004e-5_wp,0.5009884985665396_wp,speed_after)
+  IF (speed_after<0.0_wp .OR. speed_after>0.5009884985665396_wp) &
+       ERROR STOP 'mu(I) thin-front analytic update must dissipate speed'
+  BLOCK
+    REAL(wp) :: half_step, two_half_steps
+    CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
+         [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+          1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+         0.6201250000000002e-5_wp,0.5009884985665396_wp,half_step)
+    CALL solve_exact_velocity_flow(EXACT_FLOW_MUI, &
+         [1.5041236872048884_wp,3.9208794320089733e6_wp, &
+          1.4715485729779633e11_wp,0.279_wp,5.4795383377728646e5_wp], &
+         0.6201250000000002e-5_wp,half_step,two_half_steps)
+    CALL assert_close(speed_after,two_half_steps,'mu(I) thin-front exact semigroup')
+  END BLOCK
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,1.0_wp,1.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) complex-root primitive')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,2.0_wp,1.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) repeated-root primitive')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,2.0_wp,0.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) linear-denominator limit')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI, &
+       [1.0_wp,0.0_wp,0.0_wp,0.3_wp,2.0_wp], 0.5_wp, &
+       'mu(I) constant-denominator limit')
   CALL assert_flow_semigroup(EXACT_FLOW_MUI_VOELLMY,                       &
        [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp, 0.02_wp], 0.5_wp,    &
        'mu(I)-Voellmy drag')
@@ -743,7 +813,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=excess_pore_pressure
-    CALL eval_rheology_analytic([model_id],integration_step,physical_state, &
+    CALL eval_rheology_analytic(quadratic_config,[model_id],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp,use_pore_pressure, &
          use_stochastic,stochastic,actual,model_supported, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
@@ -772,7 +842,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=0.0_wp
-    CALL eval_rheology_analytic(['rheology_unsupported'],integration_step,physical_state, &
+    CALL eval_rheology_analytic(quadratic_config,['rheology_unsupported'],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp, .FALSE., &
          .FALSE.,0.0_wp,actual,model_supported, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)

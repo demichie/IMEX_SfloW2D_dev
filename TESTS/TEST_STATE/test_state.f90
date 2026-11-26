@@ -1,6 +1,7 @@
 PROGRAM test_state
     USE parameters_2d
     USE constitutive_parameters_2d
+    USE solid_transport_parameters_2d
     USE state_types
     USE state_mixture, ONLY : sauter_diameter, average_density_solids, &
         evaluate_mixture_density, evaluate_mixture_phase_properties, evaluate_reduced_gravity, &
@@ -45,6 +46,7 @@ PROGRAM test_state
     CALL assert_close('round-trip T',qp_roundtrip(idx_T),qp(idx_T),1.0E-11_wp)
     CALL assert_close('round-trip u',qp_roundtrip(idx_u),qp(idx_u),1.0E-11_wp)
     CALL check_admissibility(qp,q)
+    CALL check_opposite_optional_state_slots
 
     CALL build_physical_state_from_qp(qp,real_workspace,0.1_wp,-0.2_wp,0.0_wp,0.0_wp,0.0_wp)
     cqp=CMPLX(qp,0.0_wp,wp)
@@ -180,7 +182,7 @@ CONTAINS
             CALL assert_close('shared q->qp u',qp_check(idx_u),physical%u,tolerance)
             CALL assert_close('shared q->qp v',qp_check(idx_v),physical%v,tolerance)
             CALL assert_close('shared q->qp h',qp_check(idx_h),physical%h,tolerance)
-            gravity_value=evaluate_reduced_gravity(physical%rho_m,physical%inv_rhom)
+            gravity_value=evaluate_reduced_gravity(physical%rho_m,physical%inv_rho_m)
             CALL assert_close('shared reduced gravity',gravity_value,physical%red_grav,0.0_wp)
 
             cq_case=CMPLX(q_case,0.0_wp,wp)
@@ -214,8 +216,8 @@ CONTAINS
     !> inverse conversion must agree with the canonical mass-based EOS.
     SUBROUTINE check_inverse_volume_conversion
         REAL(wp) :: alphas(2),alphag(1),given_alphas(2),given_alphag(1)
-        REAL(wp) :: xs(2),xg(1),xc,rho_m,inv_rhom,rho_c,cp_m,cp_c
-        REAL(wp) :: rho_ref,inv_rhom_ref,rho_c_ref,inv_rho_c_ref
+        REAL(wp) :: xs(2),xg(1),xc,rho_m,inv_rho_m,rho_c,cp_m,cp_c
+        REAL(wp) :: rho_ref,inv_rho_m_ref,rho_c_ref,inv_rho_c_ref
         REAL(wp) :: cp_m_ref,cp_c_ref,alphas_ref(2),alphag_ref(1)
         REAL(wp) :: expected_density
         INTEGER :: carrier_case,composition_case
@@ -241,11 +243,11 @@ CONTAINS
                 alphas=given_alphas
                 alphag=given_alphag
                 CALL evaluate_mixture_from_volume(350.0_wp,alphag,alphas, &
-                    rho_m,inv_rhom,rho_c,xs,xg,xc,cp_c,cp_m)
-                CALL evaluate_mixture(350.0_wp,xs,xg,rho_ref,inv_rhom_ref, &
+                    rho_m,inv_rho_m,rho_c,xs,xg,xc,cp_c,cp_m)
+                CALL evaluate_mixture(350.0_wp,xs,xg,rho_ref,inv_rho_m_ref, &
                     rho_c_ref,inv_rho_c_ref,cp_m_ref,cp_c_ref,alphas_ref,alphag_ref)
                 CALL assert_close('volume inverse mixture density',rho_m,rho_ref,0.0_wp)
-                CALL assert_close('volume inverse inverse density',inv_rhom,inv_rhom_ref,0.0_wp)
+                CALL assert_close('volume inverse inverse density',inv_rho_m,inv_rho_m_ref,0.0_wp)
                 CALL assert_close('volume inverse carrier density',rho_c,rho_c_ref,0.0_wp)
                 CALL assert_close('volume inverse cp_m',cp_m,cp_m_ref,0.0_wp)
                 CALL assert_close('volume inverse cp_c',cp_c,cp_c_ref,0.0_wp)
@@ -709,6 +711,71 @@ CONTAINS
         IF (p_dyn<=0.0_wp) ERROR STOP 'dynamic pressure was not computed'
     END SUBROUTINE check_admissibility
 
+    !> @brief Test common conservative indices with opposite active slots in two local states.
+    !> @details L1 carries pore pressure only; L2 carries stochastic transport
+    !>          only. The flags are independently tested by physical source
+    !>          tests; here only REAL/COMPLEX conversion and exact zeros matter.
+    SUBROUTINE check_opposite_optional_state_slots
+        REAL(wp) :: layer_primitive(n_vars,2),layer_conservative(n_vars,2),decoded(n_vars)
+        COMPLEX(wp) :: complex_primitive(n_vars),complex_conservative(n_vars),complex_decoded(n_vars)
+        INTEGER :: layer
+
+        IF (idx_stoch==0 .OR. idx_pore==0 .OR. idx_stoch==idx_pore) &
+            ERROR STOP 'shared optional component indices are missing'
+        DO layer=1,2
+            layer_primitive(:,layer)=qp
+        END DO
+        layer_primitive(idx_stoch,1)=0.0_wp
+        layer_primitive(idx_pore,2)=0.0_wp
+
+        DO layer=1,2
+            CALL primitive_to_conservative(layer_primitive(:,layer),layer_conservative(:,layer))
+            CALL conservative_to_primitive(layer_conservative(:,layer),decoded)
+            CALL assert_close('common stochastic slot',decoded(idx_stoch), &
+                layer_primitive(idx_stoch,layer),1.0E-12_wp)
+            CALL assert_close('common Darcy slot',decoded(idx_pore), &
+                layer_primitive(idx_pore,layer),1.0E-12_wp)
+        END DO
+
+        IF (ABS(layer_conservative(idx_stoch,1))>0.0_wp .OR. ABS(layer_conservative(idx_pore,2))>0.0_wp) &
+            ERROR STOP 'inactive optional conservative component is not zero'
+        IF (ABS(layer_conservative(idx_pore,1))<=0.0_wp .OR. ABS(layer_conservative(idx_stoch,2))<=0.0_wp) &
+            ERROR STOP 'active optional conservative component was lost'
+
+        DO layer=1,2
+            complex_primitive=CMPLX(layer_primitive(:,layer),0.0_wp,wp)
+            IF (layer==1) complex_primitive(idx_pore)= &
+                CMPLX(layer_primitive(idx_pore,layer),1.0E-25_wp,wp)
+            IF (layer==2) complex_primitive(idx_stoch)= &
+                CMPLX(layer_primitive(idx_stoch,layer),1.0E-25_wp,wp)
+            CALL primitive_to_conservative(complex_primitive,complex_conservative)
+            CALL conservative_to_primitive(complex_conservative,complex_decoded)
+
+            ! An inactive scalar must remain exactly zero, including its imaginary component.
+            IF (layer==1) THEN
+                IF (ABS(complex_conservative(idx_stoch))>0.0_wp .OR. &
+                    ABS(complex_decoded(idx_stoch))>0.0_wp) &
+                    ERROR STOP 'Inactive L1 COMPLEX stochastic slot changed'
+            ELSE
+                IF (ABS(complex_conservative(idx_pore))>0.0_wp .OR. &
+                    ABS(complex_decoded(idx_pore))>0.0_wp) &
+                    ERROR STOP 'Inactive L2 COMPLEX pore-pressure slot changed'
+            END IF
+
+            ! Roundoff in the REAL part must not mask preservation of a tiny complex-step perturbation.
+            CALL assert_close('COMPLEX stochastic real slot',REAL(complex_decoded(idx_stoch),wp), &
+                REAL(complex_primitive(idx_stoch),wp),1.0E-12_wp)
+            CALL assert_close('COMPLEX pore-pressure real slot',REAL(complex_decoded(idx_pore),wp), &
+                REAL(complex_primitive(idx_pore),wp),1.0E-12_wp)
+            IF (ABS(AIMAG(complex_decoded(idx_stoch))-AIMAG(complex_primitive(idx_stoch)))> &
+                1.0E-12_wp*ABS(AIMAG(complex_primitive(idx_stoch)))) &
+                ERROR STOP 'COMPLEX stochastic imaginary slot not preserved'
+            IF (ABS(AIMAG(complex_decoded(idx_pore))-AIMAG(complex_primitive(idx_pore)))> &
+                1.0E-12_wp*ABS(AIMAG(complex_primitive(idx_pore)))) &
+                ERROR STOP 'COMPLEX pore-pressure imaginary slot not preserved'
+        END DO
+    END SUBROUTINE check_opposite_optional_state_slots
+
     SUBROUTINE initialize_case
         n_solid=2; n_add_gas=1; n_stoch_vars=1; n_pore_vars=1
         n_vars=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars
@@ -722,7 +789,7 @@ CONTAINS
         sp_heat_l=4180.0_wp; rho_l=1000.0_wp; inv_rho_l=1.0_wp/rho_l
         pres=101325.0_wp; inv_pres=1.0_wp/pres; T_ambient=300.0_wp
         rho_a_amb=pres/(sp_gas_const_a*T_ambient); grav=9.81_wp
-        gas_flag=.TRUE.; liquid_flag=.FALSE.; stoch_transport_flag=.TRUE.; pore_pressure_flag=.TRUE.
+        gas_flag=.TRUE.; liquid_flag=.FALSE.
         slope_correction_flag=.TRUE.; curvature_term_flag=.TRUE.
     END SUBROUTINE initialize_case
 

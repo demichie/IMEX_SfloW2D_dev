@@ -68,19 +68,12 @@ MODULE parameters_2d
     !> .
     LOGICAL :: rheology_flag
 
-    !> Canonical input name for the selected rheology (none, voellmy, plastic,
-    !> lava, lahar, empirical, quadratic, froude, lucas, mui, or mui_voellmy).
-    CHARACTER(LEN=32) :: rheology_model = 'none'
-
     ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
-    LOGICAL :: thermal_cooling_flag = .FALSE.
 
     LOGICAL :: liquid_flag
 
     LOGICAL :: lava_flag = .FALSE.
     LOGICAL :: gas_flag
-
-    LOGICAL :: topo_change_flag
 
     LOGICAL :: radial_source_flag
 
@@ -106,39 +99,19 @@ MODULE parameters_2d
     !> .
     LOGICAL :: curvature_term_flag
 
-    !> Flag to account for the deposit thickness in the erobidle layer
-    !> - T      => add deposit to erodible thickness
-    !> - F      => do not add deposit to erobile thickness
-    !> .
-    LOGICAL :: erodible_deposit_flag
-
     !> Flag to account for vaporization of liquid water
     !> - T      => vaporization form a source of water
     !> - F      => no vaporization
     !> .
-    LOGICAL :: liquid_vaporization_flag
 
     !> Remove transported flow material entering the identified sea zone.
     LOGICAL :: sea_mass_removal_flag = .FALSE.
-
-    LOGICAL :: stoch_transport_flag
-
-    LOGICAL :: pore_pressure_flag
-
-    !> Flag for stochastic friction model
-    !> - T      => we use stochastic friction model
-    !> - F      => we use deterministic friction model
-    !> .
-    LOGICAL :: stochastic_flag
 
     !> Flag to use the Sutherland's law for gas viscosity
     !> - T     => use Sutherland's law
     !> - F     => do not use
     !> .
     LOGICAL :: sutherland_flag
-
-    !> Scale of spatial correlation for stochastic model
-    REAL(wp) :: length_spatial_corr
 
     !> Elevation of the water level in the DEM file
     REAL(wp) :: water_level
@@ -261,9 +234,9 @@ MODULE parameters_2d
     !> Initial sediment concentration in the pile of material
     REAL(wp), ALLOCATABLE :: alphas_init(:)
 
+    !> Dimensionless excess pore-pressure production factor for the active injection source.
     REAL(wp) :: pore_pres_fract
 
-    LOGICAL :: gas_loss_flag
 
     INTEGER :: n_vars   !< Number of conservative variables
     INTEGER :: n_eqns   !< Number of equations
@@ -337,7 +310,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcW%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcW%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcW(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcW(:,:)
 
     !> bcE&flag defines the east boundary condition:\n
     !> - bcE%flag = 0     => Dirichlet boundary condition;
@@ -347,7 +321,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcE%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcE%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcE(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcE(:,:)
 
     !> bcS&flag defines the south boundary condition:\n
     !> - bcS%flag = 0     => Dirichlet boundary condition;
@@ -357,7 +332,8 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcS%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcS%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcS(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcS(:,:)
 
     !> bcN&flag defines the north boundary condition:\n
     !> - bcN%flag = 0     => Dirichlet boundary condition;
@@ -367,11 +343,12 @@ MODULE parameters_2d
     !> - value of the variable for Dirichlet boundary condition (bcN%flag=0);
     !> - gradient of the variable for Neumann boundary condition (bcN%flag=1).
     !> .
-    TYPE(bc), ALLOCATABLE :: bcN(:)
+    !> Boundary conditions indexed by component and material layer.
+    TYPE(bc), ALLOCATABLE :: bcN(:,:)
 
 CONTAINS
-    !> Configure canonical physical and conservative indices for a complete state.
-    !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
+    !> @brief Assign canonical primitive and conservative component indices.
+    !> @details Reject inconsistent solid, gas and optional-field counts before indexing.
     SUBROUTINE configure_canonical_state_indices()
         INTEGER :: next_index
         IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0)                                         &
@@ -408,6 +385,9 @@ CONTAINS
         idx_u=2; idx_v=3
     END SUBROUTINE configure_canonical_state_indices
 
+    !> @brief Reinitialize mass-exchange rate workspace for the configured species counts.
+    !> @details Resize allocated species arrays when the layout changes and zero all rate fields.
+    !> @param[in,out] r Rate workspace, preserving valid allocations where possible.
     SUBROUTINE reset_mass_exchange_rates(r)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

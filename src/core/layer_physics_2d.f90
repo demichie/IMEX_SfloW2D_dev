@@ -1,0 +1,144 @@
+!> @brief Validated, per-layer rheology and source configurations.
+!> @details The shared carrier phase is read from canonical global flags during validation.
+!>          No per-layer phase copy is stored or switched inside OpenMP loops.
+!>          Physical configurations are referenced without persistent copies.
+!>          Rheology dispatch metadata is owned by the source registry.
+!>          Both one- and two-layer execution use these canonical references.
+MODULE layer_physics_2d
+    USE rheology_parameters_2d, ONLY : rheology_config_type
+    USE thermal_parameters_2d, ONLY : thermal_config_type
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_config_type
+    USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
+    USE parameters_2d, ONLY : gas_flag, liquid_flag, lava_flag
+    USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
+        canonical_rheology_source_name
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: layer_physics_type
+
+    TYPE :: layer_physics_type
+        PRIVATE
+        !> Non-owning canonical rheology configuration.
+        TYPE(rheology_config_type), POINTER :: rheology => NULL()
+        !> Non-owning reference to the canonical thermal configuration.
+        TYPE(thermal_config_type), POINTER :: thermal => NULL()
+        !> Non-owning reference to the canonical layer Darcy parameters.
+        TYPE(pore_pressure_config_type), POINTER :: pore_pressure => NULL()
+        !> Non-owning reference to canonical layer mass exchange.
+        TYPE(mass_exchange_config_type), POINTER :: mass_exchange => NULL()
+        LOGICAL :: initialized=.FALSE.
+    CONTAINS
+        PROCEDURE :: initialize => initialize_layer_physics
+        PROCEDURE :: finalize => finalize_layer_physics
+        PROCEDURE :: is_initialized => layer_physics_initialized
+        PROCEDURE :: rheology_configuration => layer_physics_configuration
+        PROCEDURE :: thermal_configuration => layer_physics_thermal_configuration
+        PROCEDURE :: pore_pressure_configuration => layer_physics_pore_pressure_configuration
+        PROCEDURE :: mass_exchange_configuration => layer_physics_mass_exchange_configuration
+    END TYPE layer_physics_type
+
+CONTAINS
+
+    !> @brief Initialize the validated layer descriptor and bind canonical thermal settings.
+    !> @param[in,out] this Layer descriptor to initialize.
+    !> @param[in] rheology_enabled Rheology activation for this layer.
+    !> @param[in] rheology_config Stable-lifetime canonical rheology settings.
+    !> @param[in] thermal_config Stable-lifetime canonical thermal settings.
+    !> @param[in] pore_config Stable-lifetime canonical Darcy settings.
+    !> @param[in] mass_config Stable-lifetime mass-exchange settings.
+    !> @param[out] error Empty on success; diagnostic on failure.
+    SUBROUTINE initialize_layer_physics(this,rheology_enabled,rheology_config,thermal_config,pore_config, &
+        mass_config,error)
+        CLASS(layer_physics_type), INTENT(INOUT) :: this
+        LOGICAL, INTENT(IN) :: rheology_enabled
+        TYPE(rheology_config_type), TARGET, INTENT(IN) :: rheology_config
+        TYPE(thermal_config_type), TARGET, INTENT(IN) :: thermal_config
+        TYPE(pore_pressure_config_type), TARGET, INTENT(IN) :: pore_config
+        TYPE(mass_exchange_config_type), TARGET, INTENT(IN) :: mass_config
+        CHARACTER(*), INTENT(OUT) :: error
+        CHARACTER(LEN=64) :: source
+        TYPE(source_term_type) :: term
+        CALL this%finalize()
+        error=''
+        IF (COUNT([gas_flag,liquid_flag,lava_flag])/=1) THEN
+            error='TL04: invalid global carrier phase'
+            RETURN
+        END IF
+        source=''
+        IF (rheology_enabled) THEN
+            IF (TRIM(rheology_config%rheology_model)/='none') THEN
+                source=canonical_rheology_source_name(TRIM(rheology_config%rheology_model))
+                IF (LEN_TRIM(source)==0) THEN
+                    error='TL04: unknown layer rheology'
+                    RETURN
+                END IF
+                term=source_term_descriptor_by_name(source)
+                IF (gas_flag .AND. .NOT.term%allows_gas) error='TL04: rheology incompatible with gas'
+                IF (liquid_flag .AND. .NOT.term%allows_liquid) error='TL04: rheology incompatible with liquid'
+                IF (lava_flag .AND. .NOT.term%allows_lava) error='TL04: rheology incompatible with lava'
+                IF (LEN_TRIM(error)>0) RETURN
+            END IF
+        END IF
+        this%rheology=>rheology_config
+        this%thermal=>thermal_config
+        this%pore_pressure=>pore_config
+        this%mass_exchange=>mass_config
+        this%initialized=.TRUE.
+    END SUBROUTINE initialize_layer_physics
+
+    !> @brief Clear the layer descriptor without deallocating canonical configurations.
+    !> @param[in,out] this Layer descriptor to detach and mark uninitialized.
+    SUBROUTINE finalize_layer_physics(this)
+        CLASS(layer_physics_type), INTENT(INOUT) :: this
+        NULLIFY(this%rheology)
+        NULLIFY(this%thermal)
+        NULLIFY(this%pore_pressure)
+        NULLIFY(this%mass_exchange)
+        this%initialized=.FALSE.
+    END SUBROUTINE finalize_layer_physics
+
+    !> @brief Check whether canonical configuration references are bound to this layer.
+    !> @param[in] this Layer descriptor to examine.
+    !> @return True when initialization completed successfully.
+    PURE LOGICAL FUNCTION layer_physics_initialized(this)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        layer_physics_initialized=this%initialized
+    END FUNCTION layer_physics_initialized
+
+    !> @brief Read the rheology configuration without exposing the canonical pointer.
+    !> @param[in] this Layer descriptor with a bound rheology reference.
+    !> @return Independent value copy of the layer rheology settings.
+    PURE FUNCTION layer_physics_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(rheology_config_type) :: config
+        config=this%rheology
+    END FUNCTION layer_physics_configuration
+
+    !> @brief Read the referenced canonical thermal configuration without exposing its pointer.
+    !> @param[in] this Initialized layer descriptor.
+    !> @return Temporary value view of the canonical thermal configuration.
+    PURE FUNCTION layer_physics_thermal_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(thermal_config_type) :: config
+        config=this%thermal
+    END FUNCTION layer_physics_thermal_configuration
+
+    !> @brief Read the canonical per-layer Darcy configuration as a value view.
+    !> @param[in] this Initialized layer descriptor.
+    !> @return Temporary Darcy configuration, independent of the canonical owner.
+    PURE FUNCTION layer_physics_pore_pressure_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(pore_pressure_config_type) :: config
+        config=this%pore_pressure
+    END FUNCTION layer_physics_pore_pressure_configuration
+
+    !> @brief Read layer mass-exchange configuration without exposing its pointer.
+    !> @param[in] this Initialized descriptor.
+    !> @return Temporary mass-exchange value view.
+    PURE FUNCTION layer_physics_mass_exchange_configuration(this) RESULT(config)
+        CLASS(layer_physics_type), INTENT(IN) :: this
+        TYPE(mass_exchange_config_type) :: config
+        config=this%mass_exchange
+    END FUNCTION layer_physics_mass_exchange_configuration
+
+END MODULE layer_physics_2d

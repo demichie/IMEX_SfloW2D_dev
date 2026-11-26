@@ -1,13 +1,17 @@
 PROGRAM test_topography_faces
 
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp, slope_correction_flag
   USE geometry_2d, ONLY : B_vertex, B_face_x, B_face_y, B_cent
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : dx, dy, dx2, dy2
    USE geometry_2d, ONLY : x_stag, y_stag, compute_cell_fissure_fraction
   USE geometry_2d, ONLY : derive_topography_from_vertices
-  USE geometry_2d, ONLY : project_cell_field_to_vertices
+  USE geometry_2d, ONLY : project_cell_field_to_vertices, refresh_topography_geometry
+  USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, B_second_xx_geom, &
+       B_second_xy_geom, B_second_yy_geom, grav_coeff, grav_coeff_stag_x, &
+       grav_coeff_stag_y, begin_geometry_transaction, rollback_geometry_transaction, &
+       apply_local_bed_rate
 
   IMPLICIT NONE
 
@@ -46,9 +50,72 @@ PROGRAM test_topography_faces
   CALL check_analytic_bed(.TRUE.)
   CALL check_one_cell_excavation
   CALL check_cell_to_vertex_projection
+  CALL check_sparse_geometry
   WRITE(*,*) 'PASS: continuous shared Q1 topography verified'
 
 CONTAINS
+
+  SUBROUTINE check_sparse_geometry
+    REAL(wp), ALLOCATABLE :: rate(:,:), projected(:,:)
+    REAL(wp), ALLOCATABLE :: local_b(:,:), local_c(:,:),local_fx(:,:),local_fy(:,:)
+    REAL(wp), ALLOCATABLE :: local_sx(:,:),local_sy(:,:),local_xx(:,:),local_yy(:,:),local_xy(:,:)
+    REAL(wp), ALLOCATABLE :: local_g(:,:),local_gx(:,:),local_gy(:,:)
+    INTEGER :: j,k,case_id,j0,k0
+    LOGICAL :: accepted
+
+    ALLOCATE(B_prime_x_geom(comp_cells_x,comp_cells_y),B_prime_y_geom(comp_cells_x,comp_cells_y))
+    ALLOCATE(B_second_xx_geom(comp_cells_x,comp_cells_y),B_second_yy_geom(comp_cells_x,comp_cells_y))
+    ALLOCATE(B_second_xy_geom(comp_cells_x,comp_cells_y),grav_coeff(comp_cells_x,comp_cells_y))
+    ALLOCATE(grav_coeff_stag_x(comp_interfaces_x,comp_cells_y))
+    ALLOCATE(grav_coeff_stag_y(comp_cells_x,comp_interfaces_y))
+    ALLOCATE(rate(comp_cells_x,comp_cells_y),projected(comp_interfaces_x,comp_interfaces_y))
+    slope_correction_flag=.TRUE.
+    DO case_id=1,4
+        SELECT CASE(case_id)
+        CASE(1)
+            j0=4; k0=4
+        CASE(2)
+            j0=1; k0=1
+        CASE(3)
+            j0=comp_cells_x; k0=comp_cells_y
+        CASE DEFAULT
+            j0=3; k0=comp_cells_y-2
+        END SELECT
+        DO k=1,comp_interfaces_y
+            DO j=1,comp_interfaces_x
+                B_vertex(j,k)=4.0_wp+0.017_wp*REAL(j*j,wp)+0.011_wp*REAL(k*k,wp)+ &
+                    0.003_wp*REAL(j*k,wp)
+            END DO
+        END DO
+        CALL refresh_topography_geometry()
+        rate=0.0_wp
+        rate(j0,k0)=0.13_wp
+        CALL begin_geometry_transaction()
+        CALL apply_local_bed_rate(rate,0.2_wp,j0,j0,k0,k0,accepted)
+        IF (.NOT.accepted) ERROR STOP 'Sparse geometry candidate rejected'
+        local_b=B_vertex; local_c=B_cent; local_fx=B_face_x; local_fy=B_face_y
+        local_sx=B_prime_x_geom; local_sy=B_prime_y_geom
+        local_xx=B_second_xx_geom; local_yy=B_second_yy_geom
+        local_xy=B_second_xy_geom; local_g=grav_coeff
+        local_gx=grav_coeff_stag_x; local_gy=grav_coeff_stag_y
+        CALL rollback_geometry_transaction()
+        CALL project_cell_field_to_vertices(rate,projected)
+        B_vertex=B_vertex+0.2_wp*projected
+        CALL refresh_topography_geometry()
+        CALL assert_small('sparse vertices',MAXVAL(ABS(B_vertex-local_b)),tolerance)
+        CALL assert_small('sparse centers',MAXVAL(ABS(B_cent-local_c)),tolerance)
+        CALL assert_small('sparse face x',MAXVAL(ABS(B_face_x-local_fx)),tolerance)
+        CALL assert_small('sparse face y',MAXVAL(ABS(B_face_y-local_fy)),tolerance)
+        CALL assert_small('sparse first x',MAXVAL(ABS(B_prime_x_geom-local_sx)),tolerance)
+        CALL assert_small('sparse first y',MAXVAL(ABS(B_prime_y_geom-local_sy)),tolerance)
+        CALL assert_small('sparse second xx',MAXVAL(ABS(B_second_xx_geom-local_xx)),tolerance)
+        CALL assert_small('sparse second yy',MAXVAL(ABS(B_second_yy_geom-local_yy)),tolerance)
+        CALL assert_small('sparse second xy',MAXVAL(ABS(B_second_xy_geom-local_xy)),tolerance)
+        CALL assert_small('sparse gravity',MAXVAL(ABS(grav_coeff-local_g)),tolerance)
+        CALL assert_small('sparse gravity x face',MAXVAL(ABS(grav_coeff_stag_x-local_gx)),tolerance)
+        CALL assert_small('sparse gravity y face',MAXVAL(ABS(grav_coeff_stag_y-local_gy)),tolerance)
+    END DO
+  END SUBROUTINE check_sparse_geometry
 
   SUBROUTINE check_analytic_bed(curved)
 

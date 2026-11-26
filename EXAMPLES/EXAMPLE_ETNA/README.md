@@ -36,7 +36,7 @@ ellipsoidal excavation **before** launching the solver.
 
 ### 1. Prepare the DEM and ellipsoid configuration
 
-Extract the DEM archive `DEM/Etna2014_crop.zip` into `DEM/`
+Extract the single canonical DEM archive `DEM/Etna2014_crop.zip` into `DEM/`
 and edit `input_ellipsoid.py`, which defines the preprocessing
 parameters. The ellipsoid is constrained by the lowest and highest
 planimetric points of the initial avalanche, and its transverse
@@ -93,17 +93,15 @@ must be removed.
 ./cleanFolder.sh
 ```
 
-For optional raster plotting, link the plotting utility:
+For optional raster plotting, use the shared utility directly with the
+run's actual output directory (adjust the run name if needed):
 
 ```bash
-ln -s ../../UTILS/plot_overlay.py .
+python ../../UTILS/plot_overlay.py OUTPUT/exampleEtna
 ```
 
-Then create the overlay images:
-
-```bash
-python plot_overlay.py
-```
+This requires `OUTPUT_ESRI_FLAG=T`. For NetCDF-only output, use
+[ParaView](../../docs/website/getting-started/visualization.md) instead.
 
 
 ## Expected output
@@ -111,10 +109,18 @@ python plot_overlay.py
 Native NetCDF is enabled, and the legacy README describes ESRI ASCII `.asc` products and their visualization using GIS software or `plot_overlay.py`.
 
 
-## Legacy documentation and preservation
+## Documentation provenance
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 21 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+This Markdown guide supersedes the earlier plain-text instructions. Historical discrepancies are retained here and in [the examples documentation audit](../README_SECOND_PASS_AUDIT.md).
 
 ## Documentation verification note
 
 **Cleanup command.** The tracked cleanup utility is `cleanFolder.sh` (case sensitive); the old `cleanfolder.sh` spelling is not the tracked filename.
+
+## Shared terrain ownership
+
+The archive `DEM/Etna2014_crop.zip` is the only tracked Etna raster
+source. `EXAMPLE_ENSEMBLE_ETNA` copies/extracts it locally; `EXAMPLE_ETNA_LAVA`
+uses its own verified preparation script; `EXAMPLE_ETNA_TWO_LAYER` also
+extracts the same archive and reuses the original ellipsoid generator.
+Do not commit additional copies.

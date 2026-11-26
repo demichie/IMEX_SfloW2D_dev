@@ -68,10 +68,6 @@ PROGRAM IMEX_SfloW2D
     USE inpout_2d, ONLY : output_netcdf_flag
 
     USE simulation_2d, ONLY : simulation
-    USE source_registry_2d, ONLY : source_group_type, group_contains_name
-    USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
-
-    USE inpout_2d, ONLY : restart
 
     USE parameters_2d, ONLY : wp, idx_h, idx_T, idx_u, idx_v, idx_totMassEqn
 
@@ -79,16 +75,16 @@ PROGRAM IMEX_SfloW2D
     USE parameters_2d, ONLY : t_end
     USE parameters_2d, ONLY : dt_output
     USE parameters_2d, ONLY : dt0
-    USE parameters_2d, ONLY : topo_change_flag
+    USE substrate_parameters_2d, ONLY : substrate
     USE parameters_2d, ONLY : verbose_level
     USE parameters_2d, ONLY : n_solid
-    USE parameters_2d, ONLY : n_vars
+    USE parameters_2d, ONLY : n_vars,n_layers
+    USE rheology_parameters_2d, ONLY : rheology_l1,rheology_l2
     USE parameters_2d, ONLY : radial_source_flag
-    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag, stochastic_flag, cfl
+    USE parameters_2d, ONLY : lateral_source_flag, bottom_radial_source_flag
     USE parameters_2d, ONLY : collapsing_volume_flag
     USE parameters_2d, ONLY : serial_flag
 
-    USE parameters_2d, ONLY : stochastic_flag, length_spatial_corr
 
     USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,                                                 &
         thickness_levels , dyn_pres_levels
@@ -110,7 +106,7 @@ PROGRAM IMEX_SfloW2D
     LOGICAL :: thickness_exceeds, pressure_exceeds
     LOGICAL :: stop_flag_old
 
-    INTEGER :: j,k,l
+    INTEGER :: j,k,l,layer
 
     INTEGER :: i_pdyn_lev , i_thk_lev , i_table
 
@@ -125,12 +121,13 @@ PROGRAM IMEX_SfloW2D
     REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
 
     INTEGER :: len_fname
-    INTEGER :: i_source_group
-    TYPE(source_group_type), ALLOCATABLE :: lie_source_groups(:)
-    LOGICAL :: boundary_source_enabled
     CHARACTER(LEN=4) :: ext
     LOGICAL :: is_binary_restart
     LOGICAL :: runout_exists, mass_exists
+    LOGICAL :: timestep_diagnostics_enabled
+    INTEGER :: timestep_count
+    REAL(wp) :: cfl_dt,dt_pos,cfl_max_a_x,cfl_max_a_y
+    CHARACTER(LEN=8) :: timestep_diagnostics_setting
 
     WRITE(*,*) '---------------------'
     WRITE(*,*) 'IMEX_SfloW2D 2.0'
@@ -147,6 +144,10 @@ PROGRAM IMEX_SfloW2D
     CALL init_param
 
     CALL read_param
+    timestep_diagnostics_setting=''
+    CALL GET_ENVIRONMENT_VARIABLE('IMEX_TIMESTEP_DIAGNOSTICS',timestep_diagnostics_setting)
+    timestep_diagnostics_enabled=TRIM(timestep_diagnostics_setting)=='1'
+    timestep_count=0
 
     runout_exists = .FALSE.
     mass_exists = .FALSE.
@@ -177,18 +178,6 @@ PROGRAM IMEX_SfloW2D
 
     CALL simulation%initialize
 
-    lie_source_groups=simulation%source_registry%groups()
-    boundary_source_enabled=.FALSE.
-
-    DO i_source_group=1,SIZE(lie_source_groups)
-        IF (lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
-        boundary_source_enabled=boundary_source_enabled .OR. group_contains_name(                                      &
-                lie_source_groups(i_source_group),'boundary_injection')
-
-    END DO
-
-    DEALLOCATE(lie_source_groups)
-
     is_binary_restart = .FALSE.
     simulation%runtime%t = t_start
     simulation%runtime%t_output = t_start + dt_output
@@ -212,20 +201,26 @@ PROGRAM IMEX_SfloW2D
             ! CASE 1: BINARY RESTART (Exact)
             ! ---------------------------------------------------------
             WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
-            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state,    &
+            CALL read_restart_file(TRIM(restart_file), simulation%runtime, simulation%stochastic, simulation%state, &
                 simulation%domain)
             CALL validate_restart_output_manifest(simulation%runtime)
 
             is_binary_restart = .TRUE.
 
-            ! In a binary restart, Z is already loaded, but we need to allocate the kernel
-            ! if spatial correlation is active
-            IF (stochastic_flag .AND. length_spatial_corr > 0.0_wp) THEN
-                CALL simulation%stochastic%generate_kernel()
-
-            END IF
-
-            IF (stochastic_flag) CALL simulation%stochastic%refresh_effective()
+            ! A checkpoint restores each OU state. Regenerate only derived
+            ! correlation kernels and friction maps for active layer slots.
+            DO layer=1,n_layers
+                IF (layer==1) THEN
+                    IF (.NOT.rheology_l1%stochastic_rheology_flag .AND. &
+                        .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+                ELSE
+                    IF (.NOT.rheology_l2%stochastic_rheology_flag .AND. &
+                        .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+                END IF
+                IF (simulation%stochastic(layer)%config%length_spatial_corr>0.0_wp) &
+                    CALL simulation%stochastic(layer)%generate_kernel()
+                CALL simulation%stochastic(layer)%refresh_effective()
+            END DO
 
         ELSE
             ! ---------------------------------------------------------
@@ -256,18 +251,34 @@ PROGRAM IMEX_SfloW2D
 
     IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-    CALL simulation%domain%check_solve(simulation%state%q,                                                             &
-            simulation%runtime%t, .TRUE.)
-    CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
+    IF (n_layers==2) THEN
+        CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
+            simulation%runtime%t,.TRUE.,q_other=simulation%state%q(:,2,:,:))
+    ELSE
+        CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
+            simulation%runtime%t,.TRUE.)
+    END IF
+    CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
 
     ! For a new run or a classic restart, initialize the stochastic field only
     ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
     ! restart already contains Z and only needs its convolution kernel above.
-    IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                                                             &
-            CALL simulation%stochastic%initialize_steady(                                                              &
-            simulation%state, simulation%domain)
+    IF (.NOT.is_binary_restart) THEN
+        DO layer=1,n_layers
+            IF (layer==1) THEN
+                IF (.NOT.rheology_l1%stochastic_rheology_flag .AND. &
+                    .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+            ELSE
+                IF (.NOT.rheology_l2%stochastic_rheology_flag .AND. &
+                    .NOT.simulation%stochastic(layer)%config%stochastic_transport_flag) CYCLE
+            END IF
+            CALL simulation%stochastic(layer)%initialize_steady( &
+                simulation%state,simulation%domain, &
+                simulation%stochastic(layer)%config%stochastic_transport_flag)
+        END DO
+    END IF
 
-    IF ( topo_change_flag ) CALL refresh_topography_geometry
+    IF ( substrate%topo_change_flag ) CALL refresh_topography_geometry
 
     IF ( verbose_level .GE. 0 ) THEN
 
@@ -310,23 +321,23 @@ PROGRAM IMEX_SfloW2D
         j = simulation%domain%j_cent(l)
         k = simulation%domain%k_cent(l)
 
-        IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
+        IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
-            CALL conservative_to_primitive(simulation%state%q(1:n_vars,j,k), &
-                simulation%state%qp(1:n_vars,j,k),accepted=conversion_ok,p_dyn=p_dyn)
+            CALL conservative_to_primitive(simulation%state%q(1:n_vars,1,j,k), &
+                simulation%state%qp(1:n_vars,1,j,k),accepted=conversion_ok,p_dyn=p_dyn)
             IF (.NOT.conversion_ok) conversion_failed=.TRUE.
 
             IF ( .NOT. is_binary_restart )                                                                             &
-                    simulation%state%hmax(j,k) = simulation%state%qp(idx_h,j,k)
+                    simulation%state%hmax(j,k) = simulation%state%qp(idx_h,1,j,k)
 
-            r_u = simulation%state%qp(idx_u,j,k)
-            r_v = simulation%state%qp(idx_v,j,k)
+            r_u = simulation%state%qp(idx_u,1,j,k)
+            r_v = simulation%state%qp(idx_v,1,j,k)
 
             mod_vel2 = r_u**2 + r_v**2
             mod_vel = SQRT( mod_vel2 )
 
             IF ( ( .NOT. is_binary_restart ) .AND.                                                                     &
-                    ( simulation%state%qp(idx_h,j,k) .GT. 0.001_wp ) ) THEN
+                    ( simulation%state%qp(idx_h,1,j,k) .GT. 0.001_wp ) ) THEN
 
                 simulation%state%pdynmax(j,k) = p_dyn
                 simulation%state%mod_vel_max(j,k) = mod_vel
@@ -340,7 +351,7 @@ PROGRAM IMEX_SfloW2D
                 DO i_thk_lev=1,n_thickness_levels
 
                     thickness_exceeds =                                                                                &
-                            ( simulation%state%qp(idx_h,j,k) .GE.                                                      &
+                            ( simulation%state%qp(idx_h,1,j,k) .GE.                                                      &
                             thickness_levels(i_thk_lev) )
 
                     DO i_pdyn_lev=1,n_dyn_pres_levels
@@ -362,8 +373,8 @@ PROGRAM IMEX_SfloW2D
 
         ELSE
 
-            simulation%state%qp(1:n_vars,j,k) = 0.0_wp
-            simulation%state%qp(idx_T,j,k) = T_ambient
+            simulation%state%qp(1:n_vars,1,j,k) = 0.0_wp
+            simulation%state%qp(idx_T,1,j,k) = T_ambient
 
             IF ( .NOT. is_binary_restart ) THEN
                 simulation%state%hmax(j,k) = 0.0_wp
@@ -400,7 +411,7 @@ PROGRAM IMEX_SfloW2D
     IF ( ( n_probes .GT. 0 ) .AND. (.NOT. is_binary_restart) )                                                         &
             CALL output_probes(simulation%runtime%t, simulation%state, simulation%runtime)
 
-    IF ( SUM(simulation%state%q(idx_totMassEqn,:,:)) .EQ. 0.0_wp )                                                     &
+    IF ( SUM(simulation%state%q(idx_totMassEqn,1,:,:)) .EQ. 0.0_wp )                                                     &
         simulation%runtime%steady_deadline = t_end
 
     IF ( verbose_level .GE. 0 ) THEN
@@ -408,10 +419,10 @@ PROGRAM IMEX_SfloW2D
         WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,                                       &
         &ES11.3E3,A11,ES11.3E3)")                                                                                      &
             't =',simulation%runtime%t,'dt =',simulation%runtime%dt,                                                   &
-            ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,:,:)) ,                                             &
-            ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,:,:)) ,                                                   &
-            ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,:,:).GT.1.D-5) ,                                  &
-            ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,:,:)),                                           &
+            ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,1,:,:)) ,                                             &
+            ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,1,:,:)) ,                                                   &
+            ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,1,:,:).GT.1.D-5) ,                                  &
+            ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,1,:,:)),                                           &
             ' runout = ',simulation%runtime%runout%last_distance
 
     END IF
@@ -424,24 +435,27 @@ PROGRAM IMEX_SfloW2D
 
         CALL update_param
 
-        IF ( simulation%runtime%t .EQ. t_start ) THEN
-
-            CALL simulation%domain%check_solve(simulation%state%q,                                                     &
-                    simulation%runtime%t, .FALSE.)
-
+        IF (n_layers==2) THEN
+            CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
+                simulation%runtime%t,.FALSE.,q_other=simulation%state%q(:,2,:,:))
         ELSE
-
-            CALL simulation%domain%check_solve(simulation%state%q,                                                     &
-                    simulation%runtime%t, .FALSE.)
-
+            CALL simulation%domain%check_solve(simulation%state%q(:,1,:,:), &
+                simulation%runtime%t,.FALSE.)
         END IF
 
-        CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
+        CALL simulation%spatial_operators(1)%prepare_hp_workset(simulation%domain)
+        IF (n_layers==2) CALL simulation%spatial_operators(2)%prepare_hp_workset(simulation%domain)
 
-        CALL simulation%spatial_operator%compute_timestep(                                                             &
-                simulation%state%q, simulation%state%qp, simulation%runtime%t,                                         &
-                simulation%runtime%dt, simulation%domain,                                                              &
-                boundary_source_enabled=boundary_source_enabled)
+        ! Assemble the spatial residual once, then reduce CFL and mixture-mass
+        ! positivity on the active cells before applying any timestep sources.
+        ! Keep the current CFL boundary-trace override unchanged. Lateral Dirichlet
+        ! boundary injection is spatial and is not registered as a Lie source.
+        CALL simulation%time_integration%prepare_spatial(simulation%state,simulation%runtime%t, &
+            simulation%domain,simulation%spatial_operators,cfl_dt,dt_pos,cfl_max_a_x,cfl_max_a_y, &
+            boundary_source_enabled=.FALSE., &
+            diagnose_max_x_face=timestep_diagnostics_enabled .AND. &
+                (timestep_count<20 .OR. MOD(timestep_count+1,100)==0))
+        simulation%runtime%dt=MIN(cfl_dt,dt_pos)
 
         IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                                                         &
             simulation%runtime%t_output = t_end
@@ -475,21 +489,31 @@ PROGRAM IMEX_SfloW2D
         simulation%runtime%dt = MIN(simulation%runtime%dt,1.1_wp * 0.5_wp *                                            &
                 ( simulation%runtime%dt_old + simulation%runtime%dt_old_old ) )
 
+        timestep_count=timestep_count+1
+        IF (timestep_diagnostics_enabled .AND. &
+            (timestep_count<=20 .OR. MOD(timestep_count,100)==0)) THEN
+            WRITE(*,'(A,I0,5(A,ES24.16))') 'TIMESTEP_DIAG step=',timestep_count, &
+                ' t=',simulation%runtime%t,' cfl_dt=',cfl_dt, &
+                ' accepted_dt=',simulation%runtime%dt, &
+                ' max_a_x=',cfl_max_a_x,' max_a_y=',cfl_max_a_y
+            WRITE(*,'(A,I0,A,ES24.16)') 'DT_POS_DIAG step=',timestep_count,' dt_pos=',dt_pos
+        END IF
+        IF (.NOT.ieee_is_finite(simulation%runtime%dt) .OR. &
+            simulation%runtime%dt<=0.0_wp .OR. &
+            simulation%runtime%t+simulation%runtime%dt<=simulation%runtime%t) THEN
+            WRITE(*,'(A,3(A,ES24.16))') 'INVALID_TIMESTEP', &
+                ' t=',simulation%runtime%t,' cfl_dt=',cfl_dt, &
+                ' accepted_dt=',simulation%runtime%dt
+            WRITE(*,'(A,ES24.16)') 'INVALID_TIMESTEP dt_pos=',dt_pos
+            CALL fatal_error('Selected timestep does not advance simulation time')
+        END IF
         simulation%runtime%dt_old_old = simulation%runtime%dt_old
         simulation%runtime%dt_old = simulation%runtime%dt
 
-        ! CFL already prepared the unchanged conservative state, its numerical
-        ! primitives, HP traces and characteristic speeds. Radial, circular
-        ! and fissural sources run AFTER the spatial operator and do not
-        ! change its reconstruction inputs between these two passes.
-        ! OU now runs AFTER spatial transport, on its unpublished candidate.
-        ! No stochastic state is changed between CFL and spatial, including
-        ! when the stochastic scalar is conservatively transported.
-        ! Keep the fallback for disabled CFL and lateral boundary injection:
-        ! the explicit CFL boundary-source override can differ from the
-        ! fallback used by a fresh spatial reconstruction.
-        CALL simulation%advance_timestep(pre_spatial_primitives_ready=                                              &
-            cfl/=-1.0_wp .AND. .NOT.lateral_source_flag)
+        ! The unique pre-step spatial residual remains unchanged until Lie
+        ! consumes it. All time-dependent source averages use the final dt.
+        CALL simulation%advance_timestep(pre_spatial_primitives_ready=.TRUE., &
+            spatial_residual_ready=.TRUE.)
 
         ! advance_lie has already published a synchronized q/qp pair.
         ! Only the diagnostic dynamic pressure is needed; never reconvert qp.
@@ -502,21 +526,21 @@ PROGRAM IMEX_SfloW2D
             j = simulation%domain%j_cent(l)
             k = simulation%domain%k_cent(l)
 
-            IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
+            IF ( simulation%state%q(idx_totMassEqn,1,j,k) .GT. 0.0_wp ) THEN
 
                 p_dyn=dynamic_pressure_from_synchronized_state(                                                     &
-                    simulation%state%q(idx_totMassEqn,j,k),simulation%state%qp(:,j,k))
+                    simulation%state%q(idx_totMassEqn,1,j,k),simulation%state%qp(:,1,j,k))
 
                 simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),                                           &
-                        simulation%state%qp(idx_h,j,k))
+                        simulation%state%qp(idx_h,1,j,k))
 
-                r_u = simulation%state%qp(idx_u,j,k)
-                r_v = simulation%state%qp(idx_v,j,k)
+                r_u = simulation%state%qp(idx_u,1,j,k)
+                r_v = simulation%state%qp(idx_v,1,j,k)
 
                 mod_vel2 = r_u**2 + r_v**2
                 mod_vel = SQRT( mod_vel2 )
 
-                IF ( simulation%state%qp(idx_h,j,k) .GT. 0.001_wp ) THEN
+                IF ( simulation%state%qp(idx_h,1,j,k) .GT. 0.001_wp ) THEN
 
                     simulation%state%pdynmax(j,k) =                                                                    &
                             MAX(simulation%state%pdynmax(j,k), p_dyn)
@@ -530,7 +554,7 @@ PROGRAM IMEX_SfloW2D
                 DO i_thk_lev=1,n_thickness_levels
 
                     thickness_exceeds =                                                                                &
-                            ( simulation%state%qp(idx_h,j,k) .GE.                                                      &
+                            ( simulation%state%qp(idx_h,1,j,k) .GE.                                                      &
                             thickness_levels(i_thk_lev) )
 
                     DO i_pdyn_lev=1,n_dyn_pres_levels
@@ -551,8 +575,8 @@ PROGRAM IMEX_SfloW2D
 
             ELSE
 
-                simulation%state%qp(1:n_vars,j,k) = 0.0_wp
-                simulation%state%qp(idx_T,j,k) = T_ambient
+                simulation%state%qp(1:n_vars,1,j,k) = 0.0_wp
+                simulation%state%qp(idx_T,1,j,k) = T_ambient
 
             END IF
 
@@ -566,11 +590,11 @@ PROGRAM IMEX_SfloW2D
             WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,                                   &
             &ES11.3E3,A11,ES11.3E3)")                                                                                  &
                 't =',simulation%runtime%t,'dt =',simulation%runtime%dt,                                               &
-                ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,:,:)) ,                                         &
-                ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,:,:)) ,                                               &
-                ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,:,:).GT.1.D-7) ,                              &
+                ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,1,:,:)) ,                                         &
+                ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,1,:,:)) ,                                               &
+                ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,1,:,:).GT.1.D-7) ,                              &
                 ' solid mass = ',dx*dy*SUM(                                                                            &
-                simulation%state%q(5:4+n_solid,:,:)),                                                                  &
+                simulation%state%q(5:4+n_solid,1,:,:)),                                                                  &
                 ' runout = ',simulation%runtime%runout%last_distance
 
         END IF
