@@ -136,7 +136,7 @@ The broader source workflow is:
    submodules evaluate one cell's physical rates or analytical result.
 3. **Numerical solution:** the source executor and Newton/analytical
    solvers in `numerics` apply the configured treatments and control
-   the group progression, convergence, and rollback.
+   the group progression, convergence, and rejection of invalid candidates.
 
 The global end-of-step admissibility decision belongs to the
 time-integration machinery. Local state reconstruction may report
@@ -285,8 +285,8 @@ When adding or modifying physical models:
    remove a short repetition.
 5. **Separate evaluation from mutation.** The laws may return
    source rates or candidate substrate changes, but scheduling,
-   transactional commit/rollback, and the full time-step acceptance
-   decision remain in the numerical layer.
+   candidate evaluation, fatal failure handling, and full-step fluid
+   publication remain in the numerical layer.
 6. **Register new sources explicitly.** Extend
    `numerics/source_catalog_2d.f90`, the corresponding dispatcher
    and configuration/registry mapping as needed. Declare model
@@ -341,5 +341,6 @@ examples. Changes to floating-point formulas, branch conditions,
 mass/energy accounting or complex-step behavior require scientific
 regression evidence, not formatting-only comparison.
 
-The broader architecture and implementation history are described in
-[the state architecture roadmap](../../docs/STATE_ARCHITECTURE_REDESIGN_ROADMAP.md).
+Current ownership and state invariants are documented in
+[the canonical state guide](../state/README.md) and the
+[two-layer architecture specification](../../docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).

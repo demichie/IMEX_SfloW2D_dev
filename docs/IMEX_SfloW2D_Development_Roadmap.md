@@ -1,175 +1,95 @@
-# IMEX-SfloW2D — Development roadmap
+# IMEX-SfloW2D — Current development roadmap
 
-**Current integration baseline:** `master`, following [Pull Request #7](https://github.com/demichie/IMEX_SfloW2D_dev/pull/7).
-This file contains current contracts and outstanding work, not a cumulative commit diary.
-For authoritative behavior inspect the source code and CI outcome for the exact revision.
+**Baseline:** one- and two-layer execution is integrated on `master`.
+This document lists current contracts and outstanding work, **not the
+chronology of past migrations**. The source and successful CI on each
+specific revision are the authority for verification claims.
 
-## Integrated one- and two-layer execution
+## Integrated capabilities
 
-Both `N_LAYERS=1` and `N_LAYERS=2` select the standard solver path
-without an environment activation gate. The single-layer path remains
-the regression baseline. Optimized, strict/debug, OpenMP and Etna
-two-layer end-to-end integration all passed on `7388eeeb7`:
-[workflow 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249).
-This verifies the functional removal of the previous activation gate;
-it does not establish general physical validity. The characteristic
-restrictions are in [two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md).
+The standard executable accepts `N_LAYERS=1` and `N_LAYERS=2` directly in
+`IMEX_SfloW2D.inp` without a special activation environment variable.
+The single-layer solver remains the regression baseline.
 
-The solver-integration workflow now includes the short Etna two-layer
-test in every manually dispatched run; extended Etna checks remain
-optional. Every changed SHA requires its own CI verification.
-
-The [two-layer architecture and roadmap](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
-is the single authoritative specification of layer ownership, contacts,
-conservative exchanges, spatial coupling, Lie scheduling and scientific
-assumptions. Do not introduce competing implementation plans.
-
-| Area | Integrated implementation | Evidence and remaining scope |
+| Area | Integrated behavior | Limitation |
 | --- | --- | --- |
-| Layer-aware state and spatial operator (TL00–TL06) | Canonical `q/qp(component,layer,x,y)`, per-layer reconstructions and boundaries, shared two-layer spatial workset | Structural regressions and optimized/strict-debug integration verified; general coupled hyperbolicity is not assumed. |
-| Coupled Lie and physical sources (TL07–TL11) | Local external sources, conservative interlayer mass transfer, and analytic interlayer drag share one scheduler | Source, conservation and wet/dry regressions verified; physical closure calibration remains model-dependent. |
-| Input, output and restart (TL12) | Direct `N_LAYERS=1/2` selection, per-layer input and output, shared-substrate budgets and binary continuation | End-to-end Etna checks include output, restart and OpenMP; no special activation is required. |
-| Functional integration (TL13a) | **Complete**; short two-layer Etna smoke is now standard solver-workflow coverage | [Workflow 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249) passed all four jobs on `7388eeeb7`. |
-| Scientific validity (TL13b) | Formulation retained with documented applicability limits | Inverted density, degenerate equal-density states, excessive shear, coupled spectral behavior and empirical closure calibration are not generally validated. |
+| State | Canonical `q/qp(component,layer,x,y)`, shared terrain and substrate | Preserve dry states, budgets and REAL/COMPLEX agreement |
+| Spatial method | Shared active domain, high-resolution fluxes and coupled pressure terms | A CFL step is not proof of two-layer hyperbolicity |
+| Source terms | Ordered Lie groups, per-layer external laws, conservative interlayer exchange and analytic drag | Constitutive calibration depends on the scenario |
+| Input and output | Per-layer initialization, physical NetCDF fields and one complete binary checkpoint | Current development schemas only |
+| Functional integration | Two-layer path in ordinary solver execution and standard short Etna integration test | Engineering integration does not establish general scientific validity |
 
-## Consolidation scope
+Earlier optimized, strict/debug, OpenMP and Etna integration results are
+recorded by [workflow 45822522249](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/45822522249)
+on `7388eeeb7`. They verify **that SHA**, not later commits.
 
-The first repository cleanup removes tracked interpreter caches, macOS
-metadata and three N7 stage-observer directories whose executable
-entrypoints had already been retired. Their scientific contracts remain
-named in `TESTS/ACCEPTANCE/acceptance_plan.json` with the status
-`historical_only_pending_current_revalidation`; they are recoverable
-from [the pre-consolidation revision](https://github.com/demichie/IMEX_SfloW2D_dev/tree/6650582fea44ca5bcbeeb73fc5f631ba0e7bd166/TESTS).
-This is **not** new evidence that the missing N7 criteria pass.
+The [two-layer architecture](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md),
+[characteristic analysis](TWO_LAYER_HYPERBOLICITY.md) and
+[interlayer closure checklist](TL13B_C_PHYSICAL_CLOSURES.md) are the
+current detailed scientific references.
 
-Structural rheology consolidation retires the registered Newton-only
-demonstration model `rheology_newmodel` and its shared include file,
-updates all source IDs/masks and build dependencies, and moves the
-independent four-case linear Newton/complex-step check to a fixed-temperature,
-zero-yield subcase of the **existing** lava viscous law. The seven
-production rheologies' shared REAL/COMPLEX regressions are retained.
-All per-law treatment entry points remain in place, including intended
-zero contributions and explicit unsupported-method diagnostics.
-This removes a development fixture without registering a replacement law.
-The change requires optimized, strict/debug, source-physics and integration
-Actions on its own commit.
+## Permanent architecture and numerical contracts
 
-Physical laws, source ordering and numerical results must remain unchanged.
-The existing unsuffixed single-layer NAMELISTs are intentional input
-contracts and are **not** cleanup targets.
+- **One authoritative state:** no duplicated permanent layer arrays,
+  synchronized global coefficients, parallel production code paths or
+  transitional wrappers.
+- **Input names:** unsuffixed single-layer `<FAMILY>_PARAMETERS` NAMELISTs
+  are intentional, not compatibility debris.
+- **Clear ownership:** `src/state/` owns state and conversions;
+  `src/physics/` owns cell-local laws; `src/spatial/` owns fluxes and
+  pressure; `src/numerics/` owns source scheduling and accepted updates.
+- **Fatal invalid steps:** no recoverable whole-step substrate rollback,
+  timestep retry or post-update clipping. Geometry-local deferred
+  publication is a distinct mechanism.
+- **Necessary temporary data:** trial states, read-only per-layer
+  configuration snapshots, pre-CFL primitive information and thread-local
+  scratch are required numerical workspaces, not alternate authoritative
+  representations. The validated source registry is setup-only; the
+  executor owns the operational ordered groups.
+- **Scientific integrity:** do not change physics, evaluation order,
+  dry-state conventions, source splitting, tolerances or REAL/COMPLEX
+  formulas as a by-product of maintenance.
 
-The source registry now retains only state actually consumed after
-initialization. Duplicated validation branches and an unused source-name
-copy helper have been removed; source-mask construction reuses the
-catalog's canonical `source_id_mask` function. Source-name uniqueness is
-checked once over the entire catalog rather than again on its rheology
-subset. The test suite verifies the exact source mask of a combined
-Newton group. Cached fields needed by the timestep executor and all
-uniform physical-treatment interfaces remain intact.
+For actual implementation details see the
+[state guide](../src/state/README.md),
+[active-domain guide](../src/geometry/README.md),
+[Lie timestep contract](../src/numerics/README.md) and
+[physics-source guide](../src/physics/README.md).
 
-The source group no longer stores a second copy of the rheology's
-canonical name. Its validated numeric rheology ID is reused for the
-mu(I)-only momentum-reversal guard in the Lie cell sweep; the source
-identity is still available in the canonical source-name list. The
-restriction to positive single-source groups is unchanged.
+## Outstanding priorities
 
-The per-layer physics descriptor now owns only non-owning references to
-canonical rheology, thermal, Darcy and mass-exchange configurations plus
-their validation status. Rheology names and numeric dispatch IDs are
-resolved and retained by the source registry, not duplicated in the
-layer descriptor. During source initialization, canonical rheology
-lookup is evaluated once per configured layer, and source treatment
-selection recognizes rheologies through the catalog instead of a second
-hand-maintained list. The REAL/COMPLEX laws, treatment entry points and
-hot-loop input values are unchanged.
+1. **Two-layer scientific acceptance (TL13b):** examine density/shear
+   states and characteristic roots in representative runs; advance
+   quantitative closure calibration and the C1–C3/C5 checks in
+   [the closure checklist](TL13B_C_PHYSICAL_CLOSURES.md). No universal
+   hyperbolicity or empirical validation is implied.
+2. **Historical N7 revalidation:** criteria still marked
+   `historical_only_pending_current_revalidation` in the
+   [acceptance inventory](../TESTS/ACCEPTANCE/acceptance_plan.json)
+   need checks using current production observables. Do not restore
+   retired stage-observer infrastructure.
+3. **Lateral Dirichlet/CFL policy:** independently audit the existing
+   production override `boundary_source_enabled=.FALSE.`, rather than
+   silently changing it during documentation or structural cleanup.
+4. **OpenMP reproducibility and performance:** the shared wetness mask,
+   ping-pong halo, parallel ordered worklist and dependent workset
+   algorithms are integrated. Validate full-solver behavior and measure
+   complete-run scaling on matched cases before claiming speedups.
+5. **Distribution and documentation:** publish README, MkDocs, Doxygen
+   and GHCR releases only against the deliberately selected, verified
+   `master` revision. Publishing workflows require manual dispatch.
 
-## Ownership and workspace consolidation
+## Verification and history
 
-The validated `source_registry_type` is now local to simulation
-initialization. After the Lie executor receives the ordered group metadata,
-the setup registry is finalized; there is no second persistent copy of the
-source groups in `simulation_context_type`. The old driver probe for
-`boundary_injection` was removed because that name is not a schedulable
-Lie source. The existing `boundary_source_enabled=.FALSE.` CFL override
-remains unchanged; boundary-condition physics is not altered. Its interaction
-with configured lateral Dirichlet inflow requires a separate physical audit:
-the reconstruction default is `lateral_source_flag`, but this production
-call explicitly overrides it with `.FALSE.`. Do not silently change that
-behavior as part of structural cleanup.
+Use the three independent manual workflows for source/documentation,
+physics/numerical regressions and solver/OpenMP integration; include
+optimized and strict/debug checks, one- and two-layer examples, binary
+restart and conservation tests as applicable. **Green CI verifies only
+the SHA on which it ran.**
 
-The executor retains a single group descriptor per scheduled source
-group. Prepartitioned exchange-free source selection is stored as an
-integer bit mask rather than a second complete array of group descriptors
-(with duplicated allocatable names and equation indices). The physical
-explicit evaluator accepts that mask while continuing to read dispatch
-metadata from the canonical group. A focused curvature regression verifies
-that filtering does not modify the original descriptor.
+- [Workflow catalogue](../.github/ACTIONS.md)
+- [Scientific acceptance inventory](../TESTS/ACCEPTANCE/acceptance_plan.json)
+- [Dated scientific evidence](acceptance/README.md)
+- [Superseded development notes at a fixed Git revision](https://github.com/demichie/IMEX_SfloW2D_dev/tree/cccdee3ef8d54b7efea92ace97d4beabc0c52ac5/docs)
 
-The per-layer rheology, thermal, Darcy and mass-exchange values assembled
-by `advance_lie` remain **temporary, read-only timestep snapshots**.
-They are required by the existing array-based physical-source API and
-keep configuration reads outside OpenMP cell loops. Similarly, the trial
-conservative/primitive states, the optional pre-CFL primitive halo, and
-thread-owned REAL/COMPLEX physical scratch remain essential numerical
-workspaces. Removing them would change transaction or worker ownership.
-
-## Post-merge maintenance priorities
-
-- Keep the root README, MkDocs site and Doxygen API consistent with the
-  integrated `master` architecture and with the exact published revision.
-- Publish a runnable solver container to GitHub Container Registry using the
-  manually selected `master` commit; make its runtime dependencies and
-  immutable image tag explicit.
-- Revalidate remaining historical N7 acceptance criteria against current
-  observables without reinstating obsolete development infrastructure.
-- Resolve the existing lateral Dirichlet boundary/CFL override question in
-  a separate physics review, not in documentation or packaging cleanup.
-
-## Invariants of the integrated solver
-
-- **One authoritative state:** `q/qp(component,layer,x,y)`; no synchronized
-  copies, global duplicates or transitional internal APIs.
-- Keep the single-layer `<FAMILY>_PARAMETERS` input variants alongside the
-  explicit `<FAMILY>_L1_PARAMETERS` names where defined. These are intentional
-  single-layer input names, **not legacy code**.
-- Physics kernels are cell-local. The spatial operator owns pressure/flux
-  coupling; the Lie executor owns ordered sources and their limiters.
-- An invalid timestep is fatal; no recoverable global substrate rollback,
-  retry, post-update clipping or unapproved changes of physics.
-- Tests must cover REAL/COMPLEX consistency, conservation, dry states,
-  strict/debug and optimized builds, and OpenMP.
-- `N_LAYERS=2` is directly runnable, but individual simulations must
-  be interpreted within the documented density/shear limits.
-  Executable availability is not general scientific validation.
-
-## Current companion references
-
-- [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md): characteristic
-  limits and accepted scientific restrictions.
-- [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): historical
-  implementation evidence; dated gate statements do not describe the
-  current supported execution path.
-- [State architecture](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md): current state
-  ownership and performance-validation contract.
-- [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md): authoritative
-  trial/publication and fatal-error semantics.
-- [Active-domain OpenMP roadmap](ACTIVE_DOMAIN_OPENMP_ROADMAP.md):
-  implemented shared wet/dry update, ping-pong OpenMP halo, fused counting
-  and parallel ordered compaction; integration Actions and performance validation pending.
-- [NetCDF outputs](NETCDF_OUTPUT.md): visualization schema; binary checkpoint
-  is the sole restart format.
-- [Fortran style](FORTRAN_STYLE.md): mandatory conventions.
-- [Repository documentation index](README.md): guidance and dated reports.
-
-## Archived development history
-
-The former extensive master/Lie/RK migration diary and intermediate plans are
-recoverable from the immutable [pre-cleanup repository snapshot](https://github.com/demichie/IMEX_SfloW2D_dev/tree/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs),
-including the retired `docs/archive/roadmaps/` directory.
-They are **historical evidence, not specifications to reimplement**.
-Acceptance report summaries remain under [acceptance](acceptance/README.md),
-with links to the raw evidence at the same revision.
-
-**Verification rule:** A green workflow only verifies the SHA it ran.
-Structural tests or single-layer simulations alone do not establish
-coupled-model validity; functional and scientific evidence remain distinct.
+**Functional integration is complete; unrestricted physical approval is not.**

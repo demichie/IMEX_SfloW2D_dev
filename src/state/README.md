@@ -18,7 +18,7 @@ The directory serves two distinct purposes:
 
 1. **Simulation-wide state ownership.** It owns the conservative and primitive
    arrays on the computational grid, substrate inventories, diagnostic maps,
-   and the substrate snapshots used for transactional rollback.
+   and the substrate inventories and diagnostics required by the simulation.
 2. **Cell-local state evaluation.** It provides reusable REAL and COMPLEX
    physical-state workspaces and routines that calculate the properties of
    **one cell** from its conservative or primitive variables. These
@@ -109,7 +109,7 @@ and optional scalars, with ambient thermodynamic properties and
 positivity applies to **non-dry** states. Both REAL and COMPLEX constructors
 and refresh operations follow this convention.
 
-State-evaluation status and the **global end-of-step admissibility/rollback
+State-evaluation status and the **global end-of-step admissibility
 decision are distinct**. Source-group Newton evaluation can consume
 `accepted` to reject a failed trial without a fatal stop; the time integrator
 remains responsible for accepting a complete updated solution.
@@ -119,7 +119,7 @@ remains responsible for accepting a complete updated solution.
 | File | Responsibility |
 | --- | --- |
 | `state.f90` | Public facade that re-exports the canonical state modules. |
-| `state_fields.f90` | Owns grid-wide `q`/`qp`, substrate inventories, accumulated diagnostics, allocation/finalization, and snapshots for substrate rollback. |
+| `state_fields.f90` | Owns grid-wide `q`/`qp`, substrate inventories, accumulated diagnostics, allocation/finalization, without a duplicate persistent fluid state. |
 | `state_types.f90` | Defines reusable REAL/COMPLEX cell-local physical-state types and their initialization, reset, and REAL-to-COMPLEX promotion routines. |
 | `state_composition.f90` | Implements strict composition closure, separate face-specific normalization, and conservative mass-budget admissibility checks. |
 | `state_mixture.f90` | Evaluates mixture/carrier heat capacities, density, volume fractions, reduced gravity, ideal-gas specific volume, and particle descriptors. |
@@ -163,9 +163,8 @@ include.
   Avoid new allocation in hot per-cell calculations.
 - Do not introduce back-references from the state modules to global grid
   indices, time-integrator implementation, or physics source scheduling.
-- The legacy `state_2d` and `state_conversion_2d` implementations are
-  retired; production code should use the canonical modules in this
-  directory.
+- The retired `state_2d` and `state_conversion_2d` implementations are not
+  alternative production paths; use the canonical modules in this directory.
 
 ## Coding conventions and verification
 
@@ -178,9 +177,10 @@ argument/return documentation.
 
 Formatting and documentation passes must not change mathematical kernels,
 the order of floating-point operations within a procedure, source APIs,
-OpenMP directives, or simulation behavior. The directory-specific
-architecture and work history are recorded in
-[STATE_ARCHITECTURE_REDESIGN_ROADMAP.md](../../docs/STATE_ARCHITECTURE_REDESIGN_ROADMAP.md).
+OpenMP directives, or simulation behavior. The current state/conversion contract is described above and in the
+[canonical two-layer architecture](../../docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
+Superseded state-migration notes remain accessible at the
+[fixed historical revision](https://github.com/demichie/IMEX_SfloW2D_dev/blob/cccdee3ef8d54b7efea92ace97d4beabc0c52ac5/docs/STATE_ARCHITECTURE_REDESIGN_ROADMAP.md).
 
 Useful repository checks:
 

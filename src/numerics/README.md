@@ -1,29 +1,64 @@
-# numerics: Time integration, ordered Lie physical-source groups, source capability validation and nonlinear solves; physics is evaluated by the physics modules
+# Numerical integration and Lie source execution
 
-## Purpose and role in IMEX-SfloW2D
+`src/numerics/` owns time stepping, ordered physical-source groups,
+nonlinear solves and source capability validation. Constitutive laws
+remain in `src/physics/`, not duplicate implementations here.
 
-Time integration, ordered Lie physical-source groups, source capability validation and nonlinear solves; physics is evaluated by the physics modules.
-
-## Files in this directory
+## Modules
 
 | File | Responsibility |
 | --- | --- |
-| [`lapack_interfaces_2d.f90`](./lapack_interfaces_2d.f90) | Explicit interfaces to linear algebra routines. |
-| [`layer_contacts_2d.f90`](./layer_contacts_2d.f90) | Two-layer contact and exposure decisions. |
-| [`lie_source_executor_2d.f90`](./lie_source_executor_2d.f90) | Run ordered Lie groups and cell-local trial transactions; hold worker scratch and exchange-free source masks. |
-| [`nonlinear_solver_2d.f90`](./nonlinear_solver_2d.f90) | Newton solvers and complex-step Jacobian machinery. |
-| [`source_catalog_2d.f90`](./source_catalog_2d.f90) | Single immutable set of schedulable source identities and available methods. |
-| [`source_configuration_2d.f90`](./source_configuration_2d.f90) | Translate configured physics into ordered source groups. |
-| [`source_input_2d.f90`](./source_input_2d.f90) | Source-related input/configuration bindings. |
-| [`source_registry_2d.f90`](./source_registry_2d.f90) | Validate source groups during setup; the Lie executor owns the operational copy. |
-| [`time_integration_2d.f90`](./time_integration_2d.f90) | Time integration and accepted-step control. |
+| [`time_integration_2d.f90`](time_integration_2d.f90) | Trial conservative/primitive fields and accepted-step publication |
+| [`lie_source_executor_2d.f90`](lie_source_executor_2d.f90) | Ordered cell-local Lie groups and OpenMP worker scratch |
+| [`source_catalog_2d.f90`](source_catalog_2d.f90) | Source identities and supported numerical treatments |
+| [`source_configuration_2d.f90`](source_configuration_2d.f90) | Convert physical settings to source groups |
+| [`source_registry_2d.f90`](source_registry_2d.f90) | Validate groups at simulation initialization |
+| [`source_input_2d.f90`](source_input_2d.f90) | Source configuration input bindings |
+| [`nonlinear_solver_2d.f90`](nonlinear_solver_2d.f90) | Newton solves and complex-step Jacobians |
+| [`lapack_interfaces_2d.f90`](lapack_interfaces_2d.f90) | Linear algebra interfaces |
+| [`layer_contacts_2d.f90`](layer_contacts_2d.f90) | Lower/upper layer exposure and contact |
 
-## Mathematical and architectural contracts
+## Timestep and failure contracts
 
-Group 0 combines explicit spatial/source activity; positive groups represent subsequent Lie operations. A model's supported EXPLICIT, SEMI_IMPLICIT, NEWTON or ANALYTIC pathways are catalog properties, not assumptions. Neither numerical scheduling nor mass-transfer law implementations should be duplicated here.
+- `time_integration_2d` owns `q_trial` and `qp_trial`. **Authoritative
+  fluid `q/qp` are published only after the spatial stage and every
+  scheduled Lie group succeeds.**
+- Group zero evaluates rates on the pre-spatial state `q^n` and applies
+  accepted increments to the post-spatial candidate `q^*`.
+  Positive-numbered groups execute in the configured order.
+- The catalog validates each law's genuine `EXPLICIT`,
+  `SEMI_IMPLICIT`, `NEWTON` or `ANALYTIC` capability. Uniform
+  per-law treatment interfaces remain, including intentional zero
+  contributions or explicit unsupported-treatment errors.
+- Invalid spatial updates, source groups or state conversions are
+  **fatal**. There is no recoverable global substrate rollback or
+  timestep retry; shared substrate inventories may change during
+  the cell sweep. Geometry-local deferred publication is separate.
+- One- and two-layer configurations share this integration path.
+  Interlayer transfers and drag obey the pair-wide source contracts in
+  [the architecture specification](../../docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md).
 
-## Interfaces, invariants and checks
+## OpenMP and diagnostics
 
-- Respect [the project Fortran style](../../docs/FORTRAN_STYLE.md) and the official Codee configuration.
-- Preserve physics, conservative/primitive ownership and REAL/COMPLEX behavior when modifying any implementation.
-- Validate affected optimized/debug builds, source or spatial regression tests and OpenMP behavior as appropriate.
+Each worklist cell owns its candidate and visits its physical groups in
+order. The executor uses `SCHEDULE(DYNAMIC,16)` for heterogeneous cell
+work without changing a cell's source order. Failed-cell selection uses
+the earliest worklist index with synchronized witness capture.
+
+The failure-only `D19_SUBSTRATE` diagnostic reports the first rejected
+substrate candidate and its inventories/rates. Optional
+`IMEX_PROFILE_LIE=1` measures approximate worker cell-compute balance;
+it is not a measurement of whole-solver parallel efficiency.
+
+## Verification
+
+Preserve numerical evaluation order, REAL/COMPLEX equivalence,
+conservation, dry states and disjoint OpenMP writes. Use the
+`TEST_SPATIAL_OPERATOR`, `TEST_MASS_EXCHANGE`,
+`TEST_WORKSPACE_LIFECYCLE` and source registry tests as appropriate;
+verify optimized and strict/debug builds plus representative
+single-/two-layer restarts and end-to-end OpenMP runs.
+
+See [the state implementation](../state/README.md),
+[physical source laws](../physics/README.md) and
+[manually dispatched validation workflows](../../.github/ACTIONS.md).

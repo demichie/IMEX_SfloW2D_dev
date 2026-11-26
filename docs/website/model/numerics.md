@@ -22,6 +22,6 @@ Physical-law modules keep uniform `EXPLICIT`, `SEMI_IMPLICIT`, `IMPLICIT` and `A
 ## Scientific and implementation references
 
 - [Two-layer characteristic limitations](two-layer.md)
-- [Lie timestep transaction](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/LIE_TIMESTEP_TRANSACTION_ROADMAP.md)
+- [Lie timestep and failure contract](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/src/numerics/README.md)
 - [Canonical architecture](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
 - [Numerical and OpenMP verification](../development/validation.md)

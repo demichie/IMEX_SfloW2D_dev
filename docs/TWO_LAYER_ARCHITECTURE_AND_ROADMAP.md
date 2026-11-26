@@ -14,9 +14,10 @@ characteristic spectrum and CFL limitations, and
 for mass-transfer, drag and energy-budget assumptions. A completed
 run is not a certificate of hyperbolicity or empirical calibration.
 
-This document is the **current architecture specification**, not a
-chronological record. Dated implementation evidence is preserved in
-[TWO_LAYER_CODE_AUDIT.md](TWO_LAYER_CODE_AUDIT.md) and Git history.
+This is the **current architecture specification**, not a chronological
+implementation report. The dated TL13a development audit is retained at
+[a fixed historical Git revision](https://github.com/demichie/IMEX_SfloW2D_dev/blob/cccdee3ef8d54b7efea92ace97d4beabc0c52ac5/docs/TWO_LAYER_CODE_AUDIT.md);
+it does not describe the present runtime activation status.
 
 ## 1. Canonical ownership and supported configurations
 

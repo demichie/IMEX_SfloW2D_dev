@@ -1,56 +1,52 @@
 # Repository documentation
 
-This directory contains **current developer contracts** and a separately
-identified **historical acceptance record**. The repository's source code
-and CI for the exact active commit remain the source of truth.
+This directory contains the **current scientific and developer documentation**
+for IMEX-SfloW2D. The source, tests and CI results for the exact revision
+remain authoritative for implemented behavior.
 
-## Current documentation
+## Current specifications and guides
 
-- [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md): integrated solver status and remaining scientific priorities.
-- [Two-layer architecture](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md):
-  authoritative design, physical assumptions and integration status.
-- [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md):
-  characteristic spectrum, density/shear limits and conditional CFL bound.
-- [Two-layer closure audit](TWO_LAYER_CODE_AUDIT.md): technical snapshot;
-  historical status claims must be checked against current code.
-- [State architecture](STATE_ARCHITECTURE_REDESIGN_ROADMAP.md): ownership,
-  conversion and regression contract.
-- [Lie timestep transaction](LIE_TIMESTEP_TRANSACTION_ROADMAP.md):
-  accepted-step publication and fatal rejection policy.
-- [Active-domain OpenMP roadmap](ACTIVE_DOMAIN_OPENMP_ROADMAP.md): agreed
-  shared-mask expansion and global worklist compaction; not yet in production.
-- [Fortran style](FORTRAN_STYLE.md): mandatory formatting and Doxygen rules.
-- [Adding a rheology model](ADDING_A_RHEOLOGY_MODEL.md): extension guide
-  with illustrative, **not registered**, physics.
-- [NetCDF output](NETCDF_OUTPUT.md): named physical visualization fields;
-  binary checkpoints hold the full restart state.
-- [Visualization with ParaView and QGIS](website/getting-started/visualization.md):
-  menu-by-menu instructions for scientific plots and geographic textures.
-- [Docker guide](website/getting-started/docker.md): run the published solver on mounted input data.
-- [Doxygen entry page](doxygen/mainpage.md): generated API navigation and data ownership.
-- [Publishing workflows](website/development/publishing.md): manually build and deploy Pages and GHCR.
+| Document | Purpose |
+| --- | --- |
+| [Development roadmap](IMEX_SfloW2D_Development_Roadmap.md) | Integrated functionality and outstanding scientific/engineering work |
+| [Two-layer architecture](TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md) | Authoritative ownership, spatial coupling and layer source contracts |
+| [Two-layer hyperbolicity](TWO_LAYER_HYPERBOLICITY.md) | Density/shear characteristic limits and conditional CFL arguments |
+| [Interlayer physical closures](TL13B_C_PHYSICAL_CLOSURES.md) | Source budgets, accepted assumptions and calibration gaps |
+| [Initial-state input and restart](RESTART_INPUT.md) | Layer initialization and binary checkpoint continuation |
+| [NetCDF output](NETCDF_OUTPUT.md) | Physical visualization fields, units and layer names |
+| [Adding a rheology model](ADDING_A_RHEOLOGY_MODEL.md) | Source extension guide (illustrative laws are not registered) |
+| [Fortran style](FORTRAN_STYLE.md) | Mandatory source and Doxygen conventions |
 
-## Other authoritative sources
+Implementation-level contracts are maintained **beside the code**:
 
-- [Physics/source documentation](../src/physics/README.md) and
-  [state documentation](../src/state/README.md) describe owners and APIs.
-- Each example's `EXAMPLES/*/README.md` is the canonical run guide.
-- [Website sources](website/) are built by the manual MkDocs/Doxygen publishing workflow.
-  The example catalogue is generated from primary example READMEs, not supporting DEM notes.
-- [Dated acceptance reports](acceptance/README.md) and their pinned JSON
-  fixtures are historical evidence; some are still **required by the
-  executable acceptance tests** in `TESTS/ACCEPTANCE/`.
+- [State and conversions](../src/state/README.md)
+- [Finite-volume spatial methods](../src/spatial/README.md)
+- [Geometry and active-domain OpenMP worksets](../src/geometry/README.md)
+- [Time integration and Lie source transactions](../src/numerics/README.md)
+- [Physical laws and source treatments](../src/physics/README.md)
+- [I/O and restart implementation](../src/io/README.md)
 
-## Retired documentation and reproducibility
+## User documentation
 
-Superseded roadmap archives, one-off cleanup plans and the obsolete
-large state-inventory manifest are no longer maintained in the active
-tree. They remain accessible through the immutable
-[pre-cleanup Git snapshot](https://github.com/demichie/IMEX_SfloW2D_dev/tree/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs).
-Test-consumed acceptance JSON fixtures remain local; links in dated
-reports also point to their original pinned revision for reproducibility.
-Old binary/restart/NetCDF versions in historical reports do **not**
-imply ongoing compatibility requirements.
+- [Website sources](website/) and [published MkDocs](https://demichie.github.io/IMEX_SfloW2D_dev/)
+- [Doxygen entry page](doxygen/mainpage.md) and [published API](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/)
+- [Visualization](website/getting-started/visualization.md), [Docker](website/getting-started/docker.md) and [publishing](website/development/publishing.md)
+- [Runnable examples](../EXAMPLES/), each documented by its own README
 
-Do not use a dated migration plan to reinstate obsolete interfaces.
-Check the current branch, source, tests and CI results for the exact SHA.
+## Historical evidence
+
+The [acceptance directory](acceptance/README.md) retains dated scientific
+reports and machine-readable evidence. **Some JSON fixtures are consumed by
+active acceptance tests**. Preserve them until their dependencies are
+explicitly migrated; dated results apply only to their recorded revisions.
+
+Superseded state-redesign, Lie-transaction and active-domain development
+roadmaps, and the historical TL13 implementation diary, are no longer
+maintained as current specifications. Their still-relevant invariants are
+included in the module guides above. Original texts remain accessible in
+[the fixed pre-cleanup revision](https://github.com/demichie/IMEX_SfloW2D_dev/tree/cccdee3ef8d54b7efea92ace97d4beabc0c52ac5/docs).
+An older [migration-document archive](https://github.com/demichie/IMEX_SfloW2D_dev/tree/d91843a0faf8c8491cf50c240cdd50a7cd006407/docs)
+is also available.
+
+Historical records do not authorize restoring retired interfaces, earlier
+restart formats or alternate production implementations.
