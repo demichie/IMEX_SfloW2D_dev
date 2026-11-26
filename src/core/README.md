@@ -12,7 +12,7 @@ Solver-wide configuration, model layout, execution lifecycle, diagnostics and in
 | [`constitutive_parameters_2d.f90`](./constitutive_parameters_2d.f90) | Shared material and ambient parameters. |
 | [`diagnostics_2d.f90`](./diagnostics_2d.f90) | Error reporting and fatal diagnostics. |
 | [`init_2d.f90`](./init_2d.f90) | Initial-condition construction and release. |
-| [`layer_physics_2d.f90`](./layer_physics_2d.f90) | Per-layer physical configuration selection. |
+| [`layer_physics_2d.f90`](./layer_physics_2d.f90) | Validate per-layer physics and bind canonical coefficient objects without duplicate rheology dispatch metadata. |
 | [`model_layout_2d.f90`](./model_layout_2d.f90) | Resolved component counts and indices. |
 | [`parameters_2d.f90`](./parameters_2d.f90) | Working precision, global run settings and equation-index vocabulary. |
 | [`runtime_2d.f90`](./runtime_2d.f90) | Simulation time and step bookkeeping. |

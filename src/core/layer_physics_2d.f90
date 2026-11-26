@@ -1,7 +1,8 @@
 !> @brief Validated, per-layer rheology and source configurations.
 !> @details The shared carrier phase is read from canonical global flags during validation.
 !>          No per-layer phase copy is stored or switched inside OpenMP loops.
-!>          Rheology and thermal configurations are referenced without persistent copies.
+!>          Physical configurations are referenced without persistent copies.
+!>          Rheology dispatch metadata is owned by the source registry.
 !>          Both one- and two-layer execution use these canonical references.
 MODULE layer_physics_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
@@ -10,15 +11,13 @@ MODULE layer_physics_2d
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type
     USE parameters_2d, ONLY : gas_flag, liquid_flag, lava_flag
     USE source_catalog_2d, ONLY : source_term_type, source_term_descriptor_by_name, &
-        canonical_rheology_source_name, rheology_source_id, RHEOLOGY_ID_NONE
+        canonical_rheology_source_name
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: layer_physics_type
 
     TYPE :: layer_physics_type
         PRIVATE
-        INTEGER :: rheology_id=RHEOLOGY_ID_NONE
-        CHARACTER(LEN=64) :: rheology_source=''
         !> Non-owning canonical rheology configuration.
         TYPE(rheology_config_type), POINTER :: rheology => NULL()
         !> Non-owning reference to the canonical thermal configuration.
@@ -32,8 +31,6 @@ MODULE layer_physics_2d
         PROCEDURE :: initialize => initialize_layer_physics
         PROCEDURE :: finalize => finalize_layer_physics
         PROCEDURE :: is_initialized => layer_physics_initialized
-        PROCEDURE :: selected_rheology => layer_physics_rheology
-        PROCEDURE :: selected_rheology_id => layer_physics_rheology_id
         PROCEDURE :: rheology_configuration => layer_physics_configuration
         PROCEDURE :: thermal_configuration => layer_physics_thermal_configuration
         PROCEDURE :: pore_pressure_configuration => layer_physics_pore_pressure_configuration
@@ -86,9 +83,6 @@ CONTAINS
         this%thermal=>thermal_config
         this%pore_pressure=>pore_config
         this%mass_exchange=>mass_config
-        this%rheology_source=source
-        this%rheology_id=RHEOLOGY_ID_NONE
-        IF (LEN_TRIM(source)>0) this%rheology_id=rheology_source_id(source)
         this%initialized=.TRUE.
     END SUBROUTINE initialize_layer_physics
 
@@ -100,8 +94,6 @@ CONTAINS
         NULLIFY(this%thermal)
         NULLIFY(this%pore_pressure)
         NULLIFY(this%mass_exchange)
-        this%rheology_id=RHEOLOGY_ID_NONE
-        this%rheology_source=''
         this%initialized=.FALSE.
     END SUBROUTINE finalize_layer_physics
 
@@ -112,15 +104,6 @@ CONTAINS
         CLASS(layer_physics_type), INTENT(IN) :: this
         layer_physics_initialized=this%initialized
     END FUNCTION layer_physics_initialized
-
-    !> @brief Return the canonical name of the selected per-layer rheology source.
-    !> @param[in] this Initialized layer descriptor.
-    !> @return Registered source name, empty when rheology is disabled.
-    PURE FUNCTION layer_physics_rheology(this) RESULT(name)
-        CLASS(layer_physics_type), INTENT(IN) :: this
-        CHARACTER(LEN=64) :: name
-        name=this%rheology_source
-    END FUNCTION layer_physics_rheology
 
     !> @brief Read the rheology configuration without exposing the canonical pointer.
     !> @param[in] this Layer descriptor with a bound rheology reference.
@@ -158,11 +141,4 @@ CONTAINS
         config=this%mass_exchange
     END FUNCTION layer_physics_mass_exchange_configuration
 
-    !> @brief Return the canonical rheology source ID for this layer.
-    !> @param[in] this Layer descriptor being queried.
-    !> @return Selected rheology ID, or RHEOLOGY_ID_NONE when disabled.
-    PURE INTEGER FUNCTION layer_physics_rheology_id(this)
-        CLASS(layer_physics_type), INTENT(IN) :: this
-        layer_physics_rheology_id=this%rheology_id
-    END FUNCTION layer_physics_rheology_id
 END MODULE layer_physics_2d

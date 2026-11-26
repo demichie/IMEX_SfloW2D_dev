@@ -4,8 +4,9 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, one shared active-cell domain, layout, source registry and numerical workspaces. Initialization
-!> follows their dependency order; finalization releases their storage.
+!> Owns state, runtime, one shared active-cell domain, layout, source registry
+!> and numerical workspaces. Initialization follows dependency order, and
+!> finalization releases their storage.
 !********************************************************************************
 
 MODULE simulation_2d
@@ -24,10 +25,8 @@ MODULE simulation_2d
     USE model_layout_2d, ONLY : model_layout_type
     USE layer_physics_2d, ONLY : layer_physics_type
 
-    USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas,                                        &
-            n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, lava_flag, &
-            rheology_flag,                                         &
-            configure_canonical_state_indices
+    USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas, &
+            n_stoch_vars, n_pore_vars, rheology_flag, configure_canonical_state_indices
 
 
     USE runtime_2d, ONLY : runtime_state_type

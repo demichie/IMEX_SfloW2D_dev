@@ -27,11 +27,13 @@ PROGRAM test_rheology_model_names
 
         IF (TRIM(names(model))=='none') THEN
             IF (LEN_TRIM(source_name)/=0) ERROR STOP 'none is not disabled'
+            IF (rheology_source_id('none')/=RHEOLOGY_ID_NONE) ERROR STOP 'none has a rheology dispatch ID'
         ELSE
             IF (TRIM(source_name)/='rheology_'//TRIM(names(model))) &
                 ERROR STOP 'incorrect canonical rheology name'
             descriptor=source_term_descriptor_by_name(source_name)
             IF (descriptor%name/=source_name) ERROR STOP 'missing canonical source'
+            IF (rheology_source_id(source_name)/=model-1) ERROR STOP 'incorrect rheology dispatch ID'
         END IF
     END DO
 
@@ -52,4 +54,5 @@ PROGRAM test_rheology_model_names
         ERROR STOP 'retired development fixture is still registered'
     IF (LEN_TRIM(canonical_rheology_source_name('unknown-law'))/=0) &
         ERROR STOP 'unknown rheology accepted'
+    IF (rheology_source_id('rheology_unknown')/=-1) ERROR STOP 'unknown dispatch ID accepted'
 END PROGRAM test_rheology_model_names

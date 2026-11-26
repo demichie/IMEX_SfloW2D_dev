@@ -39,6 +39,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: include_thermal,include_pore
         CHARACTER(LEN=64), ALLOCATABLE, INTENT(OUT) :: active_names(:)
         CHARACTER(*), INTENT(OUT) :: error
+        CHARACTER(LEN=64) :: rheology_name
         ALLOCATE(active_names(0))
         error=''
         ! Exactly one continuous carrier may be active in the source registry.
@@ -58,15 +59,13 @@ CONTAINS
         END IF
 
         IF (rheology_flag) THEN
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology%rheology_model))>0)                                    &
-                active_names=[CHARACTER(LEN=64) :: active_names,                                                    &
-                    canonical_rheology_source_name(rheology%rheology_model)]
-        IF (LEN_TRIM(canonical_rheology_source_name(rheology%rheology_model))==0 .AND.                              &
-                TRIM(rheology%rheology_model)/='none') THEN
-            error='D17: unsupported configured rheology'; RETURN
-
-        END IF
-
+            rheology_name=canonical_rheology_source_name(rheology%rheology_model)
+            IF (LEN_TRIM(rheology_name)>0) &
+                active_names=[CHARACTER(LEN=64) :: active_names,rheology_name]
+            IF (LEN_TRIM(rheology_name)==0 .AND. TRIM(rheology%rheology_model)/='none') THEN
+                error='D17: unsupported configured rheology'
+                RETURN
+            END IF
         END IF
 
         IF (include_thermal) active_names=[CHARACTER(LEN=64) :: active_names,                                          &
@@ -179,55 +178,40 @@ CONTAINS
             groups=[groups,g]
 
             DO i=1,SIZE(names)
-        term=source_term_descriptor_by_name(names(i))
-        method=term%default_method
-        id=0
-        requested_method=''
-        BLOCK
-            CHARACTER(LEN=64) :: active_names(1)
-            active_names(1)=names(i)
-
-        SELECT CASE(TRIM(active_names(1)))
-        CASE('rheology_voellmy','rheology_plastic','rheology_lava',                                                    &
-                'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
-                'rheology_froude','rheology_lucas','rheology_mui',                                                     &
-                'rheology_mui_voellmy')
-            requested_method=selected_rheology%rheology_method
-            id=selected_rheology%rheology_group
-        CASE('thermal_cooling')
-            requested_method=selected_thermal%thermal_method
-            id=selected_thermal%thermal_group
-        CASE('pore_pressure_dissipation')
-            requested_method=selected_pore%pore_pressure_method
-            id=selected_pore%pore_pressure_group
-        CASE('bottom_circular_injection','bottom_fissural_injection',                                                  &
-                'radial_injection','geometry_curvature')
-
-            SELECT CASE(TRIM(active_names(1)))
-            CASE('bottom_circular_injection')
-                requested_method=bottom_circular_method
-                id=bottom_circular_group
-            CASE('bottom_fissural_injection')
-                requested_method=bottom_fissural_method
-                id=bottom_fissural_group
-            CASE('radial_injection')
-                requested_method=radial_injection_method
-                id=radial_injection_group
-            CASE('geometry_curvature')
-                requested_method=geometry_curvature_method
-                id=geometry_curvature_group
-
-            END SELECT
-        CASE('mass_exchange_lava_deposition','mass_exchange_erosion',                                                  &
-                'mass_exchange_deposition','mass_exchange_carrier_liquid_loss',                                        &
-                'mass_exchange_entrainment',                                                                           &
-                'mass_exchange_vaporization')
-            requested_method=selected_mass%method
-            id=selected_mass%group
-        CASE DEFAULT
-        END SELECT
-
-        END BLOCK
+                term=source_term_descriptor_by_name(names(i))
+                method=term%default_method
+                id=0
+                requested_method=''
+                IF (rheology_source_id(names(i))>RHEOLOGY_ID_NONE) THEN
+                    requested_method=selected_rheology%rheology_method
+                    id=selected_rheology%rheology_group
+                ELSE
+                    SELECT CASE(TRIM(names(i)))
+                    CASE('thermal_cooling')
+                        requested_method=selected_thermal%thermal_method
+                        id=selected_thermal%thermal_group
+                    CASE('pore_pressure_dissipation')
+                        requested_method=selected_pore%pore_pressure_method
+                        id=selected_pore%pore_pressure_group
+                    CASE('bottom_circular_injection')
+                        requested_method=bottom_circular_method
+                        id=bottom_circular_group
+                    CASE('bottom_fissural_injection')
+                        requested_method=bottom_fissural_method
+                        id=bottom_fissural_group
+                    CASE('radial_injection')
+                        requested_method=radial_injection_method
+                        id=radial_injection_group
+                    CASE('geometry_curvature')
+                        requested_method=geometry_curvature_method
+                        id=geometry_curvature_group
+                    CASE('mass_exchange_lava_deposition','mass_exchange_erosion',                                 &
+                            'mass_exchange_deposition','mass_exchange_carrier_liquid_loss',                       &
+                            'mass_exchange_entrainment','mass_exchange_vaporization')
+                        requested_method=selected_mass%method
+                        id=selected_mass%group
+                    END SELECT
+                END IF
 
         SELECT CASE(TRIM(requested_method))
         CASE('')

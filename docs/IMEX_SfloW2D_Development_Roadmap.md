@@ -67,6 +67,16 @@ subset. The test suite verifies the exact source mask of a combined
 Newton group. Cached fields needed by the timestep executor and all
 uniform physical-treatment interfaces remain intact.
 
+The per-layer physics descriptor now owns only non-owning references to
+canonical rheology, thermal, Darcy and mass-exchange configurations plus
+their validation status. Rheology names and numeric dispatch IDs are
+resolved and retained by the source registry, not duplicated in the
+layer descriptor. During source initialization, canonical rheology
+lookup is evaluated once per configured layer, and source treatment
+selection recognizes rheologies through the catalog instead of a second
+hand-maintained list. The REAL/COMPLEX laws, treatment entry points and
+hot-loop input values are unchanged.
+
 ## Invariants of the integrated solver
 
 - **One authoritative state:** `q/qp(component,layer,x,y)`; no synchronized
