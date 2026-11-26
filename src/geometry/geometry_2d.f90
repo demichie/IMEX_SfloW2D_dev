@@ -804,8 +804,8 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     END SUBROUTINE assign_topography_vertices
 
     !> Validate every geometry field used by subsequent Lie groups.
-    !> @brief topography geometry is finite operation.
-    !> @return Result computed by topography_geometry_is_finite.
+    !> @brief Check that terrain vertices, derived geometry and face metrics are finite.
+    !> @return True only if all geometry fields needed by the Lie sources are finite.
     LOGICAL FUNCTION topography_geometry_is_finite()
         topography_geometry_is_finite=.FALSE.
         IF (.NOT.ALL(ieee_is_finite(B_vertex))) RETURN
@@ -1643,7 +1643,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
             ALL(ieee_is_finite(grav_coeff_stag_y(dj0:dj1,dk0:MIN(comp_interfaces_y,dk1+1))))
     END SUBROUTINE apply_local_bed_rate
 
-    !> @brief derive topography from vertices operation.
+    !> @brief Derive face/cell elevations and geometric derivatives from B_vertex.
     SUBROUTINE derive_topography_from_vertices
 
     IMPLICIT NONE
@@ -1745,11 +1745,11 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
 
     !> Preserve only the fields potentially changed by the local Q1/LS update.
     !> Fields are captured before the first write, once per Lie transaction.
-    !> @brief capture local geometry operation.
-    !> @param[in] j0 j0 argument of capture_local_geometry.
-    !> @param[in] j1 j1 argument of capture_local_geometry.
-    !> @param[in] k0 k0 argument of capture_local_geometry.
-    !> @param[in] k1 k1 argument of capture_local_geometry.
+    !> @brief Save the geometry patch before a candidate local bed update.
+    !> @param[in] j0 First x-cell index of the geometry patch.
+    !> @param[in] j1 Last x-cell index of the geometry patch.
+    !> @param[in] k0 First y-cell index of the geometry patch.
+    !> @param[in] k1 Last y-cell index of the geometry patch.
     !> @param[in] cj0 cj0 argument of capture_local_geometry.
     !> @param[in] cj1 cj1 argument of capture_local_geometry.
     !> @param[in] ck0 ck0 argument of capture_local_geometry.
@@ -1780,7 +1780,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     END SUBROUTINE capture_local_geometry
 
     !> Accept geometric changes and discard the pre-transaction snapshot.
-    !> @brief commit geometry transaction operation.
+    !> @brief Accept updated geometry and release the saved transaction snapshot.
     SUBROUTINE commit_geometry_transaction
         IF (.NOT.geometry_transaction_active)                                                                          &
             ERROR STOP 'no geometry transaction to commit'
@@ -1788,7 +1788,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
     END SUBROUTINE commit_geometry_transaction
 
     !> Restore the original bed and derived geometric fields on rejection.
-    !> @brief rollback geometry transaction operation.
+    !> @brief Restore geometry saved before the rejected bed transaction.
     SUBROUTINE rollback_geometry_transaction
         IF (.NOT.geometry_transaction_active) RETURN
         IF (geometry_transaction_sparse) THEN
@@ -1827,7 +1827,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         CALL clear_geometry_transaction
     END SUBROUTINE rollback_geometry_transaction
 
-    !> @brief clear geometry transaction operation.
+    !> @brief Release saved geometry patches and reset transaction flags.
     SUBROUTINE clear_geometry_transaction
         IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
         IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
@@ -1846,7 +1846,7 @@ topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
         geometry_sparse_patch_saved=.FALSE.
     END SUBROUTINE clear_geometry_transaction
 
-    !> @brief refresh topography geometry operation.
+    !> @brief Recompute cell/face geometry from the accepted terrain vertices.
     SUBROUTINE refresh_topography_geometry
 
     IMPLICIT NONE

@@ -105,7 +105,7 @@ CONTAINS
     !> \param[out] vel_min Lower characteristic speed [m s^-1].
     !> \param[out] vel_max Upper characteristic speed [m s^-1].
     !> \note normal_velocity_index must identify one of the two Cartesian velocity components.
-    !> @param[out] gamma gamma argument for eval_local_speeds_direction.
+    !> @param[out] gamma Optional hydrostatic coefficient rho_m*reduced_gravity from the face trace.
     SUBROUTINE eval_local_speeds_direction(qpj, grav_coeff, normal_velocity_index, vel_min, vel_max, gamma)
         REAL(wp), INTENT(IN) :: qpj(n_vars), grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
@@ -131,10 +131,10 @@ CONTAINS
 
     !> Only density and reduced gravity are needed by hydrostatic PCCU.
     !> Evaluate from the finalized trace; no mixture heat capacities or Ri.
-    !> @brief eval spatial buoyancy operation.
-    !> @param[in] qp qp argument for eval_spatial_buoyancy.
-    !> @param[out] rho_m rho m argument for eval_spatial_buoyancy.
-    !> @param[out] reduced_gravity reduced gravity argument for eval_spatial_buoyancy.
+    !> @brief Compute mixture density and reduced gravity from a reconstructed primitive trace.
+    !> @param[in] qp Primitive face trace of length n_vars; a dry trace uses ambient density.
+    !> @param[out] rho_m Mixture density of the final trace [kg/m3].
+    !> @param[out] reduced_gravity Buoyancy-reduced gravitational acceleration [m/s2].
     SUBROUTINE eval_spatial_buoyancy(qp,rho_m,reduced_gravity)
         REAL(wp), INTENT(IN) :: qp(n_vars)
         REAL(wp), INTENT(OUT) :: rho_m,reduced_gravity

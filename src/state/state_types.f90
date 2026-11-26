@@ -19,7 +19,7 @@ MODULE state_types
     PUBLIC :: reset_physical_state_complex
     PUBLIC :: promote_physical_state
 
-    !> Complete cell-local physical state for real-valued evaluation.
+    !> @brief Complete cell-local physical state for real-valued evaluation.
     TYPE, PUBLIC :: physical_state_real
         !> Workspace allocation/layout validated at setup; never allocated in the cell loop.
         LOGICAL :: layout_valid=.FALSE.
@@ -43,19 +43,31 @@ MODULE state_types
         REAL(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
     END TYPE physical_state_real
 
-    !> Complete cell-local physical state for complex-step evaluation.
+    !> @brief Complete cell-local physical state for complex-step evaluation.
     TYPE, PUBLIC :: physical_state_complex
+        !> True after COMPLEX composition arrays have validated allocation.
         LOGICAL :: layout_valid=.FALSE.
+        !> COMPLEX layer depth and horizontal x-velocity [m, m/s].
         COMPLEX(wp) :: h=(0.0_wp,0.0_wp), u=(0.0_wp,0.0_wp)
+        !> COMPLEX y-velocity and material temperature [m/s, K].
         COMPLEX(wp) :: v=(0.0_wp,0.0_wp), T=(0.0_wp,0.0_wp)
+        !> COMPLEX mixture density and reciprocal [kg/m3, m3/kg].
         COMPLEX(wp) :: rho_m=(0.0_wp,0.0_wp), inv_rho_m=(0.0_wp,0.0_wp)
+        !> COMPLEX carrier density and reciprocal [kg/m3, m3/kg].
         COMPLEX(wp) :: rho_c=(0.0_wp,0.0_wp), inv_rho_c=(0.0_wp,0.0_wp)
+        !> COMPLEX mixture/carrier specific heat [J/(kg K)].
         COMPLEX(wp) :: cp_m=(0.0_wp,0.0_wp), cp_c=(0.0_wp,0.0_wp)
+        !> COMPLEX reduced gravity [m/s2] and dimensionless Richardson number.
         COMPLEX(wp) :: red_grav=(0.0_wp,0.0_wp), Ri=(0.0_wp,0.0_wp)
+        !> COMPLEX stochastic variable and excess pore pressure components.
         COMPLEX(wp) :: Zs=(0.0_wp,0.0_wp), exc_pore_pres=(0.0_wp,0.0_wp)
+        !> COMPLEX vertical and horizontal speed [m/s].
         COMPLEX(wp) :: w=(0.0_wp,0.0_wp), mod_vel_hor=(0.0_wp,0.0_wp)
+        !> COMPLEX speed squared [m2/s2] and total speed [m/s].
         COMPLEX(wp) :: mod_vel2=(0.0_wp,0.0_wp), mod_vel=(0.0_wp,0.0_wp)
+        !> COMPLEX curvature acceleration of the moving layer [m/s2].
         COMPLEX(wp) :: curvature_acceleration=(0.0_wp,0.0_wp)
+        !> COMPLEX solid/gas mass and volume fractions, sized at initialization.
         COMPLEX(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
     END TYPE physical_state_complex
 

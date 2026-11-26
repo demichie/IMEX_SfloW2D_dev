@@ -38,24 +38,39 @@ MODULE hyperbolic_2d
     !>          inertial endpoint flux.
     TYPE, PUBLIC :: hyperbolic_workspace_type
         ! One common characteristic bound per face and sign, not per equation.
+        !> Negative-going x-normal wave-speed bound at each x face [m/s].
         REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:)
+        !> Positive-going x-normal wave-speed bound at each x face [m/s].
         REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:)
+        !> Negative-going y-normal wave-speed bound at each y face [m/s].
         REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:)
+        !> Positive-going y-normal wave-speed bound at each y face [m/s].
         REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:)
         ! Hydrostatic coefficients derived while evaluating the same final
         ! endpoint traces for characteristic speeds. Owned by the HP workspace.
+        !> Left/right hydrostatic density-gravity coefficients at x faces.
         REAL(wp), ALLOCATABLE :: gamma_interface_xL(:,:),gamma_interface_xR(:,:)
+        !> Bottom/top hydrostatic density-gravity coefficients at y faces.
         REAL(wp), ALLOCATABLE :: gamma_interface_yB(:,:),gamma_interface_yT(:,:)
+        !> Hydrostatic path contributions on left-oriented x-face traces.
         REAL(wp), ALLOCATABLE :: G_interface_xL(:,:,:)
+        !> Hydrostatic path contributions on right-oriented x-face traces.
         REAL(wp), ALLOCATABLE :: G_interface_xR(:,:,:)
+        !> Hydrostatic path contributions on bottom-oriented y-face traces.
         REAL(wp), ALLOCATABLE :: G_interface_yB(:,:,:)
+        !> Hydrostatic path contributions on top-oriented y-face traces.
         REAL(wp), ALLOCATABLE :: G_interface_yT(:,:,:)
+        !> Cell-centered x-direction nonconservative pressure-path residuals.
         REAL(wp), ALLOCATABLE :: P_cell_x(:,:,:)
+        !> Cell-centered y-direction nonconservative pressure-path residuals.
         REAL(wp), ALLOCATABLE :: P_cell_y(:,:,:)
         !> For L2 only, suppress negative reduced gravity in hydrostatic pressure.
         LOGICAL :: clamp_buoyant_pressure=.FALSE.
+        !> Enable optional spatial reconstruction/flux timing.
         LOGICAL :: profile_enabled=.FALSE.
+        !> Number of sampled hyperbolic evaluation calls.
         INTEGER :: profile_calls=0
+        !> Cumulative reconstruction, flux and assembly timings [s].
         REAL(wp) :: profile_reconstruction=0.0_wp,profile_flux=0.0_wp,profile_assembly=0.0_wp
     CONTAINS
         PROCEDURE :: initialize => initialize_hyperbolic
@@ -197,32 +212,32 @@ CONTAINS
     !> @details Reuses the common pressure kernel and shared total-depth face-speed
     !> envelope on the OR workset. Subtract within-cell paths with
     !> the exact Gamma2 selected by the existing L2 hydrostatic cell kernel.
-    !> @param[in] l1,l2 Reconstructed layer traces on the shared workset.
+    !> Reconstructed layer traces on the shared workset.
     !> @param[in] hp2 Upper-layer pressure coefficients from the same traces.
-    !> @param[in,out] r1,r2 Existing layer spatial residuals.
+    !> Existing layer spatial residuals.
     !> @param[in] active Shared active-cell mask.
-    !> @param[in] nc,jc,kc Shared active cell count and coordinates.
+    !> Shared active cell count and coordinates.
     !> @param[in] qp2 Upper-layer primitive state for dry-cell treatment.
-    !> @param[in] nx,ny Shared face counts by Cartesian direction.
-    !> @param[in] jx,kx,jy,ky Shared compact face coordinates.
-    !> @param[in] axn,axp,ayn,ayp Shared total-depth face-speed bounds.
-    !> @param[in] l1 l1 argument of add_interlayer_terms.
-    !> @param[in] l2 l2 argument of add_interlayer_terms.
-    !> @param[in,out] r1 r1 argument of add_interlayer_terms.
-    !> @param[in,out] r2 r2 argument of add_interlayer_terms.
-    !> @param[in] nc nc argument of add_interlayer_terms.
-    !> @param[in] jc jc argument of add_interlayer_terms.
-    !> @param[in] kc kc argument of add_interlayer_terms.
-    !> @param[in] nx nx argument of add_interlayer_terms.
-    !> @param[in] jx jx argument of add_interlayer_terms.
-    !> @param[in] kx kx argument of add_interlayer_terms.
-    !> @param[in] ny ny argument of add_interlayer_terms.
-    !> @param[in] jy jy argument of add_interlayer_terms.
-    !> @param[in] ky ky argument of add_interlayer_terms.
-    !> @param[in] axn axn argument of add_interlayer_terms.
-    !> @param[in] axp axp argument of add_interlayer_terms.
-    !> @param[in] ayn ayn argument of add_interlayer_terms.
-    !> @param[in] ayp ayp argument of add_interlayer_terms.
+    !> Shared face counts by Cartesian direction.
+    !> Shared compact face coordinates.
+    !> Shared total-depth face-speed bounds.
+    !> @param[in] l1 Lower-layer reconstructed face traces.
+    !> @param[in] l2 Upper-layer reconstructed face traces.
+    !> @param[in,out] r1 Lower-layer residual accumulated in place.
+    !> @param[in,out] r2 Upper-layer residual accumulated in place.
+    !> @param[in] nc Count of shared active cells.
+    !> @param[in] jc X indices of shared active cells.
+    !> @param[in] kc Y indices of shared active cells.
+    !> @param[in] nx Count of active x-normal faces.
+    !> @param[in] jx X-face indices of active x-normal faces.
+    !> @param[in] kx Y-cell indices of active x-normal faces.
+    !> @param[in] ny Count of active y-normal faces.
+    !> @param[in] jy X-cell indices of active y-normal faces.
+    !> @param[in] ky Y-face indices of active y-normal faces.
+    !> @param[in] axn Negative-going x-normal wave speeds [m/s].
+    !> @param[in] axp Positive-going x-normal wave speeds [m/s].
+    !> @param[in] ayn Negative-going y-normal wave speeds [m/s].
+    !> @param[in] ayp Positive-going y-normal wave speeds [m/s].
     SUBROUTINE add_interlayer_terms(l1,l2,hp2,r1,r2,active,nc,jc,kc,qp2, &
         nx,jx,kx,ny,jy,ky,axn,axp,ayn,ayp)
         USE nonconservative_2d, ONLY : PATH_DIR_X,PATH_DIR_Y
@@ -732,7 +747,7 @@ CONTAINS
     !> @param[in] selected_h Depth at which cached_gamma was evaluated.
     !> @param[in] clamp_buoyant_pressure Apply the upper-layer nonnegative-pressure condition.
     !> @return Absolute pressure scale used only for stationary-roundoff cancellation.
-    !> @brief hydrostatic arithmetic scale operation.
+    !> @brief Estimate hydrostatic pressure scale for roundoff cancellation.
     FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor,cached_gamma,selected_h,                          &
         clamp_buoyant_pressure) RESULT(scale)
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
@@ -1093,12 +1108,12 @@ CONTAINS
     !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
     !> @param[in] diagnose_front Enable opt-in diagnostic for a wet-to-dry x-face.
     !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
-    !> @param[in] h_selected_left h selected left argument of eval_pccu_interface.
-    !> @param[in] h_selected_right h selected right argument of eval_pccu_interface.
-    !> @param[in] gamma_left_cached gamma left cached argument of eval_pccu_interface.
-    !> @param[in] gamma_right_cached gamma right cached argument of eval_pccu_interface.
-    !> @param[in] bed_face_left bed face left argument of eval_pccu_interface.
-    !> @param[in] bed_face_right bed face right argument of eval_pccu_interface.
+    !> @param[in] h_selected_left Selected left-trace depth [m].
+    !> @param[in] h_selected_right Selected right-trace depth [m].
+    !> @param[in] gamma_left_cached Hydrostatic coefficient cached from the left CFL trace.
+    !> @param[in] gamma_right_cached Hydrostatic coefficient cached from the right CFL trace.
+    !> @param[in] bed_face_left Optional left-oriented face bed elevation [m].
+    !> @param[in] bed_face_right Optional right-oriented face bed elevation [m].
     SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face, h_selected_left,h_selected_right,                      &
             qp_adv_left,qp_adv_right,                                                                                  &
             grav_coeff,a_minus,a_plus,gamma_left_cached,gamma_right_cached,                                          &
@@ -1521,9 +1536,9 @@ CONTAINS
     !> @param[in] cached_gamma_plus Corresponding positive-side pressure coefficient.
     !> @param[in] selected_h_plus Final face depth of the positive side.
     !> @param[in] clamp_buoyant_pressure Suppress negative pressure at buoyant L2 endpoints.
-    !> @param[out] gamma_minus_out,gamma_plus_out Optional resolved pressure coefficients.
-    !> @param[out] gamma_minus_out gamma minus out argument of eval_cell_hydrostatic_path.
-    !> @param[out] gamma_plus_out gamma plus out argument of eval_cell_hydrostatic_path.
+    !> Optional resolved pressure coefficients.
+    !> @param[out] gamma_minus_out Optional negative-endpoint hydrostatic coefficient.
+    !> @param[out] gamma_plus_out Optional positive-endpoint hydrostatic coefficient.
     SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus, qp_plus,eta_plus,grav_plus,direction,path, &
         cached_gamma_minus,selected_h_minus,cached_gamma_plus,selected_h_plus,clamp_buoyant_pressure, &
         gamma_minus_out,gamma_plus_out)

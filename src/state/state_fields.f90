@@ -42,7 +42,9 @@ MODULE state_fields
 
         !> Physical substrate inventories owned by the same simulation state as q and qp.
         REAL(wp), ALLOCATABLE :: deposit(:,:,:),deposit_tot(:,:)
+        !> Cumulative eroded solid inventory by (x,y,class), plus total map (x,y).
         REAL(wp), ALLOCATABLE :: erosion(:,:,:),erosion_tot(:,:)
+        !> Remaining erodible substrate inventory by (class,x,y).
         REAL(wp), ALLOCATABLE :: erodible(:,:,:)
 
         !> Map of positive thickness

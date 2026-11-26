@@ -84,7 +84,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_quadratic_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    !> @brief eval rheology quadratic implicit real operation.
+    !> @brief Evaluate quadratic basal resistance in REAL arithmetic for source assembly.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.

@@ -31,8 +31,9 @@ MODULE mass_exchange_2d
     PUBLIC :: eval_mass_exchange_implicit, solve_mass_exchange_analytic
     PUBLIC :: mass_exchange_scratch_type
 
-    !> Reusable cell-local mass-exchange accumulators, owned by the invoking worker.
+    !> @brief Reusable cell-local mass-exchange accumulators, owned by the invoking worker.
     TYPE :: mass_exchange_scratch_type
+        !> Separate proposed process, deposition and liquid-loss rate records.
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates
     END TYPE mass_exchange_scratch_type
 

@@ -68,12 +68,16 @@ MODULE simulation_2d
     !>          releases the owned storage without moving it into global facades.
     TYPE :: simulation_context_type
 
+        !> Owned simulation clock, accepted-step history and output schedule.
         TYPE(runtime_state_type) :: runtime
+        !> Validated number of layers and canonical component indices.
         TYPE(model_layout_type) :: model_layout
         TYPE(layer_physics_type), ALLOCATABLE :: layer_physics(:) !< Validated before worker allocation.
+        !> Canonical fluid state and shared substrate inventories.
         TYPE(state_type) :: state
         TYPE(domain_type) :: domain !< Shared OR active cell and face workset for all layer slots.
         TYPE(spatial_operator_type), ALLOCATABLE :: spatial_operators(:) !< One HP-PCCU workspace per layer slot.
+        !> Owned spatial/Lie integration workspace and source executor.
         TYPE(time_integration_workspace_type) :: time_integration
         TYPE(stochastic_workspace_type), ALLOCATABLE :: stochastic(:) !< Independent OU workspace for each layer.
 
@@ -201,7 +205,7 @@ CONTAINS
         IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED,                                            &
             this%runtime%t,step_length)
     CONTAINS
-        !> @brief notify stochastic prepared operation.
+        !> @brief Notify the observer after stochastic preparation of the Lie candidate.
         SUBROUTINE notify_stochastic_prepared()
             ! Report the new phase at its actual point, after spatial.
             CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED,step_start,step_length)

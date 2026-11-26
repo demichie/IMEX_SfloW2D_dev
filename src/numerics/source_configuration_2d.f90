@@ -26,7 +26,7 @@ MODULE source_configuration_2d
 CONTAINS
     !> Identify active physical sources exactly once for both input syntaxes.
     !> Thermal activation is determined by the physical cooling flag.
-    !> @brief collect active source names operation.
+    !> @brief Collect enabled physical source identities for one configured layer.
     !> @param[in] rheology Layer rheology configuration.
     !> @param[in] mass_config Layer mass exchange configuration.
     !> @param[in] include_thermal Include thermal sources.

@@ -137,7 +137,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_lahar_implicit
 
     !> Evaluate the shared implicit-law formula in REAL for explicit assembly.
-    !> @brief eval rheology lahar implicit real operation.
+    !> @brief Evaluate the shared lahar drag kernel in REAL arithmetic.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.

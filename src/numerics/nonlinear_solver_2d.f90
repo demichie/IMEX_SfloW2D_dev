@@ -38,21 +38,21 @@ CONTAINS
     !> Every other conservative component remains fixed at its group input value.
     !> @param[in] thermal Immutable layer thermal configuration.
     !> @param[in] rheology Immutable layer rheology configuration.
-    !> @brief solve backward euler group operation.
+    !> @brief Solve an ordered implicit source group with backward Euler/Newton.
     !> @param[in] source_group Validated source group.
     !> @param[in,out] q_cell Local conservative state.
     !> @param[in] dt Integration time increment.
-    !> @param[in] bprime_x bprime x argument for solve_backward_euler_group.
-    !> @param[in] bprime_y bprime y argument for solve_backward_euler_group.
-    !> @param[in] grav_correction grav correction argument for solve_backward_euler_group.
-    !> @param[in] stochastic_value stochastic value argument for solve_backward_euler_group.
-    !> @param[out] iterations_used iterations used argument for solve_backward_euler_group.
-    !> @param[out] converged converged argument for solve_backward_euler_group.
-    !> @param[out] linear_info linear info argument for solve_backward_euler_group.
-    !> @param[out] line_search_failed line search failed argument for solve_backward_euler_group.
+    !> @param[in] bprime_x Local x terrain slope used by the physical source.
+    !> @param[in] bprime_y Local y terrain slope used by the physical source.
+    !> @param[in] grav_correction Geometry-dependent gravitational source correction.
+    !> @param[in] stochastic_value Cell-local stochastic rheology perturbation.
+    !> @param[out] iterations_used Number of accepted Newton iterations.
+    !> @param[out] converged True if the nonlinear solve converged.
+    !> @param[out] linear_info Linear-system solver status from LAPACK.
+    !> @param[out] line_search_failed True when the Newton line search cannot accept a candidate.
     !> @param[in,out] complex_workspace Complex nonlinear workspace.
     !> @param[in,out] real_workspace Real nonlinear workspace.
-    !> @param[in] pore_enabled pore enabled argument for solve_backward_euler_group.
+    !> @param[in] pore_enabled Whether this layer has an active pore-pressure equation.
     !> @param[in] stochastic_enabled Whether stochastic source is enabled.
     SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
         stochastic_value, iterations_used, converged, linear_info, line_search_failed, complex_workspace,            &

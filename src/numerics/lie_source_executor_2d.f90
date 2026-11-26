@@ -40,40 +40,66 @@ MODULE lie_source_executor_2d
         report_lie_source_profile,lie_source_executor_type
     !> @brief Optional cumulative counters for Lie group profiling.
     TYPE :: group_profile_type
+        !> Source-group ID, integration method and accumulated profile call count.
         INTEGER :: id=0,method=0,calls=0
+        !> Cumulative setup, evaluation and commit time for the source group [s].
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
+        !> Group elapsed and sampled physical compute time [s].
         REAL(wp) :: elapsed=0.0_wp,physical=0.0_wp
+        !> Number of cells evaluated for this source group.
         INTEGER :: evaluated_cells=0
     END TYPE group_profile_type
     !> @brief Stable Lie configuration and reusable per-simulation work arrays.
     !> @details Initialized once; cell-indexed buffers are sized for the full
     !>          grid. Detailed failure diagnostics are disabled by default.
     TYPE :: lie_source_executor_type
+        !> Validated source groups used by the operational Lie executor.
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
+        !> Per-group exchange and dry-cell no-op classifications.
         LOGICAL, ALLOCATABLE :: exchange_group(:),dry_noop_group(:)
         INTEGER, ALLOCATABLE :: non_exchange_mask(:) !< Resolved non-exchange source bits per Lie group.
+        !> REAL physical-state scratch owned by each OpenMP worker.
         TYPE(physical_state_real), ALLOCATABLE :: source_physical_scratch(:)
         ! Four reusable cell-local physical records per worker for paired sources.
+        !> Paired-layer REAL physical scratch by worker and layer slot.
         TYPE(physical_state_real), ALLOCATABLE :: interlayer_physical_scratch(:,:)
         ! Per-worker complex-step workspace persists across cells and timesteps.
+        !> COMPLEX physical workspace for Newton/complex-step evaluations.
         TYPE(physical_state_complex), ALLOCATABLE :: source_complex_scratch(:)
+        !> Mass-exchange accumulators owned by each worker.
         TYPE(mass_exchange_scratch_type), ALLOCATABLE :: source_exchange_scratch(:)
+        !> Per-worker mass, thermal and bed exchange-rate records.
         TYPE(mass_exchange_rates_type), ALLOCATABLE :: source_transfers(:)
+        !> Prepared injection material data shared read-only across workers.
         TYPE(injection_material_set_type) :: injection_materials
+        !> Flags for exchange, bed changes and Newton source presence.
         LOGICAL :: has_exchange_group=.FALSE.,has_bed_group=.FALSE.,has_newton_group=.FALSE.
+        !> True if every configured source group is inactive in dry cells.
         LOGICAL :: all_groups_dry_noop=.FALSE.
+        !> Optional diagnostics, Newton witness and initialization status.
         LOGICAL :: diagnostics_enabled=.FALSE.,newton_witness=.FALSE.,initialized=.FALSE.
+        !> True while a rejected source-group candidate is being diagnosed.
         LOGICAL :: reject_active=.FALSE.
+        !> Bed-mutating group ID and first rejected group ID.
         INTEGER :: bed_group_id=-1,reject_group=-1
+        !> Per-cell failure code, group, detail and Newton iteration counts.
         INTEGER, ALLOCATABLE :: failure_code(:),failure_group(:),failure_detail(:),failure_iterations(:)
+        !> Per-cell rejected mass and component diagnostic data.
         REAL(wp), ALLOCATABLE :: failure_mass(:),failure_components(:)
+        !> Per-cell reference, rate and rejected conservative candidate records.
         REAL(wp), ALLOCATABLE :: failure_reference(:,:),failure_rate(:,:),failure_candidate(:,:)
+        !> Per-cell mixture/solid injection and pre-buoyancy masses.
         REAL(wp), ALLOCATABLE :: injection_mass(:),injection_solids(:),pre_buoyancy_mass(:)
+        !> Solid inventories and reduced gravity before buoyancy removal.
         REAL(wp), ALLOCATABLE :: pre_buoyancy_solids(:),buoyancy_reduced_gravity(:)
+        !> Newton iteration counts by group and worklist cell.
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
+        !> Proposed cell-local topographic rate [m/s].
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:)
         ! Previous step's nonzero bed-rate coordinates: avoid a full-grid reset.
+        !> X and y coordinates with nonzero bed rates from the preceding sweep.
         INTEGER, ALLOCATABLE :: bed_dirty_j(:),bed_dirty_k(:)
+        !> Number of cells in the prior bed-rate worklist.
         INTEGER :: bed_dirty_count=0
     END TYPE lie_source_executor_type
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
@@ -1169,8 +1195,8 @@ CONTAINS
         CONTAINS
 
         ! Record a cell/group failure for the caller to report as a fatal error.
-        !> @brief reject cell operation.
-        !> @param[in] message message argument for reject_cell.
+        !> @brief Record an invalid local Lie candidate for subsequent fatal reporting.
+        !> @param[in] message Diagnostic explaining the rejected source candidate.
         SUBROUTINE reject_cell(message)
             CHARACTER(*), INTENT(IN) :: message
             failure_reason=message

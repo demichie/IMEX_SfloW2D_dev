@@ -31,14 +31,22 @@ MODULE source_catalog_2d
     ! Equation-group membership is configured independently of source identity.
     !> @brief Immutable capabilities and phase permissions for one source term.
     TYPE :: source_term_type
+        !> Unique catalog source name used to resolve configured Lie groups.
         CHARACTER(LEN=64) :: name = ''
+        !> Whether an explicit rate evaluator is supported for this source.
         LOGICAL :: has_explicit = .FALSE.
+        !> Whether this source supports the implicit Newton solver.
         LOGICAL :: has_newton = .FALSE.
+        !> Whether this source supports an analytic time-integrated update.
         LOGICAL :: has_analytic = .FALSE.
+        !> Default source integration method from the catalog method IDs.
         INTEGER :: default_method = SOURCE_METHOD_NEWTON
         ! Explicit per-entry permissions; absent permissions never enable a new source.
+        !> Whether this source can operate with a gaseous carrier.
         LOGICAL :: allows_gas = .FALSE.
+        !> Whether this source can operate with a liquid carrier.
         LOGICAL :: allows_liquid = .FALSE.
+        !> Whether this source can operate in a lava-carrier configuration.
         LOGICAL :: allows_lava = .FALSE.
     END TYPE source_term_type
     ! Default method is explicit in each Lie source catalog entry; constants

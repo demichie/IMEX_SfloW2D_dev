@@ -46,9 +46,13 @@ MODULE source_terms_2d
     PUBLIC :: eval_geometry_curvature_explicit
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
     ! Cell-local geometry and stochastic context for analytic source solves.
+    !> @brief Frozen cell-local geometry and stochastic inputs for source evaluation.
     TYPE :: source_cell_context_type
+        !> Bed first derivatives in x and y (dimensionless slopes).
         REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
+        !> Bed second derivatives xx, xy and yy [1/m].
         REAL(wp) :: Bsecond_xx=0.0_wp, Bsecond_xy=0.0_wp, Bsecond_yy=0.0_wp
+        !> Local gravitational geometry factor and stochastic rheology perturbation.
         REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
     END TYPE source_cell_context_type
 CONTAINS

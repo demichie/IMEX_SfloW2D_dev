@@ -106,6 +106,55 @@ def entities(path):
 
 # These expressions deliberately cover the project's free-form declarations,
 # including continued signatures, internal procedures and interface prototypes.
+TYPE_START = re.compile(r'^\s*type(?:\s*,[^:]*)?\s*::\s*(\w+)\b', re.I)
+TYPE_END = re.compile(r'^\s*end\s*type\b', re.I)
+TYPE_FIELD = re.compile(
+    r'^\s*(?:real\b|complex\b|integer\b|logical\b|character\b|type\s*\(|class\s*\()[^!]*::', re.I)
+
+
+def validate_derived_types(path):
+    """Check each derived type and its components, including private workspaces."""
+    lines = path.read_text().splitlines()
+    problems, count, fields = [], 0, 0
+    inside = None
+    for i, line in enumerate(lines):
+        statement = code_part(line).strip()
+        start = TYPE_START.match(statement)
+        if start:
+            if inside is not None:
+                problems.append(f"{inside}: nested type declaration at {i+1}")
+            inside = start.group(1)
+            count += 1
+            first = i
+            while first and (not lines[first-1].strip()
+                             or lines[first-1].lstrip().startswith('!')):
+                first -= 1
+            if not BRIEF.search("\n".join(lines[first:i])):
+                problems.append(f"{inside}:{i+1}: missing derived-type Doxygen brief")
+            continue
+        if inside is None:
+            continue
+        if TYPE_END.match(statement):
+            inside = None
+            continue
+        if not TYPE_FIELD.match(statement):
+            continue
+        fields += 1
+        # Doxygen member comments can precede the declaration or follow it
+        # as !<; ordinary Fortran comments are not documentation.
+        preceding = i-1
+        while preceding >= 0 and not lines[preceding].strip():
+            preceding -= 1
+        previous = lines[preceding].lstrip() if preceding >= 0 else ''
+        inline = line[len(code_part(line)):]
+        if not (previous.startswith('!>') or '!<' in inline):
+            name = statement.split('::', 1)[1].strip().split('(', 1)[0]
+            problems.append(f"{inside}:{i+1}: undocumented field: {name}")
+    if inside is not None:
+        problems.append(f"{inside}: unterminated derived type")
+    return problems, count, fields
+
+
 PARAM = re.compile(
     r"[\\@]param[ \t]*\[(in(?:[ \t]*,?[ \t]*out)?|out)\]"
     r"[ \t]+(\w+)[ \t]+(\S.*)", re.I)
@@ -174,6 +223,10 @@ def main():
     counts = Counter()
     errors = []
     for path in paths:
+        type_problems, ntypes, nfields = validate_derived_types(path)
+        counts["type"] += ntypes
+        counts["documented fields"] += nfields
+        errors.extend(f"{path.name}: {message}" for message in type_problems)
         for entity in entities(path):
             counts[entity["kind"]] += 1
             for message in validate_header(entity):

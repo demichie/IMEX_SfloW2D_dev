@@ -1,29 +1,50 @@
-!********************************************************************************
-!> \mainpage IMEX_SfloW2D - Shallow Water Finite volume solver
-!> IMEX_SfloW2D is a FORTRAN90 code designed to solve an hyperbolic
-!> system of partial differential equations with relaxation and source
-!> terms.\n
-!> The model is discretized in time with an explicit-implicit Runge-Kutta
-!> method where the hyperbolic part is solved explicetely and the other
-!> terms (relaxation and surce) are treated implicitely.\n
-!> The hyperbolic part uses a KT hydrostatic-path, path-conservative central-upwind
-!> finite-volume operator; it does not require the
-!> complete eigenstructure of the model.\n
-!> The implicit part is solved with a Newton-Raphson method where the
-!> elements of the Jacobian of the nonlinear system are evaluated
-!> numerically with a complex step derivative technique.\n
-!> Version 1.0:\n
-!> \n
-!> Github project page: http://demichie.github.io/IMEX_SfloW2D/
-!> \n
-!> \authors Mattia de' Michieli Vitturi (*)
-!> (*) Istituto Nazionale di Geofisica e vulcanologia, sezione di Pisa\n
-!>     Via Cesare Battisti, 53\n
-!>     I-56125 Pisa, Italy \n
-!>     E-mail: mattia.demichielivitturi@ingv.it \n
-!********************************************************************************
+!> @mainpage IMEX-SfloW2D - Finite-volume solver for geophysical flows
+!> @brief Open-source Fortran solver for one- and two-layer depth-averaged flows.
+!>
+!> IMEX-SfloW2D solves two-dimensional depth-averaged mixture balance equations
+!> for gravity-driven flows over complex terrain, including granular, lahar,
+!> pyroclastic-current and lava configurations. Material composition, sensible
+!> thermal content, pore-pressure variables and optional stochastic transport
+!> are included according to the selected physical configuration.
+!>
+!> @section model Model and numerical formulation
+!> The spatial discretization is a hydrostatic-path, path-conservative
+!> central-upwind finite-volume method (HP-PCCU). The implemented timestep
+!> advances the spatial residual first and then applies ordered Lie physical
+!> source groups. Explicit, semi-implicit, Newton/complex-step implicit and
+!> analytic treatments are selected according to the supported source method.
+!> The solver uses an active-cell workset with OpenMP parallelism.
+!>
+!> @section layers Supported material layers
+!> N_LAYERS=1 and N_LAYERS=2 use the same execution path. In two-layer runs,
+!> the layers have independently configured physical laws and coupled spatial
+!> pressure and interlayer transfer/drag sources. Terrain and substrate
+!> inventories are shared; the conservative and primitive state arrays use
+!> q/qp(component,layer,x,y). No environment activation switch is needed.
+!>
+!> @section limitations Scientific applicability
+!> The coupled two-layer characteristic spectrum is not unconditionally real.
+!> Density inversion and sufficiently strong interlayer shear can produce
+!> complex wave speeds. The total-depth CFL bound does not establish
+!> hyperbolicity or quantitative validity of arbitrary physical closures.
+!> See the two-layer hyperbolicity and physical-closure documents for limits.
+!>
+!> @section output Input, output and continuation
+!> The runtime reads IMEX_SfloW2D.inp and its configured initial/terrain data.
+!> It writes configured physical outputs (including NetCDF), diagnostics and
+!> a canonical binary restart checkpoint for the selected layer count.
+!>
+!> @section resources Documentation and project resources
+!> - Project: https://github.com/demichie/IMEX_SfloW2D_dev
+!> - User guide: https://demichie.github.io/IMEX_SfloW2D_dev/
+!> - Fortran API: https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/
+!> - Architecture: docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md
+!> - Hyperbolicity: docs/TWO_LAYER_HYPERBOLICITY.md
+!> - Physical closures: docs/TL13B_C_PHYSICAL_CLOSURES.md
+!>
+!> @author Mattia de' Michieli Vitturi (original solver author).
 
-!> \brief Initialize, advance and write one depth-averaged flow simulation.
+!> @brief Initialize, advance and write one depth-averaged simulation.
 
 PROGRAM IMEX_SfloW2D
 

@@ -46,36 +46,60 @@ MODULE reconstruction_2d
         ! Direct h_x-based states for the advective part of the PCCU flux.
         ! The existing interface states retain the eta-based reconstruction and
         ! are used for central-upwind dissipation and hydrostatic path terms.
+        !> Advective primitive traces at left-oriented x faces (component,x-face,y-cell).
         REAL(wp), ALLOCATABLE :: qp_adv_interfaceL(:,:,:)
+        !> Selected advective depth at left-oriented x faces [m].
         REAL(wp), ALLOCATABLE :: h_selected_interfaceL(:,:)
+        !> Advective primitive traces at right-oriented x faces (component,x-face,y-cell).
         REAL(wp), ALLOCATABLE :: qp_adv_interfaceR(:,:,:)
+        !> Selected advective depth at right-oriented x faces [m].
         REAL(wp), ALLOCATABLE :: h_selected_interfaceR(:,:)
+        !> Advective primitive traces at bottom-oriented y faces.
         REAL(wp), ALLOCATABLE :: qp_adv_interfaceB(:,:,:)
+        !> Selected advective depth at bottom-oriented y faces [m].
         REAL(wp), ALLOCATABLE :: h_selected_interfaceB(:,:)
+        !> Advective primitive traces at top-oriented y faces.
         REAL(wp), ALLOCATABLE :: qp_adv_interfaceT(:,:,:)
+        !> Selected advective depth at top-oriented y faces [m].
         REAL(wp), ALLOCATABLE :: h_selected_interfaceT(:,:)
 
     ! Direct h_x-based cell-side candidates retained for the advective flux
     ! while the eta-based HP states are used by dissipation and path terms.
+        !> West cell-side advective primitive candidates (component,x-cell,y-cell).
         REAL(wp), ALLOCATABLE :: qp_cellW(:,:,:)
+        !> East cell-side advective primitive candidates (component,x-cell,y-cell).
         REAL(wp), ALLOCATABLE :: qp_cellE(:,:,:)
+        !> South cell-side advective primitive candidates (component,x-cell,y-cell).
         REAL(wp), ALLOCATABLE :: qp_cellS(:,:,:)
+        !> North cell-side advective primitive candidates (component,x-cell,y-cell).
         REAL(wp), ALLOCATABLE :: qp_cellN(:,:,:)
 
         ! Final free-surface traces.  Both cell-side and face-oriented forms are
         ! stored because the following PCCU path discretization needs both views.
+        !> Free-surface elevation traces at west and east cell sides [m].
         REAL(wp), ALLOCATABLE :: eta_cellW(:,:), eta_cellE(:,:)
+        !> Free-surface elevation traces at south and north cell sides [m].
         REAL(wp), ALLOCATABLE :: eta_cellS(:,:), eta_cellN(:,:)
+        !> Free-surface elevations at left/right x-face endpoints [m].
         REAL(wp), ALLOCATABLE :: eta_interfaceL(:,:), eta_interfaceR(:,:)
+        !> Free-surface elevations at bottom/top y-face endpoints [m].
         REAL(wp), ALLOCATABLE :: eta_interfaceB(:,:), eta_interfaceT(:,:)
+        !> Minmod-selected depths at left/right x-face endpoints [m].
         REAL(wp), ALLOCATABLE :: h_minmod_interfaceL(:,:), h_minmod_interfaceR(:,:)
+        !> Minmod-selected depths at bottom/top y-face endpoints [m].
         REAL(wp), ALLOCATABLE :: h_minmod_interfaceB(:,:), h_minmod_interfaceT(:,:)
+        !> Froude-blended depths at left/right x-face endpoints [m].
         REAL(wp), ALLOCATABLE :: h_froude_interfaceL(:,:), h_froude_interfaceR(:,:)
+        !> Froude-blended depths at bottom/top y-face endpoints [m].
         REAL(wp), ALLOCATABLE :: h_froude_interfaceB(:,:), h_froude_interfaceT(:,:)
 
+            !> Cell membership in the hydrostatic-path free-surface workset.
             LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
+            !> X and y indices for the hydrostatic-path cell worklist.
             INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
+            !> Number of cells in the hydrostatic-path cell worklist.
             INTEGER :: hp_eta_cells
+            !> True after all HP cell/face membership has been prepared.
             LOGICAL :: hp_workset_prepared = .FALSE.
             ! Per direction: h-/h+, normal momentum-/+, then tangential momentum-/+.
 
@@ -99,11 +123,11 @@ CONTAINS
     !> @param[in] this Completed lower-layer reconstruction workspace.
     !> @param[in] h_lower Nonnegative cell-centered lower-layer thickness [m].
     !> @param[out] bed_center Effective upper-layer cell-center base [m].
-    !> @param[out] bed_w,bed_e,bed_s,bed_n Cell-owned effective face bases [m].
-    !> @param[out] bed_w bed w argument of prepare_upper_layer_bed.
-    !> @param[out] bed_e bed e argument of prepare_upper_layer_bed.
-    !> @param[out] bed_s bed s argument of prepare_upper_layer_bed.
-    !> @param[out] bed_n bed n argument of prepare_upper_layer_bed.
+    !> Cell-owned effective face bases [m].
+    !> @param[out] bed_w Effective L2 west-cell base [m].
+    !> @param[out] bed_e Effective L2 east-cell base [m].
+    !> @param[out] bed_s Effective L2 south-cell base [m].
+    !> @param[out] bed_n Effective L2 north-cell base [m].
     SUBROUTINE prepare_upper_layer_bed(this,h_lower,bed_center,bed_w,bed_e,bed_s,bed_n)
         CLASS(reconstruction_workspace_type), INTENT(IN) :: this
         ! Assumed shape accepts the noncontiguous qp(idx_h,:,:) view without
@@ -1721,11 +1745,11 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !>          cell-based eta, minmod and Froude candidates are then dry,
     !>          but the external face must use its prescribed wet depth.
     !>          Neumann/outflow and source boundaries are left unchanged.
-    !> @param[in] depth_bc depth bc argument of preserve_dirichlet_hp_depth.
-    !> @param[in] bed bed argument of preserve_dirichlet_hp_depth.
-    !> @param[in,out] eta eta argument of preserve_dirichlet_hp_depth.
-    !> @param[in,out] h_minmod h minmod argument of preserve_dirichlet_hp_depth.
-    !> @param[in,out] h_froude h froude argument of preserve_dirichlet_hp_depth.
+    !> @param[in] depth_bc Prescribed depth boundary condition.
+    !> @param[in] bed Local external-face bed elevation [m].
+    !> @param[in,out] eta Free-surface elevation updated for the inlet [m].
+    !> @param[in,out] h_minmod External-face minmod depth candidate [m].
+    !> @param[in,out] h_froude External-face Froude depth candidate [m].
     SUBROUTINE preserve_dirichlet_hp_depth(depth_bc,trace,bed,eta,h_minmod,h_froude)
         TYPE(bc), INTENT(IN) :: depth_bc
         REAL(wp), INTENT(INOUT) :: trace(n_vars),eta,h_minmod,h_froude
@@ -1742,18 +1766,18 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !> Convert an imposed discharge (Dirichlet or Neumann) into a primitive
     !> velocity boundary value, using the reconstructed first-pass depth.
-    !> @brief discharge bc to velocity operation.
-    !> @param[in] discharge_bc discharge bc argument of discharge_bc_to_velocity.
-    !> @param[in] hc hc argument of discharge_bc_to_velocity.
-    !> @param[in] uc uc argument of discharge_bc_to_velocity.
-    !> @param[in] hn hn argument of discharge_bc_to_velocity.
-    !> @param[in] un un argument of discharge_bc_to_velocity.
-    !> @param[in] hface hface argument of discharge_bc_to_velocity.
-    !> @param[in] half half argument of discharge_bc_to_velocity.
-    !> @param[in] inv_dx inv dx argument of discharge_bc_to_velocity.
-    !> @param[in] side side argument of discharge_bc_to_velocity.
-    !> @param[in] normal normal argument of discharge_bc_to_velocity.
-    !> @param[out] velocity_bc velocity bc argument of discharge_bc_to_velocity.
+    !> @brief Convert prescribed face discharge into a provisional velocity.
+    !> @param[in] discharge_bc Specified momentum discharge boundary condition.
+    !> @param[in] hc Interior cell depth [m].
+    !> @param[in] uc Interior velocity component [m/s].
+    !> @param[in] hn Adjacent cell depth [m].
+    !> @param[in] un Adjacent velocity component [m/s].
+    !> @param[in] hface Reconstructed face depth [m].
+    !> @param[in] half Half normal cell width [m].
+    !> @param[in] inv_dx Inverse normal cell spacing [1/m].
+    !> @param[in] side Boundary orientation sign.
+    !> @param[in] normal True for the normal discharge component.
+    !> @param[out] velocity_bc Derived face velocity condition [m/s].
     SUBROUTINE discharge_bc_to_velocity(discharge_bc,hc,uc,hn,un,hface,half,inv_dx,side,normal,velocity_bc)
         TYPE(bc), INTENT(IN) :: discharge_bc
         REAL(wp), INTENT(IN) :: hc,uc,hn,un,hface,half,inv_dx
@@ -1776,15 +1800,15 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     END SUBROUTINE discharge_bc_to_velocity
 
     !> Evaluate the boundary discharge in the original physical input units.
-    !> @brief boundary discharge value operation.
-    !> @param[in] discharge_bc discharge bc argument of boundary_discharge_value.
-    !> @param[in] qc qc argument of boundary_discharge_value.
-    !> @param[in] qn qn argument of boundary_discharge_value.
-    !> @param[in] half half argument of boundary_discharge_value.
-    !> @param[in] inv_dx inv dx argument of boundary_discharge_value.
-    !> @param[in] side side argument of boundary_discharge_value.
-    !> @param[in] normal normal argument of boundary_discharge_value.
-    !> @param[out] discharge discharge argument of boundary_discharge_value.
+    !> @brief Evaluate a prescribed Dirichlet or Neumann discharge.
+    !> @param[in] discharge_bc Configured discharge boundary condition.
+    !> @param[in] qc Interior cell discharge.
+    !> @param[in] qn Neighboring cell discharge.
+    !> @param[in] half Half normal cell width [m].
+    !> @param[in] inv_dx Inverse normal grid spacing [1/m].
+    !> @param[in] side Boundary orientation sign.
+    !> @param[in] normal True for the normal component.
+    !> @param[out] discharge Boundary discharge selected by the condition.
     SUBROUTINE boundary_discharge_value(discharge_bc,qc,qn,half,inv_dx,side,normal,discharge)
         TYPE(bc), INTENT(IN) :: discharge_bc
         REAL(wp), INTENT(IN) :: qc,qn,half,inv_dx
@@ -1815,17 +1839,17 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !> Enforce prescribed hu/hv after HP depth selection, preserving the
     !> original physical meaning of HU_BC/HV_BC (including Neumann gradients).
-    !> @brief enforce boundary discharge operation.
-    !> @param[in,out] trace trace argument of enforce_boundary_discharge.
-    !> @param[in] hselected hselected argument of enforce_boundary_discharge.
-    !> @param[in] qcenter qcenter argument of enforce_boundary_discharge.
-    !> @param[in] qneighbor qneighbor argument of enforce_boundary_discharge.
-    !> @param[in] discharge_bc discharge bc argument of enforce_boundary_discharge.
-    !> @param[in] half half argument of enforce_boundary_discharge.
-    !> @param[in] inv_dx inv dx argument of enforce_boundary_discharge.
-    !> @param[in] side side argument of enforce_boundary_discharge.
-    !> @param[in] normal normal argument of enforce_boundary_discharge.
-    !> @param[in] idx idx argument of enforce_boundary_discharge.
+    !> @brief Enforce face discharge after the final HP depth selection.
+    !> @param[in,out] trace Selected primitive HP trace updated in place.
+    !> @param[in] hselected Final HP face depth [m].
+    !> @param[in] qcenter Interior primitive cell state.
+    !> @param[in] qneighbor Neighboring primitive cell state.
+    !> @param[in] discharge_bc Configured momentum discharge condition.
+    !> @param[in] half Half normal cell width [m].
+    !> @param[in] inv_dx Inverse normal spacing [1/m].
+    !> @param[in] side Boundary orientation sign.
+    !> @param[in] normal True for the normal component.
+    !> @param[in] idx Primitive velocity component index to update.
     SUBROUTINE enforce_boundary_discharge(trace,hselected,qcenter,qneighbor,discharge_bc,half,inv_dx,side,normal,idx)
         REAL(wp), INTENT(INOUT) :: trace(n_vars)
         REAL(wp), INTENT(IN) :: hselected,qcenter(n_vars),qneighbor(n_vars),half,inv_dx

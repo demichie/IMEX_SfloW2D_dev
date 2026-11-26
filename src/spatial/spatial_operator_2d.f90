@@ -29,10 +29,15 @@ MODULE spatial_operator_2d
     !>          spatial-term evaluation and the CFL calculation.
     TYPE, PUBLIC :: spatial_operator_type
     PRIVATE
+        !> Layer-specific reconstruction and face-trace workspace.
         TYPE(reconstruction_workspace_type) :: reconstruction
+        !> Layer-specific hyperbolic HP-PCCU flux and path workspace.
         TYPE(hyperbolic_workspace_type) :: hp_pccu
+        !> Enable optional CFL and spatial-operator timing.
         LOGICAL :: profile_enabled=.FALSE.
+        !> Number of CFL calls included in spatial profiling.
         INTEGER :: profile_cfl_calls=0
+        !> Cumulative CFL evaluation cost [s].
         REAL(wp) :: profile_cfl_seconds=0.0_wp
     CONTAINS
         PROCEDURE, PUBLIC :: initialize => initialize_spatial_operator
@@ -75,8 +80,8 @@ CONTAINS
     !> @param[in] dt Rejected forward-Euler spatial timestep.
     !> @param[in] lower Optional lower-layer spatial operator for L2 base diagnostics.
     !> @param[in] lower_h_cell Lower-layer cell depth for the effective center base.
-    !> @param[in] j j argument of diagnose_spatial_positivity.
-    !> @param[in] k k argument of diagnose_spatial_positivity.
+    !> @param[in] j X-cell index of diagnosed front.
+    !> @param[in] k Y-cell index of diagnosed front.
     SUBROUTINE diagnose_spatial_positivity(this,j,k,qp_cell,mass_cell,dt,lower,lower_h_cell)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k
@@ -257,10 +262,10 @@ CONTAINS
     !> @brief Read the mass flux facing each cell at a selected x-interface.
     !> @details Only used for opt-in diagnostics; never recomputes numerical fluxes.
     !> @param[in] this Owning object.
-    !> @param[in] j j argument of spatial_front_mass_flux.
-    !> @param[in] k k argument of spatial_front_mass_flux.
-    !> @param[out] flux_left flux left argument of spatial_front_mass_flux.
-    !> @param[out] flux_right flux right argument of spatial_front_mass_flux.
+    !> @param[in] j X-cell index of queried front.
+    !> @param[in] k Y-cell index of queried front.
+    !> @param[out] flux_left Mass flux at the left cell face.
+    !> @param[out] flux_right Mass flux at the right cell face.
     SUBROUTINE spatial_front_mass_flux(this,j,k,flux_left,flux_right)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k
@@ -334,7 +339,7 @@ CONTAINS
     !******************************************************************************
 
     !> @param[in] reuse_cfl_traces Flag allowing reuse of CFL reconstruction traces.
-    !> @param[in] lower_operator lower operator argument of evaluate_spatial_operator.
+    !> @param[in] lower_operator L1 workspace providing coupled L2 pressure data.
     !> @param[in] h_lower Lower-layer depth.
     SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, boundary_source_enabled,               &
         reuse_cfl_traces, lower_operator, h_lower )
@@ -530,8 +535,8 @@ CONTAINS
     !> @param[in] j,k Active cell indices.
     !> @param[in,out] max_a_x,max_a_y Directional maximum characteristic speeds [m/s].
     !> @param[in] paired_bounds Skip collapsed axes for the shared coupled envelope.
-    !> @param[in] j j argument of spatial_accumulate_cfl_cell.
-    !> @param[in] k k argument of spatial_accumulate_cfl_cell.
+    !> @param[in] j X-cell index in the active worklist.
+    !> @param[in] k Y-cell index in the active worklist.
     !> @param[in,out] max_a_x Maximum x-direction propagation speed.
     !> @param[in,out] max_a_y Maximum y-direction propagation speed.
     SUBROUTINE spatial_accumulate_cfl_cell(this,j,k,max_a_x,max_a_y,paired_bounds)
@@ -770,10 +775,10 @@ CONTAINS
     !> @param[in] axneg,axpos Coupled nonpositive/nonnegative x-face bounds.
     !> @param[in] ayneg,aypos Coupled nonpositive/nonnegative y-face bounds.
     !> @param[out] dt Shared CFL-limited timestep [s].
-    !> @param[in] axneg axneg argument of compute_coupled_spatial_timestep.
-    !> @param[in] axpos axpos argument of compute_coupled_spatial_timestep.
-    !> @param[in] ayneg ayneg argument of compute_coupled_spatial_timestep.
-    !> @param[in] aypos aypos argument of compute_coupled_spatial_timestep.
+    !> @param[in] axneg Negative x-face wave-speed array [m/s].
+    !> @param[in] axpos Positive x-face wave-speed array [m/s].
+    !> @param[in] ayneg Negative y-face wave-speed array [m/s].
+    !> @param[in] aypos Positive y-face wave-speed array [m/s].
     SUBROUTINE compute_coupled_spatial_timestep(this,domain,axneg,axpos,ayneg,aypos,dt)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         CLASS(domain_type), INTENT(IN) :: domain

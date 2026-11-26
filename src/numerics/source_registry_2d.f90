@@ -33,6 +33,7 @@ MODULE source_registry_2d
     PRIVATE
         LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
         LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
+        !> Validated and ordered Lie group metadata owned by this registry.
         TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
     CONTAINS
 

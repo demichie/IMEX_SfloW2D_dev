@@ -16,9 +16,12 @@ MODULE pore_pressure_parameters_2d
         REAL(wp) :: alpha_trans=0.0_wp             !< Solid volume fraction for inhibition onset.
         INTEGER :: N_inh=2                        !< Smoothstep polynomial half order.
         CHARACTER(LEN=8) :: f_inhibit_mode='OFF'  !< OFF, STEP, STATIC, DYNAMIC.
+        !> Enable state-dependent permeability in the Darcy dissipation law.
         LOGICAL :: dynamic_permeability_flag=.FALSE.
         LOGICAL :: gas_loss_flag=.FALSE.         !< Optional Darcy interstitial gas loss.
+        !> Selected time-integration treatment of pore-pressure dissipation.
         CHARACTER(LEN=16) :: pore_pressure_method=''
+        !> Ordered Lie source-group identifier for pore-pressure evolution.
         INTEGER :: pore_pressure_group=3
     END TYPE pore_pressure_config_type
 
@@ -27,7 +30,7 @@ MODULE pore_pressure_parameters_2d
         REAL(wp), ALLOCATABLE :: pascal_coeff(:)  !< Binomial products indexed 0:N_inh.
     END TYPE pore_pressure_cache_type
 
-    ! Canonical layer objects: L2 remains inactive in the current solver.
+    ! Canonical per-layer objects; both slots can be used when N_LAYERS=2.
     TYPE(pore_pressure_config_type), TARGET :: pore_pressure_l1
     TYPE(pore_pressure_config_type), TARGET :: pore_pressure_l2
     TYPE(pore_pressure_cache_type), TARGET :: pore_pressure_cache_l1

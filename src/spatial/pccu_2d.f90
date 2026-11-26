@@ -86,22 +86,22 @@ CONTAINS
     !> The caller supplies the already selected load; this kernel does not
     !> choose a buoyancy regularization or inspect global layer states.
     !> @param[in] direction Cartesian path direction.
-    !> @param[in] h1_left,h1_right Lower-layer depths [m].
-    !> @param[in] load_left,load_right Upper-layer loads [Pa].
-    !> @param[in] metric_left,metric_right Shared large-slope factors G.
-    !> @param[out] path_l1,path_l2 Full nonconservative momentum paths by layer.
+    !> Lower-layer depths [m].
+    !> Upper-layer loads [Pa].
+    !> Shared large-slope factors G.
+    !> Full nonconservative momentum paths by layer.
     !> @param[out] path_l2_metric Optional -h1*L*dG path. When the L2 hydrostatic
     !>             operator uses eta2=B+h1+h2, its -G*L*dh1 term is already present;
     !>             only this metric component can be added without double counting.
     !>             This decomposition assumes a common straight path in (h1,L,G).
-    !> @param[in] h1_left h1 left argument of eval_interlayer_pressure_path.
-    !> @param[in] load_left load left argument of eval_interlayer_pressure_path.
-    !> @param[in] metric_left metric left argument of eval_interlayer_pressure_path.
-    !> @param[in] h1_right h1 right argument of eval_interlayer_pressure_path.
-    !> @param[in] load_right load right argument of eval_interlayer_pressure_path.
-    !> @param[in] metric_right metric right argument of eval_interlayer_pressure_path.
-    !> @param[out] path_l1 path l1 argument of eval_interlayer_pressure_path.
-    !> @param[out] path_l2 path l2 argument of eval_interlayer_pressure_path.
+    !> @param[in] h1_left Lower-layer depth at the left endpoint [m].
+    !> @param[in] load_left Upper-layer pressure load at the left endpoint [Pa].
+    !> @param[in] metric_left Slope metric at the left endpoint.
+    !> @param[in] h1_right Lower-layer depth at the right endpoint [m].
+    !> @param[in] load_right Upper-layer pressure load at the right endpoint [Pa].
+    !> @param[in] metric_right Slope metric at the right endpoint.
+    !> @param[out] path_l1 Nonconservative momentum contribution in L1.
+    !> @param[out] path_l2 Nonconservative momentum contribution in L2.
     SUBROUTINE eval_interlayer_pressure_path(direction,h1_left,load_left,metric_left, &
         h1_right,load_right,metric_right,path_l1,path_l2,path_l2_metric)
         INTEGER, INTENT(IN) :: direction
@@ -152,23 +152,23 @@ CONTAINS
     !> straight hydrostatic path differently from the linearly interpolated
     !> interlayer load L=Gamma2*h2.
     !> @param[in] direction Cartesian direction.
-    !> @param[in] h1_left,h1_right Lower-layer endpoint depths.
-    !> @param[in] h2_left,h2_right Upper-layer endpoint depths.
-    !> @param[in] gamma_left,gamma_right Upper hydrostatic coefficients.
-    !> @param[in] eta2_left,eta2_right Upper-surface endpoint elevations.
-    !> @param[in] metric_left,metric_right Shared large-slope factors.
+    !> Lower-layer endpoint depths.
+    !> Upper-layer endpoint depths.
+    !> Upper hydrostatic coefficients.
+    !> Upper-surface endpoint elevations.
+    !> Shared large-slope factors.
     !> @param[out] path_l1 Full L1 interlayer contribution.
     !> @param[out] correction_l2 L2 contribution not already in hydrostatic path.
-    !> @param[in] h1_left h1 left argument of eval_interlayer_pressure_correction.
-    !> @param[in] h2_left h2 left argument of eval_interlayer_pressure_correction.
-    !> @param[in] gamma_left gamma left argument of eval_interlayer_pressure_correction.
-    !> @param[in] eta2_left eta2 left argument of eval_interlayer_pressure_correction.
-    !> @param[in] metric_left metric left argument of eval_interlayer_pressure_correction.
-    !> @param[in] h1_right h1 right argument of eval_interlayer_pressure_correction.
-    !> @param[in] h2_right h2 right argument of eval_interlayer_pressure_correction.
-    !> @param[in] gamma_right gamma right argument of eval_interlayer_pressure_correction.
-    !> @param[in] eta2_right eta2 right argument of eval_interlayer_pressure_correction.
-    !> @param[in] metric_right metric right argument of eval_interlayer_pressure_correction.
+    !> @param[in] h1_left Lower-layer left endpoint depth [m].
+    !> @param[in] h2_left Upper-layer left endpoint depth [m].
+    !> @param[in] gamma_left Upper hydrostatic coefficient at the left endpoint.
+    !> @param[in] eta2_left Upper free-surface elevation at the left endpoint [m].
+    !> @param[in] metric_left Slope metric at the left endpoint.
+    !> @param[in] h1_right Lower-layer right endpoint depth [m].
+    !> @param[in] h2_right Upper-layer right endpoint depth [m].
+    !> @param[in] gamma_right Upper hydrostatic coefficient at the right endpoint.
+    !> @param[in] eta2_right Upper free-surface elevation at the right endpoint [m].
+    !> @param[in] metric_right Slope metric at the right endpoint.
     SUBROUTINE eval_interlayer_pressure_correction(direction, &
         h1_left,h2_left,gamma_left,eta2_left,metric_left, &
         h1_right,h2_right,gamma_right,eta2_right,metric_right, &
@@ -198,28 +198,28 @@ CONTAINS
     !> already embedded in its eta2=B+h1+h2 hydrostatic path.
     !> The conservative numerical flux remains owned by each layer's HP operator.
     !> @param[in] direction Cartesian face normal.
-    !> @param[in] h1_left,h1_right Lower-layer depths at face endpoints.
-    !> @param[in] h2_left,h2_right Upper-layer depths at face endpoints.
-    !> @param[in] gamma_left,gamma_right Upper-layer pressure coefficients.
-    !> @param[in] eta2_left,eta2_right Reconstructed upper free-surface traces.
+    !> Lower-layer depths at face endpoints.
+    !> Upper-layer depths at face endpoints.
+    !> Upper-layer pressure coefficients.
+    !> Reconstructed upper free-surface traces.
     !> @param[in] metric Shared bed-slope metric at the face.
-    !> @param[in] a_minus,a_plus Validated coupled characteristic bounds.
-    !> @param[out] left_l1,right_l1 Oriented lower-layer pressure contributions.
-    !> @param[out] left_l2,right_l2 Oriented upper-layer correction contributions.
-    !> @param[in] h1_left h1 left argument of eval_interlayer_oriented_face.
-    !> @param[in] h2_left h2 left argument of eval_interlayer_oriented_face.
-    !> @param[in] gamma_left gamma left argument of eval_interlayer_oriented_face.
-    !> @param[in] eta2_left eta2 left argument of eval_interlayer_oriented_face.
-    !> @param[in] h1_right h1 right argument of eval_interlayer_oriented_face.
-    !> @param[in] h2_right h2 right argument of eval_interlayer_oriented_face.
-    !> @param[in] gamma_right gamma right argument of eval_interlayer_oriented_face.
-    !> @param[in] eta2_right eta2 right argument of eval_interlayer_oriented_face.
-    !> @param[in] a_minus a minus argument of eval_interlayer_oriented_face.
-    !> @param[in] a_plus a plus argument of eval_interlayer_oriented_face.
-    !> @param[out] left_l1 left l1 argument of eval_interlayer_oriented_face.
-    !> @param[out] right_l1 right l1 argument of eval_interlayer_oriented_face.
-    !> @param[out] left_l2 left l2 argument of eval_interlayer_oriented_face.
-    !> @param[out] right_l2 right l2 argument of eval_interlayer_oriented_face.
+    !> Validated coupled characteristic bounds.
+    !> Oriented lower-layer pressure contributions.
+    !> Oriented upper-layer correction contributions.
+    !> @param[in] h1_left Lower-layer left-face depth [m].
+    !> @param[in] h2_left Upper-layer left-face depth [m].
+    !> @param[in] gamma_left Upper hydrostatic coefficient at the left face.
+    !> @param[in] eta2_left Upper free-surface elevation at the left face [m].
+    !> @param[in] h1_right Lower-layer right-face depth [m].
+    !> @param[in] h2_right Upper-layer right-face depth [m].
+    !> @param[in] gamma_right Upper hydrostatic coefficient at the right face.
+    !> @param[in] eta2_right Upper free-surface elevation at the right face [m].
+    !> @param[in] a_minus Negative-going coupled characteristic bound [m/s].
+    !> @param[in] a_plus Positive-going coupled characteristic bound [m/s].
+    !> @param[out] left_l1 Oriented L1 contribution for the left cell.
+    !> @param[out] right_l1 Oriented L1 contribution for the right cell.
+    !> @param[out] left_l2 Oriented L2 contribution for the left cell.
+    !> @param[out] right_l2 Oriented L2 contribution for the right cell.
     SUBROUTINE eval_interlayer_oriented_face(direction, &
         h1_left,h2_left,gamma_left,eta2_left, &
         h1_right,h2_right,gamma_right,eta2_right,metric, &
@@ -282,10 +282,10 @@ CONTAINS
     END SUBROUTINE eval_interlayer_oriented_face
 
     !> @brief Contract the interlayer pressure one-forms with a straight-path tangent.
-    !> @param[in] direction direction argument of interlayer_pressure_integrand.
-    !> @param[in] path_state path state argument of interlayer_pressure_integrand.
-    !> @param[in] dstate_ds dstate ds argument of interlayer_pressure_integrand.
-    !> @param[out] integrand integrand argument of interlayer_pressure_integrand.
+    !> @param[in] direction Cartesian direction of the interlayer pressure one-form.
+    !> @param[in] path_state Path state containing lower depth, load and slope metric.
+    !> @param[in] dstate_ds Derivative of the straight path with respect to its parameter.
+    !> @param[out] integrand Pressure one-form contracted with the path tangent.
     SUBROUTINE interlayer_pressure_integrand(direction,path_state,dstate_ds,integrand)
         INTEGER, INTENT(IN) :: direction
         REAL(wp), INTENT(IN) :: path_state(:),dstate_ds(:)
@@ -390,15 +390,15 @@ CONTAINS
     !> @brief Compute factored PCCU transport, preserving one-sided upwind limits.
     !> @details This is the transport expression used by the production HP-PCCU
     !>          interface before component and dry-donor flux guards.
-    !> @param[in] a_minus a minus argument of eval_pccu_advective_flux.
-    !> @param[in] a_plus a plus argument of eval_pccu_advective_flux.
-    !> @param[in] u_left u left argument of eval_pccu_advective_flux.
-    !> @param[in] u_right u right argument of eval_pccu_advective_flux.
-    !> @param[in] q_left q left argument of eval_pccu_advective_flux.
-    !> @param[in] q_right q right argument of eval_pccu_advective_flux.
-    !> @param[in] flux_left flux left argument of eval_pccu_advective_flux.
-    !> @param[in] flux_right flux right argument of eval_pccu_advective_flux.
-    !> @param[out] flux flux argument of eval_pccu_advective_flux.
+    !> @param[in] a_minus Negative-going wave-speed bound [m/s].
+    !> @param[in] a_plus Positive-going wave-speed bound [m/s].
+    !> @param[in] u_left Left normal velocity [m/s].
+    !> @param[in] u_right Right normal velocity [m/s].
+    !> @param[in] q_left Conservative state on the left face trace.
+    !> @param[in] q_right Conservative state on the right face trace.
+    !> @param[in] flux_left Left physical advective flux.
+    !> @param[in] flux_right Right physical advective flux.
+    !> @param[out] flux Central-upwind advective flux through the face.
     SUBROUTINE eval_pccu_advective_flux(a_minus,a_plus,u_left,u_right, &
             q_left,q_right,flux_left,flux_right,flux)
         REAL(wp), INTENT(IN) :: a_minus,a_plus,u_left,u_right

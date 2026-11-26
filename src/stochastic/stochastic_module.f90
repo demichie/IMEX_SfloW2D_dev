@@ -23,9 +23,9 @@ MODULE stochastic_module
     USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
     USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
 
-    ! Parameters controlling the Ornstein-Uhlenbeck process.
+    ! Canonical configuration controlling the Ornstein-Uhlenbeck process.
 
-    !> Canonical OU parameters, transformation and transport selection for one layer.
+    !> @brief Canonical OU parameters, transformation and transport selection for one layer.
     TYPE :: stochastic_config_type
         REAL(wp) :: sym_noise=0.0_wp !< Effective-fluctuation sign transform.
         REAL(wp) :: tau_stochastic=-1.0_wp !< OU correlation time [s].
@@ -46,6 +46,7 @@ MODULE stochastic_module
     TYPE :: stochastic_workspace_type
         !> Non-owning canonical OU and matched rheology configurations.
         TYPE(stochastic_config_type), POINTER :: config=>NULL()
+        !> Non-owning rheology configuration matched to the same layer as OU noise.
         TYPE(rheology_config_type), POINTER :: rheology=>NULL()
         INTEGER :: layer=1 !< State layer slot owned by this workspace.
         INTEGER, ALLOCATABLE :: rng_state(:) !< Independent L2 RNG; L1 uses the legacy global stream.

@@ -28,7 +28,7 @@ MODULE time_integration_2d
     IMPLICIT NONE
     PRIVATE
     ABSTRACT INTERFACE
-        !> @brief stochastic stage observer operation.
+        !> @brief Notify the driver after post-spatial stochastic preparation.
         SUBROUTINE stochastic_stage_observer()
         END SUBROUTINE stochastic_stage_observer
     END INTERFACE
@@ -43,11 +43,15 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:,:), qp_trial(:,:,:,:)
         !> Persistent status worklist for primitive and spatial checks.
         INTEGER, ALLOCATABLE :: cell_status(:)
+        !> Operational ordered source groups and reusable worker-local scratch.
         TYPE(lie_source_executor_type) :: lie_executor
+        !> Enable opt-in Lie phase timing; front flag enables mass diagnostics.
         LOGICAL :: profile_enabled=.FALSE.,front_mass_diagnostics=.FALSE.
+        !> Number of time integration profile samples collected.
         INTEGER :: profile_calls=0
         !> Profile times for preparing the pre-step residual and applying the Lie step [s].
         REAL(wp) :: profile_spatial=0.0_wp,profile_prepare=0.0_wp,profile_sources=0.0_wp
+        !> Cumulative executor and final fluid-publication times [s].
         REAL(wp) :: profile_source_executor=0.0_wp,profile_publish=0.0_wp
     CONTAINS
         PROCEDURE :: initialize => initialize_time_integration
@@ -95,11 +99,11 @@ CONTAINS
     !> @param[in,out] spatial_operators Canonical L1/L2 PCCU workspaces.
     !> @param[out] dt_cfl Existing CFL policy bound, capped at MAX_DT [s].
     !> @param[out] dt_pos Positive mass-only forward-Euler bound, capped at MAX_DT [s].
-    !> @param[out] max_speed_x,max_speed_y Isolated L1 directional speed maxima [m/s].
+    !> Isolated L1 directional speed maxima [m/s].
     !> @param[in] boundary_source_enabled Optional original CFL boundary source switch.
     !> @param[in] diagnose_max_x_face Optional sampled CFL-face diagnostic switch.
-    !> @param[out] max_speed_x max speed x argument of prepare_spatial_for_timestep.
-    !> @param[out] max_speed_y max speed y argument of prepare_spatial_for_timestep.
+    !> @param[out] max_speed_x L1 x-direction propagation-speed maximum [m/s].
+    !> @param[out] max_speed_y L1 y-direction propagation-speed maximum [m/s].
     SUBROUTINE prepare_spatial_for_timestep(this,state,t,domain,spatial_operators, &
         dt_cfl,dt_pos,max_speed_x,max_speed_y,boundary_source_enabled,diagnose_max_x_face)
         CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
@@ -563,14 +567,14 @@ CONTAINS
     !> An invalid conservative candidate is rejected before sea removal, as in
     !> the original Lie stage. Status is 0 (accepted), 1 (inadmissible mass) or
     !> 2 (failed primitive conversion).
-    !> @param[in] q_before q before argument of update_spatial_cell.
-    !> @param[in] qp_before qp before argument of update_spatial_cell.
-    !> @param[in] rate rate argument of update_spatial_cell.
+    !> @param[in] q_before Pre-spatial conservative cell state.
+    !> @param[in] qp_before Pre-spatial primitive cell state.
+    !> @param[in] rate Conservative spatial residual per unit time.
     !> @param[in] dt Integration time increment.
-    !> @param[in] sea_cell sea cell argument of update_spatial_cell.
-    !> @param[out] q_candidate q candidate argument of update_spatial_cell.
-    !> @param[out] qp_candidate qp candidate argument of update_spatial_cell.
-    !> @param[out] status status argument of update_spatial_cell.
+    !> @param[in] sea_cell Sea removal enabled for this cell.
+    !> @param[out] q_candidate Conservative spatial update candidate.
+    !> @param[out] qp_candidate Converted primitive candidate.
+    !> @param[out] status Zero if admissible; nonzero on failed spatial conversion.
     SUBROUTINE update_spatial_cell(q_before,qp_before,rate,dt,sea_cell,q_candidate,qp_candidate,status)
         REAL(wp), INTENT(IN) :: q_before(n_vars),qp_before(n_vars),rate(n_eqns),dt
         LOGICAL, INTENT(IN) :: sea_cell

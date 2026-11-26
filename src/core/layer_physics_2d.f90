@@ -16,6 +16,7 @@ MODULE layer_physics_2d
     PRIVATE
     PUBLIC :: layer_physics_type
 
+    !> @brief Non-owning, validated configuration references for one material layer.
     TYPE :: layer_physics_type
         PRIVATE
         !> Non-owning canonical rheology configuration.
@@ -26,6 +27,7 @@ MODULE layer_physics_2d
         TYPE(pore_pressure_config_type), POINTER :: pore_pressure => NULL()
         !> Non-owning reference to canonical layer mass exchange.
         TYPE(mass_exchange_config_type), POINTER :: mass_exchange => NULL()
+        !> True after all referenced layer configurations pass validation.
         LOGICAL :: initialized=.FALSE.
     CONTAINS
         PROCEDURE :: initialize => initialize_layer_physics

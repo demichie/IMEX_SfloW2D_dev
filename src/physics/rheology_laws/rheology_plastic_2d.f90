@@ -84,7 +84,7 @@ CONTAINS
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
     !> \param[in] config Read-only rheology configuration for the evaluated layer.
-    !> @brief eval rheology plastic implicit real operation.
+    !> @brief Evaluate the plastic yield resistance in REAL arithmetic for source assembly.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.
     !> @param[out] rate_y Source contribution to y momentum.

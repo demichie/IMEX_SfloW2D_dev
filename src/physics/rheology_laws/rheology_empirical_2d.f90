@@ -77,7 +77,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_empirical_implicit
 
     !> Evaluate the shared implicit-law formula in REAL for explicit assembly.
-    !> @brief eval rheology empirical implicit real operation.
+    !> @brief Evaluate the empirical drag law in REAL arithmetic for source assembly.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.
     !> @param[out] rate_y Source contribution to y momentum.

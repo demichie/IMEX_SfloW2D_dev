@@ -105,13 +105,13 @@ CONTAINS
             CALL fatal_error('vaporization: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_vaporization_analytic
 
-!> @brief eval vaporization mass rate operation.
+!> @brief Compute vapor mass production driven by hot deposited solids.
 !> @param[in] flow_temperature Temperature of flowing mixture.
 !> @param[in] solid_density Solid density.
 !> @param[in] solid_heat_capacity Specific heat capacity of solids.
 !> @param[in] deposition_rate Deposition rate from underlying surface.
 !> @param[in] steam_fraction Steam mass fraction.
-!> @return Evaluated physical rate or coefficient.
+!> @return Vapor mass-production rate from the configured energy balance.
 PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,                                             &
             solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
 
@@ -131,10 +131,10 @@ PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,      
 
     END FUNCTION eval_vaporization_mass_rate
 
-!> @brief eval vaporization energy rate operation.
+!> @brief Compute the sensible thermal contribution of produced vapor.
 !> @param[in] vapor_mass_rate Mass rate of vapor production.
 !> @param[in] gas_heat_capacity Specific heat capacity of gaseous phase.
-!> @return Evaluated physical rate or coefficient.
+!> @return Sensible thermal source rate associated with vapor production.
 PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,                                                           &
             gas_heat_capacity) RESULT(rate)
 

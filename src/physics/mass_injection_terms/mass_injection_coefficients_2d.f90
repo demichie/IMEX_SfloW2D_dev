@@ -22,15 +22,20 @@ MODULE mass_injection_coefficients_2d
     REAL(wp) :: lateral_coeff_step = -1.0_wp
     !> Time-averaged injection window for each configured fissure.
     REAL(wp), ALLOCATABLE :: fissure_coeff_step(:)
-    !> Material properties shared by cells with the same injection composition.
-    !> Prepared outside the OpenMP cell sweep and passed read-only to physics.
+    !> @brief Prepared material properties shared by cells with an injection composition.
+    !> @details Evaluated before the OpenMP cell sweep; immutable during cell-local source evaluation.
     TYPE :: injection_material_type
+        !> Solid and additional-gas mass fractions for one injected material.
         REAL(wp), ALLOCATABLE :: xs(:),xg(:)
+        !> Injected mixture density, heat capacity and reduced gravity.
         REAL(wp) :: rho_m=0.0_wp,cp_m=0.0_wp,red_grav=0.0_wp
     END TYPE injection_material_type
 
+    !> @brief Prepared injection compositions for common and per-fissure sources.
     TYPE :: injection_material_set_type
+        !> Prepared material for radial or circular injection.
         TYPE(injection_material_type) :: common
+        !> Separate prepared material records for each fissure.
         TYPE(injection_material_type), ALLOCATABLE :: fissure(:)
     END TYPE injection_material_set_type
 
@@ -38,7 +43,7 @@ CONTAINS
 
     !> Recompute material-only properties once per Lie sweep (also detects
     !> changed source parameters). Temporal windows and geometry remain dynamic.
-    !> @brief prepare injection materials operation.
+    !> @brief Refresh read-only injected material properties outside the cell sweep.
     !> @param[in,out] materials Injection material collection.
     SUBROUTINE prepare_injection_materials(materials)
         TYPE(injection_material_set_type), INTENT(INOUT) :: materials
@@ -59,11 +64,11 @@ CONTAINS
         END IF
     END SUBROUTINE prepare_injection_materials
 
-    !> @brief prepare material operation.
+    !> @brief Build a physical injection mixture from temperature and species fractions.
     !> @param[in,out] material Material properties of injected fluid.
-    !> @param[in] t t argument for prepare_material.
-    !> @param[in] xs xs argument for prepare_material.
-    !> @param[in] xg xg argument for prepare_material.
+    !> @param[in] t Injection temperature [K].
+    !> @param[in] xs Mass fractions of the n_solid transported solid classes.
+    !> @param[in] xg Mass fractions of the n_add_gas additional gas species.
     SUBROUTINE prepare_material(material,T,xs,xg)
         TYPE(injection_material_type), INTENT(INOUT) :: material
         REAL(wp), INTENT(IN) :: T,xs(n_solid),xg(n_add_gas)

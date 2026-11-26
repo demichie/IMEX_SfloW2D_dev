@@ -54,7 +54,7 @@ CONTAINS
     END SUBROUTINE eval_thermal_cooling_implicit
 
     !> Evaluate exactly the same implicit contribution in REAL for explicit assembly.
-    !> @brief eval thermal cooling implicit real operation.
+    !> @brief Evaluate the implicit thermal cooling rate in REAL arithmetic.
     !> @param[in] state Local physical state.
     !> @param[in] radiative Radiative cooling coefficient.
     !> @param[in] convective Convective cooling coefficient.
@@ -72,7 +72,7 @@ CONTAINS
 
     !> Evaluate the identical cooling law from temperature alone, so thermal-
     !> only Newton groups do not construct a full REAL or COMPLEX physical state.
-    !> @brief eval thermal cooling from temperature real operation.
+    !> @brief Evaluate thermal cooling from a REAL temperature without a full physical state.
     !> @param[in] temperature Flow temperature.
     !> @param[in] radiative Radiative cooling coefficient.
     !> @param[in] convective Convective cooling coefficient.
@@ -84,7 +84,7 @@ CONTAINS
         INCLUDE 'thermal_cooling_rate.inc'
     END SUBROUTINE eval_thermal_cooling_from_temperature_real
 
-    !> @brief eval thermal cooling from temperature complex operation.
+    !> @brief Evaluate thermal cooling from COMPLEX temperature for Newton/complex-step.
     !> @param[in] temperature Flow temperature.
     !> @param[in] radiative Radiative cooling coefficient.
     !> @param[in] convective Convective cooling coefficient.

@@ -166,7 +166,7 @@ CONTAINS
     !> @brief Read canonical pair-wide mass exchange settings from one optional NAMELIST.
     !> @details Single-layer input must not contain interlayer settings. A single
     !>          pair owns these settings; neither L1 nor L2 is a surrogate owner.
-    !> @param[in] input_unit input unit argument for read_interlayer_parameters.
+    !> @param[in] input_unit Open Fortran unit containing the pair-wide interlayer NAMELIST.
     !> @param[out] error Validation or error message.
     SUBROUTINE read_interlayer_parameters(input_unit,error)
         INTEGER, INTENT(IN) :: input_unit
@@ -332,7 +332,7 @@ CONTAINS
     END SUBROUTINE validate_interlayer_momentum_exchange_configuration
 
     !> @brief Write the unique canonical interlayer configuration for two-layer restarts.
-    !> @param[in] output_unit output unit argument for write_interlayer_parameters.
+    !> @param[in] output_unit Open output unit receiving the canonical interlayer NAMELIST.
     SUBROUTINE write_interlayer_parameters(output_unit)
         INTEGER, INTENT(IN) :: output_unit
         IF (n_layers==2) WRITE(output_unit,NML=interlayer_parameters)

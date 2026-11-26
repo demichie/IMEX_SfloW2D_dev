@@ -131,7 +131,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_voellmy_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    !> @brief eval rheology voellmy implicit real operation.
+    !> @brief Evaluate the shared Voellmy resistance kernel in REAL arithmetic.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[in] use_stochastic_xi Enable stochastic friction coefficient.

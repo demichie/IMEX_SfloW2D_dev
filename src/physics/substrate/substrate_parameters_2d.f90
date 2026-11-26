@@ -7,14 +7,19 @@ MODULE substrate_parameters_2d
     PRIVATE
     PUBLIC :: substrate_config_type, substrate, erodible_fract, coeff_porosity
 
-    !> Shared terrain and erodible-bed configuration (no layer-specific copies).
+    !> @brief Shared terrain and erodible-bed configuration (no layer-specific copies).
     TYPE :: substrate_config_type
         REAL(wp) :: T_ground=-1.0_wp              !< Ground temperature [K].
         REAL(wp) :: erodible_porosity=-1.0_wp     !< Pore volume fraction of the bed.
+        !> Path to the common terrain DEM input file.
         CHARACTER(LEN=40) :: topography_file='topography_dem.asc'
+        !> Optional raster supplying erodible substrate information.
         CHARACTER(LEN=40) :: erodible_file=''
+        !> Initial globally configured erodible-bed thickness [m].
         REAL(wp) :: initial_erodible_thickness=-1.0_wp
+        !> Enable changes of terrain geometry from accepted substrate transfers.
         LOGICAL :: topo_change_flag=.FALSE.
+        !> Enable substrate inventories associated with deposition.
         LOGICAL :: erodible_deposit_flag=.FALSE.
     END TYPE substrate_config_type
 

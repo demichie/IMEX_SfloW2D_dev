@@ -27,23 +27,39 @@ MODULE model_layout_2d
         !> Number of conservative balance equations.
         INTEGER :: n_eqns = 0
 
+        !> Number of independently transported solid classes.
         INTEGER :: n_solid = 0
+        !> Number of additional gas components, excluding the ambient carrier.
         INTEGER :: n_add_gas = 0
+        !> Number of transported stochastic variables, zero or one.
         INTEGER :: n_stoch_vars = 0
+        !> Number of transported pore-pressure variables, zero or one.
         INTEGER :: n_pore_vars = 0
+        !> Conservative total-mixture-mass equation index.
         INTEGER :: idx_totMassEqn = 0
+        !> Conservative x-momentum equation index.
         INTEGER :: idx_uEqn = 0
+        !> Conservative y-momentum equation index.
         INTEGER :: idx_vEqn = 0
+        !> Conservative sensible-thermal-content equation index.
         INTEGER :: idx_engyEqn = 0
         !> Temperature component of the primitive state, not a conservative energy equation.
         INTEGER :: idx_T = 0
+        !> First transported solid component index, zero when absent.
         INTEGER :: idx_solid_first = 0
+        !> Last transported solid component index, zero when absent.
         INTEGER :: idx_solid_last = 0
+        !> First additional-gas component index, zero when absent.
         INTEGER :: idx_add_gas_first = 0
+        !> Last additional-gas component index, zero when absent.
         INTEGER :: idx_add_gas_last = 0
+        !> Primitive or transported stochastic component index, zero when absent.
         INTEGER :: idx_stoch = 0
+        !> Primitive or transported pore-pressure component index, zero when absent.
         INTEGER :: idx_pore = 0
+        !> Primitive horizontal x-velocity index; distinct from x-momentum.
         INTEGER :: idx_u = 0
+        !> Primitive horizontal y-velocity index; distinct from y-momentum.
         INTEGER :: idx_v = 0
 
     CONTAINS

@@ -33,33 +33,54 @@ MODULE domain_2d
     !>          lists also contain neighbouring dry cells read by the HP stencil.
     TYPE, PUBLIC :: domain_type
 
+        !> Configured cell release times [s] on the cell-centered grid (x,y).
         REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
         !> Next pending initialization release; refreshed only when its time is reached.
         REAL(wp) :: next_release_time = HUGE(0.0_wp)
         !> Accepted Lie published wetness for the previous solve worklist.
         LOGICAL :: committed_mask_ready = .FALSE.
 
+        !> Final cell-centered solve membership shared by all active layers (x,y).
         LOGICAL, ALLOCATABLE :: solve_mask(:,:)
+        !> Second ping-pong cell mask for OpenMP halo dilation (x,y).
         LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
+        !> Cell-centered read halo for spatial reconstruction (x,y).
         LOGICAL, ALLOCATABLE :: reconstruction_mask(:,:)
+        !> Required x-normal interfaces, indexed by x-face and y-cell.
         LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
+        !> Required y-normal interfaces, indexed by x-cell and y-face.
         LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
 
+        !> Number of owned cells in the compact solve worklist.
         INTEGER :: solve_cells
+        !> Number of cells in the reconstruction-read worklist.
         INTEGER :: reconstruction_cells
+        !> Number of cells in the hydrostatic-path free-surface worklist.
         INTEGER :: hp_eta_cells
+        !> Number of x-normal interfaces requiring flux evaluation.
         INTEGER :: solve_interfaces_x
+        !> Number of y-normal interfaces requiring flux evaluation.
         INTEGER :: solve_interfaces_y
 
+        !> Global-grid x indices for solve cells, ordered by row then column.
         INTEGER, ALLOCATABLE :: j_cent(:)
+        !> Global-grid y indices paired with j_cent for each solve cell.
         INTEGER, ALLOCATABLE :: k_cent(:)
+        !> Membership mask for cells requiring hydrostatic free-surface traces.
         LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
+        !> X and y indices of hydrostatic free-surface cells in ordered worklist.
         INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
+        !> X indices of reconstruction-read cells in the compact worklist.
         INTEGER, ALLOCATABLE :: j_reconstruction(:)
+        !> Y indices paired with j_reconstruction.
         INTEGER, ALLOCATABLE :: k_reconstruction(:)
+        !> X-face indices of the required x-normal interface worklist.
         INTEGER, ALLOCATABLE :: j_stag_x(:)
+        !> Y-cell indices paired with j_stag_x.
         INTEGER, ALLOCATABLE :: k_stag_x(:)
+        !> X-cell indices of the required y-normal interface worklist.
         INTEGER, ALLOCATABLE :: j_stag_y(:)
+        !> Y-face indices paired with j_stag_y.
         INTEGER, ALLOCATABLE :: k_stag_y(:)
 
     CONTAINS

@@ -35,7 +35,7 @@ MODULE rheology_lava_2d
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
-    !> @brief eval rheology lava explicit operation.
+    !> @brief Assemble the lava momentum source from its shared viscous and yield kernels.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[out] rate Source contribution to energy or temperature.
@@ -53,7 +53,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_explicit
 
 
-    !> @brief eval rheology lava semi implicit operation.
+    !> @brief Evaluate the lava momentum source treated semi-implicitly.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.
@@ -73,7 +73,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_semi_implicit
 
 
-    !> @brief eval rheology lava implicit operation.
+    !> @brief Evaluate the COMPLEX lava source used by the Newton solver.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.
@@ -89,7 +89,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit
 
     !> Evaluate the implicit-law contribution in REAL for explicit assembly.
-    !> @brief eval rheology lava implicit real operation.
+    !> @brief Evaluate the same lava implicit source using REAL arithmetic.
     !> @param[in] config Model parameter configuration.
     !> @param[in] state Local physical state.
     !> @param[out] rate_x Source contribution to x momentum.
@@ -105,12 +105,12 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit_real
 
 
-    !> @brief eval rheology lava analytic operation.
+    !> @brief Integrate lava basal resistance exactly with frozen physical coefficients.
     !> @param[in] config Model parameter configuration.
-    !> @param[in] dt dt argument for eval_rheology_lava_analytic.
+    !> @param[in] dt Positive source integration interval [s].
     !> @param[in] state Local physical state.
-    !> @param[in] speed_ratio speed ratio argument for eval_rheology_lava_analytic.
-    !> @param[out] velocity_after velocity after argument for eval_rheology_lava_analytic.
+    !> @param[in] speed_ratio Dimensionless velocity ratio in the basal yield term.
+    !> @param[out] velocity_after Updated horizontal velocity vector [m/s].
     SUBROUTINE eval_rheology_lava_analytic(config, dt, state, speed_ratio, velocity_after)
         TYPE(rheology_config_type), INTENT(IN) :: config
 
@@ -145,7 +145,7 @@ CONTAINS
     !> \brief Kinematic viscosity shared by lava rheology and deposition.
     !> \return Kinematic viscosity [m2/s].
     !> @param[in] config Model parameter configuration.
-    !> @param[in] t Local temperature or simulation time.
+    !> @param[in] t Local mixture temperature [K].
     PURE REAL(wp) FUNCTION lava_kinematic_viscosity(config,T) RESULT(nu)
 
         TYPE(rheology_config_type), INTENT(IN) :: config

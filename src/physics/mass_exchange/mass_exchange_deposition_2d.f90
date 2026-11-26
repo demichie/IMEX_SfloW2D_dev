@@ -204,7 +204,7 @@ CONTAINS
         !> @param[in] solid_density Solid particle density [kg/m3].
         !> @param[in] carrier_density Carrier density [kg/m3].
         !> @param[in] inverse_kinematic_viscosity Inverse carrier kinematic viscosity [s/m2].
-        !> @return Evaluated physical rate or coefficient.
+        !> @return Nonnegative solid settling velocity [m/s].
         REAL(wp) FUNCTION settling_velocity(mass_config,particle_diameter, solid_density, carrier_density, &
             inverse_kinematic_viscosity)
 
