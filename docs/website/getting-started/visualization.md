@@ -1,18 +1,16 @@
 # Visualizing IMEX-SfloW2D results with ParaView and QGIS
 
-This guide brings together the complete step-by-step ParaView workflow and
-the QGIS-to-ParaView satellite-texture workflow. It preserves the explicit
-menu paths and filter controls from the original utility guides. Menu names
-may differ across versions of ParaView, QGIS and QuickMapServices.
+This guide explains how to display simulation fields in ParaView and how to
+use QGIS to prepare satellite imagery for a terrain visualization. Menu
+names may differ between software versions.
 
-For plotting ESRI ASCII rasters or diagnostic CSV series with the repository's
-Python scripts, see the [post-processing utilities](https://github.com/demichie/IMEX_SfloW2D_dev/tree/master/UTILS).
+For ESRI ASCII rasters and diagnostic CSV plots, see the
+[Python post-processing guide](postprocessing.md).
 
 ## ParaView: simulation fields and 3D visualization
 
-This guide follows the original ParaView workflow (terrain, flow surface,
-threshold, colours, opacity, velocity arrows, deposits and time annotation).
-It updates the field names to the current solver output. Menu labels can
+The workflow covers terrain, the flowing surface, wet-cell thresholds,
+colours, velocity arrows, deposition and simulation time. Menu labels can
 differ between ParaView versions; use **Filters > Search** (or the
 **Alphabetical** submenu) when a named filter is not shown.
 
@@ -45,7 +43,7 @@ Current single-layer variables include:
 | `hMax` | Maximum thickness | m |
 | `pDynMax` | Maximum dynamic pressure | Pa |
 
-See [the full NetCDF reference](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/NETCDF_OUTPUT.md). For two-layer simulations, layer-specific fields use `_l1` and `_l2`;
+See the [NetCDF field and unit reference](netcdf-fields.md). For two-layer simulations, layer-specific fields use `_l1` and `_l2`;
 `N_LAYERS=2` runs through the standard integrated solver. Interpret the coupled
 fields within the [two-layer hyperbolicity limits](../model/two-layer.md).
 
@@ -81,8 +79,8 @@ first, then apply the warp.
 5. In **Properties**, set **Scalars** to `h`. Set the lower
    threshold just above zero (for example `0.001` m if appropriate
    to the simulation) and retain the upper range. Click **Apply**.
-   This avoids showing the dry area; unlike the old procedure,
-   **do not threshold temperature against ambient temperature**.
+   This avoids showing dry cells; use depth rather than temperature
+to select wet cells.
 6. In the colouring drop-down choose `rho_m`, `solid_fraction`,
    `T` or another meaningful physical field. If a field is not
    available for the configuration, choose another.
@@ -111,8 +109,8 @@ coincident surfaces visually, but must not be mistaken for physical depth.
    samples, depending on version).
 7. In **Coloring**, choose `Vel` or **GlyphVector** when available.
 
-The legacy UI used a **Scaling > vector** selector; newer versions may
-show **Orientation Array**, **Scale Array**, and **Glyph Mode** instead.
+Depending on your ParaView version, vector scaling may appear under
+**Orientation Array**, **Scale Array** or **Glyph Mode**.
 
 ### 5. Display deposited material
 
@@ -144,9 +142,8 @@ time, the field units and that vertical warp uses the intended geometry.
 
 ## QGIS and ParaView: georeferenced satellite textures
 
-This guide preserves the original menu-by-menu workflow while updating
-paths and clarifying the coordinate-system checks. QGIS, QuickMapServices
-and ParaView versions may show slightly different menu labels.
+QGIS, QuickMapServices and ParaView versions may show slightly different
+menu labels. Verify the coordinate system before combining datasets.
 
 ### 1. Identify the coordinate reference system
 
@@ -181,18 +178,15 @@ export when you need **exactly the simulated footprint**.
 
 ### 3. Add satellite or orthophoto imagery
 
-### Option A: QuickMapServices (original workflow)
+### Option A: QuickMapServices
 
 1. Choose **Plugins > Manage and Install Plugins**.
 2. Search for **QuickMapServices** and install/enable it.
 3. If the installed version exposes them, choose
    **Web > QuickMapServices > Settings > More services >
    Get contributed pack** to add community map providers.
-4. Open **Web > QuickMapServices**, select an appropriate imagery
-   provider and add its satellite/orthophoto layer. The old guide
-   specifically referred to **Google > Google.cn Satellite**;
-   this exact entry is not guaranteed to exist in current provider
-   lists and is not required.
+4. Open **Web > QuickMapServices**, choose an imagery provider compatible
+   with your project and add its satellite/orthophoto layer.
 5. Check that the imagery source permits your intended use and export.
 
 ### Option B: QGIS XYZ Tiles / raster source
@@ -206,8 +200,8 @@ export when you need **exactly the simulated footprint**.
 
 ### 4. Export an image covering the simulation domain
 
-The original workflow used **Convert map to raster**, then clipped
-the result and exported an image. Preserve those options:
+You can render the map as a raster, clip to the simulation extent,
+and export an image:
 
 1. With the DEM and imagery loaded, open
    **Processing > Toolbox**.

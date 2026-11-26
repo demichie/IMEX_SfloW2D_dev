@@ -1,11 +1,32 @@
 # Getting started
 
-Choose an installation method and then follow the README of a specific example.
+You can run IMEX-SfloW2D by compiling the Fortran executable or using
+a prebuilt Docker image. Each example includes its own simulation
+settings, terrain prerequisites and preparation commands.
 
-1. [Build the solver from source](installation.md) using gfortran, NetCDF-Fortran and LAPACK/BLAS, or use the [Docker container](docker.md) when a published image is available.
-2. Open the [examples catalogue](../examples/index.md). Each case documents its input prerequisites; some require copying and extracting a shared DEM.
-3. Prepare input rasters or initial conditions with the selected example's script. Such scripts do **not** run the solver unless explicitly stated.
-4. Run the executable from the case directory, where `IMEX_SfloW2D.inp` is located.
-5. Consult [output files](output-files.md) and [visualization](visualization.md) to inspect NetCDF, diagnostics and restart checkpoints.
+## Run your first simulation
 
-For two-layer cases, consult the [coupled-model limits](../model/two-layer.md) before interpreting results.
+1. [Build from source](installation.md) or [use Docker](docker.md).
+2. Choose a case from the [examples catalogue](../examples/index.md).
+3. Prepare the required DEM and initial-state files as described by
+   that example. Preparation scripts generate inputs; they do not
+   run the solver unless their instructions explicitly say so.
+4. Open the example directory containing `IMEX_SfloW2D.inp` and
+   run the solver there.
+5. Inspect the [output directories](output-files.md) and use
+   [ParaView or QGIS](visualization.md) or the
+   [Python plotting tools](postprocessing.md) to examine the results.
+
+## Before you run
+
+- Check that the case's terrain and input files are available.
+- Verify that `N_LAYERS` matches your intended single- or
+  two-layer calculation.
+- Read the [initial conditions and restart guide](initial-conditions.md)
+  if changing the initial state or continuing a run.
+- Check the [two-layer applicability limits](../model/hyperbolicity.md)
+  when using interacting layers.
+
+The examples are provided to demonstrate how to configure and use
+the model. Quantitative predictions require appropriate physical
+parameters, validation and numerical convergence checks.

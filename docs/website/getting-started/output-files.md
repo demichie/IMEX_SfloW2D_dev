@@ -53,8 +53,7 @@ Post-processing scripts are separate from solver output management.
 `UTILS/plot_overlay.py` accepts the run output directory and saves images
 beside the matching ESRI ASCII rasters, using the exact time from the
 snapshot manifest. `UTILS/plot_runout.py` and `UTILS/plot_probes.py`
-accept CSV paths and save figures next to their inputs. See
-[post-processing utilities](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/UTILS/README.md) for usage and dependencies.
+accept CSV paths and save figures next to their inputs. See the [Python post-processing guide](postprocessing.md) for commands and dependencies.
 
 For instructions on viewing NetCDF fields and preparing satellite textures,
 see the [ParaView and QGIS visualization guide](visualization.md).

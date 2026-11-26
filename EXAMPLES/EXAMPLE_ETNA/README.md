@@ -78,7 +78,7 @@ python create_input_ellipsoid.py
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ### 4. Optional cleaning and plotting

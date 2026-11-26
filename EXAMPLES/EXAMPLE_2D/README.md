@@ -50,7 +50,7 @@ python create_example.py 100 0.5 300 false
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

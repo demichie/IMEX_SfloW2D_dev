@@ -53,7 +53,7 @@ The script prepares the input for the 1-D flat-bed dam-break with deposition, en
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

@@ -5,6 +5,7 @@ Usage: python3 tools/docs/build_examples.py --repo . --output build/docs-generat
 """
 import argparse
 import json
+import posixpath
 import re
 import shutil
 import textwrap
@@ -15,6 +16,19 @@ import yaml
 
 REQUIRED = ("title", "summary", "category", "tags")
 SECTIONS = ("Overview", "Main parameters", "How to run", "Expected output")
+
+# Current user-facing explanations supersede the development specifications.
+# Example README files retain their original relative links in the repository.
+SITE_DOC_LINKS = {
+    "docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md": "model/two-layer.md",
+    "docs/TWO_LAYER_HYPERBOLICITY.md": "model/hyperbolicity.md",
+    "docs/TL13B_C_PHYSICAL_CLOSURES.md": "model/interlayer-processes.md",
+    "docs/NETCDF_OUTPUT.md": "getting-started/netcdf-fields.md",
+    "docs/RESTART_INPUT.md": "getting-started/initial-conditions.md",
+    "docs/website/getting-started/visualization.md": "getting-started/visualization.md",
+    "docs/website/getting-started/netcdf-fields.md": "getting-started/netcdf-fields.md",
+}
+
 
 
 def parse_readme(path):
@@ -75,6 +89,32 @@ def is_example_readme(readme, examples_root):
     )
 
 
+# Developer-only notes remain in the repository README, not the user manual.
+# Keep scientific limitations, run instructions and case bibliographies visible.
+INTERNAL_EXAMPLE_SECTIONS = {
+    "documentation provenance",
+    "documentation verification note",
+    "provenance and documentation notes",
+    "physical-model namelists in the legacy example",
+    "positivity and lie-source diagnostics",
+    "l2 face-base and reconstruction audit",
+    "wet/dry-front mass diagnostic",
+}
+
+
+def public_example_body(body):
+    """Exclude internal migration/diagnostic appendices from website examples."""
+    output = []
+    hidden = False
+    for line in body.splitlines(keepends=True):
+        section = re.match(r"^##\s+(.+?)\s*$", line)
+        if section:
+            hidden = section.group(1).strip().casefold() in INTERNAL_EXAMPLE_SECTIONS
+        if not hidden:
+            output.append(line)
+    return "".join(output).rstrip() + "\n"
+
+
 def rewrite_markdown_links(body, example_dir, repo_url, revision):
     """Preserve source-relative links/images, which would otherwise break after relocation."""
     def replacer(match):
@@ -96,6 +136,11 @@ def rewrite_markdown_links(body, example_dir, repo_url, revision):
             elif part not in (".", ""):
                 components.append(part)
         clean = "/".join(components)
+        if marker != "!" and clean in SITE_DOC_LINKS:
+            target = posixpath.relpath(
+                SITE_DOC_LINKS[clean], start=f"examples/{example_dir.as_posix()}"
+            )
+            return f"[{label}]({target})"
         if marker == "!":
             dest = f"https://raw.githubusercontent.com/{repo_url}/{revision}/{quote(clean, safe='/')}"
         else:
@@ -123,6 +168,7 @@ def generate(repo, output, revision, repo_slug):
             continue
         relative_dir = readme.parent.relative_to(examples_root)
         meta, body, missing = parse_readme(readme)
+        body = public_example_body(body)
         body = rewrite_markdown_links(body, relative_dir, repo_slug, revision)
         dest = pages / relative_dir / "index.md"
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -136,7 +182,16 @@ def generate(repo, output, revision, repo_slug):
     categories = {}
     for slug, meta, rel in records:
         categories.setdefault(str(meta["category"]), []).append((slug, meta, rel))
-    lines = ["# Examples", "", f"Automatically generated from **{len(records)}** example READMEs at revision `{revision[:12]}`.", "", "Every page includes a link to its original source folder. The full Markdown content, including bibliographic references and technical notes, is preserved.", ""]
+    lines = [
+        "# Examples",
+        "",
+        "Explore simulations organized by application. Each guide describes its "
+        "physical setup, required inputs, preparation commands and expected outputs.",
+        "",
+        "Example parameter values are illustrative unless calibration and "
+        "comparison with observations are explicitly documented.",
+        "",
+    ]
     for category in sorted(categories, key=str.casefold):
         lines.extend([f"## {category}", ""])
         for slug, meta, _ in sorted(categories[category], key=lambda entry: entry[1]["title"].casefold()):
@@ -149,12 +204,18 @@ def generate(repo, output, revision, repo_slug):
         "      - Overview: getting-started/index.md",
         "      - Build from source: getting-started/installation.md",
         "      - Docker: getting-started/docker.md",
+        "      - Initial conditions and restart: getting-started/initial-conditions.md",
         "      - Output files: getting-started/output-files.md",
+        "      - NetCDF variables and units: getting-started/netcdf-fields.md",
         "      - Visualization (ParaView and QGIS): getting-started/visualization.md",
+        "      - Python post-processing: getting-started/postprocessing.md",
         "  - Model:",
         "      - Overview: model/index.md",
-        "      - Spatial and temporal integration: model/numerics.md",
-        "      - Two-layer formulation and limits: model/two-layer.md",
+        "      - Numerical methods: model/numerics.md",
+        "      - Two-layer formulation: model/two-layer.md",
+        "      - Coupled pressure: model/coupling.md",
+        "      - Interlayer processes: model/interlayer-processes.md",
+        "      - Characteristic limits: model/hyperbolicity.md",
         "  - Examples:",
         "      - Catalogue: examples/index.md",
     ]
@@ -163,14 +224,7 @@ def generate(repo, output, revision, repo_slug):
         for slug, meta, _ in sorted(categories[category], key=lambda entry: entry[1]["title"].casefold()):
             label = json.dumps(meta['title'], ensure_ascii=False)
             nav.append(f"          - {label}: examples/{slug}/index.md")
-    nav += [
-        "  - Development:",
-        "      - Overview: development/index.md",
-        "      - Validation: development/validation.md",
-        "      - Publishing: development/publishing.md",
-        "  - Doxygen: https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/",
-        "  - References: references/index.md",
-    ]
+    nav += ["  - References and citation: references/index.md"]
     config = (repo / "mkdocs.yml").read_text(encoding="utf-8")
     config = config.replace("# GENERATED_NAVIGATION", "\n".join(nav))
     (output / "mkdocs.generated.yml").write_text(config, encoding="utf-8")

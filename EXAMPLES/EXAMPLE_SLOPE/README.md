@@ -53,7 +53,7 @@ The test has a supercritical inlet, no friction, no sedimentation or entrainment
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

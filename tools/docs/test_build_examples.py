@@ -23,7 +23,12 @@ class ExampleDocumentationTests(unittest.TestCase):
             (etna / "README.md").write_text(
                 "# Etna two-layer collapse\n\n"
                 "A lower-layer flow and an initially dry upper current.\n\n"
-                "See [the theory](../../docs/TWO_LAYER_HYPERBOLICITY.md).\n",
+                "See [the theory](../../docs/TWO_LAYER_HYPERBOLICITY.md).\n"
+                "See [the source](../../docs/FORTRAN_STYLE.md).\n"
+                "\n## Documentation provenance\n"
+                "This is internal migration history.\n"
+                "\n## Physical assumptions\n"
+                "The two-layer model has density and shear limits.\n",
                 encoding="utf-8",
             )
             dem = etna / "DEM"
@@ -53,11 +58,20 @@ class ExampleDocumentationTests(unittest.TestCase):
             self.assertIn("Subcritical bump", catalogue)
             self.assertIn("Two-layer flows", catalogue)
             rendered = (output / "docs" / "examples" / "EXAMPLE_ETNA_TWO_LAYER" / "index.md").read_text()
-            self.assertIn("https://github.com/owner/repo/blob/abc123/docs/TWO_LAYER_HYPERBOLICITY.md", rendered)
+            self.assertIn("[the theory](../../model/hyperbolicity.md)", rendered)
+            self.assertNotIn("internal migration history", rendered)
+            self.assertIn("The two-layer model has density and shear limits.", rendered)
+            self.assertIn("https://github.com/owner/repo/blob/abc123/docs/FORTRAN_STYLE.md", rendered)
             nav = (output / "mkdocs.generated.yml").read_text()
             self.assertIn("getting-started/docker.md", nav)
             self.assertIn("model/two-layer.md", nav)
-            self.assertIn("development/publishing.md", nav)
+            self.assertIn("model/coupling.md", nav)
+            self.assertIn("model/interlayer-processes.md", nav)
+            self.assertIn("getting-started/netcdf-fields.md", nav)
+            self.assertIn("references/index.md", nav)
+            self.assertNotIn("development/", nav)
+            self.assertNotIn("  - Doxygen:", nav)
+            self.assertNotIn("Automatically generated", catalogue)
 
     def test_invalid_explicit_front_matter_is_rejected(self):
         with TemporaryDirectory() as tmp:

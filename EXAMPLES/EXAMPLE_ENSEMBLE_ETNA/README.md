@@ -55,7 +55,7 @@ cd templatedir
 ```
 
 ```bash
-ln -s ../../../bin/IMEX_SfloW2D .
+ln -s ../../../src/IMEX_SfloW2D .
 ```
 
 ```bash

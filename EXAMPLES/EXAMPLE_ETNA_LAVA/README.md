@@ -66,7 +66,7 @@ OpenMP team sizing.
 **Solver command:**
 
 ```bash
-OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../bin/IMEX_SfloW2D
+OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../src/IMEX_SfloW2D
 ```
 
 ### Optional: prepare an independent clean run

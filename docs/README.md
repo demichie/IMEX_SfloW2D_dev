@@ -28,9 +28,18 @@ Implementation-level contracts are maintained **beside the code**:
 
 ## User documentation
 
+The MkDocs website is a **user manual**: document available physics,
+simulation setup, numerical limitations, outputs and visualization there.
+Keep implementation roadmaps, dated acceptance evidence, CI/CD
+instructions and developer audits in the repository, not the public
+website navigation. Public explanations of two-layer equations and
+physical assumptions must link to other website pages rather than
+requiring readers to consult internal GitHub development documents.
+
+
 - [Website sources](website/) and [published MkDocs](https://demichie.github.io/IMEX_SfloW2D_dev/)
 - [Doxygen entry page](doxygen/mainpage.md) and [published API](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/)
-- [Visualization](website/getting-started/visualization.md), [Docker](website/getting-started/docker.md) and [publishing](website/development/publishing.md)
+- [Visualization](website/getting-started/visualization.md) and [Docker](website/getting-started/docker.md); publication workflows are described in [Actions](../.github/ACTIONS.md)
 - [Runnable examples](../EXAMPLES/), each documented by its own README
 
 ## Historical evidence

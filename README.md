@@ -299,7 +299,7 @@ Alternatively, build from this checkout:
 docker build -t imex-sflow2d:local .
 ~~~
 
-See the [Docker execution guide](docs/website/getting-started/docker.md) and [publication procedure](docs/website/development/publishing.md).
+See the [Docker execution guide](docs/website/getting-started/docker.md) and [publication workflows](.github/ACTIONS.md).
 
 ## Verification and reproducibility
 
@@ -317,13 +317,13 @@ make check
 2. **Cell physics and numerical regressions** — state, physical-source and spatial tests.
 3. **Solver integration and OpenMP validation** — optimized and strict/debug builds, representative end-to-end simulations and OpenMP/restart checks.
 
-The combined MkDocs/Doxygen site and GHCR image can be published manually from `master`, or automatically after the release gate passes; versioned source/Examples archives are then attached to the Release. A passing result verifies **the exact Git revision tested**; it does not establish calibration or physical validity for every model regime. Consult the [GitHub Actions guide](.github/ACTIONS.md), [verification overview](docs/website/development/validation.md) and [current roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
+The combined MkDocs/Doxygen site and GHCR image can be published manually from `master`, or automatically after the release gate passes; versioned source/Examples archives are then attached to the Release. A passing result verifies **the exact Git revision tested**; it does not establish calibration or physical validity for every model regime. Consult the [GitHub Actions guide](.github/ACTIONS.md), [source and test workflows](.github/ACTIONS.md) and [current roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
 
 For reproducible scientific results, record the **commit SHA**, compiler and build flags, complete `IMEX_SfloW2D.inp`, input/DEM checksums, relevant physical model coefficients and runtime settings (including OpenMP threads), together with diagnostics and output data.
 
 ## Documentation, contributions and citation
 
-- **User documentation:** [website](https://demichie.github.io/IMEX_SfloW2D_dev/), [build/install](docs/website/getting-started/installation.md), [input/restart](docs/RESTART_INPUT.md), [outputs](docs/NETCDF_OUTPUT.md) and [visualization](docs/website/getting-started/visualization.md).
+- **User documentation:** [website](https://demichie.github.io/IMEX_SfloW2D_dev/), [build/install](docs/website/getting-started/installation.md), [initial conditions and restart](docs/website/getting-started/initial-conditions.md), [NetCDF fields](docs/website/getting-started/netcdf-fields.md), [output files](docs/website/getting-started/output-files.md) and [visualization](docs/website/getting-started/visualization.md).
 - **Scientific and architecture references:** [model overview](docs/website/model/index.md), [two-layer architecture](docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md), [hyperbolicity limits](docs/TWO_LAYER_HYPERBOLICITY.md), [source closures](docs/TL13B_C_PHYSICAL_CLOSURES.md) and [development roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
 - **Developers:** [documentation index](docs/README.md), [Fortran style](docs/FORTRAN_STYLE.md), [adding a rheology](docs/ADDING_A_RHEOLOGY_MODEL.md), [contributing guide](CONTRIBUTING.md) and [Doxygen API](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/).
 

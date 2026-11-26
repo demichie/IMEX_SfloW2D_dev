@@ -67,7 +67,7 @@ and, when plotting is requested, `initial_thickness.png` and
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 

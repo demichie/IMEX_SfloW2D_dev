@@ -33,6 +33,6 @@ The example provides the input file and creates its DEM and initial thickness ra
 
 ## Other platforms
 
-Use `--with-netcdf=/path/to/prefix` for a compiler-compatible NetCDF-Fortran installation. Consult the [repository README](https://github.com/demichie/IMEX_SfloW2D_dev#build-from-source) for build options.
+Use `--with-netcdf=/path/to/prefix` for a compiler-compatible NetCDF-Fortran installation. Select a compiler with `FC=<compiler>` and inspect additional build options with `./configure --help`.
 
 A [Docker image](docker.md) avoids installing the Fortran compilation toolchain on the host once the image has been published.

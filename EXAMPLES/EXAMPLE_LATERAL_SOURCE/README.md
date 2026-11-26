@@ -56,7 +56,7 @@ python create_example.py 200 250 10000000 900 0.5 0.01
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

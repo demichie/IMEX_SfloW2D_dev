@@ -102,7 +102,7 @@ python create_dambreak.py 300 15 3.0 0.15 0.20 0.40 0.58 300 1.0 true
 **Create the executable link:**
 
 ```bash
-ln -s ../../bin/IMEX_SfloW2D .
+ln -s ../../src/IMEX_SfloW2D .
 ```
 
 ### 3. Run the simulation

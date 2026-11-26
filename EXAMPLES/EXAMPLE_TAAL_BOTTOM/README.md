@@ -69,7 +69,7 @@ See [DEM/README.md](DEM/README.md) for both alternatives. The input uses `DEM/to
 **Create a local executable link:**
 
 ```bash
-ln -s ../../bin/IMEX_SfloW2D .
+ln -s ../../src/IMEX_SfloW2D .
 ```
 
 **Run the solver:**

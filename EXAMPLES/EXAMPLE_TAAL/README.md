@@ -60,7 +60,7 @@ The input uses `DEM/topography_dem.asc`. Do not track the extracted ASC or dupli
 **Create a local executable link:**
 
 ```bash
-ln -s ../../bin/IMEX_SfloW2D .
+ln -s ../../src/IMEX_SfloW2D .
 ```
 
 **Run the solver:**

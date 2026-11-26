@@ -41,7 +41,7 @@ The input uses `DEM/topography_dem.asc`; unpack the archive only into `DEM/`.
 **Run the solver:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 

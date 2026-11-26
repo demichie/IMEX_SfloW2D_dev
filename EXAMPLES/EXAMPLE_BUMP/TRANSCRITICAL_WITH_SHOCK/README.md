@@ -51,7 +51,7 @@ The Python script sets up the specified SWASHES bump-flow test using a single co
 **Solver command:**
 
 ```bash
-../../../bin/IMEX_SfloW2D
+../../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

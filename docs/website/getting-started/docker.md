@@ -1,18 +1,29 @@
-# Running IMEX-SfloW2D with Docker
+# Running with Docker
 
-The GHCR package can be published manually from `master`, or automatically after the validation pipeline for a **published stable GitHub Release**. Both paths build and smoke-test the solver image; check that publication succeeded and that the package is public before pulling.
+A published Docker image lets you run IMEX-SfloW2D without installing
+a Fortran compiler or numerical libraries on the host.
 
-## Pull the published image
+## Get the image
 
 ```bash
 docker pull ghcr.io/demichie/imex_sflow2d_dev:latest
 ```
 
-The image contains the compiled solver and Linux runtime libraries. It does **not** contain simulation examples, DEM rasters or input files. Prepare an example on the host first.
+Use a published release-version tag (for example `:v1.2.3`)
+or a full-commit `:sha-...` tag when you need reproducible
+software. The moving `:latest` tag may change after publication.
+Check the [GitHub package page](https://github.com/demichie/IMEX_SfloW2D_dev/pkgs/container/imex_sflow2d_dev)
+if the image cannot be pulled.
 
-## Run a simulation
+The image contains the compiled solver and its runtime libraries.
+It does **not** contain example directories, DEM rasters or input files.
 
-From an example directory containing `IMEX_SfloW2D.inp` and its required DEM files:
+## Prepare and run a simulation
+
+Prepare the chosen case first, following the
+[example instructions](../examples/index.md). From its directory,
+which contains `IMEX_SfloW2D.inp` and all required terrain inputs,
+run:
 
 ```bash
 docker run --rm \
@@ -22,11 +33,15 @@ docker run --rm \
   ghcr.io/demichie/imex_sflow2d_dev:latest
 ```
 
-The executable reads the input from `/work` and writes its normal `OUTPUT/<RUN_NAME>/` tree to the mounted case directory. Supplying the host user/group avoids root-owned output files on Linux and macOS. Adjust the command for platforms that do not provide `id` or a POSIX shell.
+The solver reads the case input from `/work` and writes the
+usual `OUTPUT/<RUN_NAME>/` directory into the mounted host
+folder. The `--user` option avoids root-owned output on
+Linux systems that support `id`.
 
-The image also receives an immutable revision tag of the form `sha-<40-character Git commit>`. A stable release additionally publishes its version tag (for example `v1.2.3`). Use a revision or version tag instead of `latest` for reproducible results.
+To use a fixed version, replace `:latest` in the command
+with your chosen release or commit tag.
 
-## Build locally
+## Build an image locally
 
 From the repository root:
 
@@ -34,6 +49,8 @@ From the repository root:
 docker build --tag imex-sflow2d:local .
 ```
 
-Then replace the GHCR image name in the run command with `imex-sflow2d:local`.
+Then use `imex-sflow2d:local` instead of the published GHCR image
+in the run command.
 
-Image build and publication details, permissions and release checks are described under [Publishing](../development/publishing.md). Source-code installation remains available in [Build from source](installation.md).
+After a run, see [Output files](output-files.md) and
+[Visualizing results](visualization.md).

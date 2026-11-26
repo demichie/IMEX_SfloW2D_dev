@@ -82,7 +82,7 @@ python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

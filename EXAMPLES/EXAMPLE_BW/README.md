@@ -53,7 +53,7 @@ The example includes friction, settling/deposition and entrainment, and transpor
 **Solver command:**
 
 ```bash
-../../bin/IMEX_SfloW2D
+../../src/IMEX_SfloW2D
 ```
 
 ## Expected output

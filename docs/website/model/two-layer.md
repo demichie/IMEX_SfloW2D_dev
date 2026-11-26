@@ -1,35 +1,91 @@
 # Two-layer formulation
 
-Set `N_LAYERS=2` in `IMEX_SfloW2D.inp` to use the integrated coupled solver. No environment activation flag is required. `N_LAYERS=1` remains the standard single-layer configuration.
+IMEX-SfloW2D can evolve two interacting, depth-averaged mixtures using
+the same executable as a single-layer simulation.
 
-## Shared and per-layer quantities
+Set `N_LAYERS=2` in `IMEX_SfloW2D.inp`. For a single layer, use
+`N_LAYERS=1`. There is no separate two-layer executable or
+activation environment variable.
 
-- **Shared:** terrain elevation, grid and geometry, active-cell domain, material/species catalogue and substrate inventories.
-- **Per layer:** conservative and primitive states, rheology, thermal/pore-pressure configurations, and supported external source laws.
-- **Interlayer:** mass-transfer and momentum-drag laws use the single pair-wide `INTERLAYER_PARAMETERS` configuration.
+## Layer geometry
 
-The four local wetness cases (both wet, L1 only, L2 only, both dry) determine which layer touches terrain or atmosphere. Interlayer drag requires both layers present.
+The lower layer is **L1**, with depth $h_1$; the upper layer is
+**L2**, with depth $h_2$. Both share the terrain elevation $B$.
 
-## Physical coupling
+The interface between layers lies at $B+h_1$. The upper free
+surface is
 
-With terrain `B` and layer depths `h1` and `h2`, the two free surfaces are `eta1=B+h1` and `eta2=B+h1+h2`. Coupled pressure enters the spatial operator, not a separate Lie source. Interlayer mass transfer and drag are handled by coupled source transactions that enforce donor availability and update both layers consistently.
+$$
+\eta_{\mathrm{top}}=B+h_1+h_2.
+$$
 
-## Important applicability limits
+The model uses one computational grid and shared terrain/substrate
+inventories. Each layer has its own conservative and primitive
+variables, composition and configurable physical properties.
 
-!!! warning "Coupled characteristics are not always real"
-    Inverted density ordering (`rho2>rho1`) can produce complex gravitational eigenvalues even at zero relative velocity. Sufficiently strong shear can produce complex eigenvalues even for stable density ordering. Equal-density wet/wet states may have repeated real eigenvalues without a complete eigenbasis.
+## Layer configurations
 
-The current total-depth CFL speed envelope is not a general hyperbolicity test. Reducing the timestep cannot make a non-hyperbolic state hyperbolic. The documented spectrum is an analysis of a frozen smooth gravitational subsystem, not a global certificate for the full discrete solver.
+| Aspect | L1 (lower) | L2 (upper) |
+| --- | --- | --- |
+| Flow state | Depth, velocity, mixture and optional variables | Separate depth, velocity, mixture and optional variables |
+| Rheology and cooling | Layer-specific parameters | Layer-specific parameters |
+| Initial condition | Own initial raster or complete state | Own initial raster or complete state |
+| Coupling | Receives pressure and exchanges from L2 | Receives pressure and exchanges from L1 |
+| Substrate deposition | Supported for L1 | L2 settling transfers solids to L1, not directly to the substrate |
 
-**Read before interpreting results:**
+Layer contact with the terrain or atmosphere depends on whether
+the other layer is present. For example, an isolated wet upper
+layer can contact terrain where the configured law allows it.
 
-- [Scientific hyperbolicity analysis](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/TWO_LAYER_HYPERBOLICITY.md)
-- [Architecture and conservation contracts](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/TWO_LAYER_ARCHITECTURE_AND_ROADMAP.md)
-- [Physical closure assumptions](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/docs/TL13B_C_PHYSICAL_CLOSURES.md)
+## Input groups
 
-## Runnable examples
+For a two-layer run, supply the appropriate L1 and L2 groups,
+such as `INITIAL_L1_PARAMETERS` and `INITIAL_L2_PARAMETERS`.
+The shared `INTERLAYER_PARAMETERS` group configures the
+pair-wide transfer and drag laws.
 
-- [Etna granular collapse and upper dilute current](../examples/EXAMPLE_ETNA_TWO_LAYER/index.md)
-- [1D dam-break with initially dry upper layer](../examples/EXAMPLE_DAMBREAK_TWO_LAYER_1D/index.md)
+For `N_LAYERS=1`, the unsuffixed forms such as
+`INITIAL_PARAMETERS` and `RHEOLOGY_PARAMETERS` are intentional,
+supported names.
 
-These examples demonstrate supported workflows; they are not empirical validation for every density, shear or exchange regime.
+Two-layer primitive initialization currently requires the
+layer release times to be zero; independent delayed layer
+releases are not supported. See
+[initial conditions and restart](../getting-started/initial-conditions.md).
+
+## What couples the layers?
+
+**Pressure coupling** is part of the finite-volume spatial equations:
+both layers affect horizontal pressure forces. The exact terms and
+terrain metric are described on the
+[coupled pressure page](coupling.md).
+
+**Mass exchange** may transfer solids and associated carrier
+between the layers through settling and elutriation. **Interlayer drag**
+relaxes relative motion while conserving combined momentum at fixed
+layer masses. Their assumptions are explained under
+[interlayer processes](interlayer-processes.md).
+
+## Scientific applicability
+
+!!! warning "Density and shear restrictions"
+    The coupled gravitational system does not always have real
+    characteristic speeds. Inverted density ordering or sufficiently
+    strong interlayer shear can produce complex eigenvalues; even equal
+    density can lead to a defective repeated characteristic.
+    Successful execution or satisfaction of a CFL condition does not
+    establish general physical validity.
+
+Read the [characteristic analysis](hyperbolicity.md), particularly
+when layer densities are close, inverted, or relative velocities
+are large. Interlayer transfer laws also require scenario-specific
+calibration.
+
+## Try a simulation
+
+- [Two-layer 1D dam-break](../examples/EXAMPLE_DAMBREAK_TWO_LAYER_1D/index.md):
+  begin with a lower layer and an initially dry upper layer.
+- [Two-layer Etna collapse](../examples/EXAMPLE_ETNA_TWO_LAYER/index.md):
+  explore lower-to-upper particle transfer and a dilute upper current.
+
+These are model demonstrations, not universal calibration benchmarks.
