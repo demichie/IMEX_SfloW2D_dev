@@ -11,19 +11,19 @@ MODULE source_catalog_2d
     PUBLIC :: canonical_rheology_source_name, rheology_name_has_role, canonical_rheology_catalog_unique
     PUBLIC :: rheology_source_id, source_term_id_by_name, source_id_mask
     ! Catalogue indices are stable internal dispatch IDs, not user-facing group IDs.
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_THERMAL_COOLING=12
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_BOTTOM_CIRCULAR_INJECTION=14
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_BOTTOM_FISSURAL_INJECTION=15
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_RADIAL_INJECTION=16
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_GEOMETRY_CURVATURE=17
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_LAVA_DEPOSITION=18
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_EROSION=19
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_DEPOSITION=20
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS=21
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_ENTRAINMENT=22
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_VAPORIZATION=23
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_INTERLAYER_MASS_EXCHANGE=24
-    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_INTERLAYER_DRAG=25
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_THERMAL_COOLING=11
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_BOTTOM_CIRCULAR_INJECTION=13
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_BOTTOM_FISSURAL_INJECTION=14
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_RADIAL_INJECTION=15
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_GEOMETRY_CURVATURE=16
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_LAVA_DEPOSITION=17
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_EROSION=18
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_DEPOSITION=19
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_CARRIER_LIQUID_LOSS=20
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_ENTRAINMENT=21
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_EXCHANGE_VAPORIZATION=22
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_INTERLAYER_MASS_EXCHANGE=23
+    INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_INTERLAYER_DRAG=24
     INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_NEWTON_BLOCK=1, SOURCE_SOLVE_ANALYTIC_VELOCITY=2
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_ANALYTIC_TEMPERATURE=3, SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE=4
@@ -55,8 +55,7 @@ MODULE source_catalog_2d
     INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_LUCAS=8
     INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_MUI=9
     INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_MUI_VOELLMY=10
-    INTEGER, PARAMETER, PUBLIC :: RHEOLOGY_ID_NEWMODEL=11
-    INTEGER, PARAMETER :: SOURCE_TERM_COUNT=25
+    INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
     TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[                                           &
             source_term_type('rheology_voellmy',.TRUE.,.TRUE.,.TRUE.,                                                  &
                     default_method=SOURCE_METHOD_NEWTON,                                                               &
@@ -86,9 +85,6 @@ MODULE source_catalog_2d
                     default_method=SOURCE_METHOD_EXPLICIT,                                                             &
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
             source_term_type('rheology_mui_voellmy',.TRUE.,.TRUE.,.TRUE.,                                              &
-                    default_method=SOURCE_METHOD_NEWTON,                                                               &
-                    allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
-            source_term_type('rheology_newmodel',.FALSE.,.TRUE.,.FALSE.,                                               &
                     default_method=SOURCE_METHOD_NEWTON,                                                               &
                     allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.),                                     &
             source_term_type('thermal_cooling',.TRUE.,.TRUE.,.TRUE.,                                                   &
@@ -169,7 +165,7 @@ CONTAINS
             id=RHEOLOGY_ID_NONE
             RETURN
         END IF
-        DO i=1,RHEOLOGY_ID_NEWMODEL
+        DO i=1,RHEOLOGY_ID_MUI_VOELLMY
             IF (TRIM(name)==TRIM(SOURCE_CATALOG(i)%name)) THEN
                 id=i
                 RETURN
@@ -218,7 +214,7 @@ CONTAINS
         SELECT CASE(TRIM(name))
         CASE('rheology_voellmy','rheology_plastic','rheology_lava',                                                    &
             'rheology_lahar','rheology_empirical','rheology_quadratic',                                                &
-            'rheology_mui_voellmy','rheology_newmodel')
+            'rheology_mui_voellmy')
             ids=[idx_uEqn,idx_vEqn]
         CASE('thermal_cooling')
             ids=[idx_engyEqn]
@@ -304,7 +300,7 @@ CONTAINS
             SELECT CASE(TRIM(source_name))
             CASE('rheology_voellmy','rheology_plastic','rheology_lava',                                                &
                 'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
-                'rheology_mui_voellmy','rheology_newmodel')
+                'rheology_mui_voellmy')
                 found=.TRUE.
 
             END SELECT

@@ -191,7 +191,7 @@ CONTAINS
         CASE('rheology_voellmy','rheology_plastic','rheology_lava',                                                    &
                 'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
                 'rheology_froude','rheology_lucas','rheology_mui',                                                     &
-                'rheology_mui_voellmy','rheology_newmodel')
+                'rheology_mui_voellmy')
             requested_method=selected_rheology%rheology_method
             id=selected_rheology%rheology_group
         CASE('thermal_cooling')

@@ -165,7 +165,7 @@ actual physical domain of validity; do not copy permissions without justificatio
 
 **Important catalog invariant:** the current catalog starts with a contiguous
 block of rheology entries, numbered `RHEOLOGY_ID_VOELLMY` through
-`RHEOLOGY_ID_NEWMODEL`. `rheology_source_id` searches that initial block.
+`RHEOLOGY_ID_MUI_VOELLMY`. `rheology_source_id` searches that initial block.
 Adding a new rheology **after** non-rheological sources will make this resolver
 fail unless you redesign the lookup. The minimally invasive approach today is:
 
@@ -196,12 +196,15 @@ CASE(RHEOLOGY_ID_LINEAR_DRAG)
     CALL eval_rheology_linear_drag_explicit(config,state,process_rate)
 ```
 
-For EXPLICIT-only registration, **do not expose** unsupported `NEWTON` or
-`ANALYTIC` paths. Inspect the exhaustive `SELECT CASE` statements in
-`eval_rheology_semi_implicit_id`, `eval_rheology_implicit_id`, and
-`eval_rheology_implicit_real_id`; add the new ID to their explicit
-zero/unsupported cases as appropriate so dispatch behavior is defined,
-without claiming an unavailable capability.
+For EXPLICIT-only registration, **do not advertise** unsupported `NEWTON`
+or `ANALYTIC` capabilities in the source catalog. Keep the shared
+`EXPLICIT`, `SEMI_IMPLICIT`, `IMPLICIT` and `ANALYTIC` law interfaces:
+an intentionally absent contribution may return zero; an unsupported
+treatment must report its established explicit error. Inspect the
+exhaustive `SELECT CASE` statements in `eval_rheology_semi_implicit_id`,
+`eval_rheology_implicit_id` and `eval_rheology_implicit_real_id` and
+add the new ID to the appropriate zero/unsupported cases. Do not remove
+these common interfaces as an apparent code-cleanup opportunity.
 
 If implementing `NEWTON` as well, provide the physically correct real and
 complex implicit evaluations (or a justified split between semi-implicit and

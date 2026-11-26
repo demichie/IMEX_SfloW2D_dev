@@ -20,7 +20,7 @@ MODULE rheology_2d
     USE source_catalog_2d, ONLY : rheology_source_id,RHEOLOGY_ID_NONE,                                                 &
             RHEOLOGY_ID_VOELLMY,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_LAVA,RHEOLOGY_ID_LAHAR,                                &
             RHEOLOGY_ID_EMPIRICAL,RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_FROUDE,                                            &
-            RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI,RHEOLOGY_ID_MUI_VOELLMY,RHEOLOGY_ID_NEWMODEL
+            RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI,RHEOLOGY_ID_MUI_VOELLMY
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                                    &
                 eval_rheology_voellmy_implicit_real,                                                                   &
                 eval_rheology_voellmy_implicit,                                                                        &
@@ -48,9 +48,6 @@ MODULE rheology_2d
                 eval_rheology_quadratic_implicit_real,                                                                 &
                 eval_rheology_quadratic_implicit,                                                                      &
                 eval_rheology_quadratic_analytic
-    USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_explicit,                                                  &
-                eval_rheology_newmodel_implicit_real,                                                                  &
-                eval_rheology_newmodel_implicit
     USE rheology_froude_2d, ONLY : eval_rheology_froude_explicit,                                                      &
                 eval_rheology_froude_semi_implicit,                                                                    &
                 eval_rheology_froude_analytic
@@ -137,8 +134,6 @@ CONTAINS
                 CALL eval_rheology_empirical_explicit(state, process_rate)
             CASE(RHEOLOGY_ID_QUADRATIC)
                 CALL eval_rheology_quadratic_explicit(config,state, process_rate)
-            CASE(RHEOLOGY_ID_NEWMODEL)
-                CALL eval_rheology_newmodel_explicit(state, process_rate)
             CASE(RHEOLOGY_ID_FROUDE)
                 CALL eval_rheology_froude_explicit(config,state, grav_coeff,                                           &
                     use_stochastic, stochastic_value, process_rate)
@@ -233,7 +228,7 @@ CONTAINS
                     use_pore_pressure, process_rate(1),                                                                &
                     process_rate(2))
             CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_PLASTIC,RHEOLOGY_ID_EMPIRICAL,                                           &
-                    RHEOLOGY_ID_QUADRATIC,RHEOLOGY_ID_NEWMODEL)
+                    RHEOLOGY_ID_QUADRATIC)
                 CONTINUE
             CASE DEFAULT
                 CALL fatal_error('Invalid rheology name in semi-implicit momentum-process_rate dispatch')
@@ -307,8 +302,6 @@ CONTAINS
                 CALL eval_rheology_lahar_implicit(config,state, process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_EMPIRICAL)
                 CALL eval_rheology_empirical_implicit(state, process_rate(1), process_rate(2))
-            CASE(RHEOLOGY_ID_NEWMODEL)
-                CALL eval_rheology_newmodel_implicit(state,process_rate(1),process_rate(2))
             CASE(RHEOLOGY_ID_QUADRATIC)
                 CALL eval_rheology_quadratic_implicit(config,state, process_rate(1), process_rate(2))
             CASE(RHEOLOGY_ID_NONE, RHEOLOGY_ID_FROUDE, RHEOLOGY_ID_LUCAS, RHEOLOGY_ID_MUI)
@@ -350,8 +343,6 @@ CONTAINS
             CALL eval_rheology_lahar_implicit_real(config,state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_EMPIRICAL)
             CALL eval_rheology_empirical_implicit_real(state,rate(1),rate(2))
-        CASE(RHEOLOGY_ID_NEWMODEL)
-            CALL eval_rheology_newmodel_implicit_real(state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_QUADRATIC)
             CALL eval_rheology_quadratic_implicit_real(config,state,rate(1),rate(2))
         CASE(RHEOLOGY_ID_NONE,RHEOLOGY_ID_FROUDE,RHEOLOGY_ID_LUCAS,RHEOLOGY_ID_MUI)

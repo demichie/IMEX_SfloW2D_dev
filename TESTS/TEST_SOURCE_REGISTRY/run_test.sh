@@ -35,24 +35,24 @@ for profile in strict optimized; do
       $netcdf_fflags -c "$test_dir/test_source_registry.f90"
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       ./*.o -llapack $netcdf_flibs $netcdf_clibs -o test_source_registry
-    # D17.20 independent Newton-only extension fixture (no historical solver API).
-    # The production module objects are already built above in dependency order.
-    # Recompiling newmodel separately would require the shared state .mod file.
+    # The production lava viscous law has an exact linear subcase (zero yield).
+    # It keeps the independent four-case Newton/complex-step regression without
+    # registering a dummy constitutive law in the solver.
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-      $netcdf_fflags -c "$test_dir/test_newmodel_numerics.f90"
+      $netcdf_fflags -c "$test_dir/test_lava_newton_numerics.f90"
+    production_objects=$(printf '%s\n' $sources | sed -n \
+      -e 's|.*/||;s/\.f90$/.o/p' -e 's|.*/||;s/\.c$/.o/p' | tr '\n' ' ')
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-      parameters_2d.o diagnostics_2d.o source_catalog_2d.o \
-      rheology_newmodel_2d.o test_newmodel_numerics.o -o test_newmodel_numerics
-    ./test_newmodel_numerics > newmodel-numerics.log
-    cat newmodel-numerics.log
+      $production_objects test_lava_newton_numerics.o -llapack \
+      $netcdf_flibs $netcdf_clibs -o test_lava_newton_numerics
+    ./test_lava_newton_numerics > lava-newton-numerics.log
+    cat lava-newton-numerics.log
     ./test_source_registry > results.log
     cat results.log
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       $netcdf_fflags -c "$test_dir/test_interlayer_mass_exchange.f90"
     # The paired physical coordinator uses the existing deposition and state
     # modules: link the entire production module closure, excluding test mains.
-    production_objects=$(printf '%s\n' $sources | sed -n \
-      -e 's|.*/||;s/\.f90$/.o/p' -e 's|.*/||;s/\.c$/.o/p' | tr '\n' ' ')
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       $production_objects test_interlayer_mass_exchange.o -llapack \
       $netcdf_flibs $netcdf_clibs -o test_interlayer_mass_exchange

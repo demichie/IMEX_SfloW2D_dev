@@ -5,7 +5,6 @@ PROGRAM test_shared_implicit_kernels
     USE solid_transport_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE rheology_2d, ONLY : eval_rheology_implicit_real_id
-    USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, eval_rheology_newmodel_implicit_real
     USE state_types, ONLY : physical_state_real, physical_state_complex, &
         initialize_physical_state_real, promote_physical_state
     USE rheology_voellmy_2d, ONLY : &
@@ -122,11 +121,6 @@ PROGRAM test_shared_implicit_kernels
         CALL set_real_velocity(state,[3.0_wp,4.0_wp])
     END DO
 
-    ! The Newton-only linear fixture also has identical REAL/COMPLEX kernels.
-    CALL promote_physical_state(state,complex_state)
-    CALL eval_rheology_newmodel_implicit_real(state,implicit_real(1),implicit_real(2))
-    CALL eval_rheology_newmodel_implicit(complex_state,implicit_rate(1),implicit_rate(2))
-    CALL assert_rate(implicit_real,REAL(implicit_rate,wp),1.0E-12_wp,8,0)
     PRINT *, 'PASS: shared implicit rheology REAL/COMPLEX, complex-step and zero speed'
 CONTAINS
     SUBROUTINE set_real_velocity(s,v)

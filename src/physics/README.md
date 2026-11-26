@@ -178,14 +178,12 @@ rotation of momentum by a dissipative substep.
 | `rheology_lucas_2d.f90` | Lucas rheology. |
 | `rheology_mui_2d.f90` | \(\mu(I)\)-related rheology. |
 | `rheology_mui_voellmy_2d.f90` | Combined \(\mu(I)\) and Voellmy formulation. |
-| `rheology_newmodel_2d.f90` | Additional selectable rheology model. |
 
 The directory also contains
 `rheology_empirical_drag.inc`,
 `rheology_lahar_drag.inc`,
 `rheology_lahar_viscosity.inc`,
 `rheology_lava_viscous.inc`,
-`rheology_newmodel_linear.inc`,
 `rheology_plastic_yield.inc`,
 `rheology_quadratic_drag.inc`, and
 `rheology_voellmy_turbulent.inc`. These hold shared mathematical

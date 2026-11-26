@@ -42,13 +42,19 @@ named in `TESTS/ACCEPTANCE/acceptance_plan.json` with the status
 from [the pre-consolidation revision](https://github.com/demichie/IMEX_SfloW2D_dev/tree/6650582fea44ca5bcbeeb73fc5f631ba0e7bd166/TESTS).
 This is **not** new evidence that the missing N7 criteria pass.
 
-Further consolidation must be dependency-complete, not blind deletion.
-In particular, `rheology_newmodel` remains a registered Newton-only
-development fixture: it is referenced by the source catalog, rheology
-dispatch, source configuration, Makefile and active REAL/COMPLEX tests.
-Retiring it requires migrating its quantitative test coverage while
-updating all affected catalog IDs and source masks. Physical laws,
-source ordering and numerical results must remain unchanged.
+Structural rheology consolidation retires the registered Newton-only
+demonstration model `rheology_newmodel` and its shared include file,
+updates all source IDs/masks and build dependencies, and moves the
+independent four-case linear Newton/complex-step check to a fixed-temperature,
+zero-yield subcase of the **existing** lava viscous law. The seven
+production rheologies' shared REAL/COMPLEX regressions are retained.
+All per-law treatment entry points remain in place, including intended
+zero contributions and explicit unsupported-method diagnostics.
+This removes a development fixture without registering a replacement law.
+The change requires optimized, strict/debug, source-physics and integration
+Actions on its own commit.
+
+Physical laws, source ordering and numerical results must remain unchanged.
 The existing unsuffixed single-layer NAMELISTs are intentional input
 contracts and are **not** cleanup targets.
 

@@ -21,11 +21,9 @@ Cell-local momentum resistance models, their shared REAL/COMPLEX mathematical ke
 | [`rheology_lucas_2d.f90`](./rheology_lucas_2d.f90) | Lucas friction |
 | [`rheology_mui_2d.f90`](./rheology_mui_2d.f90) | Regularized granular mu(I) |
 | [`rheology_mui_voellmy_2d.f90`](./rheology_mui_voellmy_2d.f90) | Granular and Voellmy hybrid |
-| [`rheology_newmodel_2d.f90`](./rheology_newmodel_2d.f90) | NEWTON-only extension fixture |
 | [`rheology_empirical_drag.inc`](./rheology_empirical_drag.inc) | Shared empirical kernel |
 | [`rheology_lahar_drag.inc`](./rheology_lahar_drag.inc) | Shared lahar kernel |
 | [`rheology_lava_viscous.inc`](./rheology_lava_viscous.inc) | Shared lava kernel |
-| [`rheology_newmodel_linear.inc`](./rheology_newmodel_linear.inc) | Shared fixture kernel |
 | [`rheology_plastic_yield.inc`](./rheology_plastic_yield.inc) | Shared plastic kernel |
 | [`rheology_quadratic_drag.inc`](./rheology_quadratic_drag.inc) | Shared quadratic kernel |
 | [`rheology_voellmy_turbulent.inc`](./rheology_voellmy_turbulent.inc) | Shared turbulent kernel |
@@ -46,12 +44,11 @@ With horizontal velocity \(\boldsymbol u_h\), mixture density \(\rho_m\), thickn
 | Lucas | \(\mu=\mu_0\) below threshold \(U_w\) or for shallow \(h<0.1\); otherwise \(\mu_\infty+(\mu_0-\mu_\infty)U_w/U_f\). |
 | mu(I) | \(I=d\dot\gamma/\sqrt{\sigma'_n/\rho_p}\), \(\mu(I)=(\mu_s I_0+\mu_2 I+\mu_{I,\infty}I^2)/(I_0+I)\), \(\tau_b=\mu(I)\sigma'_n\). |
 | mu(I)+Voellmy | Regularized granular basal stress plus turbulent Voellmy resistance. |
-| newmodel | NEWTON-only development fixture with fixed linear drag \(k=0.1\,\mathrm{s}^{-1}\). |
 
 The exact dry-state, pore-pressure, curvature, and velocity regularizations must be read in each law. In isolated dissipative friction groups, the limiter restricts the momentum result to \(\boldsymbol m_{\mathrm{after}}=\alpha\boldsymbol m_{\mathrm{before}}\), \(0\le\alpha\le1\), preventing reversal or unwanted rotation.
 
 ## Architectural and numerical contracts
 
-Model coefficients belong to the canonical layer configuration; the dispatch module chooses the law and supported explicit, semi-implicit, implicit REAL/COMPLEX or analytic path. Shared .inc files contain substantive formulas, not duplicate state. New models must register in source_catalog_2d.f90; consult docs/ADDING_A_RHEOLOGY_MODEL.md.
+Model coefficients belong to the canonical layer configuration; the dispatch module chooses the law and supported explicit, semi-implicit, implicit REAL/COMPLEX or analytic path. Each physical-law module retains its uniform treatment entry points even when a contribution is identically zero or the treatment is rejected explicitly; catalog capabilities are a separate contract. Shared .inc files contain substantive formulas, not duplicate state. New models must register in source_catalog_2d.f90; consult docs/ADDING_A_RHEOLOGY_MODEL.md.
 
 Numerical thresholds, dry-state branches, regularization, and available methods are governed by the linked implementation. The equations above describe implemented physical terms; they are not a replacement for checking each kernel. See the [parent physics guide](../README.md) and [Fortran style](../../../docs/FORTRAN_STYLE.md).
