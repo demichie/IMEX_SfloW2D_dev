@@ -58,6 +58,15 @@ Physical laws, source ordering and numerical results must remain unchanged.
 The existing unsuffixed single-layer NAMELISTs are intentional input
 contracts and are **not** cleanup targets.
 
+The source registry now retains only state actually consumed after
+initialization. Duplicated validation branches and an unused source-name
+copy helper have been removed; source-mask construction reuses the
+catalog's canonical `source_id_mask` function. Source-name uniqueness is
+checked once over the entire catalog rather than again on its rheology
+subset. The test suite verifies the exact source mask of a combined
+Newton group. Cached fields needed by the timestep executor and all
+uniform physical-treatment interfaces remain intact.
+
 ## Invariants of the integrated solver
 
 - **One authoritative state:** `q/qp(component,layer,x,y)`; no synchronized

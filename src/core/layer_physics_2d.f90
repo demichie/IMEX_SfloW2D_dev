@@ -2,7 +2,7 @@
 !> @details The shared carrier phase is read from canonical global flags during validation.
 !>          No per-layer phase copy is stored or switched inside OpenMP loops.
 !>          Rheology and thermal configurations are referenced without persistent copies.
-!>          Two-layer activation remains a later step.
+!>          Both one- and two-layer execution use these canonical references.
 MODULE layer_physics_2d
     USE rheology_parameters_2d, ONLY : rheology_config_type
     USE thermal_parameters_2d, ONLY : thermal_config_type

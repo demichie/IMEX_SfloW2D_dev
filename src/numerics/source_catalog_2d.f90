@@ -8,7 +8,7 @@ MODULE source_catalog_2d
     PUBLIC :: source_term_type, SOURCE_CATALOG, SOURCE_TERM_COUNT
     PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
     PUBLIC :: source_newton_affected_equations
-    PUBLIC :: canonical_rheology_source_name, rheology_name_has_role, canonical_rheology_catalog_unique
+    PUBLIC :: canonical_rheology_source_name, rheology_name_has_role
     PUBLIC :: rheology_source_id, source_term_id_by_name, source_id_mask
     ! Catalogue indices are stable internal dispatch IDs, not user-facing group IDs.
     INTEGER, PARAMETER, PUBLIC :: SOURCE_ID_THERMAL_COOLING=11
@@ -264,25 +264,6 @@ CONTAINS
         ok=.TRUE.
     END FUNCTION source_catalog_names_unique
 
-    !> @brief Ensure the rheology subset contains no duplicate source names.
-    !> @return True if rheology source identities are unique.
-    PURE LOGICAL FUNCTION canonical_rheology_catalog_unique() RESULT(ok)
-        INTEGER :: i,j
-        ok=.FALSE.
-
-        DO i=1,SOURCE_TERM_COUNT
-            IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
-
-            DO j=i+1,SOURCE_TERM_COUNT
-                IF (INDEX(TRIM(SOURCE_CATALOG(j)%name),'rheology_')/=1) CYCLE
-                IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
-
-            END DO
-
-        END DO
-
-        ok=.TRUE.
-    END FUNCTION canonical_rheology_catalog_unique
 
     !> Check a rheology's actual SI/IM contribution by canonical source name.
     !> This is independent of the legacy numeric model ID.

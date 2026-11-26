@@ -91,7 +91,6 @@ PROGRAM test_source_registry
   CALL evaluate_layer_contacts([1.0_wp,2.0_wp,3.0_wp],contact_result,contact_valid)
   CALL require(.NOT.contact_valid,'unsupported layer count rejected')
   CALL require(source_catalog_names_unique(),'unique catalog names')
-  CALL require(canonical_rheology_catalog_unique(),'unique rheology names')
   CALL require(ALL(source_newton_affected_equations('rheology_voellmy')==[2,3]), &
        'rheology momentum footprint')
   CALL require(ALL(source_newton_affected_equations('thermal_cooling')==[4]), &
@@ -110,6 +109,8 @@ PROGRAM test_source_registry
        'numeric source mask contains rheology')
   CALL require(BTEST(groups(2)%source_mask,SOURCE_ID_THERMAL_COOLING-1), &
        'numeric source mask contains cooling')
+  CALL require(groups(2)%source_mask==IOR(source_id_mask(RHEOLOGY_ID_VOELLMY), &
+       source_id_mask(SOURCE_ID_THERMAL_COOLING)), 'Newton group source mask is exact')
   CALL require(.NOT.BTEST(groups(2)%source_mask,SOURCE_ID_GEOMETRY_CURVATURE-1), &
        'numeric source mask excludes inactive curvature')
    CALL require(groups(2)%rheology_name=='rheology_voellmy','cached rheology identity')

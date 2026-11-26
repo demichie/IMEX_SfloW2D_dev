@@ -10,7 +10,7 @@ MODULE source_registry_2d
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: source_group_type, source_registry_type
-    PUBLIC :: group_contains_name, group_source_names
+    PUBLIC :: group_contains_name
     PUBLIC :: SOURCE_SCOPE_L1, SOURCE_SCOPE_L2, SOURCE_SCOPE_INTERLAYER
 
     INTEGER, PARAMETER :: SOURCE_SCOPE_L1=1, SOURCE_SCOPE_L2=2, SOURCE_SCOPE_INTERLAYER=3
@@ -32,8 +32,6 @@ MODULE source_registry_2d
     !> \brief Validated metadata owned and finalized by one simulation context.
     TYPE :: source_registry_type
     PRIVATE
-        INTEGER :: n_eqns=0 !< Conservative layout size.
-        INTEGER :: idx_poreEqn=0 !< Pore index, zero when absent.
         LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
         LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
         TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
@@ -110,8 +108,6 @@ CONTAINS
 
             END SELECT
 
-            IF (groups(i)%method==SOURCE_METHOD_NEWTON .AND. SIZE(groups(i)%equation_ids)==0) RETURN
-            IF (groups(i)%method==SOURCE_METHOD_ANALYTIC .AND. SIZE(groups(i)%source_names)/=1) RETURN
             ALLOCATE(expected(0))
 
             DO j=1,SIZE(groups(i)%source_names)
@@ -194,8 +190,6 @@ CONTAINS
             IF (ANY((seen=='mass_exchange_vaporization') .AND. (seen_scope==layer)) .AND. &
                 .NOT.ANY((seen=='mass_exchange_deposition') .AND. (seen_scope==layer))) RETURN
         END DO
-        this%n_eqns=n_eqns
-        this%idx_poreEqn=idx_poreEqn
         this%lie_entries=groups
         ! Resolve source identities and capabilities once, outside all cell loops.
         DO i=1,SIZE(this%lie_entries)
@@ -208,7 +202,7 @@ CONTAINS
             DO j=1,SIZE(this%lie_entries(i)%source_names)
                 source_id=source_term_id_by_name(this%lie_entries(i)%source_names(j))
                 IF (source_id<=0) RETURN
-                this%lie_entries(i)%source_mask=IBSET(this%lie_entries(i)%source_mask,source_id-1)
+                this%lie_entries(i)%source_mask=IOR(this%lie_entries(i)%source_mask,source_id_mask(source_id))
                 IF (INDEX(TRIM(this%lie_entries(i)%source_names(j)),'rheology_')==1) THEN
                     this%lie_entries(i)%rheology_name=this%lie_entries(i)%source_names(j)
                     this%lie_entries(i)%rheology_id=rheology_source_id(this%lie_entries(i)%rheology_name)
@@ -272,7 +266,7 @@ CONTAINS
     SUBROUTINE finalize_registry(this)
         CLASS(source_registry_type), INTENT(INOUT) :: this
         IF (ALLOCATED(this%lie_entries)) DEALLOCATE(this%lie_entries)
-        this%n_eqns=0; this%idx_poreEqn=0; this%initialized=.FALSE.
+        this%initialized=.FALSE.
         this%implicit_sources_flag=.FALSE.
     END SUBROUTINE finalize_registry
 
@@ -288,15 +282,6 @@ CONTAINS
         found=ANY(group%source_names==TRIM(name))
     END FUNCTION group_contains_name
 
-    !> @brief Copy the source identities owned by a Lie group.
-    !> @param[in] group Lie group with an optional allocated source list.
-    !> @return Independent source name array, empty if none are configured.
-    FUNCTION group_source_names(group) RESULT(names)
-        TYPE(source_group_type), INTENT(IN) :: group
-        CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-        ALLOCATE(names(0))
-        IF (ALLOCATED(group%source_names)) names=group%source_names
-    END FUNCTION group_source_names
 
     !> \brief Query cached initialization status without walking term arrays.
     !> \param[in] this Registry.
