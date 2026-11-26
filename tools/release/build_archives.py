@@ -58,8 +58,8 @@ MAKE_CHECK_FILES = (
     "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/cleanFolder.sh",
     "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/example_2D_0000.q_2d",
     "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/topography_dem.asc",
-    "EXAMPLES/EXAMPLE_CF/topo.zip",
-    "EXAMPLES/EXAMPLE_TAAL/topography_dem.asc",
+    "EXAMPLES/EXAMPLE_CF/DEM/topo.zip",
+    "EXAMPLES/EXAMPLE_TAAL/DEM/topography_dem.zip",
 )
 
 

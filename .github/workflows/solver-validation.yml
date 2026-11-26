@@ -14,6 +14,17 @@ on:
         required: false
         default: false
 
+  workflow_call:
+    inputs:
+      compare_openmp:
+        type: boolean
+        required: false
+        default: true
+      two_layer_extended:
+        type: boolean
+        required: false
+        default: false
+
 permissions:
   contents: read
 

@@ -1,6 +1,6 @@
 # Running IMEX-SfloW2D with Docker
 
-The GHCR package is published by the repository's **manual Docker workflow**. Do not assume the image exists until that workflow reports success and the package is visible on GitHub.
+The GHCR package can be published manually from `master`, or automatically after the validation pipeline for a **published stable GitHub Release**. Both paths build and smoke-test the solver image; check that publication succeeded and that the package is public before pulling.
 
 ## Pull the published image
 
@@ -24,7 +24,7 @@ docker run --rm \
 
 The executable reads the input from `/work` and writes its normal `OUTPUT/<RUN_NAME>/` tree to the mounted case directory. Supplying the host user/group avoids root-owned output files on Linux and macOS. Adjust the command for platforms that do not provide `id` or a POSIX shell.
 
-The image also receives an immutable revision tag of the form `sha-<40-character Git commit>`. Use that tag instead of `latest` for reproducible results.
+The image also receives an immutable revision tag of the form `sha-<40-character Git commit>`. A stable release additionally publishes its version tag (for example `v1.2.3`). Use a revision or version tag instead of `latest` for reproducible results.
 
 ## Build locally
 

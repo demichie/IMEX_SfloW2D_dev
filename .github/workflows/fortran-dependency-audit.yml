@@ -2,6 +2,7 @@ name: Static source and documentation audit
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -46,4 +47,6 @@ jobs:
           run_check python3 TESTS/ACCEPTANCE/test_d17_state_finalization.py
           run_check python3 TESTS/ACCEPTANCE/test_plan_inventory.py
           run_check python3 TESTS/TEST_STATE/check_legacy_boundary.py
+          run_check python3 -m unittest discover -s tools/release -p 'test_*.py'
+          run_check python3 -m unittest discover -s tools/docs -p 'test_doxygen_policy.py'
           exit "$failed"

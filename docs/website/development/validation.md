@@ -2,7 +2,7 @@
 
 ## Recommended checks for a source revision
 
-From GitHub **Actions**, choose the intended branch and run the following workflows explicitly:
+During development, select the intended branch in GitHub **Actions** and run the following checks explicitly. Published stable GitHub Releases automatically execute the same suites before publishing artifacts:
 
 1. **Static source and documentation audit:** Fortran style, Doxygen contracts, direct module dependencies and static invariants.
 2. **Cell physics and numerical regressions:** state conversions, physical source laws, REAL/COMPLEX kernels and spatial operator checks.
@@ -19,4 +19,4 @@ The integrated two-layer model can enter non-hyperbolic density/shear regimes. S
 - [Two-layer characteristic analysis](../model/two-layer.md)
 - [Historical acceptance evidence](https://github.com/demichie/IMEX_SfloW2D_dev/tree/master/docs/acceptance)
 - [Current acceptance inventory](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/TESTS/ACCEPTANCE/acceptance_plan.json)
-- [Current workflow catalogue](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/.github/README.md)
+- [Current workflow catalogue](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/.github/ACTIONS.md)

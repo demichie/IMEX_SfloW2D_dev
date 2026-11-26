@@ -89,8 +89,9 @@ Run the diagnostic-parser unit test independently:
 python3 -m unittest discover -s TESTS -p 'test_compare_finh_timestep.py'
 ```
 
-GitHub Actions workflows remain **manual-only** (`workflow_dispatch`);
-the comparison script does not dispatch any workflow.
+This diagnostic script does not dispatch any GitHub Action. Development
+workflows remain manually selectable; the separate stable-release pipeline
+executes source/numerical integration checks automatically.
 
 ## Interpretation
 

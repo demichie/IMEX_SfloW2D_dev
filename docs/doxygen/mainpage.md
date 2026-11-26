@@ -1,5 +1,8 @@
 # IMEX-SfloW2D Fortran API
 
+This supplementary reference complements the authoritative Doxygen
+landing page declared with `@mainpage` in `src/IMEX_SfloW2D.f90`.
+
 IMEX-SfloW2D is a depth-averaged finite-volume solver for geophysical
 and volcanic flows. This reference is generated from the Fortran source
 of the same revision as the public documentation website.

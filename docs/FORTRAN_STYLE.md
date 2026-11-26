@@ -36,6 +36,14 @@ Comment substantial algorithmic blocks with the reason for ordering and key inva
 The repository already provides `python3 TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py` for Doxygen contract checks, including argument names/directions, derived-type `@brief` headers and Doxygen component comments;
 it also supports `--check-against-git REF` to compare executable lines. The complementary `python3 tools/docs/check_fortran_style.py src/` checks four-space indentation, TABs and trailing whitespace. Run `python3 tools/docs/check_fortran_style.py --structural-report src/` to collect **non-failing, conservative** warnings for mismatched DO/IF/SELECT/WHERE block indentation. This heuristic intentionally does not rewrite source and may miss or misclassify continued statements; review its findings against the Fortran control-flow structure before editing. The original production sources received an initial whitespace-only normalization pass. The documentation suite invokes the style checker over `src/` on every run. Subsequent semantic reviews must still verify true lexical nesting, blank-line grouping and full Doxygen completeness; a multiples-of-four check alone does not prove these.
 
+The published Doxygen API uses a single `@mainpage` from
+`src/IMEX_SfloW2D.f90`, extracts documented private procedures,
+checks incomplete parameter documentation and **fails the Pages build
+when Doxygen emits a warning**. The independent source coverage checker
+still protects declarations that Doxygen may not extract.
+Run `python3 -m unittest discover -s tools/docs -p 'test_doxygen_policy.py'`
+to verify these publication settings.
+
 Formatting is not an opportunity to alter formulas or the Lie algorithm.
 
 ## Official Fortran formatter: Codee Formatter

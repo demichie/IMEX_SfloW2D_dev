@@ -61,4 +61,4 @@ single-/two-layer restarts and end-to-end OpenMP runs.
 
 See [the state implementation](../state/README.md),
 [physical source laws](../physics/README.md) and
-[manually dispatched validation workflows](../../.github/ACTIONS.md).
+[manual and release-triggered validation workflows](../../.github/ACTIONS.md).

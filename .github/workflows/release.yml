@@ -1,0 +1,134 @@
+name: Validate and publish a release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify stable release tag and source revision
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a version tag at the current master HEAD
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v?[0-9]+(\.[0-9]+)+([+-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "::error::Release tag must be version-like (for example v1.2.3)"
+            exit 1
+          }
+          [[ "$GITHUB_REF" == "refs/tags/$RELEASE_TAG" ]] || {
+            echo "::error::Release event does not match its tag"
+            exit 1
+          }
+          tag_sha=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
+          [[ "$tag_sha" == "$GITHUB_SHA" ]] || {
+            echo "::error::Release tag does not resolve to the selected commit"
+            exit 1
+          }
+          git fetch origin master --no-tags
+          master_sha=$(git rev-parse FETCH_HEAD)
+          [[ "$tag_sha" == "$master_sha" ]] || {
+            echo "::error::Automatic publication requires the release tag at current master HEAD"
+            exit 1
+          }
+          echo "Release $RELEASE_TAG targets verified master commit $tag_sha"
+
+  audit:
+    needs: verify
+    uses: ./.github/workflows/fortran-dependency-audit.yml
+    permissions:
+      contents: read
+
+  regressions:
+    needs: verify
+    uses: ./.github/workflows/physics-regressions.yml
+    permissions:
+      contents: read
+
+  integration:
+    needs: verify
+    uses: ./.github/workflows/solver-validation.yml
+    with:
+      compare_openmp: true
+      two_layer_extended: true
+    permissions:
+      contents: read
+
+  archives:
+    name: Build and attach versioned source/example archives
+    needs: [audit, regressions, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install release packaging dependencies
+        run: |
+          bash .github/scripts/install-ubuntu-deps.sh \
+            autoconf automake gfortran make liblapack-dev libnetcdff-dev
+      - name: Verify release inventory is synchronized
+        run: python3 -m unittest discover -s tools/release -p 'test_*.py'
+      - name: Build and verify tag-matched archives and checksums
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          python3 tools/release/build_archives.py \
+            --tag "$RELEASE_TAG" --output dist --configure-option=--with-netcdf=/usr
+          test -s "dist/IMEX_SfloW2D-$RELEASE_TAG.tar.gz"
+          test -s "dist/IMEX_SfloW2D-$RELEASE_TAG-examples.tar.gz"
+          test -s "dist/IMEX_SfloW2D-$RELEASE_TAG-manifest.json"
+      - name: Attach validated archives to the published GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" dist/* --clobber
+      - name: Keep a copy of the distribution manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-archives-${{ github.run_id }}
+          path: dist/*-manifest.json
+          if-no-files-found: warn
+
+  documentation:
+    needs: archives
+    uses: ./.github/workflows/publish-documentation.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+  container:
+    needs: archives
+    uses: ./.github/workflows/docker_create_publish.yml
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write

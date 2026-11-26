@@ -1,36 +1,85 @@
-# Publish documentation and container images
+# Publishing documentation, containers and releases
 
-Publication is **intentional and manual**. The workflows do not run on ordinary commits, tags or PRs.
+The project supports **two activation paths**: manual publication from the
+selected `master` revision, and automatic, gated publication when a **stable
+GitHub Release is published**. An ordinary push, pull request or tag creation
+does not publish artifacts.
 
-## Documentation website
+## Stable GitHub Release
 
-For a pre-merge check, run **Publish documentation** manually on the PR branch:
-MkDocs, Doxygen and example catalogue tests run, but no Pages deployment occurs.
-Only the `master` selection uploads and deploys the public site.
+The [release pipeline](https://github.com/demichie/IMEX_SfloW2D_dev/actions/workflows/release.yml)
+runs automatically for the `release: published` event, provided that:
 
-1. Merge the validated documentation/source changes into `master`.
-2. From **Actions → Publish documentation (MkDocs + Doxygen) → Run workflow**, select `master`.
-3. Confirm the **build** and **deploy** jobs succeed.
-4. Open the [MkDocs website](https://demichie.github.io/IMEX_SfloW2D_dev/) and [Doxygen API reference](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/).
+- The release is **not a prerelease**.
+- Its tag has a version-like name, for example `v1.2.3`.
+- The tag resolves to the **current HEAD of `master`**. Older commits
+  cannot automatically replace the public `latest` image or website.
 
-The build discovers primary simulation guides in `EXAMPLES/`, generates a catalogue without including helper DEM/template README files, and builds Doxygen against the same source SHA. The workflow uploads generation logs and deploys one combined Pages artifact.
+Once the gate succeeds, the release pipeline checks **the tagged revision**:
+source/style/Doxygen contracts, cell physics, spatial regressions,
+optimized/strict-debug solver integration, complete-solver OpenMP comparisons,
+and extended two-layer Etna validation. Only after these succeed does it
+generate the versioned source/Examples archives and SHA-256 manifest and
+attach them to the GitHub Release.
 
-## Docker / GitHub Container Registry
+After archive validation, two jobs publish in parallel:
+the combined MkDocs/Doxygen website to GitHub Pages, and the tested Docker
+runtime to GHCR. The container is tagged `latest`, `sha-<full-commit>` and
+with the release version, and receives a provenance attestation.
 
-For a pre-merge check, run **Publish Docker image to GHCR** manually on the
-PR branch: the workflow builds, loads and checks the runtime image locally,
-without authenticating to GHCR or publishing tags. Only `master` pushes and attests.
+**A GitHub Release is already visible while its workflow is running.**
+If validation or publication fails, the published release is not
+automatically deleted; inspect Actions before advertising it as validated.
 
-1. Merge the validated Dockerfile/workflow into `master`.
-2. From **Actions → Publish Docker image to GHCR → Run workflow**, select `master`.
-3. Confirm the image build, runtime-library check, registry push and provenance-attestation steps succeed.
-4. Verify the GitHub Packages page for `ghcr.io/demichie/imex_sflow2d_dev`. The repository owner may need to configure package visibility as **public** before anonymous users can pull it.
-5. Pull `:latest` for the current release or use its immutable `sha-<commit>` tag for reproducible simulations.
+## Manual documentation publication
 
-The workflow authenticates using the scoped Actions `GITHUB_TOKEN` with `packages: write`. No personal access token is required in the repository. The image runs the solver against a mounted case directory; it does not run the regression suite by default.
+The [documentation workflow](https://github.com/demichie/IMEX_SfloW2D_dev/actions/workflows/publish-documentation.yml)
+remains manually dispatchable. On the `master` branch it deploys Pages;
+on any other selected branch or tag it builds only a preview.
 
-See [Docker execution](../getting-started/docker.md) for pull, mount and run commands.
+1. In **Actions → Publish documentation (MkDocs + Doxygen)**, select
+   **Run workflow** and `master`.
+2. Confirm that the example-catalogue tests and `mkdocs build --strict`
+   complete successfully.
+3. Confirm that Doxygen's **documentation warnings are fatal**, including
+   missing/inconsistent parameter descriptions, then inspect its log.
+4. Confirm the Pages deployment and open
+   [MkDocs](https://demichie.github.io/IMEX_SfloW2D_dev/) and
+   [Doxygen](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/).
 
-## Validation before publication
+The Fortran `@mainpage` in `src/IMEX_SfloW2D.f90` is the single Doxygen
+main page; `docs/doxygen/mainpage.md` is a supplementary API guide.
+Documented private symbols are extracted. The separate source checker
+enforces coverage of modules, procedures, arguments and derived types.
 
-Run the three active source/physics/integration Actions against the exact revision first. A successful build and push do not establish scientific validity of every physical configuration.
+## Manual Docker publication
+
+The [GHCR workflow](https://github.com/demichie/IMEX_SfloW2D_dev/actions/workflows/docker_create_publish.yml)
+remains manually dispatchable. On non-`master` selections it builds and
+**executes a solver fixture inside the local image** without pushing.
+On `master` it first smoke-tests the local image, then pushes a matching
+build and confirms its registry digest and library linkage.
+
+1. Select **Actions → Publish Docker image to GHCR → Run workflow → master**.
+2. Check the TEST_2D runtime smoke test, GHCR digest verification
+   and provenance attestation.
+3. Confirm package visibility for `ghcr.io/demichie/imex_sflow2d_dev`.
+   Public visibility may need an explicit package setting.
+4. Pull a revision-specific `sha-...` tag for reproducible results;
+   `latest` is a moving tag.
+
+The registry workflow uses the scoped `GITHUB_TOKEN`, not a personal
+access token. The image contains the solver and runtime libraries, but no
+simulation examples or DEM data; mount the case directory when running.
+
+## Validation and provenance
+
+Manual workflows do **not** implicitly run the release gate. Run the
+three independent source, physics and solver Actions on the exact SHA
+before a manual scientific publication. A successful CI run validates only
+its recorded source revision and test scope, not all two-layer physical
+regimes. Source and Examples archives are produced from the **same tag**,
+with an inventory and checksums for reproducibility.
+
+See [Docker execution](../getting-started/docker.md) and the
+[full workflow catalogue](https://github.com/demichie/IMEX_SfloW2D_dev/blob/master/.github/ACTIONS.md).

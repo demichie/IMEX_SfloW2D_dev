@@ -4,7 +4,7 @@ IMEX-SfloW2D is maintained as a scientific Fortran solver with explicit ownershi
 
 ## Current workflows
 
-The active GitHub Actions workflows are **manual** (`workflow_dispatch`). Ordinary commits, PRs and tags do not automatically compile, validate, publish documentation or release a container.
+GitHub Actions retain **manual** execution for regular development. Publishing a **stable GitHub Release** starts a gated validation and publication pipeline automatically; ordinary pushes, PRs and tag creation do not. The release tag must resolve to the current `master` HEAD.
 
 - [Validation and acceptance](validation.md): optimized/strict builds, physical and numerical regressions, solver/OpenMP integration, and scientific acceptance scope.
 - [Documentation and Docker publication](publishing.md): generate MkDocs and Doxygen, deploy Pages and publish a GHCR container intentionally.

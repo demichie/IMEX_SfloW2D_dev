@@ -83,7 +83,8 @@ For actual implementation details see the
    speedups or introducing accelerator-oriented changes.
 7. **Distribution and documentation:** publish README, MkDocs, Doxygen
    and GHCR releases only against the deliberately selected, verified
-   `master` revision. Publishing workflows require manual dispatch.
+   `master` revision. Publication is manual during development or
+   automatic after validation of a stable GitHub Release at `master` HEAD.
 
 ## Phase H — Local domains, active tiles and MPI/HPC
 
@@ -168,8 +169,9 @@ or stencil width requires a separately justified scientific decision.
 
 ## Verification and history
 
-Use the three independent manual workflows for source/documentation,
-physics/numerical regressions and solver/OpenMP integration; include
+Use the three independently dispatchable workflows for source/documentation,
+physics/numerical regressions and solver/OpenMP integration. Published stable
+releases invoke them automatically before distribution; include
 optimized and strict/debug checks, one- and two-layer examples, binary
 restart and conservation tests as applicable. **Green CI verifies only
 the SHA on which it ran.**

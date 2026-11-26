@@ -2,6 +2,7 @@ name: Publish documentation (MkDocs + Doxygen)
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - name: Check out manually selected revision
+      - name: Check out selected manual or release revision
         uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -52,7 +53,10 @@ jobs:
 
       - name: Generate Doxygen HTML under /doxygen/
         shell: bash
+        env:
+          REVISION: ${{ steps.revision.outputs.sha }}
         run: |
+          set -euo pipefail
           mkdir -p build/site/doxygen
           {
             cat template.doxy
@@ -63,11 +67,18 @@ jobs:
             echo 'INPUT = ./src ./docs/doxygen/mainpage.md'
             echo 'RECURSIVE = YES'
             echo 'PROJECT_BRIEF = Fortran source documentation'
+            echo "PROJECT_NUMBER = ${REVISION:0:12}"
           } > build/doxygen-pages.conf
           doxygen build/doxygen-pages.conf > build/doxygen.log 2>&1 || {
+            if test -s build/doxygen.warnings; then tail -n 100 build/doxygen.warnings; fi
             tail -n 100 build/doxygen.log
             exit 1
           }
+          if test -s build/doxygen.warnings; then
+            echo "::error::Doxygen emitted documentation warnings"
+            tail -n 100 build/doxygen.warnings
+            exit 1
+          fi
           test -s build/site/doxygen/index.html
           test -s build/site/doxygen/files.html
           tail -n 20 build/doxygen.log
@@ -93,21 +104,22 @@ jobs:
           path: |
             build/docs-generated/example-audit.txt
             build/doxygen.log
+            build/doxygen.warnings
           if-no-files-found: ignore
 
       - name: Configure GitHub Pages
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || (github.event_name == 'release' && github.event.action == 'published' && !github.event.release.prerelease)
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || (github.event_name == 'release' && github.event.action == 'published' && !github.event.release.prerelease)
         uses: actions/upload-pages-artifact@v4
         with:
           path: build/site
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || (github.event_name == 'release' && github.event.action == 'published' && !github.event.release.prerelease)
     runs-on: ubuntu-24.04
     environment:
       name: github-pages

@@ -203,11 +203,12 @@ Focused state, physical-source and spatial regressions were
 also verified on earlier documented code revisions.
 
 `solver-validation.yml` now runs the short Etna two-layer
-integration as a **mandatory** job on every manual dispatch;
-extended Etna conservation/restart/OpenMP tests remain
-optional. Both standard integration build profiles remain
-enabled. GitHub Actions do not run automatically on pushes;
-any subsequent change must be verified on its **own SHA**.
+integration as a **mandatory** job on manual and release dispatch.
+Extended Etna conservation/restart/OpenMP tests remain optional
+manually but are enabled automatically for a stable published
+release. Both standard integration profiles remain enabled.
+Ordinary pushes do not trigger Actions; every change must be
+validated on its **own SHA**.
 
 **Functional acceptance:** the one- and two-layer execution
 paths are integrated, with no special activation variable

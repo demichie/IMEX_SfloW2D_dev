@@ -140,7 +140,7 @@ For implementation details, see [spatial methods](src/spatial/README.md), [numer
 | [`EXAMPLES/`](EXAMPLES/) | Runnable cases, input files, preparation scripts and case-specific instructions |
 | [`TESTS/`](TESTS/) | Unit, numerical, integration and acceptance-oriented checks |
 | [`docs/`](docs/README.md) | Scientific architecture, formats, validation, developer guides and website sources |
-| [`.github/workflows/`](.github/ACTIONS.md) | Manually dispatched GitHub Actions for verification and publication |
+| [`.github/workflows/`](.github/ACTIONS.md) | Manual validation and gated automatic release publication |
 
 The governing architecture keeps **one authoritative simulation-wide state** in `q/qp(component,layer,x,y)`. Per-layer physical configurations have defined owners; cell-local physical states are reusable workspaces rather than independent persistent copies. Physical kernels do not traverse the grid themselves. See the [development roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md) for current integration status and remaining scientific work.
 
@@ -276,7 +276,7 @@ The outputs can be examined in ParaView, and terrain/georeferenced imagery can b
 
 ## Docker
 
-The repository includes a multi-stage [Dockerfile](Dockerfile) that builds the solver and packages the runtime executable and Linux libraries without the compiler toolchain. Image publication to **GitHub Container Registry (GHCR)** is a manually triggered workflow; **check that a successful publication exists and that the package is public before attempting to pull it**.
+The repository includes a multi-stage [Dockerfile](Dockerfile) that builds the solver and packages the runtime executable and Linux libraries without the compiler toolchain. Image publication to **GitHub Container Registry (GHCR)** is manual on `master` or automatic after a validated stable GitHub Release; **check that the workflow succeeded and that the package is public before attempting to pull it**.
 
 After publication:
 
@@ -311,13 +311,13 @@ Run local tests after building:
 make check
 ~~~
 
-**GitHub Actions are intentionally manual**: they do not run automatically on every push. The core validation workflows are:
+**Development Actions remain manually dispatched**: ordinary pushes and pull requests do not run CI automatically. Publishing a stable GitHub Release starts all three validation workflows and the release/distribution pipeline on the tagged SHA. The core validation workflows are:
 
 1. **Static source and documentation audit** — source formatting, Doxygen and dependency/interface checks.
 2. **Cell physics and numerical regressions** — state, physical-source and spatial tests.
 3. **Solver integration and OpenMP validation** — optimized and strict/debug builds, representative end-to-end simulations and OpenMP/restart checks.
 
-Separate manual workflows publish the combined MkDocs/Doxygen website and the GHCR image. A passing result verifies **the exact Git revision tested**; it does not establish calibration or physical validity for every model regime. Consult the [GitHub Actions guide](.github/ACTIONS.md), [verification overview](docs/website/development/validation.md) and [current roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
+The combined MkDocs/Doxygen site and GHCR image can be published manually from `master`, or automatically after the release gate passes; versioned source/Examples archives are then attached to the Release. A passing result verifies **the exact Git revision tested**; it does not establish calibration or physical validity for every model regime. Consult the [GitHub Actions guide](.github/ACTIONS.md), [verification overview](docs/website/development/validation.md) and [current roadmap](docs/IMEX_SfloW2D_Development_Roadmap.md).
 
 For reproducible scientific results, record the **commit SHA**, compiler and build flags, complete `IMEX_SfloW2D.inp`, input/DEM checksums, relevant physical model coefficients and runtime settings (including OpenMP threads), together with diagnostics and output data.
 
