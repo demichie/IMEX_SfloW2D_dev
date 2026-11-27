@@ -26,15 +26,13 @@ An avalanche initially held within a hemispherical shell slides down a 35-degree
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
 
-| Group | Scope | Source (input setting) | Method | Status | Role |
-| ---: | --- | --- | --- | --- | --- |
-| 0 | Flow | `GEOMETRY_CURVATURE_METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
-| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='voellmy'` | `NEWTON` | Active | Voellmy basal friction modifies momentum. |
-| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Thermal cooling is not enabled. |
-| 3 | Flow | `PORE_PRESSURE%PORE_PRESSURE_METHOD='ANALYTIC'` | `ANALYTIC` | Active | Darcy pore-pressure dissipation advances the pore-pressure state. |
-| 4 | Flow | `MASS_EXCHANGE%METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Environmental mass-exchange mechanisms are disabled. |
+| Group | Scope | Source (input setting) | Method | Role |
+| ---: | --- | --- | --- | --- |
+| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='voellmy'` | `NEWTON` | Voellmy basal friction modifies momentum. |
+| 3 | Flow | `PORE_PRESSURE%PORE_PRESSURE_METHOD='ANALYTIC'` | `ANALYTIC` | Darcy pore-pressure dissipation advances the pore-pressure state. |
+
 
 ## How to run
 

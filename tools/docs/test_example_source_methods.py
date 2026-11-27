@@ -83,18 +83,26 @@ class ExampleSourceMethodsTests(unittest.TestCase):
                 body = readme.read_text(encoding="utf-8-sig")
                 self.assertIn("## Source integration", body)
                 section = body.split("## Source integration", 1)[1].split("\n## ", 1)[0]
-                self.assertIn("| Group | Scope | Source (input setting) | Method | Status | Role |",
-                              section)
+                header = "| Group | Scope | Source (input setting) | Method | Role |"
+                if header not in section:
+                    self.assertIn(
+                        "No optional physical source terms are active in this example",
+                        section,
+                    )
+                    self.assertNotIn("| Group |", section)
+                    continue
                 for heading in ("**Group**", "**Scope**", "**Source (input setting)**",
-                                "**Method**", "**Status**", "**Role**"):
+                                "**Method**", "**Role**"):
                     self.assertIn(heading, section)
+                self.assertNotIn("Configured only", section)
+                self.assertNotIn("| Status |", section)
                 source_input = path.read_text(encoding="utf-8-sig")
                 group_ids = []
                 for line in section.splitlines():
                     if not re.match(r"^\|\s*\d+\s*\|", line):
                         continue
                     cells = [cell.strip() for cell in line.strip("|").split("|")]
-                    self.assertEqual(len(cells), 6)
+                    self.assertEqual(len(cells), 5)
                     group_ids.append(int(cells[0]))
                     settings = re.findall(r"`([^`]+)`", cells[2])
                     self.assertTrue(settings, "Missing source input settings")
@@ -105,7 +113,7 @@ class ExampleSourceMethodsTests(unittest.TestCase):
                         self.assertIsNotNone(match, f"Source not found in {path}: {key}")
                         self.assertEqual(match.group(1).strip(), value.strip(),
                                          f"Source value differs from input: {key}")
-                self.assertTrue(group_ids, "Missing source group rows")
+                self.assertTrue(group_ids, "Missing active source group rows")
                 self.assertEqual(group_ids, sorted(group_ids))
 
 

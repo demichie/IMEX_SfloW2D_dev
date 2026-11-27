@@ -32,14 +32,13 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
 
-| Group | Scope | Source (input setting) | Method | Status | Role |
-| ---: | --- | --- | --- | --- | --- |
-| 0 | Flow | `BOTTOM_FISSURAL_SOURCE_FLAG=T`, `BOTTOM_FISSURAL_METHOD='EXPLICIT'` | `EXPLICIT` | Active | Two bottom fissures inject lava; curvature is disabled. |
-| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='lava'` | `NEWTON` | Active | Temperature-dependent lava rheology modifies momentum. |
-| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Active | Thermal cooling changes the lava's sensible thermal content. |
-| 4 | Flow | `MASS_EXCHANGE%METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Environmental exchange is specified but no active transfer is described in this setup. |
+| Group | Scope | Source (input setting) | Method | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `BOTTOM_FISSURAL_SOURCE_FLAG=T`, `BOTTOM_FISSURAL_METHOD='EXPLICIT'` | `EXPLICIT` | Two bottom fissures inject lava; curvature is disabled. |
+| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='lava'` | `NEWTON` | Temperature-dependent lava rheology modifies momentum. |
+| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Thermal cooling changes the lava's sensible thermal content. |
 
 
 ## How to run

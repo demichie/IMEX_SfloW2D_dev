@@ -29,14 +29,7 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
-
-| Group | Scope | Source (input setting) | Method | Status | Role |
-| ---: | --- | --- | --- | --- | --- |
-| 0 | Flow | `GEOMETRY_CURVATURE_METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
-| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Configured only | Quadratic rheology is disabled by `RHEOLOGY_FLAG=F`. |
-| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Cooling is not enabled. |
-| 4 | Flow | `MASS_EXCHANGE%METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Environmental mass exchange is disabled. |
+No optional physical source terms are active in this example; the flow is advanced by the spatial transport operator without additional Lie source contributions.
 
 
 ## How to run

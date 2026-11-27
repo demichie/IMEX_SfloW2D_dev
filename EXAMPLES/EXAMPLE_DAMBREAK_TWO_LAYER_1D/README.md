@@ -106,12 +106,5 @@ interleave under OpenMP.
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+No optional physical source terms are active in this example; the flow is advanced by the spatial transport operator without additional Lie source contributions.
 
-| Group | Scope | Source (input setting) | Method | Status | Role |
-| ---: | --- | --- | --- | --- | --- |
-| 0 | L1 + L2 | `GEOMETRY_CURVATURE_METHOD='EXPLICIT'` | `EXPLICIT` | Initial stage | No optional curvature or injection source is enabled. |
-| 1 | L1 | `RHEOLOGY_L1%RHEOLOGY_MODEL='none'` | `NEWTON` | Configured only | L1 rheology is set to `none`; L2 rheology is also disabled. |
-| 2 | L1 + L2 | `THERMAL_L1%THERMAL_METHOD='NEWTON'`, `THERMAL_L2%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Thermal cooling is disabled in both layers. |
-| 4 | L1 + L2 | `MASS_EXCHANGE_L1%METHOD='EXPLICIT'`, `MASS_EXCHANGE_L2%METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Environmental exchange and paired settling/elutriation are disabled. |
-| 5 | Interlayer | `INTERLAYER_MOMENTUM_EXCHANGE%MODEL='CHEZY'`, `INTERLAYER_MOMENTUM_EXCHANGE%CHEZY_DRAG_COEFF=0.0` | `ANALYTIC` | Configured only | Interlayer Chézy drag has a zero coefficient. |

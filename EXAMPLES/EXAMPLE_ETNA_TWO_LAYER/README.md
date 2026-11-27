@@ -368,15 +368,14 @@ numerical method or mass-exchange sources.
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
 
-| Group | Scope | Source (input setting) | Method | Status | Role |
-| ---: | --- | --- | --- | --- | --- |
-| 0 | L1 + L2 | `GEOMETRY_CURVATURE_METHOD='EXPLICIT'` | `EXPLICIT` | Initial stage | No optional curvature or injection source is enabled. |
-| 1 | L1 | `RHEOLOGY_L1%RHEOLOGY_MODEL='voellmy'` | `NEWTON` | Active | Voellmy basal friction modifies L1 momentum. |
-| 1 | L2 | `RHEOLOGY_L2%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Active | Quadratic resistance modifies L2 momentum. |
-| 2 | L1 + L2 | `THERMAL_L1%THERMAL_METHOD='NEWTON'`, `THERMAL_L2%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Thermal cooling is not enabled. |
-| 4 | L1 | `MASS_EXCHANGE_L1%DEPOSITION%SETTLING_FLAG=T` | `EXPLICIT` | Active | Solid deposition removes material from L1 into the substrate. |
-| 4 | L2 | `MASS_EXCHANGE_L2%ENTRAINMENT%FLAG=T` | `EXPLICIT` | Active | Ambient-air entrainment adds material to L2. |
-| 4 | Interlayer | `INTERLAYER_MASS_EXCHANGE%SETTLING_FLAG=F`, `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T` | `EXPLICIT` | Active | Elutriation transfers solids and associated carrier between layers. |
-| 5 | Interlayer | `INTERLAYER_MOMENTUM_EXCHANGE%MODEL='CHEZY'`, `INTERLAYER_MOMENTUM_EXCHANGE%CHEZY_DRAG_COEFF=0.03` | `ANALYTIC` | Active | Chézy interlayer drag exchanges momentum between the layers. |
+| Group | Scope | Source (input setting) | Method | Role |
+| ---: | --- | --- | --- | --- |
+| 1 | L1 | `RHEOLOGY_L1%RHEOLOGY_MODEL='voellmy'` | `NEWTON` | Voellmy basal friction modifies L1 momentum. |
+| 1 | L2 | `RHEOLOGY_L2%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Quadratic resistance modifies L2 momentum. |
+| 4 | L1 | `MASS_EXCHANGE_L1%DEPOSITION%SETTLING_FLAG=T` | `EXPLICIT` | Solid deposition removes material from L1 into the substrate. |
+| 4 | L2 | `MASS_EXCHANGE_L2%ENTRAINMENT%FLAG=T` | `EXPLICIT` | Ambient-air entrainment adds material to L2. |
+| 4 | Interlayer | `INTERLAYER_MASS_EXCHANGE%SETTLING_FLAG=F`, `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T` | `EXPLICIT` | Elutriation transfers solids and associated carrier between layers. |
+| 5 | Interlayer | `INTERLAYER_MOMENTUM_EXCHANGE%MODEL='CHEZY'`, `INTERLAYER_MOMENTUM_EXCHANGE%CHEZY_DRAG_COEFF=0.03` | `ANALYTIC` | Chézy interlayer drag exchanges momentum between the layers. |
+
