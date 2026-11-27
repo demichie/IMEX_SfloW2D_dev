@@ -29,12 +29,14 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## Source integration
 
-The input provides a quadratic-rheology configuration with zero friction factor,
-but `RHEOLOGY_FLAG=F`, so its declared `NEWTON`, `GROUP=1` is inactive.
-Thermal `NEWTON`, `GROUP=2`; curvature `EXPLICIT`, `GROUP=0`; and
-mass exchange `EXPLICIT`, `GROUP=4` are also present as scheduling settings,
-not as independent activation switches. No rheological or environmental
-exchange source is intended for this transcritical benchmark.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Configured only | Quadratic rheology is disabled by `RHEOLOGY_FLAG=F`. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass exchange is disabled. |
 
 ## How to run
 
