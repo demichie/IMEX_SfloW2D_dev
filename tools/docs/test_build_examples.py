@@ -13,6 +13,9 @@ class ExampleDocumentationTests(unittest.TestCase):
             website = repo / "docs" / "website"
             website.mkdir(parents=True)
             (website / "index.md").write_text("# Home\n", encoding="utf-8")
+            # The generated website requires both repository-owned logo assets.
+            for filename in ("IMEX-SfloW2D.svg", "IMEX-SfloW2D.png"):
+                (repo / "docs" / filename).write_bytes(("fixture-" + filename).encode("ascii"))
             (repo / "mkdocs.yml").write_text(
                 "site_name: IMEX-SfloW2D\nnav:\n# GENERATED_NAVIGATION\n",
                 encoding="utf-8",
@@ -50,6 +53,11 @@ class ExampleDocumentationTests(unittest.TestCase):
             )
             output = repo / "build" / "docs-generated"
             self.assertEqual(generate(repo, output, "abc123", "owner/repo"), 2)
+            for filename in ("IMEX-SfloW2D.svg", "IMEX-SfloW2D.png"):
+                self.assertEqual(
+                    (output / "docs" / "assets" / "images" / filename).read_bytes(),
+                    (repo / "docs" / filename).read_bytes(),
+                )
             self.assertTrue((output / "docs" / "examples" / "EXAMPLE_ETNA_TWO_LAYER" / "index.md").is_file())
             self.assertFalse((output / "docs" / "examples" / "EXAMPLE_ETNA_TWO_LAYER" / "DEM").exists())
             self.assertFalse((output / "docs" / "examples" / "EXAMPLE_ETNA_TWO_LAYER" / "templatedir").exists())
