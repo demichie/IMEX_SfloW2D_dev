@@ -34,6 +34,16 @@ This numerical-verification example tests spurious transport across wet–dry in
 
 The input generator requires Python 3 and NumPy. Matplotlib is required only when the `--plot` option is enabled.
 
+## Source integration
+
+This case explicitly disables rheology (`RHEOLOGY_FLAG=F`,
+`RHEOLOGY_MODEL='none'`) and curvature
+(`CURVATURE_TERM_FLAG=F`). The specified thermal `NEWTON`,
+`GROUP=2`, curvature `EXPLICIT`, `GROUP=0`, and mass-exchange
+`EXPLICIT`, `GROUP=4` entries are scheduling parameters, not
+activation flags. The exchange rates are zero or disabled, so the
+benchmark evolves without those physical source contributions.
+
 ## How to run
 
 Run these commands from this example directory, in order.

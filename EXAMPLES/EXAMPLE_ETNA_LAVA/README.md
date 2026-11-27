@@ -30,6 +30,19 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 | `KT_TRACE_RECONSTRUCTION` | `h_x` |
 | Slope correction / curvature | Disabled |
 
+## Source integration
+
+Both bottom fissures supply material through the `EXPLICIT`,
+`GROUP=0` injection configured by `BOTTOM_FISSURAL_METHOD` and
+`BOTTOM_FISSURAL_GROUP` in `FISSURAL_SOURCE_PARAMETERS`.
+Temperature-dependent lava rheology is evaluated with `NEWTON`,
+`GROUP=1`. The lava configuration also activates thermal cooling
+with `THERMAL_METHOD='NEWTON'`, `THERMAL_GROUP=2`.
+The environmental mass-exchange block declares `EXPLICIT`,
+`GROUP=4`, but its configured coefficients determine whether any
+of those exchange processes is active. The source group number
+controls Lie ordering, not the number of fissures or spatial stages.
+
 ## How to run
 
 From the repository root, execute the following steps in order.

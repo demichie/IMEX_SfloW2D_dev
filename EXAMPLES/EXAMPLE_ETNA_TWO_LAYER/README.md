@@ -365,3 +365,17 @@ These diagnostics do not prove that the two-layer pressure system
 satisfies the Kurganov-Petrova theorem; they test the necessary mass
 reconstruction and numerical speed hypotheses without modifying the
 numerical method or mass-exchange sources.
+
+## Source integration
+
+Each layer has its own source schedule. L1 Voellmy and L2 quadratic
+resistance both use `NEWTON`, `GROUP=1` in their respective layer
+scopes. L1 substrate deposition and L2 atmospheric entrainment use
+`EXPLICIT`, `GROUP=4` under their independent mass-exchange
+configurations. Enabled pair-wide elutriation uses `EXPLICIT`,
+`GROUP=4`, whereas pair-wide Chézy drag uses `ANALYTIC`,
+`GROUP=5`. The common group number 4 does not merge unrelated layer
+and interlayer laws into a single physical formula; the registry also
+orders them by scope. Thermal `NEWTON`, group 2 entries describe a
+possible cooling schedule but do not alone enable cooling.
+

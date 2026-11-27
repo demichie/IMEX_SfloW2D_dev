@@ -30,6 +30,17 @@ This example sets up multiple pyroclastic-avalanche simulations at Etna, samples
 
 Requires Python 3 and the IMEX_SfloW2D executable. NumPy and pandas are used for sampling, input generation and aggregation; Matplotlib is used for plots. The optional `create_hazard_maps.py` additionally requires netCDF4 and GDAL's Python bindings (`osgeo`).
 
+## Source integration
+
+Each generated ensemble member inherits the same source schedule from
+`templatedir/IMEX_SfloW2D.inp`: Voellmy resistance is assigned
+`NEWTON`, `GROUP=1`. The environmental mass-exchange schedule is
+`EXPLICIT`, `GROUP=4`, but deposition, erosion and entrainment are
+disabled in the supplied template. Thermal `NEWTON`, group 2 and
+curvature `EXPLICIT`, group 0 entries do not enable cooling or
+curvature by themselves. Ensemble variation changes the selected Voellmy
+coefficient, not the numerical source grouping.
+
 ## How to run
 
 Perform these operations in order from the

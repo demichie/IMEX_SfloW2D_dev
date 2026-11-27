@@ -28,6 +28,18 @@ A supercritical radial inlet over flat terrain, intended to reproduce the behavi
 
 The input generator requires Python 3 and NumPy.
 
+## Source integration
+
+The radial source is now configured explicitly in
+`RADIAL_SOURCE_PARAMETERS` with `RADIAL_INJECTION_METHOD='EXPLICIT'`,
+`RADIAL_INJECTION_GROUP=0`. Quadratic rheology uses `NEWTON`,
+`GROUP=1`; sediment deposition and atmospheric entrainment share the
+`EXPLICIT` mass-exchange `GROUP=4`. Group 0 belongs to the initial
+explicit source stage; subsequent Lie groups operate on the evolving
+post-spatial state. Thermal `NEWTON`, group 2 and curvature
+`EXPLICIT`, group 0 settings are not activation flags.
+The radial cell source is distinct from a prescribed boundary condition.
+
 ## How to run
 
 From this example directory, first generate the inputs and then run the solver.
