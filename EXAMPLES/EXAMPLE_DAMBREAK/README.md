@@ -69,15 +69,16 @@ the tracked input/template for the active run.
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
 
-| Group | Scope | Method | Status | Role |
-| ---: | --- | --- | --- | --- |
-| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
-| 1 | Flow | `EXPLICIT` | Active | Granular `mui` resistance modifies momentum. |
-| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
-| 3 | Flow | `ANALYTIC` | Active | Darcy pore-pressure evolution is integrated analytically. |
-| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass exchange is disabled. |
+| Group | Scope | Source (input setting) | Method | Status | Role |
+| ---: | --- | --- | --- | --- | --- |
+| 0 | Flow | `GEOMETRY_CURVATURE_METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='mui'` | `EXPLICIT` | Active | Granular `mui` resistance modifies momentum. |
+| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Cooling is not enabled. |
+| 3 | Flow | `PORE_PRESSURE%PORE_PRESSURE_METHOD='ANALYTIC'` | `ANALYTIC` | Active | Darcy pore-pressure evolution is integrated analytically. |
+| 4 | Flow | `MASS_EXCHANGE%METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Environmental mass exchange is disabled. |
+
 
 ## How to run
 
