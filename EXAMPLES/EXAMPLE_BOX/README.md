@@ -29,13 +29,14 @@ Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag 
 
 ## Source integration
 
-Quadratic basal resistance is assigned to `NEWTON`, `GROUP=1`.
-Settling/deposition and air entrainment use the combined `EXPLICIT` mass-exchange
-`GROUP=4`. Using one group for material exchange allows the solver to enforce
-the same available-mass constraints across these processes. Cooling and curvature
-have declared scheduling values (`NEWTON`, group 2; `EXPLICIT`, group 0),
-but they are not activated by their method/group settings alone.
-These groups are ordered Lie source updates, not independent timesteps.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Settling and atmospheric entrainment exchange material with the flow. |
 
 ## How to run
 

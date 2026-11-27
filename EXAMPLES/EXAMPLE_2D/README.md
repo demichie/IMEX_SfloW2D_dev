@@ -26,13 +26,14 @@ A finite granular mass initially confined in a hemispherical shell is released o
 
 ## Source integration
 
-The input explicitly assigns **quadratic rheology** to `NEWTON`, `GROUP=1`.
-Settling/deposition and atmospheric entrainment share the `EXPLICIT` mass-exchange
-`GROUP=4`, so their transfer rates use the same local inventory and admissibility
-limits. The thermal `NEWTON`, `GROUP=2` and curvature `EXPLICIT`, `GROUP=0`
-settings are present, but do not activate cooling or curvature by themselves.
-Group numbers determine the order of the physical-source updates after transport;
-they are not the number of Runge–Kutta stages.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance reduces flow momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Thermal cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Settling/deposition and air entrainment exchange mass with the surroundings. |
 
 ## How to run
 

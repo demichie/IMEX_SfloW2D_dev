@@ -26,13 +26,15 @@ An avalanche initially held within a hemispherical shell slides down a 35-degree
 
 ## Source integration
 
-The **Voellmy resistance** uses `RHEOLOGY%RHEOLOGY_METHOD='NEWTON'`,
-`RHEOLOGY%RHEOLOGY_GROUP=1`. The active Darcy pore-pressure source uses
-`PORE_PRESSURE%PORE_PRESSURE_METHOD='ANALYTIC'`, `GROUP=3`.
-The mass-exchange schedule is declared as `EXPLICIT`, `GROUP=4`, but settling,
-erosion and entrainment are disabled in this configuration. The thermal and
-curvature method/group entries do not by themselves enable these processes.
-The numerical groups are applied in ascending order after the spatial step.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Active | Voellmy basal friction modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Thermal cooling is not enabled. |
+| 3 | Flow | `ANALYTIC` | Active | Darcy pore-pressure dissipation advances the pore-pressure state. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass-exchange mechanisms are disabled. |
 
 ## How to run
 
