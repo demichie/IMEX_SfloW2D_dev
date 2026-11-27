@@ -26,12 +26,13 @@ A finite granular mass initially confined in a hemispherical shell is released o
 
 ## Source integration
 
-The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
+The table lists the **active physical source processes** in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source** gives the exact input parameter name (and the selected rheology model where relevant), without repeating physical coefficients; **Method** is the integration treatment; **Role** briefly explains the physical effect. Different processes may share a group.
 
-| Group | Scope | Source (input setting) | Method | Role |
+| Group | Scope | Source | Method | Role |
 | ---: | --- | --- | --- | --- |
 | 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Quadratic basal resistance reduces flow momentum. |
-| 4 | Flow | `MASS_EXCHANGE%DEPOSITION%SETTLING_FLAG=T`, `MASS_EXCHANGE%ENTRAINMENT%FLAG=T` | `EXPLICIT` | Settling/deposition and air entrainment exchange mass with the surroundings. |
+| 4 | Flow | `MASS_EXCHANGE%DEPOSITION%SETTLING_FLAG` | `EXPLICIT` | Settles suspended solid particles onto the substrate. |
+| 4 | Flow | `MASS_EXCHANGE%ENTRAINMENT%FLAG` | `EXPLICIT` | Entrains ambient gas into the flowing mixture. |
 
 
 ## How to run

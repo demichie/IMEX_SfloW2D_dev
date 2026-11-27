@@ -77,20 +77,18 @@ particle classes.
 `1e-8 m/s`. Erosion, deposition and liquid loss are handled in the
 explicit mass-exchange source group (`METHOD='EXPLICIT'`, `GROUP=4`).
 
-**Disabled processes.** Atmospheric entrainment is disabled, and there is
-no radial injection or collapsing-volume source. Dynamic topographic
-evolution is disabled (`SUBSTRATE%TOPO_CHANGE_FLAG=F`), although
-sediment inventories and deposition/erosion diagnostics are still tracked.
-No additional gas phase or second flowing layer is used.
+
 
 ## Source integration
 
-The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
+The table lists the **active physical source processes** in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source** gives the exact input parameter name (and the selected physical model where relevant), without repeating physical coefficients; **Method** is the integration treatment; **Role** briefly explains the physical effect. Different processes may share a group.
 
-| Group | Scope | Source (input setting) | Method | Role |
+| Group | Scope | Source | Method | Role |
 | ---: | --- | --- | --- | --- |
 | 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL="lahar"` | `NEWTON` | Concentration- and temperature-dependent lahar resistance modifies momentum. |
-| 4 | Flow | `MASS_EXCHANGE%DEPOSITION%SETTLING_FLAG=T`, `MASS_EXCHANGE%EROSION%COEFFICIENT=1.D-4`, `MASS_EXCHANGE%CARRIER_LIQUID_LOSS%LOSS_RATE=1.D-8` | `EXPLICIT` | Substrate erosion, particle settling and liquid-carrier loss exchange mass. |
+| 4 | Flow | `MASS_EXCHANGE%DEPOSITION%SETTLING_FLAG` | `EXPLICIT` | Settles suspended solid particles onto the substrate. |
+| 4 | Flow | `MASS_EXCHANGE%EROSION%COEFFICIENT` | `EXPLICIT` | Erodes available substrate material and transfers sediment into the flow. |
+| 4 | Flow | `MASS_EXCHANGE%CARRIER_LIQUID_LOSS%LOSS_RATE` | `EXPLICIT` | Removes liquid carrier mass from the flow. |
 
 
 ## Run the example

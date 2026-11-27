@@ -32,13 +32,13 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 
 ## Source integration
 
-The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
+The table lists the **active physical source processes** in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source** gives the exact input parameter name (and the selected physical model where relevant), without repeating physical coefficients; **Method** is the integration treatment; **Role** briefly explains the physical effect. Different processes may share a group.
 
-| Group | Scope | Source (input setting) | Method | Role |
+| Group | Scope | Source | Method | Role |
 | ---: | --- | --- | --- | --- |
-| 0 | Flow | `BOTTOM_FISSURAL_SOURCE_FLAG=T`, `BOTTOM_FISSURAL_METHOD='EXPLICIT'` | `EXPLICIT` | Two bottom fissures inject lava; curvature is disabled. |
+| 0 | Flow | `BOTTOM_FISSURAL_SOURCE_FLAG` | `EXPLICIT` | Two bottom fissures inject lava. |
 | 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='lava'` | `NEWTON` | Temperature-dependent lava rheology modifies momentum. |
-| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Thermal cooling changes the lava's sensible thermal content. |
+| 2 | Flow | `THERMAL%EMISSIVITY` | `NEWTON` | Cools lava through radiative and atmospheric convective heat transfer. |
 
 
 ## How to run

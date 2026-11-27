@@ -368,14 +368,14 @@ numerical method or mass-exchange sources.
 
 ## Source integration
 
-The table lists only the **active physical source terms** of this simulation, in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source (input setting)** reproduces the relevant names and values from the input file; **Method** specifies the numerical integration treatment; **Role** summarizes the physical contribution. Groups with the same index may contain multiple sources.
+The table lists the **active physical source processes** in ascending **Group** order, complementing the Physical processes description above. **Scope** identifies the affected layer or layer pair; **Source** gives the exact input parameter name (and the selected physical model where relevant), without repeating physical coefficients; **Method** is the integration treatment; **Role** briefly explains the physical effect. Different processes may share a group.
 
-| Group | Scope | Source (input setting) | Method | Role |
+| Group | Scope | Source | Method | Role |
 | ---: | --- | --- | --- | --- |
 | 1 | L1 | `RHEOLOGY_L1%RHEOLOGY_MODEL='voellmy'` | `NEWTON` | Voellmy basal friction modifies L1 momentum. |
 | 1 | L2 | `RHEOLOGY_L2%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Quadratic resistance modifies L2 momentum. |
-| 4 | L1 | `MASS_EXCHANGE_L1%DEPOSITION%SETTLING_FLAG=T` | `EXPLICIT` | Solid deposition removes material from L1 into the substrate. |
-| 4 | L2 | `MASS_EXCHANGE_L2%ENTRAINMENT%FLAG=T` | `EXPLICIT` | Ambient-air entrainment adds material to L2. |
-| 4 | Interlayer | `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T` | `EXPLICIT` | Elutriation transfers solids and associated carrier between layers. |
-| 5 | Interlayer | `INTERLAYER_MOMENTUM_EXCHANGE%MODEL='CHEZY'`, `INTERLAYER_MOMENTUM_EXCHANGE%CHEZY_DRAG_COEFF=0.03` | `ANALYTIC` | Chézy interlayer drag exchanges momentum between the layers. |
+| 4 | L1 | `MASS_EXCHANGE_L1%DEPOSITION%SETTLING_FLAG` | `EXPLICIT` | Settles suspended solid particles onto the substrate. |
+| 4 | L2 | `MASS_EXCHANGE_L2%ENTRAINMENT%FLAG` | `EXPLICIT` | Entrains ambient gas into the flowing mixture. |
+| 4 | Interlayer | `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG` | `EXPLICIT` | Transfers suspended solids and associated carrier from L1 to L2. |
+| 5 | Interlayer | `INTERLAYER_MOMENTUM_EXCHANGE%MODEL='CHEZY'` | `ANALYTIC` | Chézy interlayer drag exchanges momentum between the layers. |
 
