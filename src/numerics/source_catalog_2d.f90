@@ -1,6 +1,21 @@
-!> @brief Define supported Lie source identities and their method capabilities.
-!> @details This immutable catalog describes physical method availability,
-!>          permitted phases and the conservative equations touched by Newton.
+!> @brief Define the canonical identities and supported treatments of physical source terms.
+!> @details Physical processes are selected by input configuration, but their admissible
+!>          integration methods must be known before constructing any Lie source group.
+!>          SOURCE_CATALOG provides that fixed lookup table: a canonical source name,
+!>          explicit/Newton/analytic availability, the default method and permitted carrier phases.
+!>          Entries include rheologies, cooling, pore-pressure dissipation, injections,
+!>          geometric terms, environmental mass exchange and pair-wide interlayer processes.
+!>
+!>          During simulation initialization, source_configuration_2d resolves active physical
+!>          laws against these descriptors and source_registry_2d validates their ordering,
+!>          method compatibility and equation footprints. The resulting metadata is consumed
+!>          by lie_source_executor_2d when advancing each cell. Numerical fluxes, actual
+!>          source rates, Newton iterations and physical parameter values are NOT owned here:
+!>          they belong to the spatial, physical-law and source-execution modules.
+!>
+!>          The catalogue IDs are internal dispatch and bitmask positions, not user-selected
+!>          Lie GROUP numbers. The Newton equation sets describe structural coupling, not
+!>          whether an instantaneous source rate happens to be nonzero.
 MODULE source_catalog_2d
     USE parameters_2d, ONLY : idx_uEqn,idx_vEqn,idx_engyEqn,idx_poreEqn
     IMPLICIT NONE
@@ -29,7 +44,11 @@ MODULE source_catalog_2d
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_ANALYTIC_TEMPERATURE=3, SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE=4
     INTEGER, PARAMETER, PUBLIC :: SOURCE_ROLE_IMPLICIT=1, SOURCE_ROLE_SEMI_IMPLICIT=2
     ! Equation-group membership is configured independently of source identity.
-    !> @brief Immutable capabilities and phase permissions for one source term.
+    !> @brief One entry in the fixed physical-source catalogue.
+    !> @details The descriptor records which integration methods can be requested and which
+    !>          carrier configurations may use a source. It contains no closure coefficients,
+    !>          evolving state or callable source evaluator. Registry validation rejects a
+    !>          configured method not enabled by these flags before the time integrator runs.
     TYPE :: source_term_type
         !> Unique catalog source name used to resolve configured Lie groups.
         CHARACTER(LEN=64) :: name = ''
@@ -140,6 +159,9 @@ MODULE source_catalog_2d
             ]
 CONTAINS
     !> @brief Resolve a canonical source name to its catalog index during setup.
+    !> @details Scans the fixed table in declaration order. The returned index is used as
+    !>          a stable internal dispatch ID and as the bit position encoded by source_id_mask;
+    !>          it must not be interpreted as the input GROUP or numerical method.
     !> @param[in] name Exact source identifier from the immutable registry.
     !> @return One-based catalog ID, or zero if no source matches.
     PURE INTEGER FUNCTION source_term_id_by_name(name) RESULT(id)
@@ -155,6 +177,9 @@ CONTAINS
     END FUNCTION source_term_id_by_name
 
     !> @brief Encode a source catalog ID as one bit of the active-source mask.
+    !> @details The registry combines these bits to describe the configured members of a
+    !>          group. The executor tests them to dispatch physical laws without repeatedly
+    !>          comparing character names inside the OpenMP cell loop.
     !> @param[in] id One-based source ID to encode.
     !> @return The corresponding active bit, or zero when out of range.
     PURE INTEGER FUNCTION source_id_mask(id) RESULT(mask)
@@ -183,6 +208,9 @@ CONTAINS
 
 
     !> @brief Resolve a rheology model name to its canonical source identity.
+    !> @details Converts a physical rheology model such as 'voellmy' to the corresponding
+    !>          'rheology_voellmy' source identity. This separates the input model selection
+    !>          from the names used by the source registry; it does not activate the law.
     !> @param[in] model_name Text identifier of the rheology constitutive law.
     !> @return Registered rheology source name, empty when not found or disabled.
     PURE FUNCTION canonical_rheology_source_name(model_name) RESULT(name)
@@ -203,12 +231,15 @@ CONTAINS
 
         END DO
     END FUNCTION canonical_rheology_source_name
-    !> Structurally affected conservative equations for a Newton-capable source.
-    !> A zero instantaneous rate does not remove an equation from this set.
-    !> An unsupported source/method returns an empty set.
     !> @brief Return conservative equation indices structurally affected by Newton.
-    !> @details Inactive instantaneous rates do not remove structural equations;
-    !>          unsupported methods return an empty array.
+    !> @details Newton groups solve only the conserved quantities coupled by their sources.
+    !>          Supported rheology terms affect the two momentum equations; thermal cooling
+    !>          affects thermal content. The returned footprint is independent of current cell
+    !>          values, so a locally vanishing rate does not change the nonlinear system size.
+    !>          source_configuration_2d unions these footprints for each proposed group, and
+    !>          source_registry_2d verifies the exact set before nonlinear_solver_2d uses it.
+    !>          Unknown or non-Newton sources return an empty set; an absent optional
+    !>          equation is never inserted.
     !> @param[in] name Canonical source name.
     !> @return Allocatable list of conservative equation indices.
     FUNCTION source_newton_affected_equations(name) RESULT(ids)
@@ -234,6 +265,9 @@ CONTAINS
 
 
     !> @brief Look up one catalog descriptor by its canonical source name.
+    !> @details Returns a value descriptor, not a pointer to mutable catalogue state.
+    !>          Unknown names map to the default descriptor with all method and phase
+    !>          capabilities disabled, allowing setup validation to reject the source.
     !> @param[in] name Exact registered source name.
     !> @return Descriptor, or default-disabled descriptor when unknown.
     PURE FUNCTION source_term_descriptor_by_name(name) RESULT(term)
@@ -254,6 +288,8 @@ CONTAINS
     END FUNCTION source_term_descriptor_by_name
 
     !> @brief Check uniqueness and nonempty names across source descriptors.
+    !> @details Checks the fixed catalogue's identifying strings, independently of any
+    !>          simulation input, to guard the name-to-ID resolution used by the registry.
     !> @return True if all registered source names are valid and unique.
     PURE LOGICAL FUNCTION source_catalog_names_unique() RESULT(ok)
         INTEGER :: i,j
@@ -273,9 +309,11 @@ CONTAINS
     END FUNCTION source_catalog_names_unique
 
 
-    !> Check a rheology's actual SI/IM contribution by canonical source name.
-    !> This is independent of the legacy numeric model ID.
     !> @brief Query whether a rheology implements a requested physical treatment.
+    !> @details This query distinguishes the constitutive implicit and semi-implicit
+    !>          contributions from the catalogue's group-level integration methods.
+    !>          Callers use the result to select a supported rheological contribution;
+    !>          the answer depends on the canonical source name rather than a model ID.
     !> @param[in] source_name Canonical rheology source name.
     !> @param[in] role Requested implicit or semi-implicit contribution identifier.
     !> @return True if that rheology supports the selected contribution.

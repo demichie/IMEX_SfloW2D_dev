@@ -1,6 +1,16 @@
-!> @brief Read physical-source scheduling input without duplicated closure storage.
-!> @details Short and explicit L1 mass-exchange NAMELISTs are mutually exclusive
-!>          and reference exactly the same canonical L1 configuration.
+!> @brief Read and validate source-related input settings and scheduling metadata.
+!> @details This module owns the input parsing of environmental mass exchange and
+!>          pair-wide interlayer settings. It binds the single-layer mass-exchange
+!>          NAMELIST and the explicit L1 NAMELIST to the same canonical L1 object,
+!>          while L2 uses its own configuration. Pair-wide interlayer coefficients
+!>          belong to the interlayer modules, not to either individual layer.
+!>
+!>          It also provides the METHOD/GROUP settings for injection and curvature
+!>          sources. After parsing and normalization, source_configuration_2d uses
+!>          these settings to build the ordered source identities; source_registry_2d
+!>          validates method compatibility, and lie_source_executor_2d applies the
+!>          selected physical laws. Parsing does not evaluate any cell-local source
+!>          rates or mutate the evolving conservative state.
 MODULE source_input_2d
     USE parameters_2d, ONLY : wp, n_layers
     USE mass_exchange_parameters_2d, ONLY : mass_exchange_config_type, mass_exchange_l1, mass_exchange_l2
@@ -33,8 +43,14 @@ MODULE source_input_2d
 CONTAINS
 
     !> @brief Read layer-local mass-exchange options and validate the combined source.
-    !> @details The historical scalar syntax is rejected; the short group is
-    !>          intentionally supported only for the single-layer L1 object.
+    !> @details Scans the input for the accepted mass-exchange NAMELIST forms,
+    !>          rejecting duplicates and incompatible layer configurations.
+    !>          A single-layer run may use the short or explicit L1 name, both of
+    !>          which configure the same L1 physical object. A two-layer run
+    !>          requires separate L1/L2 groups. Each selected configuration is
+    !>          normalized and checked before source group construction; the input
+    !>          unit is rewound for subsequent parsing. This routine does not decide
+    !>          which cell exchanges material or evaluate a mass-transfer rate.
     !> @param[in] input_unit Open formatted input unit.
     !> @param[out] error Empty on success; error message on invalid input.
     SUBROUTINE read_mass_exchange_parameters(input_unit,error)

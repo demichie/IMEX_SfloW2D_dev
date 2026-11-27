@@ -1,8 +1,23 @@
 !********************************************************************************
-!> \brief Execute ordered first-order Lie physical source groups.
-!> \details Ordered groups advance each cell independently while geometry
-!>          remains frozen. Physical rates are assembled by source_terms_2d;
-!>          accepted bed changes are projected through geometry_2d.
+!> \brief Execute the validated physical-source schedule of a Lie timestep.
+!> \details This is the runtime counterpart of source_catalog_2d,
+!>          source_configuration_2d and source_registry_2d. The executor receives
+!>          their validated, ordered group descriptors and applies them to the
+!>          post-spatial trial state prepared by time_integration_2d.
+!>
+!>          Each OpenMP worker visits its assigned active cells, evaluating the
+!>          groups in configured order. Explicit rates are assembled through
+!>          source_terms_2d, Newton groups use nonlinear_solver_2d, and supported
+!>          analytic laws perform their dedicated updates. Pair-wide interlayer
+!>          groups update both layer candidates atomically. Conservative and
+!>          primitive candidates are checked before acceptance; substrate
+!>          transfers are tracked together with the evolving flow state.
+!>
+!>          The executor owns reusable thread-local physical workspaces and
+!>          diagnostic buffers, but not the canonical fluid state or physical
+!>          coefficients. Terrain geometry stays frozen during source evaluation;
+!>          the integrator publishes the accepted transaction and commits geometry
+!>          only after all active cells have succeeded.
 !********************************************************************************
 
 MODULE lie_source_executor_2d
@@ -50,8 +65,12 @@ MODULE lie_source_executor_2d
         INTEGER :: evaluated_cells=0
     END TYPE group_profile_type
     !> @brief Stable Lie configuration and reusable per-simulation work arrays.
-    !> @details Initialized once; cell-indexed buffers are sized for the full
-    !>          grid. Detailed failure diagnostics are disabled by default.
+    !> @details Holds the detached validated Lie schedule, method classifications
+    !>          and flags for optional bed transactions. Per-worker REAL and COMPLEX
+    !>          physical workspaces avoid reallocation and shared mutable scratch in
+    !>          OpenMP loops. Cell-indexed failure and diagnostic buffers are allocated
+    !>          at initialization; only active worklist cells are advanced each step.
+    !>          Optional profiling and detailed failure diagnostics are disabled by default.
     TYPE :: lie_source_executor_type
         !> Validated source groups used by the operational Lie executor.
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
@@ -111,7 +130,12 @@ MODULE lie_source_executor_2d
 CONTAINS
 
     !> @brief Prepare group metadata and allocate all executor work arrays.
-    !> @details Called once after source registration and before the first step.
+    !> @details Called once after the registry has validated the input schedule.
+    !>          Copies the ordered groups, resolves catalogue masks into exchange
+    !>          and non-exchange dispatch classes, identifies dry-cell and
+    !>          topography-changing groups, and allocates reusable per-worker and
+    !>          diagnostic storage. The executor cannot be initialized twice
+    !>          without finalization and rejects schedules for inactive layers.
     !> @param[in,out] executor Persistent Lie configuration and work arrays.
     !> @param[in] source_registry Validated ordered physical-source groups.
     SUBROUTINE initialize_lie_source_executor(executor,source_registry)
@@ -272,10 +296,22 @@ CONTAINS
     END SUBROUTINE finalize_lie_source_executor
 
     !> @brief Apply ordered physical-source groups to the trial state.
-    !> @details Each OpenMP iteration processes one cell and visits the groups
-    !>          sequentially. Group zero reads the pre-spatial snapshot while
-    !>          incrementing the post-spatial trial state. Geometry remains
-    !>          frozen until all cells succeed; failure is fatal to the caller.
+    !> @details The caller supplies post-spatial conservative/primitive candidates,
+    !>          pre-spatial snapshots and immutable per-layer physics configurations.
+    !>          Each OpenMP iteration owns one active cell and processes all Lie
+    !>          groups sequentially, using worker-local scratch rather than global
+    !>          physical-state temporaries. Group zero evaluates its source rates
+    !>          on the pre-spatial snapshot but applies them to the post-spatial
+    !>          candidate. Other groups advance the current candidate in order.
+    !>
+    !>          Explicit sources share inventory and admissibility limiters;
+    !>          Newton groups solve their validated equation subset, and analytic
+    !>          groups apply their supported closed-form updates. Interlayer groups
+    !>          validate and update L1/L2 as a paired transaction. Each accepted
+    !>          group refreshes the candidate primitive state as required.
+    !>          Substrate changes are staged while geometry remains frozen.
+    !>          On failure the caller receives an error and does not publish the
+    !>          timestep; time_integration_2d commits only after overall success.
     !> @param[in,out] executor Configured Lie groups and reusable work arrays.
     !> @param[in,out] state Owns substrate inventories and aggregate fields.
     !> @param[in,out] q Conservative candidates (component,layer,x-cell,y-cell).

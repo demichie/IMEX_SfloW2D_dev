@@ -1,9 +1,20 @@
 !********************************************************************************
-!> \brief Validated source groups derived from physical source configuration.
-!> \details Builds metadata once, outside cell/stage loops. Does not evaluate
-!>          physics or depend on legacy global equation partitions.
-!>          Private storage is exposed only through copies; failed initialization
-!>          releases all storage. Joint Newton blocks remain coupled.
+!> \brief Validate and own the ordered Lie groups selected by physical configuration.
+!> \details source_configuration_2d assembles candidate groups from the selected rheology,
+!>          thermal, pore-pressure, injection and mass-exchange settings. This module checks
+!>          those candidates against source_catalog_2d and stores an immutable-in-practice
+!>          schedule for time_integration_2d and lie_source_executor_2d.
+!>
+!>          Each group has a Lie ordering ID, a scope (L1, L2 or both layers), an
+!>          integration method, canonical source names and a conservative equation set.
+!>          The registry rejects unsupported methods, duplicate source identities,
+!>          invalid group ordering and incompatible Newton equation footprints. Interlayer
+!>          mass exchange and drag have their own pair-wide rules. No physical rates
+!>          or evolving flow states are computed or stored here.
+!>
+!>          Validation is transactional: an unsuccessful initialization leaves the registry
+!>          uninitialized. The operational executor receives a detached copy of the groups,
+!>          so worker code does not mutate the registry's owned metadata.
 !********************************************************************************
 MODULE source_registry_2d
     USE source_catalog_2d
@@ -15,7 +26,13 @@ MODULE source_registry_2d
 
     INTEGER, PARAMETER :: SOURCE_SCOPE_L1=1, SOURCE_SCOPE_L2=2, SOURCE_SCOPE_INTERLAYER=3
 
-    !> \brief Ordered Lie source group; id=0 is the explicit spatial/source group.
+    !> \brief Ordered, scoped description of one physical-source integration group.
+    !> \details GROUP selects the position in the Lie source sequence, while method
+    !>          selects explicit evaluation, a coupled Newton solve or an analytic substep.
+    !>          source_names enumerate the configured laws; equation_ids specify the
+    !>          conservative subset for Newton, the full set for explicit groups and the
+    !>          empty set for analytic groups. scope distinguishes L1, L2 and paired updates.
+    !>          Resolved IDs and the bit mask accelerate execution without re-parsing names.
     TYPE :: source_group_type
         INTEGER :: id=0 !< Public or normalized internal group identity.
         INTEGER :: method=0 !< Explicit, Newton or analytic.
@@ -28,7 +45,11 @@ MODULE source_registry_2d
         INTEGER :: source_mask=0 !< Immutable bitset of validated catalogue IDs.
     END TYPE source_group_type
 
-    !> \brief Validated metadata owned and finalized by one simulation context.
+    !> \brief Single owner of the validated group schedule for one simulation.
+    !> \details Initialized during simulation setup and finalized with its context.
+    !>          Its ordered descriptors are private; groups() supplies a detached
+    !>          copy to the operational executor. The cached implicit-source flag
+    !>          reports whether any validated group requires Newton integration.
     TYPE :: source_registry_type
     PRIVATE
         LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
@@ -47,8 +68,15 @@ MODULE source_registry_2d
 CONTAINS
 
     !> @brief Validate and store groups for the first-order Lie integrator.
-    !> @details Rejects inconsistent methods, duplicated identities and invalid
-    !>          equation footprints; updates registry ownership on successful validation.
+    !> @details This setup-only validation starts by clearing any previous schedule.
+    !>          It requires an explicit group zero, sorted group IDs/scopes and source
+    !>          identities present in SOURCE_CATALOG. Method permissions, allowed
+    !>          source combinations and per-layer uniqueness are checked before storing
+    !>          descriptors. Newton equation_ids must equal the union of the structural
+    !>          equation footprints of all their sources; analytic groups are exclusive.
+    !>          Shared mass-exchange inventory sources must use the same explicit group.
+    !>          Interlayer updates may only contain the supported paired mass or drag law.
+    !>          A failure is returned through error and no initialized schedule is exposed.
     !> @param[in,out] this Registry receiving validated group metadata.
     !> @param[in] n_eqns Number of conservative equations.
     !> @param[in] idx_poreEqn Pressure-of-pore equation index, zero when absent.
@@ -299,6 +327,9 @@ CONTAINS
     END FUNCTION registry_is_initialized
 
     !> @brief Return a detached copy of the ordered Lie source groups.
+    !> @details The executor takes ownership of its copy, including allocatable name and
+    !>          equation-index arrays. This prevents runtime bookkeeping from changing
+    !>          the registry's validated description of the simulation.
     !> @param[in] this Initialized source registry.
     !> @return Independently allocated group descriptors for the caller.
     FUNCTION copy_lie_groups(this) RESULT(groups)

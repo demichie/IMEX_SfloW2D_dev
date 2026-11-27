@@ -1,7 +1,17 @@
-!> @brief Coordinate first-order Lie integration of spatial fluxes and physical sources.
-!> @details The spatial operator advances first without rate limiting. Ordered
-!>          source groups subsequently modify a transaction candidate; only a
-!>          fully accepted timestep publishes fluid, substrate and geometry.
+!> @brief Coordinate conservative spatial transport and ordered Lie source integration.
+!> @details This module owns the timestep transaction between the canonical fluid state,
+!>          spatial_operator_2d and lie_source_executor_2d. It prepares a single spatial
+!>          residual on the compact active-domain workset, advances conservative trial
+!>          variables and checks admissibility before applying physical source groups.
+!>
+!>          The post-spatial stochastic stage evolves the OU field and updates the
+!>          optional transported scalar before rheological source evaluation. The Lie
+!>          executor then applies validated explicit, Newton and analytic groups to
+!>          candidate states, including paired L1/L2 sources when configured.
+!>          The published q/qp arrays remain unchanged until every candidate succeeds;
+!>          bed changes are staged and terrain geometry is committed only with the
+!>          accepted step. This module coordinates source evaluation but owns no
+!>          constitutive coefficients or physical closure formulas.
 MODULE time_integration_2d
     USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                  &
             idx_add_gas_first,idx_add_gas_last,sea_mass_removal_flag,n_layers,idx_h
@@ -33,7 +43,13 @@ MODULE time_integration_2d
         END SUBROUTINE stochastic_stage_observer
     END INTERFACE
     PUBLIC :: time_integration_workspace_type
-    !> @brief Scratch and transactional state buffers for one Lie integration.
+    !> @brief Per-simulation workspaces for the spatial and source transaction.
+    !> @details Owns spatial residuals, pre-step primitive traces when necessary,
+    !>          per-layer conservative and primitive candidate arrays, active-cell
+    !>          status flags and the configured Lie executor. Candidate fields
+    !>          have full-grid dimensions but are initialized and published on
+    !>          the active solve worklist. The canonical state remains in state_type;
+    !>          these arrays are temporary data for an admissible timestep.
     TYPE :: time_integration_workspace_type
         !> Spatial residual, dimensioned by conservative equation and cell.
         REAL(wp), ALLOCATABLE :: spatial_rate(:,:,:,:)
@@ -61,6 +77,10 @@ MODULE time_integration_2d
     END TYPE
 CONTAINS
     !> @brief Allocate integration workspaces from the configured domain sizes.
+    !> @details Allocates reusable full-grid trial/residual arrays and a compact
+    !>          status buffer. It initializes the Lie executor from already
+    !>          validated registry metadata and reads optional timing controls.
+    !>          This is simulation setup, not a physical time integration step.
     !> @param[in,out] this Integration workspace to allocate.
     !> @param[in] source_registry Validated Lie source groups for the executor.
     SUBROUTINE initialize_time_integration(this,source_registry)

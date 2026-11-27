@@ -1,8 +1,18 @@
 !********************************************************************************
-!> \brief Translate configured source activation into validated D17 metadata.
-!> \details Runs once from physical source settings. Owns no
-!>          physical state and performs no rate evaluation or temporal update.
-!>          Per-cell wetness, packing and window gates remain in existing kernels.
+!> \brief Translate physical model settings into ordered Lie source groups.
+!> \details After source_input_2d has read input options, this module determines
+!>          which physical processes are enabled for each configured layer. It maps
+!>          rheology, cooling, pore-pressure, injection, curvature and environmental
+!>          mass-exchange settings to canonical source_catalog_2d names. For two-layer
+!>          runs it also collects pair-wide settling, elutriation and interlayer drag.
+!>
+!>          Each active source is assigned the configured GROUP and METHOD, or the
+!>          catalogue default method. Newton groups obtain the union of their structural
+!>          equation footprints. The resulting ordered candidates are passed to
+!>          source_registry_2d for validation and ownership, then used by the Lie
+!>          executor during timestepping. This module only prepares metadata: physical
+!>          rates, wet/dry eligibility, donor inventories and packing limiters are
+!>          evaluated later in the cell-local source kernels.
 !********************************************************************************
 MODULE source_configuration_2d
     USE source_catalog_2d
@@ -27,6 +37,11 @@ CONTAINS
     !> Identify active physical sources exactly once for both input syntaxes.
     !> Thermal activation is determined by the physical cooling flag.
     !> @brief Collect enabled physical source identities for one configured layer.
+    !> @details Converts activation flags and selected constitutive models into a list
+    !>          of catalogue names. This is a setup-time selection, not a test of the
+    !>          local wetness or instantaneous rate. It also validates the global carrier
+    !>          phase combination and the availability of lava deposition.
+    !>          The caller subsequently assigns methods and groups to these names.
     !> @param[in] rheology Layer rheology configuration.
     !> @param[in] mass_config Layer mass exchange configuration.
     !> @param[in] include_thermal Include thermal sources.
@@ -106,8 +121,15 @@ CONTAINS
     END SUBROUTINE collect_active_source_names
 
     !> @brief Create one ordered Lie registry from layer-specific physical configuration.
-    !> @details Optional L2 arguments must be provided together; they do not create
-    !>          duplicated runtime storage or change the single-layer input contract.
+    !> @details Reads the already selected layer configurations and prepares a group-zero
+    !>          explicit entry plus the enabled, numbered source groups. Configured methods
+    !>          are checked against each catalogue descriptor, and explicit groups cover
+    !>          all conservative equations while Newton groups collect their structural
+    !>          equation sets. Analytic sources remain exclusive in their group.
+    !>          Optional L2 arguments must be provided together; paired mass transfer and
+    !>          interlayer drag receive separate INTERLAYER-scope groups when enabled.
+    !>          Groups are ordered by ID and scope before registry%initialize validates
+    !>          and owns the resulting schedule. No physical rates are evaluated here.
     !> @param[in,out] registry Destination for validated source groups.
     !> @param[out] error Empty on success, otherwise configuration diagnostic.
     !> @param[in] rheology Selected L1 rheology.
