@@ -54,14 +54,14 @@ For steady-state injection, remove the `TIME_PARAM` line from the radial-source 
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
 
-| Group | Scope | Method | Status | Role |
-| ---: | --- | --- | --- | --- |
-| 0 | Flow | `EXPLICIT` | Active | Circular bottom source injects mixture; curvature is disabled. |
-| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
-| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
-| 4 | Flow | `EXPLICIT` | Active | Settling and entrainment exchange material, accounting for the injection area. |
+| Group | Scope | Source (input setting) | Method | Status | Role |
+| ---: | --- | --- | --- | --- | --- |
+| 0 | Flow | `BOTTOM_RADIAL_SOURCE_FLAG=T`, `BOTTOM_CIRCULAR_METHOD='EXPLICIT'` | `EXPLICIT` | Active | Circular bottom source injects mixture; curvature is disabled. |
+| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `MASS_EXCHANGE%DEPOSITION%SETTLING_FLAG=T`, `MASS_EXCHANGE%ENTRAINMENT%FLAG=T` | `EXPLICIT` | Active | Settling and entrainment exchange material, accounting for the injection area. |
 
 ## How to run
 
