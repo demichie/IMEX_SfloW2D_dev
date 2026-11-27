@@ -376,6 +376,6 @@ The table lists only the **active physical source terms** of this simulation, in
 | 1 | L2 | `RHEOLOGY_L2%RHEOLOGY_MODEL='quadratic'` | `NEWTON` | Quadratic resistance modifies L2 momentum. |
 | 4 | L1 | `MASS_EXCHANGE_L1%DEPOSITION%SETTLING_FLAG=T` | `EXPLICIT` | Solid deposition removes material from L1 into the substrate. |
 | 4 | L2 | `MASS_EXCHANGE_L2%ENTRAINMENT%FLAG=T` | `EXPLICIT` | Ambient-air entrainment adds material to L2. |
-| 4 | Interlayer | `INTERLAYER_MASS_EXCHANGE%SETTLING_FLAG=F`, `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T` | `EXPLICIT` | Elutriation transfers solids and associated carrier between layers. |
+| 4 | Interlayer | `INTERLAYER_MASS_EXCHANGE%ELUTRIATION_FLAG=T` | `EXPLICIT` | Elutriation transfers solids and associated carrier between layers. |
 | 5 | Interlayer | `INTERLAYER_MOMENTUM_EXCHANGE%MODEL='CHEZY'`, `INTERLAYER_MOMENTUM_EXCHANGE%CHEZY_DRAG_COEFF=0.03` | `ANALYTIC` | Chézy interlayer drag exchanges momentum between the layers. |
 
