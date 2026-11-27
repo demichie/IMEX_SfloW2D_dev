@@ -85,18 +85,14 @@ No additional gas phase or second flowing layer is used.
 
 ## Source integration
 
-The input now explicitly assigns the concentration- and
-temperature-dependent **lahar rheology** to `NEWTON`, `GROUP=1`,
-matching the solver's existing default. Erosion, sediment settling
-and carrier-liquid loss share the `EXPLICIT` mass-exchange
-`GROUP=4`, allowing inventory and composition constraints to be
-applied to the combined transaction. The temperature block declares
-`THERMAL_METHOD='NEWTON'`, `THERMAL_GROUP=2`, but this is the schedule
-for optional cooling: the lahar rheology's temperature dependence does
-not by itself activate the thermal-cooling source. Similarly,
-`GEOMETRY_CURVATURE_METHOD='EXPLICIT'`, `GROUP=0` does not activate
-curvature without its flag. The active groups execute after
-conservative spatial transport in ascending Lie order.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Active | Concentration- and temperature-dependent lahar resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled; temperature dependence of friction remains. |
+| 4 | Flow | `EXPLICIT` | Active | Substrate erosion, particle settling and liquid-carrier loss exchange mass. |
 
 ## Run the example
 

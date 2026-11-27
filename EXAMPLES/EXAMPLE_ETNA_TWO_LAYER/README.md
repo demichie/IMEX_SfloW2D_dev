@@ -368,14 +368,15 @@ numerical method or mass-exchange sources.
 
 ## Source integration
 
-Each layer has its own source schedule. L1 Voellmy and L2 quadratic
-resistance both use `NEWTON`, `GROUP=1` in their respective layer
-scopes. L1 substrate deposition and L2 atmospheric entrainment use
-`EXPLICIT`, `GROUP=4` under their independent mass-exchange
-configurations. Enabled pair-wide elutriation uses `EXPLICIT`,
-`GROUP=4`, whereas pair-wide Chézy drag uses `ANALYTIC`,
-`GROUP=5`. The common group number 4 does not merge unrelated layer
-and interlayer laws into a single physical formula; the registry also
-orders them by scope. Thermal `NEWTON`, group 2 entries describe a
-possible cooling schedule but do not alone enable cooling.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
 
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | L1 + L2 | `EXPLICIT` | Initial stage | No optional curvature or injection source is enabled. |
+| 1 | L1 | `NEWTON` | Active | Voellmy basal friction modifies L1 momentum. |
+| 1 | L2 | `NEWTON` | Active | Quadratic resistance modifies L2 momentum. |
+| 2 | L1 + L2 | `NEWTON` | Configured only | Thermal cooling is not enabled. |
+| 4 | L1 | `EXPLICIT` | Active | Solid deposition removes material from L1 into the substrate. |
+| 4 | L2 | `EXPLICIT` | Active | Ambient-air entrainment adds material to L2. |
+| 4 | Interlayer | `EXPLICIT` | Active | Elutriation transfers solids and associated carrier between layers. |
+| 5 | Interlayer | `ANALYTIC` | Active | Chézy interlayer drag exchanges momentum between the layers. |

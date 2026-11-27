@@ -36,13 +36,13 @@ The input generator requires Python 3 and NumPy. Matplotlib is required only whe
 
 ## Source integration
 
-This case explicitly disables rheology (`RHEOLOGY_FLAG=F`,
-`RHEOLOGY_MODEL='none'`) and curvature
-(`CURVATURE_TERM_FLAG=F`). The specified thermal `NEWTON`,
-`GROUP=2`, curvature `EXPLICIT`, `GROUP=0`, and mass-exchange
-`EXPLICIT`, `GROUP=4` entries are scheduling parameters, not
-activation flags. The exchange rates are zero or disabled, so the
-benchmark evolves without those physical source contributions.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Terrain-curvature correction is disabled. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass exchange is disabled. |
 
 ## How to run
 

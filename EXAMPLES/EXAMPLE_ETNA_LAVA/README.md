@@ -32,16 +32,14 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 
 ## Source integration
 
-Both bottom fissures supply material through the `EXPLICIT`,
-`GROUP=0` injection configured by `BOTTOM_FISSURAL_METHOD` and
-`BOTTOM_FISSURAL_GROUP` in `FISSURAL_SOURCE_PARAMETERS`.
-Temperature-dependent lava rheology is evaluated with `NEWTON`,
-`GROUP=1`. The lava configuration also activates thermal cooling
-with `THERMAL_METHOD='NEWTON'`, `THERMAL_GROUP=2`.
-The environmental mass-exchange block declares `EXPLICIT`,
-`GROUP=4`, but its configured coefficients determine whether any
-of those exchange processes is active. The source group number
-controls Lie ordering, not the number of fissures or spatial stages.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Active | Two bottom fissures inject lava; curvature is disabled. |
+| 1 | Flow | `NEWTON` | Active | Temperature-dependent lava rheology modifies momentum. |
+| 2 | Flow | `NEWTON` | Active | Thermal cooling changes the lava's sensible thermal content. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental exchange is specified but no active transfer is described in this setup. |
 
 ## How to run
 
