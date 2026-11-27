@@ -1,5 +1,10 @@
 # IMEX-SfloW2D
 
+> [!WARNING]
+> **Development version — NOT FOR PRODUCTION USE**
+>
+> **IMEX-SfloW2D is under active development and is not intended for production use.** Its numerical methods, physical models, interfaces, and results may change. Do not rely on this development version for operational hazard assessment, safety-critical decisions, or other production applications. Validate the software and its results independently before research use.
+
 **Documentation:** **[User guide, model and examples (MkDocs)](https://demichie.github.io/IMEX_SfloW2D_dev/)** · **[Fortran API reference (Doxygen)](https://demichie.github.io/IMEX_SfloW2D_dev/doxygen/)**
 
 **IMEX-SfloW2D** is an open-source, depth-averaged **finite-volume solver for two-dimensional geophysical flows**, written in Fortran. It combines a hydrostatic, path-conservative central-upwind spatial discretization with implicit-explicit time integration, ordered physical-source treatments, and OpenMP parallelism.

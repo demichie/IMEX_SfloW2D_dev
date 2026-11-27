@@ -44,6 +44,15 @@ class PublicWebsiteTests(unittest.TestCase):
                 self.assertNotIn("/blob/master/docs/", text)
                 self.assertNotIn("docs/acceptance", text)
 
+    def test_development_disclaimer_is_prominent(self):
+        website = (SITE / "index.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for page in (website, readme):
+            self.assertIn("under active development", page)
+            self.assertIn("not intended for production use", page)
+        self.assertIn('!!! danger "Development version', website)
+        self.assertIn("> [!WARNING]", readme)
+
     def test_internal_markdown_links_resolve(self):
         for path in sorted(SITE.rglob("*.md")):
             content = path.read_text(encoding="utf-8")

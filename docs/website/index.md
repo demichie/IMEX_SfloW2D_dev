@@ -1,5 +1,8 @@
 # IMEX-SfloW2D
 
+!!! danger "Development version — not for production use"
+    **IMEX-SfloW2D is under active development and is not intended for production use.** Its numerical methods, physical models, interfaces, and results may change. Do not rely on this development version for operational hazard assessment, safety-critical decisions, or other production applications. Validate the software and its results independently before research use.
+
 **Finite-volume modelling of volcanic and other geophysical flows.**
 
 IMEX-SfloW2D is an open-source Fortran model for two-dimensional, depth-averaged
