@@ -88,7 +88,7 @@ class ExampleSourceMethodsTests(unittest.TestCase):
                                 "**Status**", "**Role**"):
                     self.assertIn(heading, section)
                 group_ids = [int(value) for value in re.findall(
-                    r"^\\|\\s*(\\d+)\\s*\\|", section, re.MULTILINE)]
+                    r"^\|\s*(\d+)\s*\|", section, re.MULTILINE)]
                 self.assertTrue(group_ids, "Missing source group rows")
                 self.assertEqual(group_ids, sorted(group_ids))
 
