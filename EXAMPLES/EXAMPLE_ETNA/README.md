@@ -31,14 +31,14 @@ Requires Python 3, NumPy, and pandas for preprocessing. Matplotlib is required o
 
 ## Source integration
 
-The enabled Voellmy basal resistance is assigned `NEWTON`,
-`GROUP=1`. The mass-exchange block explicitly declares
-`METHOD='EXPLICIT'`, `GROUP=4`, but the supplied erosion,
-deposition and entrainment flags/rates do not activate that group.
-The declared thermal `NEWTON`, group 2 and curvature
-`EXPLICIT`, group 0 settings are likewise not standalone
-activation switches. Active source groups are applied in ascending
-Lie order after spatial transport.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Active | Voellmy basal friction modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass-exchange mechanisms are disabled. |
 
 ## How to run
 

@@ -30,15 +30,14 @@ The input generator requires Python 3 and NumPy.
 
 ## Source integration
 
-The radial source is now configured explicitly in
-`RADIAL_SOURCE_PARAMETERS` with `RADIAL_INJECTION_METHOD='EXPLICIT'`,
-`RADIAL_INJECTION_GROUP=0`. Quadratic rheology uses `NEWTON`,
-`GROUP=1`; sediment deposition and atmospheric entrainment share the
-`EXPLICIT` mass-exchange `GROUP=4`. Group 0 belongs to the initial
-explicit source stage; subsequent Lie groups operate on the evolving
-post-spatial state. Thermal `NEWTON`, group 2 and curvature
-`EXPLICIT`, group 0 settings are not activation flags.
-The radial cell source is distinct from a prescribed boundary condition.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Active | Radial cell injection supplies the supercritical inflow; curvature is disabled. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Particle settling and air entrainment exchange material. |
 
 ## How to run
 

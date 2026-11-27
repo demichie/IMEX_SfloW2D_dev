@@ -32,14 +32,14 @@ Requires Python 3 and the IMEX_SfloW2D executable. NumPy and pandas are used for
 
 ## Source integration
 
-Each generated ensemble member inherits the same source schedule from
-`templatedir/IMEX_SfloW2D.inp`: Voellmy resistance is assigned
-`NEWTON`, `GROUP=1`. The environmental mass-exchange schedule is
-`EXPLICIT`, `GROUP=4`, but deposition, erosion and entrainment are
-disabled in the supplied template. Thermal `NEWTON`, group 2 and
-curvature `EXPLICIT`, group 0 entries do not enable cooling or
-curvature by themselves. Ensemble variation changes the selected Voellmy
-coefficient, not the numerical source grouping.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `NEWTON` | Active | Voellmy friction uses the coefficient selected for each ensemble member. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass-exchange mechanisms are disabled. |
 
 ## How to run
 
