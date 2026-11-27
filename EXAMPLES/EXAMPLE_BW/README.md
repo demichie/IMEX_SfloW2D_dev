@@ -27,6 +27,16 @@ A 1-D flow down a gentle slope with friction, sedimentation and air entrainment.
 
 Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
 
+## Source integration
+
+Quadratic basal resistance is assigned to `NEWTON`, `GROUP=1`.
+Particle deposition and atmospheric entrainment are assembled together as
+`MASS_EXCHANGE%METHOD='EXPLICIT'`, `GROUP=4`. This lets the exchange
+transaction apply its inventory and composition constraints to the combined
+material source. Thermal `NEWTON`, `GROUP=2`, and curvature `EXPLICIT`,
+`GROUP=0`, are documented scheduling options, not independent activation
+flags. The numbered groups execute in Lie order following spatial transport.
+
 ## How to run
 
 From this example directory, first generate the inputs, then run the solver.

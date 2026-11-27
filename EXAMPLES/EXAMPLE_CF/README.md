@@ -26,6 +26,17 @@ Dilute gas–particle mixture collapsing over the Campi Flegrei area. Initial co
 | Initial solid volume fraction | 0.015 |
 | Topography | `DEM/topo.zip` |
 
+## Source integration
+
+This case enables the **curvature source** with
+`GEOMETRY_CURVATURE_METHOD='EXPLICIT'`, `GROUP=0`.
+Settling/deposition uses the mass-exchange `EXPLICIT`, `GROUP=4`.
+Although quadratic-law scheduling is declared as `NEWTON`, `GROUP=1`,
+`RHEOLOGY_FLAG=F` disables the rheological source. The thermal
+`NEWTON`, `GROUP=2` entry does not activate cooling by itself.
+The curvature term participates in the first Lie source group; group 4
+follows later in the configured ordering.
+
 ## How to run
 
 From this example directory, execute the following commands in order:

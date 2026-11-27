@@ -67,6 +67,17 @@ These blocks reproduce the historical settings for reference; consult
 the tracked input/template for the active run.
 
 
+## Source integration
+
+The granular `mui` rheology is evaluated with
+`RHEOLOGY%RHEOLOGY_METHOD='EXPLICIT'`, `RHEOLOGY%RHEOLOGY_GROUP=1`.
+The enabled pore-pressure process uses `ANALYTIC`, `GROUP=3`.
+Mass exchange is declared `EXPLICIT`, `GROUP=4` but the specified
+deposition, erosion and entrainment options do not activate that group.
+Thermal `NEWTON`, group 2 and curvature `EXPLICIT`, group 0
+are scheduling entries, not activation switches. Each active source
+is applied in group order after spatial transport.
+
 ## How to run
 
 Run these steps from the example directory, in the order shown.

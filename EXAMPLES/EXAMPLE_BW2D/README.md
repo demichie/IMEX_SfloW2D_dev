@@ -52,6 +52,18 @@ The generated template sets `BOTTOM_RADIAL_SOURCE_FLAG=T`, so `TIME_PARAM(4)` is
 For steady-state injection, remove the `TIME_PARAM` line from the radial-source namelist.
 
 
+## Source integration
+
+The circular **bottom injection** is explicitly scheduled in
+`RADIAL_SOURCE_PARAMETERS` using `BOTTOM_CIRCULAR_METHOD='EXPLICIT'`
+and `BOTTOM_CIRCULAR_GROUP=0`. Group 0 is evaluated with the pre-spatial
+state and applied to the post-spatial trial state. Quadratic rheology uses
+`NEWTON`, `GROUP=1`, while settling and entrainment share the
+`EXPLICIT` mass-exchange `GROUP=4`. The source-region coverage modifies
+environmental exchange where bottom material enters. The thermal
+`NEWTON`, group 2 and curvature `EXPLICIT`, group 0 settings do not
+enable either process on their own.
+
 ## How to run
 
 From this example directory, first generate the inputs and then run the solver.

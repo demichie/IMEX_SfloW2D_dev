@@ -103,3 +103,16 @@ Diagnostics are read-only, are disabled by default and do not change the
 physical model. For the 1D example, there is only one right-facing wet/dry
 front; in a general 2D domain, diagnostic lines from multiple x-faces can
 interleave under OpenMP.
+
+## Source integration
+
+Both layers select `RHEOLOGY_MODEL='none'`, and `RHEOLOGY_FLAG=F`,
+so no basal rheological group executes. Each layer nevertheless declares
+its thermal `NEWTON`, `GROUP=2` and environmental exchange
+`EXPLICIT`, `GROUP=4` settings; the associated physics is inactive.
+The pair-wide interlayer mass-exchange source declares `EXPLICIT`,
+`GROUP=4` but both settling and elutriation are disabled.
+Interlayer drag declares `ANALYTIC`, `GROUP=5` but its coefficient
+is zero. These settings specify the intended methods if the corresponding
+laws are enabled; they do not activate those laws.
+
