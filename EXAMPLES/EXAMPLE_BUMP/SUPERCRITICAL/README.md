@@ -27,6 +27,15 @@ Supercritical shallow-water flow with weak bump response. The flow uses a single
 
 Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
 
+## Source integration
+
+The supercritical benchmark disables basal rheology (`RHEOLOGY_FLAG=F`) and
+selects `RHEOLOGY_MODEL='none'`. Thermal (`NEWTON`, group 2), curvature
+(`EXPLICIT`, group 0) and mass-exchange (`EXPLICIT`, group 4)
+method/group values are specified for clarity, but no corresponding source is
+activated by these scheduling values alone. The flow therefore tests spatial
+transport without adding rheological or mass-exchange resistance.
+
 ## How to run
 
 From this example directory, first prepare the inputs and then run the solver.

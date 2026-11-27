@@ -27,6 +27,15 @@ Transcritical transition from subcritical to supercritical flow without a shock.
 
 Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
 
+## Source integration
+
+The input provides a quadratic-rheology configuration with zero friction factor,
+but `RHEOLOGY_FLAG=F`, so its declared `NEWTON`, `GROUP=1` is inactive.
+Thermal `NEWTON`, `GROUP=2`; curvature `EXPLICIT`, `GROUP=0`; and
+mass exchange `EXPLICIT`, `GROUP=4` are also present as scheduling settings,
+not as independent activation switches. No rheological or environmental
+exchange source is intended for this transcritical benchmark.
+
 ## How to run
 
 From this example directory, first prepare the inputs and then run the solver.

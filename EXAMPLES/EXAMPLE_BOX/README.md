@@ -27,6 +27,16 @@ A 1-D dam-break problem on flat terrain, including deposition, entrainment, and 
 
 Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
 
+## Source integration
+
+Quadratic basal resistance is assigned to `NEWTON`, `GROUP=1`.
+Settling/deposition and air entrainment use the combined `EXPLICIT` mass-exchange
+`GROUP=4`. Using one group for material exchange allows the solver to enforce
+the same available-mass constraints across these processes. Cooling and curvature
+have declared scheduling values (`NEWTON`, group 2; `EXPLICIT`, group 0),
+but they are not activated by their method/group settings alone.
+These groups are ordered Lie source updates, not independent timesteps.
+
 ## How to run
 
 From this example directory, first generate the inputs, then run the solver.

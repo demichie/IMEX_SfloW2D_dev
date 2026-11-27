@@ -27,6 +27,16 @@ Steady subcritical shallow-water benchmark. The flow uses a single phase with no
 
 Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
 
+## Source integration
+
+This is a non-rheological flow benchmark (`RHEOLOGY_FLAG=F`,
+`RHEOLOGY_MODEL='none'`). No basal rheology source is scheduled.
+The input declares thermal `NEWTON`, `GROUP=2`, curvature `EXPLICIT`,
+`GROUP=0`, and mass exchange `EXPLICIT`, `GROUP=4`, but the associated
+physical activation and rate settings do not turn these into active sources.
+Consequently these metadata entries do not introduce friction, cooling or
+environmental mass exchange into the benchmark.
+
 ## How to run
 
 From this example directory, first prepare the inputs and then run the solver.

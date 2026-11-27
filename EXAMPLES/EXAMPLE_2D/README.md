@@ -24,6 +24,16 @@ A finite granular mass initially confined in a hemispherical shell is released o
 | Temperature | User-specified, K |
 | Grid resolution | Set by preprocessing argument |
 
+## Source integration
+
+The input explicitly assigns **quadratic rheology** to `NEWTON`, `GROUP=1`.
+Settling/deposition and atmospheric entrainment share the `EXPLICIT` mass-exchange
+`GROUP=4`, so their transfer rates use the same local inventory and admissibility
+limits. The thermal `NEWTON`, `GROUP=2` and curvature `EXPLICIT`, `GROUP=0`
+settings are present, but do not activate cooling or curvature by themselves.
+Group numbers determine the order of the physical-source updates after transport;
+they are not the number of Runge–Kutta stages.
+
 ## How to run
 
 From this example directory, first generate the inputs, then run the solver.

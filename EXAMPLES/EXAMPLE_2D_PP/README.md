@@ -24,6 +24,16 @@ An avalanche initially held within a hemispherical shell slides down a 35-degree
 | Sedimentation / air entrainment | Disabled |
 | Solid volume fraction, temperature, resolution | Preprocessing arguments |
 
+## Source integration
+
+The **Voellmy resistance** uses `RHEOLOGY%RHEOLOGY_METHOD='NEWTON'`,
+`RHEOLOGY%RHEOLOGY_GROUP=1`. The active Darcy pore-pressure source uses
+`PORE_PRESSURE%PORE_PRESSURE_METHOD='ANALYTIC'`, `GROUP=3`.
+The mass-exchange schedule is declared as `EXPLICIT`, `GROUP=4`, but settling,
+erosion and entrainment are disabled in this configuration. The thermal and
+curvature method/group entries do not by themselves enable these processes.
+The numerical groups are applied in ascending order after the spatial step.
+
 ## How to run
 
 From this example directory, first generate the inputs, then run the solver.
