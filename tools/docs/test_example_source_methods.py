@@ -49,18 +49,25 @@ class ExampleSourceMethodsTests(unittest.TestCase):
                 if namelist(text, "MASS_EXCHANGE_L2_PARAMETERS") is not None:
                     self.assert_schedule(namelist(text, "MASS_EXCHANGE_L2_PARAMETERS"), "MASS_EXCHANGE_L2%")
                 self.assert_schedule(namelist(text, "EXPL_TERMS_PARAMETERS"), "GEOMETRY_CURVATURE_")
-                if re.search(r"^\s*RHEOLOGY_FLAG\s*=\s*T\b", newrun, re.IGNORECASE):
+                if re.search(r"^\s*RHEOLOGY_FLAG\s*=\s*T\b", newrun, re.IGNORECASE | re.MULTILINE):
                     self.assert_schedule(namelist(text, "RHEOLOGY_PARAMETERS")
                                          or namelist(text, "RHEOLOGY_L1_PARAMETERS"),
                                          "RHEOLOGY%RHEOLOGY_" if namelist(text, "RHEOLOGY_PARAMETERS") is not None
                                          else "RHEOLOGY_L1%RHEOLOGY_")
-                if re.search(r"^\s*RADIAL_SOURCE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE):
+                if re.search(r"^\s*RHEOLOGY_FLAG\s*=\s*T\b", newrun,
+                             re.IGNORECASE | re.MULTILINE):
+                    l2 = namelist(text, "RHEOLOGY_L2_PARAMETERS")
+                    if l2 is not None and not re.search(
+                            r"^\s*RHEOLOGY_L2%RHEOLOGY_MODEL\s*=\s*['\"]none['\"]",
+                            l2, re.IGNORECASE | re.MULTILINE):
+                        self.assert_schedule(l2, "RHEOLOGY_L2%RHEOLOGY_")
+                if re.search(r"^\s*RADIAL_SOURCE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE | re.MULTILINE):
                     self.assert_schedule(namelist(text, "RADIAL_SOURCE_PARAMETERS"), "RADIAL_INJECTION_")
-                if re.search(r"^\s*BOTTOM_RADIAL_SOURCE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE):
+                if re.search(r"^\s*BOTTOM_RADIAL_SOURCE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE | re.MULTILINE):
                     self.assert_schedule(namelist(text, "RADIAL_SOURCE_PARAMETERS"), "BOTTOM_CIRCULAR_")
-                if re.search(r"^\s*BOTTOM_FISSURAL_SOURCE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE):
+                if re.search(r"^\s*BOTTOM_FISSURAL_SOURCE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE | re.MULTILINE):
                     self.assert_schedule(namelist(text, "FISSURAL_SOURCE_PARAMETERS"), "BOTTOM_FISSURAL_")
-                if re.search(r"^\s*PORE_PRESSURE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE):
+                if re.search(r"^\s*PORE_PRESSURE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE | re.MULTILINE):
                     self.assert_schedule(namelist(text, "PORE_PRESSURE_PARAMETERS"), "PORE_PRESSURE%PORE_PRESSURE_")
 
 
