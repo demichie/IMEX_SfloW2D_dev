@@ -28,6 +28,18 @@ Supercritical lateral inflow of a gas–particle mixture on flat terrain. Sedime
 
 The input generator requires Python 3 and NumPy.
 
+## Source integration
+
+Quadratic basal resistance uses `NEWTON`, `GROUP=1`.
+Settling/deposition and atmospheric entrainment share the
+`EXPLICIT` mass-exchange `GROUP=4`. Thermal `NEWTON`,
+group 2 and curvature `EXPLICIT`, group 0 are declared
+scheduling settings, not physical activation switches.
+The configured **lateral source** acts through boundary conditions
+rather than through a numbered cell-local Lie injection group;
+its boundary flux should not be confused with a `GROUP=0`
+bottom or radial cell injection.
+
 ## How to run
 
 From this example directory, first generate the inputs and then run the solver.

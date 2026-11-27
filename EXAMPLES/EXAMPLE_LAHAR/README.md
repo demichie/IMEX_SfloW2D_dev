@@ -83,6 +83,21 @@ evolution is disabled (`SUBSTRATE%TOPO_CHANGE_FLAG=F`), although
 sediment inventories and deposition/erosion diagnostics are still tracked.
 No additional gas phase or second flowing layer is used.
 
+## Source integration
+
+The input now explicitly assigns the concentration- and
+temperature-dependent **lahar rheology** to `NEWTON`, `GROUP=1`,
+matching the solver's existing default. Erosion, sediment settling
+and carrier-liquid loss share the `EXPLICIT` mass-exchange
+`GROUP=4`, allowing inventory and composition constraints to be
+applied to the combined transaction. The temperature block declares
+`THERMAL_METHOD='NEWTON'`, `THERMAL_GROUP=2`, but this is the schedule
+for optional cooling: the lahar rheology's temperature dependence does
+not by itself activate the thermal-cooling source. Similarly,
+`GEOMETRY_CURVATURE_METHOD='EXPLICIT'`, `GROUP=0` does not activate
+curvature without its flag. The active groups execute after
+conservative spatial transport in ascending Lie order.
+
 ## Run the example
 
 From the repository root:

@@ -47,6 +47,21 @@ A dilute gas–particle flow over Taal terrain, with an elliptical bottom-source
 
 For the bottom radial source, `TIME_PARAM(1:3)` define the cycle period (30 s), injection duration (20 s) and ramp duration (0 s). Unlike the lateral source, `TIME_PARAM(4)` is a phase offset used in the periodic window, not an absolute cut-off or total source duration. The tracked value (150 s) is exactly five periods, so it causes no net phase shift: the source is active during 0–20 s and 30–50 s, until the simulation ends. Removing the timing line gives a steady source. The legacy README labels the fourth value a total duration; under the current bottom-source implementation its single-pulse example (`300,20,0,150`) instead shifts the pulse to 150–170 s, if the simulation runs that long. The physical interpretation of `XS_SOURCE` must not be conflated with `ALPHAS_SOURCE` without reading the model equation.
 
+## Source integration
+
+The elliptical bottom source uses the circular-bottom injection law
+with the supplied second semi-axis and orientation. It explicitly
+declares `BOTTOM_CIRCULAR_METHOD='EXPLICIT'` and
+`BOTTOM_CIRCULAR_GROUP=0` in `RADIAL_SOURCE_PARAMETERS`.
+Quadratic rheology uses `NEWTON`, `GROUP=1`, while Darcy
+pore-pressure dissipation uses `ANALYTIC`, `GROUP=3`.
+Sediment deposition and atmospheric entrainment share the
+`EXPLICIT` mass-exchange `GROUP=4`. Thermal `NEWTON`,
+group 2 and curvature `EXPLICIT`, group 0 describe scheduling
+only and do not activate these processes by themselves.
+Group zero is evaluated against the pre-spatial state, with
+subsequent groups applied in their configured Lie order.
+
 ## How to run
 
 The source parameters and pulse schedule are supplied, but the DEM is **not duplicated** in this example. Prepare it from the canonical Taal example before running: From this example directory, link the executable and run the solver:

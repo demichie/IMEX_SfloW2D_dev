@@ -45,6 +45,18 @@ A supercritical radial source injects a dilute gas–particle mixture onto the t
 
 For this lateral radial source, the four timing parameters mean: period between cycles (30 s); injection duration per cycle (20 s, followed by 10 s off); ramp time for increasing/decreasing source intensity (4 s), scaling height and velocity to preserve Richardson number; and absolute source cut-off time (150 s). Thus the tracked input produces five pulses before the source stops at 150 s; the simulation continues to 200 s. For steady injection remove the timing line. The legacy README says to make the period longer than the source duration for a single pulse, but its example `TIME_PARAM=100.D0,20.D0,0.D0,200.D0` has a 100 s period and a 200 s cut-off; under the current implementation it produces pulses at 0–20 s and 100–120 s, not a single pulse.
 
+## Source integration
+
+The radial source is explicitly assigned `RADIAL_INJECTION_METHOD='EXPLICIT'`
+and `RADIAL_INJECTION_GROUP=0` inside `RADIAL_SOURCE_PARAMETERS`.
+Quadratic rheology uses `NEWTON`, `GROUP=1`. Sediment deposition
+and atmospheric entrainment share the `EXPLICIT` mass-exchange
+`GROUP=4`, evaluated with the available-material constraints.
+The thermal `NEWTON`, group 2 and curvature `EXPLICIT`, group 0
+settings do not activate those processes on their own. Radial source
+timing controls when the group-zero injection contributes mass;
+the GROUP value determines its position in Lie ordering.
+
 ## How to run
 
 The source parameters are supplied. The single compressed terrain archive is tracked in `DEM/`; extract it before running (no Python generator is needed). From this example directory, link the executable and run the solver:

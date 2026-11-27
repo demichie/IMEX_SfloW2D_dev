@@ -27,6 +27,16 @@ Supercritical inflow (`Ri<1`) enters from the left and passes an initial slope, 
 
 Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
 
+## Source integration
+
+The slope benchmark sets `RHEOLOGY_FLAG=F`, so the quadratic-law
+parameters and their `NEWTON`, `GROUP=1` schedule do not activate
+basal friction. Thermal `NEWTON`, `GROUP=2`, curvature
+`EXPLICIT`, `GROUP=0`, and mass exchange `EXPLICIT`,
+`GROUP=4` are declared in the input, but do not independently
+turn on those physical processes. Settling, erosion and entrainment
+are disabled for this benchmark.
+
 ## How to run
 
 From this example directory, first prepare the inputs and then run the solver.
