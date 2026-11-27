@@ -53,6 +53,18 @@ class PublicWebsiteTests(unittest.TestCase):
         self.assertIn('!!! danger "Development version', website)
         self.assertIn("> [!WARNING]", readme)
 
+    def test_project_logo_sources_and_configuration(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        config = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+        builder = (ROOT / "tools" / "docs" / "build_examples.py").read_text(encoding="utf-8")
+        self.assertIn("![IMEX-SfloW2D logo](docs/IMEX-SfloW2D.png)", readme)
+        self.assertIn("logo: assets/images/IMEX-SfloW2D.svg", config)
+        self.assertIn("favicon: assets/images/IMEX-SfloW2D.png", config)
+        for filename in ("IMEX-SfloW2D.svg", "IMEX-SfloW2D.png"):
+            with self.subTest(filename=filename):
+                self.assertTrue((ROOT / "docs" / filename).is_file())
+                self.assertIn('repo / "docs" / filename', builder)
+
     def test_internal_markdown_links_resolve(self):
         for path in sorted(SITE.rglob("*.md")):
             content = path.read_text(encoding="utf-8")

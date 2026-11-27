@@ -1,5 +1,7 @@
 # IMEX-SfloW2D
 
+![IMEX-SfloW2D logo](docs/IMEX-SfloW2D.png)
+
 > [!WARNING]
 > **Development version — NOT FOR PRODUCTION USE**
 >

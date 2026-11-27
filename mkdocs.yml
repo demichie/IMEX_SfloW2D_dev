@@ -8,6 +8,8 @@ edit_uri: edit/master/docs/website/
 theme:
   name: material
   language: en
+  logo: assets/images/IMEX-SfloW2D.svg
+  favicon: assets/images/IMEX-SfloW2D.png
   features:
     - navigation.tabs
     - navigation.sections

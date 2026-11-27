@@ -90,6 +90,9 @@ jobs:
       - name: Verify site links and output
         run: |
           test -s build/site/index.html
+          test -s build/site/assets/images/IMEX-SfloW2D.svg
+          test -s build/site/assets/images/IMEX-SfloW2D.png
+          grep -q 'IMEX-SfloW2D.svg' build/site/index.html
           test -s build/site/examples/index.html
           test -s build/site/model/two-layer/index.html
           test -s build/site/getting-started/docker/index.html

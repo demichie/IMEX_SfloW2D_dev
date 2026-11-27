@@ -160,6 +160,11 @@ def generate(repo, output, revision, repo_slug):
         shutil.rmtree(output)
     docs = output / "docs"
     shutil.copytree(repo / "docs" / "website", docs)
+    # Use the original project logos; do not keep a second copy in docs/website.
+    logo_dir = docs / "assets" / "images"
+    logo_dir.mkdir(parents=True, exist_ok=True)
+    for filename in ("IMEX-SfloW2D.svg", "IMEX-SfloW2D.png"):
+        shutil.copy2(repo / "docs" / filename, logo_dir / filename)
     pages = docs / "examples"
     pages.mkdir(parents=True, exist_ok=True)
     records, warnings = [], []
