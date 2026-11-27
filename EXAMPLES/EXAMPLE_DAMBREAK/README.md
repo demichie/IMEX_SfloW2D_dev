@@ -69,14 +69,15 @@ the tracked input/template for the active run.
 
 ## Source integration
 
-The granular `mui` rheology is evaluated with
-`RHEOLOGY%RHEOLOGY_METHOD='EXPLICIT'`, `RHEOLOGY%RHEOLOGY_GROUP=1`.
-The enabled pore-pressure process uses `ANALYTIC`, `GROUP=3`.
-Mass exchange is declared `EXPLICIT`, `GROUP=4` but the specified
-deposition, erosion and entrainment options do not activate that group.
-Thermal `NEWTON`, group 2 and curvature `EXPLICIT`, group 0
-are scheduling entries, not activation switches. Each active source
-is applied in group order after spatial transport.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `EXPLICIT` | Active | Granular `mui` resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 3 | Flow | `ANALYTIC` | Active | Darcy pore-pressure evolution is integrated analytically. |
+| 4 | Flow | `EXPLICIT` | Configured only | Environmental mass exchange is disabled. |
 
 ## How to run
 

@@ -28,14 +28,14 @@ Dilute gas–particle mixture collapsing over the Campi Flegrei area. Initial co
 
 ## Source integration
 
-This case enables the **curvature source** with
-`GEOMETRY_CURVATURE_METHOD='EXPLICIT'`, `GROUP=0`.
-Settling/deposition uses the mass-exchange `EXPLICIT`, `GROUP=4`.
-Although quadratic-law scheduling is declared as `NEWTON`, `GROUP=1`,
-`RHEOLOGY_FLAG=F` disables the rheological source. The thermal
-`NEWTON`, `GROUP=2` entry does not activate cooling by itself.
-The curvature term participates in the first Lie source group; group 4
-follows later in the configured ordering.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Active | Terrain-curvature source contributes to momentum. |
+| 1 | Flow | `NEWTON` | Configured only | Quadratic rheology is disabled. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Particle settling removes suspended solids into deposits. |
 
 ## How to run
 

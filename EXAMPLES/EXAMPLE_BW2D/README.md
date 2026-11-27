@@ -54,15 +54,14 @@ For steady-state injection, remove the `TIME_PARAM` line from the radial-source 
 
 ## Source integration
 
-The circular **bottom injection** is explicitly scheduled in
-`RADIAL_SOURCE_PARAMETERS` using `BOTTOM_CIRCULAR_METHOD='EXPLICIT'`
-and `BOTTOM_CIRCULAR_GROUP=0`. Group 0 is evaluated with the pre-spatial
-state and applied to the post-spatial trial state. Quadratic rheology uses
-`NEWTON`, `GROUP=1`, while settling and entrainment share the
-`EXPLICIT` mass-exchange `GROUP=4`. The source-region coverage modifies
-environmental exchange where bottom material enters. The thermal
-`NEWTON`, group 2 and curvature `EXPLICIT`, group 0 settings do not
-enable either process on their own.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Active | Circular bottom source injects mixture; curvature is disabled. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Settling and entrainment exchange material, accounting for the injection area. |
 
 ## How to run
 
