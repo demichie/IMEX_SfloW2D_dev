@@ -49,18 +49,15 @@ For the bottom radial source, `TIME_PARAM(1:3)` define the cycle period (30 s), 
 
 ## Source integration
 
-The elliptical bottom source uses the circular-bottom injection law
-with the supplied second semi-axis and orientation. It explicitly
-declares `BOTTOM_CIRCULAR_METHOD='EXPLICIT'` and
-`BOTTOM_CIRCULAR_GROUP=0` in `RADIAL_SOURCE_PARAMETERS`.
-Quadratic rheology uses `NEWTON`, `GROUP=1`, while Darcy
-pore-pressure dissipation uses `ANALYTIC`, `GROUP=3`.
-Sediment deposition and atmospheric entrainment share the
-`EXPLICIT` mass-exchange `GROUP=4`. Thermal `NEWTON`,
-group 2 and curvature `EXPLICIT`, group 0 describe scheduling
-only and do not activate these processes by themselves.
-Group zero is evaluated against the pre-spatial state, with
-subsequent groups applied in their configured Lie order.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Active | Pulsed elliptical bottom injection adds mixture; curvature is disabled. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 3 | Flow | `ANALYTIC` | Active | Darcy pore-pressure evolution is integrated analytically. |
+| 4 | Flow | `EXPLICIT` | Active | Particle settling and air entrainment exchange material. |
 
 ## How to run
 

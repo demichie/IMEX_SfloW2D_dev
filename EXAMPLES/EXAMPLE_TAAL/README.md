@@ -47,15 +47,14 @@ For this lateral radial source, the four timing parameters mean: period between 
 
 ## Source integration
 
-The radial source is explicitly assigned `RADIAL_INJECTION_METHOD='EXPLICIT'`
-and `RADIAL_INJECTION_GROUP=0` inside `RADIAL_SOURCE_PARAMETERS`.
-Quadratic rheology uses `NEWTON`, `GROUP=1`. Sediment deposition
-and atmospheric entrainment share the `EXPLICIT` mass-exchange
-`GROUP=4`, evaluated with the available-material constraints.
-The thermal `NEWTON`, group 2 and curvature `EXPLICIT`, group 0
-settings do not activate those processes on their own. Radial source
-timing controls when the group-zero injection contributes mass;
-the GROUP value determines its position in Lie ordering.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Active | Time-dependent radial injection adds mixture; curvature is disabled. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Particle settling and atmospheric entrainment exchange material. |
 
 ## How to run
 

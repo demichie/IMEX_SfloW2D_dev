@@ -30,15 +30,16 @@ The input generator requires Python 3 and NumPy.
 
 ## Source integration
 
-Quadratic basal resistance uses `NEWTON`, `GROUP=1`.
-Settling/deposition and atmospheric entrainment share the
-`EXPLICIT` mass-exchange `GROUP=4`. Thermal `NEWTON`,
-group 2 and curvature `EXPLICIT`, group 0 are declared
-scheduling settings, not physical activation switches.
-The configured **lateral source** acts through boundary conditions
-rather than through a numbered cell-local Lie injection group;
-its boundary flux should not be confused with a `GROUP=0`
-bottom or radial cell injection.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+
+| Group | Scope | Method | Status | Role |
+| ---: | --- | --- | --- | --- |
+| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is disabled; lateral supply is a boundary flux, not a Lie cell source. |
+| 1 | Flow | `NEWTON` | Active | Quadratic basal resistance modifies momentum. |
+| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled. |
+| 4 | Flow | `EXPLICIT` | Active | Settling/deposition and ambient-air entrainment exchange material. |
+
+The lateral supply enters through a boundary condition rather than a numbered cell-local Lie group.
 
 ## How to run
 
