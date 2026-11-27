@@ -70,6 +70,19 @@ class ExampleSourceMethodsTests(unittest.TestCase):
                 if re.search(r"^\s*PORE_PRESSURE_FLAG\s*=\s*T\b", newrun, re.IGNORECASE | re.MULTILINE):
                     self.assert_schedule(namelist(text, "PORE_PRESSURE_PARAMETERS"), "PORE_PRESSURE%PORE_PRESSURE_")
 
+    def test_runnable_examples_document_source_integration(self):
+        inputs = sorted(EXAMPLES.rglob("IMEX_SfloW2D.template"))
+        inputs += sorted(EXAMPLES.rglob("IMEX_SfloW2D.inp"))
+        for path in inputs:
+            example_dir = path.parent
+            if example_dir.name == "templatedir":
+                example_dir = example_dir.parent
+            readme = example_dir / "README.md"
+            with self.subTest(path=readme.relative_to(ROOT)):
+                self.assertTrue(readme.is_file())
+                self.assertIn("## Source integration",
+                              readme.read_text(encoding="utf-8-sig"))
+
 
 if __name__ == "__main__":
     unittest.main()
