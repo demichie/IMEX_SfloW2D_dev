@@ -351,7 +351,8 @@
         r2_source, angle_source, vel_source, T_source, h_source,                                                       &
         alphas_source, alphag_source, time_param, Ri_source,                                                           &
         mfr_source, xs_source, xg_source, azimuth_source, arc_width_source,                                            &
-        n_intervals, t_intervals, vel_intervals, pore_pres_fract
+        n_intervals, t_intervals, vel_intervals, pore_pres_fract,                                               &
+        bottom_circular_method, bottom_circular_group, radial_injection_method, radial_injection_group
 
     NAMELIST /particle_distribution_parameters/ fractal_dim, diam_min, diam_max,                                       &
         rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0, alphas_source_total
