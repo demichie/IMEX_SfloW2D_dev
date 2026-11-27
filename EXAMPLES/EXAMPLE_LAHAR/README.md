@@ -85,14 +85,15 @@ No additional gas phase or second flowing layer is used.
 
 ## Source integration
 
-The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
+The table follows ascending **Group** numbers (the order of Lie source updates after spatial transport). **Scope** identifies the layer or layer pair affected; **Source (input setting)** reproduces the relevant input parameter names and values; **Method** is the configured numerical treatment; **Status** distinguishes enabled sources from settings that do not activate a process; **Role** explains the physical contribution. An entry marked *Configured only* is not an executed source group. Group 0 denotes the initial explicit source stage, not a time-integration stage count.
 
-| Group | Scope | Method | Status | Role |
-| ---: | --- | --- | --- | --- |
-| 0 | Flow | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
-| 1 | Flow | `NEWTON` | Active | Concentration- and temperature-dependent lahar resistance modifies momentum. |
-| 2 | Flow | `NEWTON` | Configured only | Cooling is not enabled; temperature dependence of friction remains. |
-| 4 | Flow | `EXPLICIT` | Active | Substrate erosion, particle settling and liquid-carrier loss exchange mass. |
+| Group | Scope | Source (input setting) | Method | Status | Role |
+| ---: | --- | --- | --- | --- | --- |
+| 0 | Flow | `GEOMETRY_CURVATURE_METHOD='EXPLICIT'` | `EXPLICIT` | Configured only | Curvature correction is not enabled. |
+| 1 | Flow | `RHEOLOGY%RHEOLOGY_MODEL="lahar"` | `NEWTON` | Active | Concentration- and temperature-dependent lahar resistance modifies momentum. |
+| 2 | Flow | `THERMAL%THERMAL_METHOD='NEWTON'` | `NEWTON` | Configured only | Cooling is not enabled; temperature dependence of friction remains. |
+| 4 | Flow | `MASS_EXCHANGE%DEPOSITION%SETTLING_FLAG=T`, `MASS_EXCHANGE%EROSION%COEFFICIENT=1.D-4`, `MASS_EXCHANGE%CARRIER_LIQUID_LOSS%LOSS_RATE=1.D-8` | `EXPLICIT` | Active | Substrate erosion, particle settling and liquid-carrier loss exchange mass. |
+
 
 ## Run the example
 
