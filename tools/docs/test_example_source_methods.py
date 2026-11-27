@@ -80,8 +80,17 @@ class ExampleSourceMethodsTests(unittest.TestCase):
             readme = example_dir / "README.md"
             with self.subTest(path=readme.relative_to(ROOT)):
                 self.assertTrue(readme.is_file())
-                self.assertIn("## Source integration",
-                              readme.read_text(encoding="utf-8-sig"))
+                body = readme.read_text(encoding="utf-8-sig")
+                self.assertIn("## Source integration", body)
+                section = body.split("## Source integration", 1)[1].split("\n## ", 1)[0]
+                self.assertIn("| Group | Scope | Method | Status | Role |", section)
+                for heading in ("**Group**", "**Scope**", "**Method**",
+                                "**Status**", "**Role**"):
+                    self.assertIn(heading, section)
+                group_ids = [int(value) for value in re.findall(
+                    r"^\\|\\s*(\\d+)\\s*\\|", section, re.MULTILINE)]
+                self.assertTrue(group_ids, "Missing source group rows")
+                self.assertEqual(group_ids, sorted(group_ids))
 
 
 if __name__ == "__main__":
