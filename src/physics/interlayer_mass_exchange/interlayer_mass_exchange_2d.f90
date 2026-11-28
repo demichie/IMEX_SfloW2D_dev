@@ -339,14 +339,20 @@ CONTAINS
         REAL(wp) :: limited_s(n_solid),limited_e(n_solid)
         REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
         REAL(wp) :: down,up,chi,interfacial_u,interfacial_v,solid_mass,carrier_mass
-        REAL(wp) :: donor_xg(n_add_gas),gas_mass_fraction
+        REAL(wp) :: donor_xg(n_add_gas),gas_mass_fraction,rho_c1_eval,rho_c1_limit
         INTEGER :: i
 
         source_l1=0.0_wp
         source_l2=0.0_wp
         valid=.FALSE.
         IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
-        IF (limit_l1%rho_c<=0.0_wp .OR. limit_l2%rho_c<=0.0_wp) RETURN
+        ! A dry L1 has no carrier of its own: its first deposit is settled L2
+        ! solids with L2 carrier, so it takes the L2 carrier density.
+        rho_c1_eval=eval_l1%rho_c
+        rho_c1_limit=limit_l1%rho_c
+        IF (eval_l1%h<=0.0_wp) rho_c1_eval=eval_l2%rho_c
+        IF (limit_l1%h<=0.0_wp) rho_c1_limit=eval_l2%rho_c
+        IF (rho_c1_limit<=0.0_wp .OR. limit_l2%rho_c<=0.0_wp) RETURN
         IF (config%settling_flag .AND. eval_l2%h>0.0_wp) THEN
             CALL eval_interlayer_settling_explicit(config,rheology_l2,mass_l2,eval_l2,dt,proposed_s)
         ELSE
@@ -363,8 +369,8 @@ CONTAINS
         carrier2=limit_l2%h*MAX(0.0_wp,1.0_wp-SUM(limit_l2%alphas))
         CALL limit_interlayer_mass_transfer(solid1,solid2,carrier1,carrier2,proposed_s,proposed_e, &
             dt,maximum_solid_packing,config,limited_s,limited_e,down,up,valid, &
-            rho_carrier_l1=eval_l1%rho_c,rho_carrier_l2=eval_l2%rho_c, &
-            candidate_rho_l1=limit_l1%rho_c,candidate_rho_l2=limit_l2%rho_c)
+            rho_carrier_l1=rho_c1_eval,rho_carrier_l2=eval_l2%rho_c, &
+            candidate_rho_l1=rho_c1_limit,candidate_rho_l2=limit_l2%rho_c)
         IF (.NOT.valid) RETURN
 
         ! The same interface velocity is debited from L2 and credited to L1.

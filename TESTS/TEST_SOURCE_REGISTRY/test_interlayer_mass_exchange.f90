@@ -203,6 +203,7 @@ PROGRAM test_interlayer_mass_exchange
     CALL test_concentrated_carrier_limit()
     CALL test_physical_sources()
     CALL test_bidirectional_physical_budget()
+    CALL test_dry_l1_deposit()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
 
@@ -743,6 +744,51 @@ CONTAINS
             END DO
         END DO
     END SUBROUTINE test_bidirectional_physical_budget
+
+    !> @brief Verify that settling can form L1 over dry ground.
+    !> @details A dry L1 has no carrier of its own: its first deposit is settled
+    !>          L2 solids with L2 carrier, at the maximum packing.
+    SUBROUTINE test_dry_l1_deposit()
+        TYPE(physical_state_real) :: l1,l2
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        TYPE(mass_exchange_config_type) :: mass_l2
+        TYPE(rheology_config_type) :: rheology_l2
+        REAL(wp) :: source1(6),source2(6)
+        REAL(wp), PARAMETER :: dt_local=0.05_wp
+        LOGICAL :: valid
+        INTEGER :: eq
+
+        n_layers=2; n_solid=2; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
+        n_vars=6; n_eqns=6
+        CALL configure_canonical_state_indices()
+        maximum_solid_packing=0.6_wp
+        CALL initialize_physical_state_real(l1)
+        CALL initialize_physical_state_real(l2)
+        l2%h=10.0_wp; l2%alphas=[0.002_wp,0.001_wp]; l2%rho_c=0.5_wp
+        l2%rho_m=SUM(rho_s*l2%alphas)+l2%rho_c*(1.0_wp-SUM(l2%alphas))
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l2%cp_c=1100.0_wp; l2%T=700.0_wp; l2%u=20.0_wp; l2%v=-1.0_wp
+        pair%settling_flag=.TRUE.; pair%elutriation_flag=.FALSE.
+
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid .AND. SUM(source1(idx_solidEqn_first:idx_solidEqn_first+1))>0.0_wp, &
+            'settling into a dry L1 accepted')
+        CALL close(carrier_per_solid(source1,l2%rho_c),0.4_wp/0.6_wp, &
+            'dry L1 deposit at the maximum packing')
+        DO eq=1,n_eqns
+            CALL close(source1(eq)+source2(eq),0.0_wp,'dry L1 deposit pair')
+        END DO
+    END SUBROUTINE test_dry_l1_deposit
+
+    !> Carrier volume (at the donor carrier density) per solid volume received by L1.
+    REAL(wp) FUNCTION carrier_per_solid(source1,rho_c)
+        REAL(wp), INTENT(IN) :: source1(:),rho_c
+        REAL(wp) :: solid_mass,solid_volume
+        solid_mass=SUM(source1(idx_solidEqn_first:idx_solidEqn_first+1))
+        solid_volume=SUM(source1(idx_solidEqn_first:idx_solidEqn_first+1)/rho_s)
+        carrier_per_solid=(source1(idx_totMassEqn)-solid_mass)/rho_c/solid_volume
+    END FUNCTION carrier_per_solid
 
     SUBROUTINE execute(expected_valid)
         LOGICAL, INTENT(IN) :: expected_valid
