@@ -23,6 +23,13 @@ spatial equations rather than separate physical source operations.
 Only cells and interfaces needed for the active flow and its
 reconstruction neighbourhood are processed.
 
+For a radial source, the central interior is excluded from the flow
+domain and material is injected into cells around its perimeter.
+The internal boundary is impermeable: flow directed towards it receives
+the reflecting-wall momentum response, while outward-moving material
+is not pulled back by numerical advection through that boundary.
+Hydrostatic pressure contributions remain part of the spatial balance.
+
 ## CFL timestep selection
 
 The `NUMERIC_PARAMETERS` group supports two CFL policies based on

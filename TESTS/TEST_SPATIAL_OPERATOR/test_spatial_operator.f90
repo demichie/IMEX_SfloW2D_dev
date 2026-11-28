@@ -90,6 +90,7 @@ PROGRAM test_spatial_operator
   READ(input_unit,*) nx,ny,slope,curvature,limiter_id
   READ(input_unit,*) dx,dy
   CALL initialize_fixture
+  CALL check_radial_ring_wall_flux
   CALL check_uniform_minmod_kernel
   CALL check_optional_pccu_flux_slots
   CALL check_interlayer_pressure_path
@@ -2778,6 +2779,143 @@ CONTAINS
     CALL reconstruction%initialize
     CALL hyperbolic%initialize
   END SUBROUTINE initialize_fixture
+
+  !> @brief Check radial inner-wall fluxes through the production HP-PCCU backend.
+  !> @details All four source-facing orientations are exercised with shared
+  !> characteristic bounds, at receding, incoming and resting traces.
+  !> The internal wall must never transport mass, and receding flow must not
+  !> receive artificial central-upwind momentum from the mirrored state.
+  SUBROUTINE check_radial_ring_wall_flux
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+    REAL(wp) :: state_left(n_vars),state_right(n_vars)
+    REAL(wp) :: baseline(n_eqns),wall(n_eqns),velocity
+    INTEGER :: direction,side,mode,fi,fj,normal
+    LOGICAL :: saved_radial
+
+    IF (nx<6 .OR. ny<6) RETURN
+    saved_radial=radial_source_flag
+    B_face_x=0.0_wp; B_face_y=0.0_wp
+    grav_coeff_stag_x=1.0_wp; grav_coeff_stag_y=1.0_wp
+    qp=0.0_wp
+    qp(idx_T,:,:)=T_ambient
+    fi=nx/2; fj=ny/2
+    state_left=0.0_wp
+    state_left(idx_h)=2.0_wp
+    state_left(idx_T)=T_ambient
+
+    DO direction=PATH_DIR_X,PATH_DIR_Y
+        normal=idx_u
+        IF (direction==PATH_DIR_Y) normal=idx_v
+        DO side=1,2
+            DO mode=1,3
+                source_cell=0
+                sourceE=.FALSE.; sourceW=.FALSE.; sourceN=.FALSE.; sourceS=.FALSE.
+                IF (direction==PATH_DIR_X) THEN
+                    IF (side==1) THEN
+                        source_cell(fi-1,fj)=2
+                        source_cell(fi,fj)=1
+                        sourceE(fi-1,fj)=.TRUE.
+                    ELSE
+                        source_cell(fi,fj)=2
+                        source_cell(fi-1,fj)=1
+                        sourceW(fi,fj)=.TRUE.
+                    END IF
+                ELSE
+                    IF (side==1) THEN
+                        source_cell(fi,fj-1)=2
+                        source_cell(fi,fj)=1
+                        sourceN(fi,fj-1)=.TRUE.
+                    ELSE
+                        source_cell(fi,fj)=2
+                        source_cell(fi,fj-1)=1
+                        sourceS(fi,fj)=.TRUE.
+                    END IF
+                END IF
+
+                velocity=12.0_wp
+                IF (side==1) velocity=-velocity
+                IF (mode==2) velocity=-velocity
+                IF (mode==3) velocity=0.0_wp
+                state_left(idx_u:idx_v)=0.0_wp
+                state_left(normal)=velocity
+                state_right=state_left
+                state_right(normal)=-velocity
+
+                IF (direction==PATH_DIR_X) THEN
+                    reconstruction%qp_adv_interfaceL(:,fi,fj)=state_left
+                    reconstruction%qp_adv_interfaceR(:,fi,fj)=state_right
+                    reconstruction%h_selected_interfaceL(fi,fj)=2.0_wp
+                    reconstruction%h_selected_interfaceR(fi,fj)=2.0_wp
+                    reconstruction%eta_interfaceL(fi,fj)=2.0_wp
+                    reconstruction%eta_interfaceR(fi,fj)=2.0_wp
+                    hyperbolic%gamma_interface_xL(fi,fj)=10000.0_wp
+                    hyperbolic%gamma_interface_xR(fi,fj)=10000.0_wp
+                    hyperbolic%a_interface_xNeg(fi,fj)=-20.0_wp
+                    hyperbolic%a_interface_xPos(fi,fj)=20.0_wp
+                ELSE
+                    reconstruction%qp_adv_interfaceB(:,fi,fj)=state_left
+                    reconstruction%qp_adv_interfaceT(:,fi,fj)=state_right
+                    reconstruction%h_selected_interfaceB(fi,fj)=2.0_wp
+                    reconstruction%h_selected_interfaceT(fi,fj)=2.0_wp
+                    reconstruction%eta_interfaceB(fi,fj)=2.0_wp
+                    reconstruction%eta_interfaceT(fi,fj)=2.0_wp
+                    hyperbolic%gamma_interface_yB(fi,fj)=10000.0_wp
+                    hyperbolic%gamma_interface_yT(fi,fj)=10000.0_wp
+                    hyperbolic%a_interface_yNeg(fi,fj)=-20.0_wp
+                    hyperbolic%a_interface_yPos(fi,fj)=20.0_wp
+                END IF
+
+                radial_source_flag=.FALSE.
+                IF (direction==PATH_DIR_X) THEN
+                    CALL hyperbolic%evaluate_terms(reconstruction,qp,direct,0.0_wp, &
+                        0,[INTEGER::],[INTEGER::],1,[fi],[fj],0,[INTEGER::],[INTEGER::], &
+                        reuse_cfl_traces=.TRUE.)
+                ELSE
+                    CALL hyperbolic%evaluate_terms(reconstruction,qp,direct,0.0_wp, &
+                        0,[INTEGER::],[INTEGER::],0,[INTEGER::],[INTEGER::],1,[fi],[fj], &
+                        reuse_cfl_traces=.TRUE.)
+                END IF
+                IF (direction==PATH_DIR_X) THEN
+                    baseline=hyperbolic%G_interface_xL(:,fi,fj)
+                ELSE
+                    baseline=hyperbolic%G_interface_yB(:,fi,fj)
+                END IF
+
+                radial_source_flag=.TRUE.
+                IF (direction==PATH_DIR_X) THEN
+                    CALL hyperbolic%evaluate_terms(reconstruction,qp,direct,0.0_wp, &
+                        0,[INTEGER::],[INTEGER::],1,[fi],[fj],0,[INTEGER::],[INTEGER::], &
+                        reuse_cfl_traces=.TRUE.)
+                ELSE
+                    CALL hyperbolic%evaluate_terms(reconstruction,qp,direct,0.0_wp, &
+                        0,[INTEGER::],[INTEGER::],0,[INTEGER::],[INTEGER::],1,[fi],[fj], &
+                        reuse_cfl_traces=.TRUE.)
+                END IF
+                IF (direction==PATH_DIR_X) THEN
+                    wall=hyperbolic%G_interface_xL(:,fi,fj)
+                    IF (ANY(hyperbolic%G_interface_xR(:,fi,fj)/=wall)) &
+                        ERROR STOP 'Radial wall x-oriented values disagree'
+                ELSE
+                    wall=hyperbolic%G_interface_yB(:,fi,fj)
+                    IF (ANY(hyperbolic%G_interface_yT(:,fi,fj)/=wall)) &
+                        ERROR STOP 'Radial wall y-oriented values disagree'
+                END IF
+                IF (wall(idx_totMassEqn)/=0.0_wp) ERROR STOP 'Radial inner wall transports mass'
+                IF (mode==1) THEN
+                    IF (baseline(normal)==0.0_wp) ERROR STOP 'Radial-wall baseline has no momentum diffusion'
+                    IF (ANY(wall/=0.0_wp)) ERROR STOP 'Receding ring wall retains artificial advective force'
+                ELSE
+                    IF (ANY(wall/=baseline)) ERROR STOP 'Incoming or resting radial wall flux changed'
+                END IF
+            END DO
+        END DO
+    END DO
+
+    radial_source_flag=saved_radial
+    source_cell=0
+    sourceE=.FALSE.; sourceW=.FALSE.; sourceN=.FALSE.; sourceS=.FALSE.
+    WRITE(*,*) 'PASS: four radial inner-wall orientations and receding/incoming/resting fluxes'
+  END SUBROUTINE check_radial_ring_wall_flux
 
   !> Verify that a prescribed wet inlet remains wet in HP reconstruction,
   !> even if the entire initial flow is dry (as in EXAMPLE_BW).
