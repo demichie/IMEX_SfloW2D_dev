@@ -2837,9 +2837,12 @@ CONTAINS
                 IF (mode==2) velocity=-velocity
                 IF (mode==3) velocity=0.0_wp
                 state_left(idx_u:idx_v)=0.0_wp
+                ! The source trace is on the left for side 1, on the right for side 2.
+                ! Mirror the ring velocity across the interior wall in either orientation.
                 state_left(normal)=velocity
+                IF (side==2) state_left(normal)=-velocity
                 state_right=state_left
-                state_right(normal)=-velocity
+                state_right(normal)=-state_left(normal)
 
                 IF (direction==PATH_DIR_X) THEN
                     reconstruction%qp_adv_interfaceL(:,fi,fj)=state_left
