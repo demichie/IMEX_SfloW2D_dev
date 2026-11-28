@@ -17,6 +17,7 @@ MODULE hyperbolic_2d
     USE parameters_2d, ONLY : idx_solid_first, idx_solid_last
     USE parameters_2d, ONLY : kt_trace_reconstruction
     USE parameters_2d, ONLY : lateral_source_flag
+    USE parameters_2d, ONLY : radial_source_flag
     USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
@@ -1280,6 +1281,20 @@ CONTAINS
                 interface_flux(1),eta_left-eta_right,eta_roundoff
         END IF
 
+        ! Radial-source ring wall. The face between a ring cell and the walled interior
+        ! carries the mirrored trace of the ring cell. When the ring cell's flow recedes
+        ! from the wall, the central-upwind momentum flux of that pair falls below the
+        ! hydrostatic value by rho h u (a - u), with u the receding velocity and a the
+        ! shared two-layer characteristic bound, and pulls the ring cell back onto the
+        ! wall. Such a face carries no advective flux: the wall then gives the cell its
+        ! own hydrostatic pressure only, since the path below has no jump across the
+        ! mirrored traces. Flow into the wall keeps the mirrored pair, whose flux is the
+        ! compression a wall gives.
+        IF ( radial_source_flag ) THEN
+            IF ( ring_wall_receding(direction,face_i,face_j,u_normal_left,u_normal_right) )             &
+                interface_flux = 0.0_wp
+        END IF
+
         qp_path_left=qp_adv_left_use
         qp_path_right=qp_adv_right_use
         eta_path_left=eta_left
@@ -1419,6 +1434,47 @@ CONTAINS
         END SELECT
 
     END SUBROUTINE lateral_source_trace_sides
+
+    !******************************************************************************
+    !> \brief Flag a face between a radial-source ring cell and the walled interior
+    !> when the ring cell's normal velocity at that face points away from the wall.
+    !> \param[in] direction Path direction of the face.
+    !> \param[in] face_i x index of the face (an x face lies between cells face_i-1 and face_i).
+    !> \param[in] face_j y index of the face (a y face lies between cells face_j-1 and face_j).
+    !> \param[in] u_normal_left Normal velocity of the left trace [m/s].
+    !> \param[in] u_normal_right Normal velocity of the right trace [m/s].
+    !> \return True when the ring cell recedes from the wall at this face.
+    LOGICAL FUNCTION ring_wall_receding(direction,face_i,face_j,u_normal_left,u_normal_right)
+
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+
+    IMPLICIT NONE
+
+        INTEGER, INTENT(IN) :: direction,face_i,face_j
+        REAL(wp), INTENT(IN) :: u_normal_left,u_normal_right
+        INTEGER :: cell_left,cell_right
+
+        ring_wall_receding=.FALSE.
+        SELECT CASE (direction)
+        CASE (PATH_DIR_X)
+            IF ( face_i .LE. 1 .OR. face_i .GE. comp_interfaces_x ) RETURN
+            cell_left=source_cell(face_i-1,face_j)
+            cell_right=source_cell(face_i,face_j)
+        CASE (PATH_DIR_Y)
+            IF ( face_j .LE. 1 .OR. face_j .GE. comp_interfaces_y ) RETURN
+            cell_left=source_cell(face_i,face_j-1)
+            cell_right=source_cell(face_i,face_j)
+        CASE DEFAULT
+            RETURN
+        END SELECT
+
+        IF ( cell_left .EQ. 2 .AND. cell_right .EQ. 1 ) THEN
+            ring_wall_receding = u_normal_left .LT. 0.0_wp
+        ELSEIF ( cell_left .EQ. 1 .AND. cell_right .EQ. 2 ) THEN
+            ring_wall_receding = u_normal_right .GT. 0.0_wp
+        END IF
+
+    END FUNCTION ring_wall_receding
 
     !******************************************************************************
     !> \brief Integrate the hydrostatic path between the final traces of each active cell.
