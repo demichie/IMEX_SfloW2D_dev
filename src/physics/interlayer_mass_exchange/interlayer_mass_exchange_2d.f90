@@ -738,7 +738,7 @@ CONTAINS
                         ! not mutate either physical recipient.
                         lo=previous_extra
                         hi=extra
-                        DO k=1,32
+                        DO k=1,56
                             mid=0.5_wp*(lo+hi)
                             CALL trial_transfer(scale,mid,trial_q,trial_qp,fits,accepted)
                             IF (accepted .AND. ALL(fits)) THEN
