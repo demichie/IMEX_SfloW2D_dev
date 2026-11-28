@@ -2,7 +2,7 @@
 
 ## Purpose and role in IMEX-SfloW2D
 
-Layer-local Darcy pore pressure and optional carrier-gas evolution.
+Darcy excess pore pressure in dense L1 and optional carrier-gas evolution.
 
 ## Files in this directory
 
@@ -22,6 +22,15 @@ $$
 $$
 
 This rate represents the integrated Darcy pressure/gas update and is not an explicit Euler discretization. Pore pressure can reduce effective basal normal stress in the rheology law; the stress subtraction itself is owned by rheology. Detailed permeability and thermodynamic closures are implemented in the Darcy module.
+
+In two-layer simulations L2 is dilute and cannot activate an excess
+pore-pressure equation. When L1's Darcy step removes carrier gas, the Lie
+executor credits the same mass, horizontal momentum, thermal energy and
+gas-species masses to L2. The transfer can create an initially dry L2.
+The analytic Darcy law remains unchanged; only the destination of its
+accepted carrier loss differs from the single-layer atmospheric sink.
+Settling into L1 does not seed excess pore pressure; elutriation removes
+the pressure load associated with outgoing L1 mass.
 
 ## Architectural and numerical contracts
 

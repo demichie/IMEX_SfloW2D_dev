@@ -33,7 +33,7 @@ MODULE lie_source_executor_2d
     USE interlayer_momentum_exchange_2d, ONLY : interlayer_momentum_exchange, &
         apply_interlayer_momentum_exchange_analytic
     USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, n_add_gas, mass_exchange_rates_type, idx_totMassEqn,        &
-        idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn
+        idx_solidEqn_first, idx_solidEqn_last, idx_engyEqn, idx_addGasEqn_first
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x, comp_interfaces_y
     USE domain_2d, ONLY : domain_type
     USE source_registry_2d, ONLY : source_registry_type, source_group_type, SOURCE_SCOPE_L1, SOURCE_SCOPE_L2,       &
@@ -374,6 +374,7 @@ CONTAINS
         REAL(wp) :: qpentry(n_vars),q_candidate(n_vars),qp_candidate(n_vars)
         REAL(wp) :: q_local(n_vars),qp_local(n_vars)
         REAL(wp) :: q_layers(n_vars,n_layers),qp_layers(n_vars,n_layers)
+        REAL(wp) :: darcy_l2_q(n_vars),darcy_l2_qp(n_vars)
         TYPE(layer_contacts_type) :: contacts
         LOGICAL :: contacts_valid
         REAL(wp) :: deposit_local(n_solid),erosion_local(n_solid),erodible_local(n_solid),lava_local
@@ -381,7 +382,7 @@ CONTAINS
         REAL(wp) :: erodible_candidate(n_solid),lava_candidate
         REAL(wp) :: total_rate(n_eqns)
         REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),source_time,noise
-        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated
+        LOGICAL :: cell_has_exchange,ok,failed,bed_accepted,conversion_ok,cell_updated,darcy_pair
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,layer
         INTEGER :: changed_jmin,changed_jmax,changed_kmin,changed_kmax
         INTEGER :: cell_error,cell_detail,cell_iterations,cell_group
@@ -531,7 +532,8 @@ CONTAINS
         substrate_witness_group=-1
         !$OMP PARALLEL DEFAULT(SHARED)                                                                              &
         !$OMP& PRIVATE(cell,j,k,group_index,qpentry,q_candidate,qp_candidate,                                          &
-        !$OMP& q_local,qp_local,q_layers,qp_layers,layer,contacts,contacts_valid,                                    &
+        !$OMP& q_local,qp_local,q_layers,qp_layers,darcy_l2_q,darcy_l2_qp,darcy_pair, &
+        !$OMP& layer,contacts,contacts_valid,                                    &
         !$OMP& deposit_local,erosion_local,erodible_local,lava_local,                                 &
         !$OMP& deposit_candidate,erosion_candidate,erodible_candidate,lava_candidate,total_rate,                       &
         !$OMP& analytic_rate,analytic_input,noise,cell_context,                                           &
@@ -684,6 +686,7 @@ CONTAINS
                     END IF
                 END IF
 
+                darcy_pair=.FALSE.
                 SELECT CASE(executor%groups(group_index)%method)
                 CASE(SOURCE_METHOD_EXPLICIT)
                     ! The current recipient provides strict conservation bounds.
@@ -855,6 +858,34 @@ CONTAINS
 
                     q_candidate=q_local
                     q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*analytic_rate
+
+                    ! Darcy has already computed the accepted gas loss from L1.
+                    ! In two-layer mode the same gas, momentum, sensible energy
+                    ! and gas species enter L2 in this very Lie transaction.
+                    ! Keep the single-layer atmospheric loss unchanged.
+                    IF (n_layers==2 .AND. layer==SOURCE_SCOPE_L1 .AND. &
+                        pore_pressure(layer)%gas_loss_flag .AND. analytic_rate(idx_totMassEqn)<0.0_wp .AND. &
+                        ANY(executor%groups(group_index)%source_names=='pore_pressure_dissipation')) THEN
+                        darcy_l2_q=q_layers(:,2)
+                        darcy_l2_q(idx_totMassEqn)=darcy_l2_q(idx_totMassEqn)- &
+                            time_step*analytic_rate(idx_totMassEqn)
+                        darcy_l2_q(idx_uEqn)=darcy_l2_q(idx_uEqn)-time_step*analytic_rate(idx_uEqn)
+                        darcy_l2_q(idx_vEqn)=darcy_l2_q(idx_vEqn)-time_step*analytic_rate(idx_vEqn)
+                        darcy_l2_q(idx_engyEqn)=darcy_l2_q(idx_engyEqn)-time_step*analytic_rate(idx_engyEqn)
+                        IF (n_add_gas>0) darcy_l2_q(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
+                            darcy_l2_q(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)- &
+                            time_step*analytic_rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)
+                        IF (.NOT.conservative_mass_admissible(darcy_l2_q(1:n_eqns))) THEN
+                            cell_error=23
+                            EXIT group_loop
+                        END IF
+                        CALL conservative_to_primitive(darcy_l2_q,darcy_l2_qp,accepted=conversion_ok)
+                        IF (.NOT.conversion_ok) THEN
+                            cell_error=23
+                            EXIT group_loop
+                        END IF
+                        darcy_pair=.TRUE.
+                    END IF
                 CASE(SOURCE_METHOD_NEWTON)
                     ! Solve the coupled implicit update on a cell-local candidate.
                     IF (q(idx_totMassEqn,layer,j,k)<=0.0_wp) CYCLE
@@ -920,6 +951,10 @@ CONTAINS
                 q_local=q_candidate
                 q_layers(:,layer)=q_local
                 qp_layers(:,layer)=qp_local
+                IF (darcy_pair) THEN
+                    q_layers(:,2)=darcy_l2_q
+                    qp_layers(:,2)=darcy_l2_qp
+                END IF
                 IF (profiling_enabled) THEN
                     CALL SYSTEM_CLOCK(profile_tock)
                     thread_group(group_index,tid)=thread_group(group_index,tid)+                                  &

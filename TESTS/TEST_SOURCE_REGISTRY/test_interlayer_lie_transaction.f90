@@ -317,9 +317,8 @@ PROGRAM test_interlayer_lie_transaction
 
     CALL test_external_and_interlayer_budget()
 
-    ! Optional transported scalars belong to their configured layer even
-    ! when the interlayer transaction changes mass and recomputes primitives.
-    ! No stochastic/Darcy state is silently transferred with solid or carrier.
+    ! Stochastic scalars stay with their layer. The L1 pore load follows
+    ! outgoing L1 mass, while incoming L2 material has zero excess pressure.
     BLOCK
         TYPE(physical_state_real) :: optional_physical(4)
         REAL(wp) :: optional_q(8,2),optional_qp(8,2),optional_before(8,2),optional_snapshot(8,2)
@@ -354,11 +353,13 @@ PROGRAM test_interlayer_lie_transaction
         CALL require(status==0,'paired transfer with independent optional layers accepted')
         CALL require(ALL(optional_q(idx_stoch,:)==optional_before(idx_stoch,:)), &
             'interlayer transfer does not invent or move stochastic conservative scalar')
-        CALL require(ALL(optional_q(idx_pore,:)==optional_before(idx_pore,:)), &
-            'interlayer transfer does not invent or move Darcy conservative scalar')
+        CALL require(optional_q(idx_pore,1)<=optional_before(idx_pore,1) .AND. &
+            optional_q(idx_pore,1)>=0.0_wp, &
+            'L1 pore load only decreases through outgoing mass')
         CALL require(optional_q(idx_pore,2)==0.0_wp .AND. optional_q(idx_stoch,1)==0.0_wp, &
             'inactive optional layer components remain exactly zero')
         DO layer=1,8
+            IF (layer==idx_pore) CYCLE
             CALL require(ABS(SUM(optional_q(layer,:))-SUM(optional_before(layer,:)))<= &
                 1.0E-10_wp*MAX(1.0_wp,ABS(SUM(optional_before(layer,:)))), &
                 'optional pair preserves every conservative component')

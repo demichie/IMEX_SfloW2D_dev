@@ -157,8 +157,7 @@ PROGRAM test_source_registry
   CALL require(group_contains_name(groups(2),'thermal_cooling'), &
        'Etna thermal cooling in Newton group')
   CALL registry%finalize()
-  ! The selected L1 configuration alone determines Darcy registration,
-  ! even if L2 enables Darcy in the common structural layout.
+  ! Only the dense basal layer may enable excess pore pressure.
   rheology_flag=.FALSE.
   thermal_l1%thermal_cooling_flag=.FALSE.
   bottom_fissural_source_flag=.FALSE.
@@ -246,7 +245,7 @@ PROGRAM test_source_registry
   CALL registry%initialize(5,0,groups,error)
   CALL require(LEN_TRIM(error)>0,'invalid source scope rejected')
   CALL registry%finalize()
-  ! Registry construction selects both layer configurations without cloning source logic.
+  ! A dilute upper layer cannot carry excess pore pressure.
   n_eqns=5; n_vars=5; idx_pore=5; idx_poreEqn=5
   rheology_flag=.FALSE.
   thermal_l1%thermal_cooling_flag=.FALSE.
@@ -258,11 +257,20 @@ PROGRAM test_source_registry
   CALL initialize_configured_sources(registry,error, &
        rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
        rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
+  CALL require(INDEX(error,'dilute L2')>0,'L2 excess pore pressure is rejected')
+  CALL require(.NOT.registry%is_initialized(),'rejected L2 pore pressure leaves no registry')
+  pore_pressure_l2%pore_pressure_flag=.FALSE.
+  pore_pressure_l1%pore_pressure_flag=.TRUE.
+  pore_pressure_l1%pore_pressure_method='ANALYTIC'
+  pore_pressure_l1%pore_pressure_group=3
+  CALL initialize_configured_sources(registry,error, &
+       rheology_l1,thermal_l1,pore_pressure_l1,mass_exchange_l1, &
+       rheology_l2,thermal_l2,pore_pressure_l2,mass_exchange_l2)
   CALL require(LEN_TRIM(error)==0,'two-layer source configuration: '//TRIM(error))
   groups=registry%groups()
   CALL require(COUNT(groups%id==0)==2,'one explicit group zero for each layer')
-  CALL require(ANY(groups%scope==SOURCE_SCOPE_L2 .AND. groups%id==3), &
-       'L2 Darcy source configured at its own group')
+  CALL require(ANY(groups%scope==SOURCE_SCOPE_L1 .AND. groups%id==3), &
+       'L1 Darcy source configured at its own group')
   CALL registry%finalize()
   interlayer_mass_exchange%elutriation_flag=.TRUE.
   interlayer_mass_exchange%method='EXPLICIT'

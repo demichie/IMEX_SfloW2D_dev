@@ -3,7 +3,7 @@ PROGRAM test_interlayer_mass_exchange
     USE parameters_2d, ONLY : wp,n_layers,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : n_stoch_vars,n_pore_vars,gas_flag,sutherland_flag
     USE parameters_2d, ONLY : configure_canonical_state_indices,idx_solidEqn_first
-    USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn,idx_addGasEqn_first
+    USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn,idx_addGasEqn_first,idx_poreEqn
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_mass_exchange
     USE interlayer_mass_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_mass_exchange_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
@@ -254,6 +254,7 @@ PROGRAM test_interlayer_mass_exchange
     CALL test_concentrated_carrier_limit()
     CALL test_physical_sources()
     CALL test_bidirectional_physical_budget()
+    CALL test_pore_mass_exchange()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
 
@@ -794,6 +795,65 @@ CONTAINS
             END DO
         END DO
     END SUBROUTINE test_bidirectional_physical_budget
+
+    !> @brief L2 carries no excess pressure; L1 outgoing mass carries its own load.
+    SUBROUTINE test_pore_mass_exchange()
+        TYPE(physical_state_real) :: l1,l2
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        TYPE(mass_exchange_config_type) :: mass_l2
+        TYPE(rheology_config_type) :: rheology_l2
+        REAL(wp) :: rate1(7),rate2(7),initial_mass,initial_qp,final_mass,final_qp
+        REAL(wp), PARAMETER :: dt_local=0.5_wp,pe1=2000.0_wp
+        LOGICAL :: valid
+
+        n_layers=2; n_solid=2; n_add_gas=0; n_stoch_vars=0; n_pore_vars=1
+        n_vars=7; n_eqns=7
+        CALL configure_canonical_state_indices()
+        CALL require(idx_poreEqn==7,'one pore equation is present in the shared layout')
+        CALL initialize_physical_state_real(l1)
+        CALL initialize_physical_state_real(l2)
+        l1%h=0.01_wp; l1%alphas=[0.35_wp,0.24_wp]; l1%rho_c=1.5_wp
+        l1%rho_m=SUM(rho_s*l1%alphas)+l1%rho_c*(1.0_wp-SUM(l1%alphas))
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        l1%cp_c=900.0_wp; l1%T=410.0_wp; l1%u=8.0_wp; l1%v=0.5_wp
+        l1%exc_pore_pres=pe1
+        l2%h=1.0_wp; l2%alphas=[0.11_wp,0.07_wp]; l2%rho_c=0.8_wp
+        l2%rho_m=SUM(rho_s*l2%alphas)+l2%rho_c*(1.0_wp-SUM(l2%alphas))
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l2%cp_c=1100.0_wp; l2%T=290.0_wp; l2%u=-2.0_wp; l2%v=-0.25_wp
+        l2%exc_pore_pres=0.0_wp
+        pair%rouse_critical=100.0_wp
+        initial_mass=l1%h*l1%rho_m
+        initial_qp=initial_mass*pe1
+
+        pair%settling_flag=.TRUE.; pair%elutriation_flag=.FALSE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,rate1,rate2,valid)
+        CALL require(valid .AND. rate1(idx_totMassEqn)>0.0_wp,'settling adds dilute L2 mass')
+        CALL close(rate1(idx_poreEqn),0.0_wp,'settling brings no excess pore load')
+        final_mass=initial_mass+dt_local*rate1(idx_totMassEqn)
+        CALL require(initial_qp/final_mass<pe1,'incoming settling dilutes L1 pressure')
+        CALL close(rate2(idx_poreEqn),0.0_wp,'L2 pore component stays zero')
+
+        pair%settling_flag=.FALSE.; pair%elutriation_flag=.TRUE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,rate1,rate2,valid)
+        CALL require(valid .AND. rate1(idx_totMassEqn)<0.0_wp,'elutriation withdraws L1 mass')
+        CALL close(rate1(idx_poreEqn),pe1*rate1(idx_totMassEqn), &
+            'elutriation removes L1 mass-weighted pore pressure')
+        final_mass=initial_mass+dt_local*rate1(idx_totMassEqn)
+        final_qp=initial_qp+dt_local*rate1(idx_poreEqn)
+        CALL close(final_qp/final_mass,pe1,'elutriation keeps the donor pressure')
+        CALL close(rate2(idx_poreEqn),0.0_wp,'elutriated material has no L2 pressure')
+
+        pair%settling_flag=.TRUE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,rate1,rate2,valid)
+        CALL require(valid .AND. rate1(idx_poreEqn)<0.0_wp, &
+            'two-way exchange removes only the L1 outgoing pore load')
+        CALL close(rate2(idx_poreEqn),0.0_wp,'simultaneous exchange leaves L2 pore load zero')
+        n_pore_vars=0
+    END SUBROUTINE test_pore_mass_exchange
 
     SUBROUTINE execute(expected_valid)
         LOGICAL, INTENT(IN) :: expected_valid

@@ -21,6 +21,17 @@ L2 settling places material in the lower mobile layer; it is
 **not** direct deposition into the static substrate. Basal
 deposition is a separate process involving L1.
 
+### Excess pore pressure in the dense layer
+
+Only L1 carries excess pore pressure. The material received from dilute L2
+has zero excess pore pressure, so settling adds mixture mass without adding
+to the conservative L1 pressure load $Q_p=M_1p_e$. Existing L1 pressure is
+therefore diluted. Conversely, elutriation removes $p_{e,1}$ times the
+outgoing L1 mixture mass (solids and carrier); it does not transfer a
+pore-pressure variable into L2. Simultaneous opposed streams are treated
+by their gross fluxes, not the net mass change. No automatic lithostatic
+pore-pressure seed is added to newly formed L1 deposits.
+
 ## Carrier transported with lifted solids
 
 Elutriated particles may be accompanied by carrier gas.
@@ -50,6 +61,13 @@ Two carrier policies are supported:
 
 Atmospheric air entrainment into L2 is a separate **external**
 source that can dilute the upper mixture later in the evolution.
+
+When optional Darcy gas loss is enabled in L1, the gas leaving L1 is
+routed into L2 in a two-layer run, including when L2 was previously
+dry. The transfer carries the donor's horizontal momentum, sensible
+thermal content and gas-species composition. Darcy relaxation without
+gas loss only reduces L1 excess pore pressure. In a single-layer run,
+the existing atmospheric gas-loss behavior is preserved.
 
 ## Conservation and thermal content
 

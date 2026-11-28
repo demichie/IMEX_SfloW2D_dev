@@ -23,6 +23,10 @@ $$
 
 Mass transfers use species density $\rho_{s,i}$, and carrier co-lift and
 downward carrier exchange enter the two layers with opposite signs.
+Only concentrated L1 carries excess pore pressure. Its conservative load
+$Q_p=M_1p_e$ loses $p_e$ times each outgoing L1 mass flux; incoming
+material from dilute L2 carries no excess pressure and dilutes L1.
+There is no automatic lithostatic pressure seed on settling.
 
 When `ELUTRIATION_SOLID_VOLUME_FRACTION` is omitted, its default `-1`
 selects the current L1 donor solid volume fraction:

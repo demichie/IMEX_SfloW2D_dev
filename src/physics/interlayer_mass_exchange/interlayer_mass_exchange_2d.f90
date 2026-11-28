@@ -6,7 +6,7 @@
 MODULE interlayer_mass_exchange_2d
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
-    USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
+    USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first,idx_poreEqn
     USE parameters_2d, ONLY : idx_T,idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real,physical_state_complex
@@ -583,7 +583,7 @@ CONTAINS
         REAL(wp) :: proposed_s(n_solid),proposed_e(n_solid)
         REAL(wp) :: limited_s(n_solid),limited_e(n_solid)
         REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
-        REAL(wp) :: down,up,chi,interfacial_u,interfacial_v,solid_mass,carrier_mass
+        REAL(wp) :: down,up,chi,interfacial_u,interfacial_v,solid_mass,carrier_mass,pore_mass_out
         REAL(wp) :: rho_eval_l1,rho_eval_l2,rho_limit_l1,rho_limit_l2
         INTEGER :: i
 
@@ -592,6 +592,7 @@ CONTAINS
         valid=.FALSE.
         IF (PRESENT(carrier_down_used)) carrier_down_used=0.0_wp
         IF (PRESENT(carrier_up_used)) carrier_up_used=0.0_wp
+        pore_mass_out=0.0_wp
         IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
 
         ! The dry-state carrier density is an ambient placeholder, not the
@@ -641,6 +642,7 @@ CONTAINS
             CALL add_pair(solid_mass,interfacial_u,interfacial_v, &
                 solid_mass*sp_heat_s(i)*eval_l2%T,1.0_wp,idx_solidEqn_first+i-1)
             solid_mass=rho_s(i)*limited_e(i)
+            pore_mass_out=pore_mass_out+solid_mass
             CALL add_pair(solid_mass,eval_l1%u,eval_l1%v, &
                 solid_mass*sp_heat_s(i)*eval_l1%T,-1.0_wp,idx_solidEqn_first+i-1)
         END DO
@@ -653,12 +655,18 @@ CONTAINS
             RETURN
         END IF
         carrier_mass=eval_l1%rho_c*up
+        pore_mass_out=pore_mass_out+carrier_mass
         CALL add_paired_carrier_transfer(source_l1,source_l2,carrier_mass,eval_l1,-1.0_wp,valid)
         IF (.NOT.valid) THEN
             source_l1=0.0_wp
             source_l2=0.0_wp
             RETURN
         END IF
+
+        ! Only L1 carries excess pore pressure. Outgoing L1 material removes
+        ! its mass-weighted pressure load; incoming dilute L2 material has none.
+        ! Include all solid and carrier withdrawals, not the signed net mass.
+        IF (idx_poreEqn>0) source_l1(idx_poreEqn)=-pore_mass_out*eval_l1%exc_pore_pres
 
     CONTAINS
         !> @brief Add a signed, paired mass, momentum and thermal energy transfer.
@@ -882,6 +890,9 @@ CONTAINS
             ELSE
                 CALL add_paired_carrier_transfer(trial_l1,trial_l2,-physical(1)%rho_c*extra, &
                     physical(1),-1.0_wp,accepted)
+                IF (idx_poreEqn>0 .AND. accepted) &
+                    trial_l1(idx_poreEqn)=trial_l1(idx_poreEqn)+ &
+                    physical(1)%rho_c*extra*physical(1)%exc_pore_pres
             END IF
             IF (.NOT.accepted) RETURN
             trial_q=q

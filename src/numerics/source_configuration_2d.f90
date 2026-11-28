@@ -174,6 +174,11 @@ CONTAINS
                 RETURN
             END IF
             last_layer=2
+            ! Excess pore pressure belongs only to the dense basal layer.
+            IF (pore_pressure_l2%pore_pressure_flag) THEN
+                error='TL07: dilute L2 cannot enable excess pore pressure'
+                RETURN
+            END IF
         END IF
         ALLOCATE(groups(0))
         DO layer=SOURCE_SCOPE_L1,last_layer
@@ -390,9 +395,6 @@ CONTAINS
 
         pore=0
         IF (pore_pressure%pore_pressure_flag) pore=idx_pore
-        IF (last_layer==2) THEN
-            IF (pore_pressure_l2%pore_pressure_flag) pore=idx_pore
-        END IF
         CALL registry%initialize(n_eqns,pore,groups,error)
     END SUBROUTINE initialize_configured_sources
 
