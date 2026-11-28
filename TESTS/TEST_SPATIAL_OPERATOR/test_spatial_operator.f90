@@ -2375,6 +2375,27 @@ CONTAINS
             ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
             ERROR STOP 'Individually dry layers produced a nonzero interlayer force'
 
+        ! Etna mu(I)-Voellmy regression: L2 is dry at both endpoints,
+        ! while L1 has a thin resting film on the right endpoint.
+        CALL eval_interlayer_oriented_face(1, &
+            0.0_wp,0.0_wp,0.0_wp,3.1758661212499997E+03_wp, &
+            2.4328983272425830E-10_wp,2.7284841053187847E-12_wp, &
+            7.3576748693682252E-10_wp,3.1758661212502461E+03_wp,1.0_wp, &
+            0.0_wp,0.0_wp,l1left,l1right,l2left,l2right)
+        IF (ANY(l1left/=0.0_wp) .OR. ANY(l1right/=0.0_wp) .OR. &
+            ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
+            ERROR STOP 'A dry L2 produced a nonzero interlayer pressure with degenerate speeds'
+
+        ! Symmetric dry-L1 case: a wet L2 cannot support an interlayer
+        ! pressure term without a lower layer.
+        CALL eval_interlayer_oriented_face(1, &
+            0.0_wp,0.0_wp,0.0_wp,100.0_wp, &
+            2.0E-12_wp,0.3_wp,10.0_wp,100.3_wp,1.0_wp, &
+            0.0_wp,0.0_wp,l1left,l1right,l2left,l2right)
+        IF (ANY(l1left/=0.0_wp) .OR. ANY(l1right/=0.0_wp) .OR. &
+            ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
+            ERROR STOP 'A dry L1 produced a nonzero interlayer pressure with degenerate speeds'
+
         WRITE(*,*) 'PASS: stationary and layer-wise dry interlayer faces'
     END SUBROUTINE check_degenerate_interlayer_face
 
