@@ -34,6 +34,48 @@ MODULE interlayer_mass_exchange_2d
 
 CONTAINS
 
+    !> @brief Add one antisymmetric carrier transfer using the donor's physical state.
+    !> @details This assembly is shared by the initial exchange and the thermodynamic
+    !>          packing correction; transferred energy and species always use the donor.
+    !> @param[in,out] source_l1 Lower-layer conservative rate [per area and time].
+    !> @param[in,out] source_l2 Upper-layer conservative rate [per area and time].
+    !> @param[in] mass Positive donor carrier mass rate [kg/m2/s].
+    !> @param[in] donor Donor physical state for momentum, energy and gas composition.
+    !> @param[in] direction Positive for L2-to-L1, negative for L1-to-L2.
+    !> @param[out] accepted Whether the positive carrier rate has a valid donor fraction.
+    SUBROUTINE add_paired_carrier_transfer(source_l1,source_l2,mass,donor,direction,accepted)
+        REAL(wp), INTENT(INOUT) :: source_l1(n_eqns),source_l2(n_eqns)
+        REAL(wp), INTENT(IN) :: mass,direction
+        TYPE(physical_state_real), INTENT(IN) :: donor
+        LOGICAL, INTENT(OUT) :: accepted
+        REAL(wp) :: carrier_fraction,gas_mass
+        INTEGER :: i,eq
+
+        accepted=.TRUE.
+        IF (mass<=0.0_wp) RETURN
+        carrier_fraction=1.0_wp-SUM(donor%xs)
+        IF (carrier_fraction<=0.0_wp) THEN
+            accepted=.FALSE.
+            RETURN
+        END IF
+
+        source_l1(idx_totMassEqn)=source_l1(idx_totMassEqn)+direction*mass
+        source_l1(idx_uEqn)=source_l1(idx_uEqn)+direction*mass*donor%u
+        source_l1(idx_vEqn)=source_l1(idx_vEqn)+direction*mass*donor%v
+        source_l1(idx_engyEqn)=source_l1(idx_engyEqn)+direction*mass*donor%cp_c*donor%T
+        source_l2(idx_totMassEqn)=source_l2(idx_totMassEqn)-direction*mass
+        source_l2(idx_uEqn)=source_l2(idx_uEqn)-direction*mass*donor%u
+        source_l2(idx_vEqn)=source_l2(idx_vEqn)-direction*mass*donor%v
+        source_l2(idx_engyEqn)=source_l2(idx_engyEqn)-direction*mass*donor%cp_c*donor%T
+
+        DO i=1,n_add_gas
+            eq=idx_addGasEqn_first+i-1
+            gas_mass=mass*donor%xg(i)/carrier_fraction
+            source_l1(eq)=source_l1(eq)+direction*gas_mass
+            source_l2(eq)=source_l2(eq)-direction*gas_mass
+        END DO
+    END SUBROUTINE add_paired_carrier_transfer
+
     !> @brief Limit gross two-way solid and carrier fluxes against both layer inventories.
     !> @details All volumes are phase volumes per horizontal area [m]; proposed
     !>          and accepted fluxes are [m/s]. The solid rates for all classes in
@@ -328,11 +370,9 @@ CONTAINS
     !> @param[out] source_l1 Signed L1 conservative rate vector.
     !> @param[out] source_l2 Signed L2 conservative rate vector.
     !> @param[out] valid Whether an admissible paired rate has been assembled.
-    !> @param[in] rate_scale Optional common reduction of the already limited transfer rates.
-    !> @param[in] carrier_down_extra Optional additional L2-to-L1 carrier volume rate [m/s].
-    !> @param[out] carrier_down_used Optional original limited downward carrier rate [m/s].
+    !> @param[out] carrier_down_used Optional limited downward carrier volume rate [m/s].
     SUBROUTINE eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
-            limit_l1,limit_l2,dt,source_l1,source_l2,valid,rate_scale,carrier_down_extra,carrier_down_used)
+            limit_l1,limit_l2,dt,source_l1,source_l2,valid,carrier_down_used)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
@@ -340,13 +380,11 @@ CONTAINS
         REAL(wp), INTENT(IN) :: dt
         REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
         LOGICAL, INTENT(OUT) :: valid
-        REAL(wp), INTENT(IN), OPTIONAL :: rate_scale,carrier_down_extra
         REAL(wp), INTENT(OUT), OPTIONAL :: carrier_down_used
         REAL(wp) :: proposed_s(n_solid),proposed_e(n_solid)
         REAL(wp) :: limited_s(n_solid),limited_e(n_solid)
         REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
         REAL(wp) :: down,up,chi,interfacial_u,interfacial_v,solid_mass,carrier_mass
-        REAL(wp) :: donor_xg(n_add_gas),gas_mass_fraction
         REAL(wp) :: rho_eval_l1,rho_eval_l2,rho_limit_l1,rho_limit_l2
         INTEGER :: i
 
@@ -392,40 +430,6 @@ CONTAINS
         IF (.NOT.valid) RETURN
         IF (PRESENT(carrier_down_used)) carrier_down_used=down
 
-        ! The optional adjustment is used only after testing the reconstructed
-        ! conservative candidate. It preserves gross donor budgets: even a
-        ! compensating carrier transfer cannot spend simultaneous receipts.
-        IF (PRESENT(rate_scale)) THEN
-            IF (.NOT.ieee_is_finite(rate_scale)) THEN
-                valid=.FALSE.
-                RETURN
-            END IF
-            IF (rate_scale<0.0_wp .OR. rate_scale>1.0_wp) THEN
-                valid=.FALSE.
-                RETURN
-            END IF
-            limited_s=rate_scale*limited_s
-            limited_e=rate_scale*limited_e
-            down=rate_scale*down
-            up=rate_scale*up
-        END IF
-        IF (PRESENT(carrier_down_extra)) THEN
-            IF (.NOT.ieee_is_finite(carrier_down_extra)) THEN
-                valid=.FALSE.
-                RETURN
-            END IF
-            IF (carrier_down_extra<0.0_wp) THEN
-                valid=.FALSE.
-                RETURN
-            END IF
-            down=down+carrier_down_extra
-        END IF
-        IF (dt*down*eval_l2%rho_c>carrier2*limit_l2%rho_c+ &
-            128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,carrier2*limit_l2%rho_c)) THEN
-            valid=.FALSE.
-            RETURN
-        END IF
-
         ! The same interface velocity is debited from L2 and credited to L1.
         chi=config%settling_velocity_weight+(1.0_wp-config%settling_velocity_weight)* &
             config%settling_plug_thickness/(MAX(0.0_wp,eval_l2%h)+config%settling_plug_thickness)
@@ -441,36 +445,18 @@ CONTAINS
         END DO
 
         carrier_mass=eval_l2%rho_c*down
-        IF (carrier_mass>0.0_wp) THEN
-            donor_xg=eval_l2%xg
-            gas_mass_fraction=1.0_wp-SUM(eval_l2%xs)
-            IF (gas_mass_fraction<=0.0_wp) THEN
-                valid=.FALSE.
-                source_l1=0.0_wp
-                source_l2=0.0_wp
-                RETURN
-            END IF
-            CALL add_pair(carrier_mass,eval_l2%u,eval_l2%v, &
-                carrier_mass*eval_l2%cp_c*eval_l2%T,1.0_wp,0)
-            DO i=1,n_add_gas
-                CALL add_gas(carrier_mass*donor_xg(i)/gas_mass_fraction,1.0_wp,i)
-            END DO
+        CALL add_paired_carrier_transfer(source_l1,source_l2,carrier_mass,eval_l2,1.0_wp,valid)
+        IF (.NOT.valid) THEN
+            source_l1=0.0_wp
+            source_l2=0.0_wp
+            RETURN
         END IF
         carrier_mass=eval_l1%rho_c*up
-        IF (carrier_mass>0.0_wp) THEN
-            donor_xg=eval_l1%xg
-            gas_mass_fraction=1.0_wp-SUM(eval_l1%xs)
-            IF (gas_mass_fraction<=0.0_wp) THEN
-                valid=.FALSE.
-                source_l1=0.0_wp
-                source_l2=0.0_wp
-                RETURN
-            END IF
-            CALL add_pair(carrier_mass,eval_l1%u,eval_l1%v, &
-                carrier_mass*eval_l1%cp_c*eval_l1%T,-1.0_wp,0)
-            DO i=1,n_add_gas
-                CALL add_gas(carrier_mass*donor_xg(i)/gas_mass_fraction,-1.0_wp,i)
-            END DO
+        CALL add_paired_carrier_transfer(source_l1,source_l2,carrier_mass,eval_l1,-1.0_wp,valid)
+        IF (.NOT.valid) THEN
+            source_l1=0.0_wp
+            source_l2=0.0_wp
+            RETURN
         END IF
 
     CONTAINS
@@ -496,16 +482,6 @@ CONTAINS
             IF (species_eq>0) source_l2(species_eq)=source_l2(species_eq)-direction*mass
         END SUBROUTINE add_pair
 
-        !> @brief Add equal and opposite transported additional-carrier species mass.
-        !> @param[in] mass Additional carrier constituent mass rate [kg/m2/s].
-        !> @param[in] direction Positive L2-to-L1, negative L1-to-L2.
-        !> @param[in] index Additional gas species index (1-based).
-        SUBROUTINE add_gas(mass,direction,index)
-            REAL(wp), INTENT(IN) :: mass,direction
-            INTEGER, INTENT(IN) :: index
-            source_l1(idx_addGasEqn_first+index-1)=source_l1(idx_addGasEqn_first+index-1)+direction*mass
-            source_l2(idx_addGasEqn_first+index-1)=source_l2(idx_addGasEqn_first+index-1)-direction*mass
-        END SUBROUTINE add_gas
     END SUBROUTINE eval_interlayer_mass_exchange_explicit
 
     !> @brief Perform one paired cell-local Lie transfer as an atomic transaction.
@@ -676,9 +652,22 @@ CONTAINS
             INTEGER :: k
 
             fits=.FALSE.
-            CALL eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2, &
-                physical(1),physical(2),physical(3),physical(4),dt,trial_l1,trial_l2,accepted, &
-                rate_scale=scale,carrier_down_extra=extra)
+            accepted=ieee_is_finite(scale) .AND. ieee_is_finite(extra)
+            IF (.NOT.accepted) RETURN
+            accepted=scale>=0.0_wp .AND. scale<=1.0_wp .AND. extra>=0.0_wp
+            IF (.NOT.accepted) RETURN
+            IF (dt*(scale*down_baseline+extra)*physical(2)%rho_c> &
+                physical(4)%h*MAX(0.0_wp,1.0_wp-SUM(physical(4)%alphas))*physical(4)%rho_c+ &
+                128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,physical(4)%h*physical(4)%rho_c)) THEN
+                accepted=.FALSE.
+                RETURN
+            END IF
+            ! All solid and baseline carrier sources are linear in the common
+            ! reduction. Evaluate only the additional donor-carrier contribution.
+            trial_l1=scale*rate_l1
+            trial_l2=scale*rate_l2
+            CALL add_paired_carrier_transfer(trial_l1,trial_l2,physical(2)%rho_c*extra, &
+                physical(2),1.0_wp,accepted)
             IF (.NOT.accepted) RETURN
             trial_q=q
             trial_q(1:n_eqns,1)=q(1:n_eqns,1)+dt*trial_l1
