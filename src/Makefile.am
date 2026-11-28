@@ -668,7 +668,7 @@ physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_elutriation_2d.$(OBJEXT) \
     state/state_types.$(OBJEXT) state/state_physical.$(OBJEXT) \
     state/state_conversions.$(OBJEXT) state/state_composition.$(OBJEXT) \
-    state/state_fields.$(OBJEXT) \
+    state/state_mixture.$(OBJEXT) state/state_fields.$(OBJEXT) \
     core/parameters_2d.$(OBJEXT) core/solid_transport_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
     physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
