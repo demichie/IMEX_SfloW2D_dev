@@ -162,6 +162,30 @@ PROGRAM test_interlayer_lie_transaction
     CALL check_admissibility(qp)
     config%elutriation_flag=.TRUE.
 
+    ! A nearly packed hot L2 receives cold solids from L1. Even with a
+    ! downward-free transaction, cooling can require additional upward carrier.
+    config%settling_flag=.FALSE.
+    config%elutriation_solid_volume_fraction=1.0_wp
+    CALL make_column(1.0_wp,0.2_wp,20.0_wp,2.0_wp,q,qp)
+    alpha_test=[0.35_wp,0.2499_wp]
+    CALL evaluate_mixture_from_volume(900.0_wp,alphag_test,alpha_test, &
+        rho_test,inv_rho_test,rho_c_test,xs_test,xg_test,xc_test,cp_c_test,cp_m_test)
+    qp(idx_solid_first:idx_solid_last,2)=xs_test
+    qp(idx_T,1)=280.0_wp
+    qp(idx_T,2)=900.0_wp
+    DO i=1,2
+        CALL primitive_to_conservative(qp(:,i),q(:,i),accepted=ok)
+        CALL require(ok,'upper-layer thermal packing fixture conversion')
+    END DO
+    before=q; snapshot=qp
+    CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
+    CALL require(status==0,'hot packed L2 accepts cold elutriated solids and carrier correction')
+    CALL require(q(idx_totMassEqn,2)>before(idx_totMassEqn,2),'cold solids reach packed L2')
+    CALL check_conservation(before,q,'upper-layer thermodynamic packing correction')
+    CALL check_admissibility(qp)
+    config%settling_flag=.TRUE.
+    config%elutriation_solid_volume_fraction=0.1_wp
+
     CALL make_column(1.0_wp,1.0_wp,20.0_wp,2.0_wp,q,qp)
     before=q; snapshot=qp
     CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)

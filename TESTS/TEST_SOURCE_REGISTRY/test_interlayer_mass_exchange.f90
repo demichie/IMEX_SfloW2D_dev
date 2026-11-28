@@ -96,6 +96,30 @@ PROGRAM test_interlayer_mass_exchange
         'both physical transfers remain possible')
     CALL require(down>=0.0_wp .AND. up>=0.0_wp,'two-way carrier fluxes nonnegative')
 
+    ! An initially overpacked L1 can become admissible by exporting a
+    ! sufficiently concentrated solid parcel, without spending receipts.
+    config%elutriation_solid_volume_fraction=1.0_wp
+    s1=[0.65_wp,0.0_wp]; carrier1=0.35_wp
+    s2=[0.10_wp,0.0_wp]; carrier2=0.90_wp
+    settle=0.0_wp; elut=[0.15_wp,0.0_wp]
+    CALL execute(.TRUE.)
+    CALL require(accepted_e(1)>0.0_wp,'overpacked L1 exports solids to recover packing')
+
+    ! An initially overpacked L2 may likewise recover by settling solids,
+    ! provided both post-transfer layers remain below the packing limit.
+    s1=[0.10_wp,0.0_wp]; carrier1=0.90_wp
+    s2=[0.65_wp,0.0_wp]; carrier2=0.35_wp
+    settle=[0.20_wp,0.0_wp]; elut=0.0_wp
+    CALL execute(.TRUE.)
+    CALL require(accepted_s(1)>0.0_wp,'overpacked L2 settles solids to recover packing')
+
+    ! Reject an overpacked state when no physical solid transfer can repair it.
+    s1=[0.65_wp,0.0_wp]; carrier1=0.35_wp
+    s2=[0.65_wp,0.0_wp]; carrier2=0.35_wp
+    settle=0.0_wp; elut=0.0_wp
+    CALL execute(.FALSE.)
+    config%elutriation_solid_volume_fraction=0.1_wp
+
     ! Zero fluxes and zero layer inventories are valid.
     s1=0.0_wp; s2=0.0_wp; carrier1=0.0_wp; carrier2=0.0_wp
     settle=0.0_wp; elut=0.0_wp

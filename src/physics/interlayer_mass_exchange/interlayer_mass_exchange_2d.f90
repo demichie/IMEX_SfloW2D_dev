@@ -122,7 +122,8 @@ CONTAINS
         REAL(wp) :: f_settle,f_elut,co_lift,requested,alpha_lift,beta,lo,hi,mid,scale
         REAL(wp) :: initial_scale,down_candidate,f_carrier
         REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2
-        INTEGER :: i,k,n
+        LOGICAL :: initially_overpacked
+        INTEGER :: i,k,n,j,mode
 
         accepted_settling=0.0_wp
         accepted_elutriation=0.0_wp
@@ -184,8 +185,8 @@ CONTAINS
         END IF
 
         beta=(1.0_wp-packing)/packing
-        IF (s1>packing*(s1+c1)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s1+c1)) RETURN
-        IF (s2>packing*(s2+c2)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)) RETURN
+        initially_overpacked=s1>packing*(s1+c1)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s1+c1) .OR. &
+            s2>packing*(s2+c2)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)
 
         ! Gross per-species donor bounds: no reliance on simultaneous receipts.
         f_settle=1.0_wp
@@ -218,6 +219,12 @@ CONTAINS
             END IF
         END IF
 
+        IF (initially_overpacked .AND. settle_total<=0.0_wp .AND. elut_total<=0.0_wp) THEN
+            accepted_settling=0.0_wp
+            accepted_elutriation=0.0_wp
+            RETURN
+        END IF
+
         ! Start with a jointly feasible scale. The old common-scale
         ! solution remains a conservative admissible point; it is not the
         ! final physical limit when the two gross transfers can differ.
@@ -227,7 +234,80 @@ CONTAINS
         ! In ALLOW_CONCENTRATED, reduce upward carrier independently
         ! before sacrificing either solid flux. This never applies to
         ! LIMIT_SOLIDS, whose lifted parcel composition is prescribed.
-        IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED' .AND. &
+        IF (initially_overpacked) THEN
+            ! A zero exchange is not feasible here. Search the donor-bounded
+            ! settling/elutriation rectangle directly; each sampled state
+            ! satisfies BOTH final packing constraints before being accepted.
+            ! This path is only used for already overpacked inventories.
+            valid=.FALSE.
+            DO i=64,0,-1
+                IF (valid) EXIT
+                DO j=64,0,-1
+                    f_settle=REAL(i,wp)/64.0_wp
+                    f_elut=REAL(j,wp)/64.0_wp
+                    f_carrier=f_elut
+                    IF (feasible(f_settle,f_elut,f_carrier)) THEN
+                        valid=.TRUE.
+                        EXIT
+                    END IF
+                    IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED') THEN
+                        DO mode=1,8
+                            f_carrier=f_elut*REAL(8-mode,wp)/8.0_wp
+                            IF (feasible(f_settle,f_elut,f_carrier)) THEN
+                                valid=.TRUE.
+                                EXIT
+                            END IF
+                        END DO
+                        IF (valid) EXIT
+                    END IF
+                END DO
+            END DO
+            IF (.NOT.valid) THEN
+                accepted_settling=0.0_wp
+                accepted_elutriation=0.0_wp
+                RETURN
+            END IF
+            ! Refine each solid process independently without relying on an
+            ! admissible no-transfer endpoint. The feasible segment at fixed
+            ! other process/carrier factors is an interval.
+            IF (f_settle<1.0_wp) THEN
+                lo=f_settle
+                hi=1.0_wp
+                IF (feasible(hi,f_elut,f_carrier)) THEN
+                    lo=hi
+                ELSE
+                    DO k=1,56
+                        mid=0.5_wp*(lo+hi)
+                        IF (feasible(mid,f_elut,f_carrier)) THEN
+                            lo=mid
+                        ELSE
+                            hi=mid
+                        END IF
+                    END DO
+                END IF
+                f_settle=lo
+            END IF
+            IF (f_elut>0.0_wp .AND. f_elut<1.0_wp) THEN
+                lo=f_elut
+                hi=1.0_wp
+                IF (feasible(f_settle,hi,hi*f_carrier/f_elut)) THEN
+                    lo=hi
+                END IF
+                ! Preserve the selected co-lift policy when increasing elutriation.
+                IF (lo==f_elut) THEN
+                    DO k=1,56
+                        mid=0.5_wp*(lo+hi)
+                        IF (feasible(f_settle,mid,mid*f_carrier/f_elut)) THEN
+                            lo=mid
+                        ELSE
+                            hi=mid
+                        END IF
+                    END DO
+                END IF
+                f_carrier=lo*f_carrier/f_elut
+                f_elut=lo
+            END IF
+        ELSE IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED' .AND. &
             .NOT.feasible(1.0_wp,1.0_wp,1.0_wp) .AND. feasible(1.0_wp,1.0_wp,0.0_wp)) THEN
             f_settle=1.0_wp
             f_elut=1.0_wp
@@ -371,8 +451,9 @@ CONTAINS
     !> @param[out] source_l2 Signed L2 conservative rate vector.
     !> @param[out] valid Whether an admissible paired rate has been assembled.
     !> @param[out] carrier_down_used Optional limited downward carrier volume rate [m/s].
+    !> @param[out] carrier_up_used Optional limited upward carrier volume rate [m/s].
     SUBROUTINE eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
-            limit_l1,limit_l2,dt,source_l1,source_l2,valid,carrier_down_used)
+            limit_l1,limit_l2,dt,source_l1,source_l2,valid,carrier_down_used,carrier_up_used)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
@@ -380,7 +461,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: dt
         REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
         LOGICAL, INTENT(OUT) :: valid
-        REAL(wp), INTENT(OUT), OPTIONAL :: carrier_down_used
+        REAL(wp), INTENT(OUT), OPTIONAL :: carrier_down_used,carrier_up_used
         REAL(wp) :: proposed_s(n_solid),proposed_e(n_solid)
         REAL(wp) :: limited_s(n_solid),limited_e(n_solid)
         REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
@@ -392,6 +473,7 @@ CONTAINS
         source_l2=0.0_wp
         valid=.FALSE.
         IF (PRESENT(carrier_down_used)) carrier_down_used=0.0_wp
+        IF (PRESENT(carrier_up_used)) carrier_up_used=0.0_wp
         IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
 
         ! The dry-state carrier density is an ambient placeholder, not the
@@ -429,6 +511,7 @@ CONTAINS
             candidate_rho_l1=rho_limit_l1,candidate_rho_l2=rho_limit_l2)
         IF (.NOT.valid) RETURN
         IF (PRESENT(carrier_down_used)) carrier_down_used=down
+        IF (PRESENT(carrier_up_used)) carrier_up_used=up
 
         ! The same interface velocity is debited from L2 and credited to L1.
         chi=config%settling_velocity_weight+(1.0_wp-config%settling_velocity_weight)* &
@@ -515,7 +598,7 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT) :: physical(4)
         INTEGER, INTENT(OUT) :: status
         REAL(wp) :: candidate_q(n_vars,2),candidate_qp(n_vars,2)
-        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns),rate_margin,down_baseline
+        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns),rate_margin,down_baseline,up_baseline
         REAL(wp) :: best_q(n_vars,2),best_qp(n_vars,2)
         LOGICAL :: ok,roundoff_depletion,has_negative_solid,packed(2)
         LOGICAL :: trial_ok
@@ -542,7 +625,7 @@ CONTAINS
         status=19
         CALL eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2, &
             physical(1),physical(2),physical(3),physical(4),dt,rate_l1,rate_l2,ok, &
-            carrier_down_used=down_baseline)
+            carrier_down_used=down_baseline,carrier_up_used=up_baseline)
         IF (.NOT.ok) RETURN
         candidate_q=q
         candidate_q(1:n_eqns,1)=candidate_q(1:n_eqns,1)+dt*rate_l1
@@ -590,8 +673,8 @@ CONTAINS
         CALL evaluate_candidate_packing(candidate_q,candidate_qp,packed,ok)
         IF (.NOT.ok) RETURN
         IF (.NOT.ALL(packed)) THEN
-            ! Keep the transaction atomic. First seek extra descending carrier,
-            ! then reduce the original coupled source rates when insufficient.
+            ! Keep the transaction atomic. Correct carrier transfer in either
+            ! direction, then reduce coupled source rates only if necessary.
             CALL recover_thermodynamic_packing(best_q,best_qp,trial_ok)
             IF (.NOT.trial_ok) RETURN
             candidate_q=best_q
@@ -639,7 +722,7 @@ CONTAINS
 
         !> @brief Assemble and validate one candidate without committing either layer.
         !> @param[in] scale Common factor on the previously accepted physical exchange.
-        !> @param[in] extra Additional L2-to-L1 carrier volume rate [m/s].
+        !> @param[in] extra Signed carrier correction [m/s]: positive downward, negative upward.
         !> @param[out] trial_q Conservative candidate, unchanged outside this call.
         !> @param[out] trial_qp Primitive candidate, unchanged outside this call.
         !> @param[out] fits Layer-wise thermodynamic packing validity.
@@ -654,20 +737,34 @@ CONTAINS
             fits=.FALSE.
             accepted=ieee_is_finite(scale) .AND. ieee_is_finite(extra)
             IF (.NOT.accepted) RETURN
-            accepted=scale>=0.0_wp .AND. scale<=1.0_wp .AND. extra>=0.0_wp
+            accepted=scale>=0.0_wp .AND. scale<=1.0_wp
             IF (.NOT.accepted) RETURN
-            IF (dt*(scale*down_baseline+extra)*physical(2)%rho_c> &
-                physical(4)%h*MAX(0.0_wp,1.0_wp-SUM(physical(4)%alphas))*physical(4)%rho_c+ &
-                128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,physical(4)%h*physical(4)%rho_c)) THEN
-                accepted=.FALSE.
-                RETURN
+            IF (extra>=0.0_wp) THEN
+                IF (dt*(scale*down_baseline+extra)*physical(2)%rho_c> &
+                    physical(4)%h*MAX(0.0_wp,1.0_wp-SUM(physical(4)%alphas))*physical(4)%rho_c+ &
+                    128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,physical(4)%h*physical(4)%rho_c)) THEN
+                    accepted=.FALSE.
+                    RETURN
+                END IF
+            ELSE
+                IF (dt*(scale*up_baseline-extra)*physical(1)%rho_c> &
+                    physical(3)%h*MAX(0.0_wp,1.0_wp-SUM(physical(3)%alphas))*physical(3)%rho_c+ &
+                    128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,physical(3)%h*physical(3)%rho_c)) THEN
+                    accepted=.FALSE.
+                    RETURN
+                END IF
             END IF
             ! All solid and baseline carrier sources are linear in the common
             ! reduction. Evaluate only the additional donor-carrier contribution.
             trial_l1=scale*rate_l1
             trial_l2=scale*rate_l2
-            CALL add_paired_carrier_transfer(trial_l1,trial_l2,physical(2)%rho_c*extra, &
-                physical(2),1.0_wp,accepted)
+            IF (extra>=0.0_wp) THEN
+                CALL add_paired_carrier_transfer(trial_l1,trial_l2,physical(2)%rho_c*extra, &
+                    physical(2),1.0_wp,accepted)
+            ELSE
+                CALL add_paired_carrier_transfer(trial_l1,trial_l2,-physical(1)%rho_c*extra, &
+                    physical(1),-1.0_wp,accepted)
+            END IF
             IF (.NOT.accepted) RETURN
             trial_q=q
             trial_q(1:n_eqns,1)=q(1:n_eqns,1)+dt*trial_l1
@@ -692,7 +789,7 @@ CONTAINS
         END SUBROUTINE trial_transfer
 
         !> @brief Find a physically admissible correction without sequencing source laws.
-        !> @details Sample carrier increments and refine a feasible transition.
+        !> @details Sample carrier corrections in both directions and refine a feasible transition.
         !>          No global monotonicity is assumed across different source scales.
         !> @param[out] final_q Conservative pair for the accepted adjustment.
         !> @param[out] final_qp Primitive pair for the accepted adjustment.
@@ -703,44 +800,50 @@ CONTAINS
             REAL(wp) :: scale,maximum_extra,extra,previous_extra,lo,hi,mid
             REAL(wp) :: trial_q(n_vars,2),trial_qp(n_vars,2)
             LOGICAL :: fits(2),accepted
-            INTEGER :: attempt,j,k
+            INTEGER :: attempt,j,k,direction
 
             found=.FALSE.
             DO attempt=1,13
                 scale=2.0_wp**(1-attempt)
-                ! An extra transfer can use only the post-spatial L2 carrier
-                ! inventory remaining after the original gross downward flux.
-                maximum_extra=physical(4)%h*MAX(0.0_wp,1.0_wp-SUM(physical(4)%alphas))* &
-                    physical(4)%rho_c/(dt*physical(2)%rho_c)-scale*down_baseline
-                maximum_extra=MAX(0.0_wp,maximum_extra*(1.0_wp-64.0_wp*EPSILON(1.0_wp)))
-                previous_extra=0.0_wp
-                DO j=0,16
-                    extra=maximum_extra*REAL(j,wp)/16.0_wp
-                    CALL trial_transfer(scale,extra,trial_q,trial_qp,fits,accepted)
-                    IF (accepted .AND. ALL(fits)) THEN
-                        final_q=trial_q
-                        final_qp=trial_qp
-                        found=.TRUE.
-                        IF (j==0) RETURN
-                        ! Refine the first sampled admissible transition. The
-                        ! complete pair is checked at each trial; failure does
-                        ! not mutate either physical recipient.
-                        lo=previous_extra
-                        hi=extra
-                        DO k=1,56
-                            mid=0.5_wp*(lo+hi)
-                            CALL trial_transfer(scale,mid,trial_q,trial_qp,fits,accepted)
-                            IF (accepted .AND. ALL(fits)) THEN
-                                hi=mid
-                                final_q=trial_q
-                                final_qp=trial_qp
-                            ELSE
-                                lo=mid
-                            END IF
-                        END DO
-                        RETURN
+                ! Positive correction transfers L2-to-L1; negative correction
+                ! transfers L1-to-L2. Both obey the gross donor inventory.
+                DO direction=1,2
+                    IF (direction==1) THEN
+                        maximum_extra=physical(4)%h*MAX(0.0_wp,1.0_wp-SUM(physical(4)%alphas))* &
+                            physical(4)%rho_c/(dt*physical(2)%rho_c)-scale*down_baseline
+                    ELSE
+                        maximum_extra=physical(3)%h*MAX(0.0_wp,1.0_wp-SUM(physical(3)%alphas))* &
+                            physical(3)%rho_c/(dt*physical(1)%rho_c)-scale*up_baseline
                     END IF
-                    previous_extra=extra
+                    maximum_extra=MAX(0.0_wp,maximum_extra*(1.0_wp-64.0_wp*EPSILON(1.0_wp)))
+                    previous_extra=0.0_wp
+                    DO j=0,16
+                        extra=maximum_extra*REAL(j,wp)/16.0_wp
+                        IF (direction==2) extra=-extra
+                        CALL trial_transfer(scale,extra,trial_q,trial_qp,fits,accepted)
+                        IF (accepted .AND. ALL(fits)) THEN
+                            final_q=trial_q
+                            final_qp=trial_qp
+                            found=.TRUE.
+                            IF (j==0) RETURN
+                            ! Refine only after finding an admissible bracket.
+                            lo=previous_extra
+                            hi=extra
+                            DO k=1,56
+                                mid=0.5_wp*(lo+hi)
+                                CALL trial_transfer(scale,mid,trial_q,trial_qp,fits,accepted)
+                                IF (accepted .AND. ALL(fits)) THEN
+                                    hi=mid
+                                    final_q=trial_q
+                                    final_qp=trial_qp
+                                ELSE
+                                    lo=mid
+                                END IF
+                            END DO
+                            RETURN
+                        END IF
+                        previous_extra=extra
+                    END DO
                 END DO
             END DO
 
