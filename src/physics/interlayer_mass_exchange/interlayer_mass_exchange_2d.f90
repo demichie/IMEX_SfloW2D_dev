@@ -77,8 +77,9 @@ CONTAINS
         REAL(wp) :: up_to_l1,down_to_l1,up_to_l2,down_to_l2,available_up,available_down
         REAL(wp) :: f_settle,f_elut,co_lift,requested,alpha_lift,beta,lo,hi,mid,scale
         REAL(wp) :: initial_scale,down_candidate,f_carrier
-        REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2
+        REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2,beta1
         INTEGER :: i,k,n
+        LOGICAL :: dense_l1,keep_l1
 
         accepted_settling=0.0_wp
         accepted_elutriation=0.0_wp
@@ -140,7 +141,13 @@ CONTAINS
         END IF
 
         beta=(1.0_wp-packing)/packing
-        IF (s1>packing*(s1+c1)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s1+c1)) RETURN
+        ! Cold settled solids cool a hot L1 and contract its carrier, so L1 can end a
+        ! transfer slightly denser than packing. It is not rejected: see beta1 below.
+        ! No round-off tolerance here: an L1 denser than packing by round-off only
+        ! must not draw carrier from a dry L2 either.
+        dense_l1=s1>packing*(s1+c1)
+        keep_l1=.FALSE.
+        beta1=beta
         IF (s2>packing*(s2+c2)+128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)) RETURN
 
         ! Gross per-species donor bounds: no reliance on simultaneous receipts.
@@ -171,6 +178,16 @@ CONTAINS
                 co_lift=(1.0_wp-alpha_lift)/alpha_lift*elut_total
             ELSE
                 co_lift=MIN(requested,available_up)
+            END IF
+        END IF
+
+        ! A dense L1 draws its missing carrier from L2 through the packing term of
+        ! candidate_flux; when L2 cannot supply it, transfers keep the L1 fraction.
+        IF (dense_l1) THEN
+            IF ((beta*s1-c1)/(dt*down_to_l1)>available_down .OR. &
+                .NOT.feasible(0.0_wp,0.0_wp,0.0_wp)) THEN
+                keep_l1=.TRUE.
+                beta1=c1/s1
             END IF
         END IF
 
@@ -286,8 +303,15 @@ CONTAINS
             REAL(wp), INTENT(IN) :: fs,fe,fc
             REAL(wp), INTENT(OUT) :: down,up
             up=fc*co_lift
-            down=MAX(0.0_wp,(beta*(s1+dt*(fs*settle_total-fe*elut_total))-c1+dt*up_to_l1*up)/ &
-                (dt*down_to_l1))
+            IF (keep_l1) THEN
+                ! Only the transferred solids bring carrier, at the dense L1 ratio,
+                ! so a zero transfer draws exactly zero carrier from L2.
+                down=MAX(0.0_wp,(beta1*dt*(fs*settle_total-fe*elut_total)+dt*up_to_l1*up)/ &
+                    (dt*down_to_l1))
+            ELSE
+                down=MAX(0.0_wp,(beta*(s1+dt*(fs*settle_total-fe*elut_total))-c1+dt*up_to_l1*up)/ &
+                    (dt*down_to_l1))
+            END IF
         END SUBROUTINE candidate_flux
 
         !> @brief Check L2 carrier inventory and packing at the proposed process scales.

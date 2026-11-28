@@ -203,6 +203,7 @@ PROGRAM test_interlayer_mass_exchange
     CALL test_concentrated_carrier_limit()
     CALL test_physical_sources()
     CALL test_bidirectional_physical_budget()
+    CALL test_dense_l1()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
 
@@ -743,6 +744,62 @@ CONTAINS
             END DO
         END DO
     END SUBROUTINE test_bidirectional_physical_budget
+
+    !> An L1 denser than packing is not rejected: it draws the missing L2 carrier
+    !> back to packing, and when L2 is too thin to supply it, settling keeps its fraction.
+    SUBROUTINE test_dense_l1()
+        TYPE(physical_state_real) :: l1,l2
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        TYPE(mass_exchange_config_type) :: mass_l2
+        TYPE(rheology_config_type) :: rheology_l2
+        REAL(wp) :: source1(6),source2(6),s1,c1
+        REAL(wp), PARAMETER :: dt_local=0.05_wp
+        LOGICAL :: valid
+        INTEGER :: eq
+
+        n_layers=2; n_solid=2; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
+        n_vars=6; n_eqns=6
+        CALL configure_canonical_state_indices()
+        maximum_solid_packing=0.6_wp
+        CALL initialize_physical_state_real(l1)
+        CALL initialize_physical_state_real(l2)
+        l2%h=10.0_wp; l2%alphas=[0.002_wp,0.001_wp]; l2%rho_c=0.5_wp
+        l2%rho_m=SUM(rho_s*l2%alphas)+l2%rho_c*(1.0_wp-SUM(l2%alphas))
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l2%cp_c=1100.0_wp; l2%T=700.0_wp; l2%u=20.0_wp; l2%v=-1.0_wp
+        l1%h=0.5_wp; l1%alphas=[0.41_wp,0.20_wp]; l1%rho_c=l2%rho_c
+        l1%rho_m=SUM(rho_s*l1%alphas)+l1%rho_c*(1.0_wp-SUM(l1%alphas))
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        l1%cp_c=l2%cp_c; l1%T=650.0_wp; l1%u=5.0_wp
+        pair%settling_flag=.TRUE.; pair%elutriation_flag=.FALSE.
+
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid,'dense L1 under a wet L2 accepted')
+        CALL l1_after(l1,source1,dt_local,s1,c1)
+        CALL close(s1/(s1+c1),0.6_wp,'dense L1 restored to the maximum packing')
+        DO eq=1,n_eqns
+            CALL close(source1(eq)+source2(eq),0.0_wp,'dense L1 pair')
+        END DO
+
+        l2%h=1.0E-6_wp
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid,'dense L1 under a thin L2 accepted')
+        CALL l1_after(l1,source1,dt_local,s1,c1)
+        CALL require(s1/(s1+c1)<=0.61_wp*(1.0_wp+1.0E-12_wp),'dense L1 not made denser')
+    END SUBROUTINE test_dense_l1
+
+    !> L1 solid and carrier volumes per area after one step of the pair source.
+    SUBROUTINE l1_after(l1,source1,dt_local,s1,c1)
+        TYPE(physical_state_real), INTENT(IN) :: l1
+        REAL(wp), INTENT(IN) :: source1(:),dt_local
+        REAL(wp), INTENT(OUT) :: s1,c1
+        REAL(wp) :: solid_mass
+        solid_mass=SUM(source1(idx_solidEqn_first:idx_solidEqn_first+1))
+        s1=SUM(l1%alphas)*l1%h+dt_local*SUM(source1(idx_solidEqn_first:idx_solidEqn_first+1)/rho_s)
+        c1=(1.0_wp-SUM(l1%alphas))*l1%h+dt_local*(source1(idx_totMassEqn)-solid_mass)/l1%rho_c
+    END SUBROUTINE l1_after
 
     SUBROUTINE execute(expected_valid)
         LOGICAL, INTENT(IN) :: expected_valid
