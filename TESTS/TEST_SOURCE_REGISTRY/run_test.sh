@@ -63,7 +63,11 @@ for profile in strict optimized; do
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       $production_objects test_interlayer_lie_transaction.o -llapack \
       $netcdf_flibs $netcdf_clibs -o test_interlayer_lie_transaction
-    ./test_interlayer_lie_transaction > interlayer-lie-results.log
+    if ! ./test_interlayer_lie_transaction > interlayer-lie-results.log 2>&1; then
+      printf 'FAIL: interlayer Lie transaction (%s)\n' "$profile" >&2
+      cat interlayer-lie-results.log >&2
+      exit 1
+    fi
     cat interlayer-lie-results.log
     "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       $netcdf_fflags -c "$test_dir/test_interlayer_momentum_exchange.f90"
