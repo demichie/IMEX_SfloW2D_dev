@@ -4,6 +4,8 @@ PROGRAM test_interlayer_mass_exchange
     USE parameters_2d, ONLY : n_stoch_vars,n_pore_vars,gas_flag,sutherland_flag
     USE parameters_2d, ONLY : configure_canonical_state_indices,idx_solidEqn_first
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn,idx_addGasEqn_first
+    USE parameters_2d, ONLY : idx_poreEqn
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
     USE interlayer_mass_exchange_parameters_2d, ONLY : interlayer_mass_exchange_config_type, interlayer_mass_exchange
     USE interlayer_mass_exchange_2d, ONLY : limit_interlayer_mass_transfer,eval_interlayer_mass_exchange_explicit
     USE interlayer_elutriation_2d, ONLY : eval_interlayer_elutriation_explicit
@@ -203,6 +205,7 @@ PROGRAM test_interlayer_mass_exchange
     CALL test_concentrated_carrier_limit()
     CALL test_physical_sources()
     CALL test_bidirectional_physical_budget()
+    CALL test_pore_content_exchange()
 
     PRINT *, 'PASS paired interlayer inventory, packing, co-lift modes and input validation'
 
@@ -743,6 +746,82 @@ CONTAINS
             END DO
         END DO
     END SUBROUTINE test_bidirectional_physical_budget
+
+    !> @brief Verify that the pore component moves with the exchanged mass.
+    !> @details The pore variable rho_m*h*p_e is mass-specific: a donor gives
+    !>          away mass*p_e(donor), so the exchange leaves the donor p_e
+    !>          unchanged. A layer whose pore equation is off neither gives
+    !>          nor receives pore content.
+    SUBROUTINE test_pore_content_exchange()
+        TYPE(physical_state_real) :: l1,l2
+        TYPE(interlayer_mass_exchange_config_type) :: pair
+        TYPE(mass_exchange_config_type) :: mass_l2
+        TYPE(rheology_config_type) :: rheology_l2
+        REAL(wp) :: source1(7),source2(7)
+        REAL(wp), PARAMETER :: pe1=2000.0_wp,pe2=50.0_wp,dt_local=0.5_wp
+        LOGICAL :: valid
+
+        n_layers=2; n_solid=2; n_add_gas=0; n_stoch_vars=0; n_pore_vars=1
+        n_vars=7; n_eqns=7
+        CALL configure_canonical_state_indices()
+        CALL require(idx_poreEqn==7,'pore equation follows the two solid equations')
+        CALL initialize_physical_state_real(l1)
+        CALL initialize_physical_state_real(l2)
+        l1%h=0.01_wp; l1%alphas=[0.35_wp,0.24_wp]; l1%rho_c=1.5_wp
+        l1%rho_m=SUM(rho_s*l1%alphas)+l1%rho_c*(1.0_wp-SUM(l1%alphas))
+        l1%xs=rho_s*l1%alphas/l1%rho_m
+        l1%cp_c=900.0_wp; l1%T=410.0_wp; l1%u=8.0_wp; l1%v=0.5_wp
+        l1%exc_pore_pres=pe1
+        l2%h=1.0_wp; l2%alphas=[0.11_wp,0.07_wp]; l2%rho_c=0.8_wp
+        l2%rho_m=SUM(rho_s*l2%alphas)+l2%rho_c*(1.0_wp-SUM(l2%alphas))
+        l2%xs=rho_s*l2%alphas/l2%rho_m
+        l2%cp_c=1100.0_wp; l2%T=290.0_wp; l2%u=-2.0_wp; l2%v=-0.25_wp
+        l2%exc_pore_pres=pe2
+        pair%rouse_critical=100.0_wp
+
+        ! Only L1 carries pore pressure: lifted material releases it.
+        pore_pressure_l1%pore_pressure_flag=.TRUE.
+        pore_pressure_l2%pore_pressure_flag=.FALSE.
+        pair%settling_flag=.FALSE.; pair%elutriation_flag=.TRUE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid .AND. source1(idx_totMassEqn)<0.0_wp,'elutriation with L1 pore pressure')
+        CALL close(source1(idx_poreEqn),pe1*source1(idx_totMassEqn), &
+            'elutriation removes L1 pore content at the L1 excess pressure')
+        CALL close(source2(idx_poreEqn),0.0_wp,'L2 without pore equation receives none')
+
+        ! Material settling from an L2 without pore pressure arrives with none.
+        pair%settling_flag=.TRUE.; pair%elutriation_flag=.FALSE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid .AND. source1(idx_totMassEqn)>0.0_wp,'settling with L1 pore pressure')
+        CALL close(source1(idx_poreEqn),0.0_wp,'settled material carries no excess pressure')
+
+        ! Both layers carry pore pressure: each donor gives mass*p_e(donor).
+        pore_pressure_l2%pore_pressure_flag=.TRUE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid,'settling with pore pressure in both layers')
+        CALL close(source1(idx_poreEqn),pe2*source1(idx_totMassEqn), &
+            'settling moves L2 pore content at the L2 excess pressure')
+        CALL close(source1(idx_poreEqn)+source2(idx_poreEqn),0.0_wp,'settling pore pair')
+        pair%settling_flag=.FALSE.; pair%elutriation_flag=.TRUE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid,'elutriation with pore pressure in both layers')
+        CALL close(source1(idx_poreEqn),pe1*source1(idx_totMassEqn), &
+            'elutriation moves L1 pore content at the L1 excess pressure')
+        CALL close(source1(idx_poreEqn)+source2(idx_poreEqn),0.0_wp,'elutriation pore pair')
+        pair%settling_flag=.TRUE.
+        CALL eval_interlayer_mass_exchange_explicit(pair,rheology_l2,mass_l2, &
+            l1,l2,l1,l2,dt_local,source1,source2,valid)
+        CALL require(valid,'two-way exchange with pore pressure in both layers')
+        CALL close(source1(idx_poreEqn)+source2(idx_poreEqn),0.0_wp,'two-way pore pair')
+
+        pore_pressure_l1%pore_pressure_flag=.FALSE.
+        pore_pressure_l2%pore_pressure_flag=.FALSE.
+        n_pore_vars=0
+    END SUBROUTINE test_pore_content_exchange
 
     SUBROUTINE execute(expected_valid)
         LOGICAL, INTENT(IN) :: expected_valid

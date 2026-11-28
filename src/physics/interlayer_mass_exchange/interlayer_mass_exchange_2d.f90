@@ -6,7 +6,8 @@
 MODULE interlayer_mass_exchange_2d
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
-    USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
+    USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first,idx_poreEqn
+    USE pore_pressure_parameters_2d, ONLY : pore_pressure_l1,pore_pressure_l2
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real,physical_state_complex
     USE state_physical, ONLY : build_physical_state_from_qp
@@ -435,7 +436,33 @@ CONTAINS
             source_l2(idx_vEqn)=source_l2(idx_vEqn)-direction*mass*uy
             source_l2(idx_engyEqn)=source_l2(idx_engyEqn)-direction*thermal
             IF (species_eq>0) source_l2(species_eq)=source_l2(species_eq)-direction*mass
+            IF (idx_poreEqn>0) CALL add_pore(mass,direction)
         END SUBROUTINE add_pair
+
+        !> @brief Carry the donor excess pore pressure with the transferred mass.
+        !> @details The pore component rho_m*h*p_e is a mass-specific quantity, like
+        !>          momentum: the donor loses mass*p_e(donor), so its own p_e does not
+        !>          change when it gives mass away. A layer whose pore-pressure equation
+        !>          is off neither carries nor receives excess pressure: material lifted
+        !>          from L1 into it releases its excess pressure, and material settling
+        !>          from it arrives with none.
+        !> @param[in] mass Positive transferred phase mass rate [kg/m2/s].
+        !> @param[in] direction Positive L2-to-L1, negative L1-to-L2.
+        SUBROUTINE add_pore(mass,direction)
+            REAL(wp), INTENT(IN) :: mass,direction
+            REAL(wp) :: pore_content
+            IF (direction>0.0_wp) THEN
+                IF (.NOT.pore_pressure_l2%pore_pressure_flag) RETURN
+                pore_content=mass*eval_l2%exc_pore_pres
+            ELSE
+                IF (.NOT.pore_pressure_l1%pore_pressure_flag) RETURN
+                pore_content=mass*eval_l1%exc_pore_pres
+            END IF
+            IF (pore_pressure_l1%pore_pressure_flag) &
+                source_l1(idx_poreEqn)=source_l1(idx_poreEqn)+direction*pore_content
+            IF (pore_pressure_l2%pore_pressure_flag) &
+                source_l2(idx_poreEqn)=source_l2(idx_poreEqn)-direction*pore_content
+        END SUBROUTINE add_pore
 
         !> @brief Add equal and opposite transported additional-carrier species mass.
         !> @param[in] mass Additional carrier constituent mass rate [kg/m2/s].

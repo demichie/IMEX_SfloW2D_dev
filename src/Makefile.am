@@ -671,7 +671,8 @@ physics/interlayer_mass_exchange/interlayer_mass_exchange_2d.$(OBJEXT): \
     state/state_fields.$(OBJEXT) \
     core/parameters_2d.$(OBJEXT) core/solid_transport_parameters_2d.$(OBJEXT) \
     physics/rheology_laws/rheology_parameters_2d.$(OBJEXT) \
-    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT)
+    physics/mass_exchange/mass_exchange_parameters_2d.$(OBJEXT) \
+    physics/pore_pressure/pore_pressure_parameters_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): \
     physics/interlayer_mass_exchange/interlayer_mass_exchange_parameters_2d.$(OBJEXT) \
     physics/interlayer_momentum_exchange/interlayer_momentum_exchange_2d.$(OBJEXT)
