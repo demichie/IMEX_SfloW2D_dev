@@ -340,13 +340,29 @@ CONTAINS
         REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
         REAL(wp) :: down,up,chi,interfacial_u,interfacial_v,solid_mass,carrier_mass
         REAL(wp) :: donor_xg(n_add_gas),gas_mass_fraction
+        REAL(wp) :: rho_eval_l1,rho_eval_l2,rho_limit_l1,rho_limit_l2
         INTEGER :: i
 
         source_l1=0.0_wp
         source_l2=0.0_wp
         valid=.FALSE.
         IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
-        IF (limit_l1%rho_c<=0.0_wp .OR. limit_l2%rho_c<=0.0_wp) RETURN
+
+        ! The dry-state carrier density is an ambient placeholder, not the
+        ! density of material first received from the other layer. Use the
+        ! donor density to convert transferred carrier mass into recipient
+        ! volume when that recipient has no material yet. The evaluation
+        ! snapshot and the post-spatial inventory may have different wetness.
+        rho_eval_l1=eval_l1%rho_c
+        rho_eval_l2=eval_l2%rho_c
+        rho_limit_l1=limit_l1%rho_c
+        rho_limit_l2=limit_l2%rho_c
+        IF (eval_l1%h<=0.0_wp) rho_eval_l1=eval_l2%rho_c
+        IF (eval_l2%h<=0.0_wp) rho_eval_l2=eval_l1%rho_c
+        IF (limit_l1%h<=0.0_wp) rho_limit_l1=eval_l2%rho_c
+        IF (limit_l2%h<=0.0_wp) rho_limit_l2=eval_l1%rho_c
+        IF (rho_limit_l1<=0.0_wp .OR. rho_limit_l2<=0.0_wp) RETURN
+
         IF (config%settling_flag .AND. eval_l2%h>0.0_wp) THEN
             CALL eval_interlayer_settling_explicit(config,rheology_l2,mass_l2,eval_l2,dt,proposed_s)
         ELSE
@@ -363,8 +379,8 @@ CONTAINS
         carrier2=limit_l2%h*MAX(0.0_wp,1.0_wp-SUM(limit_l2%alphas))
         CALL limit_interlayer_mass_transfer(solid1,solid2,carrier1,carrier2,proposed_s,proposed_e, &
             dt,maximum_solid_packing,config,limited_s,limited_e,down,up,valid, &
-            rho_carrier_l1=eval_l1%rho_c,rho_carrier_l2=eval_l2%rho_c, &
-            candidate_rho_l1=limit_l1%rho_c,candidate_rho_l2=limit_l2%rho_c)
+            rho_carrier_l1=rho_eval_l1,rho_carrier_l2=rho_eval_l2, &
+            candidate_rho_l1=rho_limit_l1,candidate_rho_l2=rho_limit_l2)
         IF (.NOT.valid) RETURN
 
         ! The same interface velocity is debited from L2 and credited to L1.

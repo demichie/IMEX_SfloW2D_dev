@@ -85,6 +85,46 @@ PROGRAM test_interlayer_lie_transaction
     CALL check_conservation(before,q,'cold-start L1')
     CALL check_admissibility(qp)
 
+    ! The canonical dry-state density is ambient, but the first material
+    ! transferred into the empty layer has the hot donor's carrier density.
+    CALL make_column(0.0_wp,1.0_wp,0.0_wp,2.0_wp,q,qp)
+    qp(idx_T,2)=650.0_wp
+    CALL primitive_to_conservative(qp(:,2),q(:,2),accepted=ok)
+    CALL require(ok,'hot L2 donor conservative conversion')
+    CALL build_physical_state_from_qp(qp(:,1),check1,accepted=ok)
+    CALL require(ok,'dry L1 physical reconstruction')
+    CALL build_physical_state_from_qp(qp(:,2),check2,accepted=ok)
+    CALL require(ok,'hot L2 physical reconstruction')
+    CALL require(ABS(check1%rho_c-check2%rho_c)>0.1_wp*check1%rho_c, &
+        'cold-start test distinguishes ambient and donor carrier densities')
+    before=q; snapshot=qp
+    CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
+    CALL require(status==0,'hot L2 settles into initially dry L1')
+    CALL require(q(idx_totMassEqn,1)>0.0_wp,'hot donor creates lower-layer mass')
+    CALL build_physical_state_from_qp(qp(:,1),check1,accepted=ok)
+    CALL require(ok,'hot donor produces a valid lower-layer physical state')
+    CALL require(ABS(SUM(check1%alphas)-maximum_solid_packing)<1.0E-8_wp, &
+        'first settled L1 deposit uses donor carrier density at packing')
+    CALL check_conservation(before,q,'hot donor cold-start L1')
+    CALL check_admissibility(qp)
+
+    ! The reverse transfer must likewise initialize an empty L2 using the
+    ! L1 donor properties rather than its ambient dry-state placeholder.
+    CALL make_column(1.0_wp,0.0_wp,20.0_wp,0.0_wp,q,qp)
+    qp(idx_T,1)=650.0_wp
+    CALL primitive_to_conservative(qp(:,1),q(:,1),accepted=ok)
+    CALL require(ok,'hot L1 donor conservative conversion')
+    before=q; snapshot=qp
+    CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
+    CALL require(status==0,'hot L1 elutriates into initially dry L2')
+    CALL require(q(idx_totMassEqn,2)>0.0_wp,'hot donor creates upper-layer mass')
+    CALL build_physical_state_from_qp(qp(:,2),check2,accepted=ok)
+    CALL require(ok,'hot donor produces a valid upper-layer physical state')
+    CALL require(ABS(SUM(check2%alphas)-config%elutriation_solid_volume_fraction)<1.0E-8_wp, &
+        'first elutriated L2 parcel retains prescribed solid fraction')
+    CALL check_conservation(before,q,'hot donor cold-start L2')
+    CALL check_admissibility(qp)
+
     CALL make_column(1.0_wp,1.0_wp,20.0_wp,2.0_wp,q,qp)
     before=q; snapshot=qp
     CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
