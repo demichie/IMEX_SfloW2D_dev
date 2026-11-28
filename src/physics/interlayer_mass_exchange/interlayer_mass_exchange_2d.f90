@@ -4,13 +4,15 @@
 !>          before returning any accepted flux. It does not update conservative
 !>          states, own grid indices or perform a Lie timestep.
 MODULE interlayer_mass_exchange_2d
-    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns
+    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,n_eqns,gas_flag
     USE parameters_2d, ONLY : idx_totMassEqn,idx_uEqn,idx_vEqn,idx_engyEqn
     USE parameters_2d, ONLY : idx_solidEqn_first,idx_addGasEqn_first
+    USE parameters_2d, ONLY : idx_T,idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last
     USE diagnostics_2d, ONLY : fatal_error
     USE state_types, ONLY : physical_state_real,physical_state_complex
     USE state_physical, ONLY : build_physical_state_from_qp
     USE state_conversions, ONLY : conservative_to_primitive
+    USE state_mixture, ONLY : evaluate_mixture_phase_properties
     USE state_composition, ONLY : conservative_mass_admissible
     USE state_fields, ONLY : initialize_dry_physical_cell
     USE rheology_parameters_2d, ONLY : rheology_config_type
@@ -326,8 +328,11 @@ CONTAINS
     !> @param[out] source_l1 Signed L1 conservative rate vector.
     !> @param[out] source_l2 Signed L2 conservative rate vector.
     !> @param[out] valid Whether an admissible paired rate has been assembled.
+    !> @param[in] rate_scale Optional common reduction of the already limited transfer rates.
+    !> @param[in] carrier_down_extra Optional additional L2-to-L1 carrier volume rate [m/s].
+    !> @param[out] carrier_down_used Optional original limited downward carrier rate [m/s].
     SUBROUTINE eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2,eval_l1,eval_l2, &
-            limit_l1,limit_l2,dt,source_l1,source_l2,valid)
+            limit_l1,limit_l2,dt,source_l1,source_l2,valid,rate_scale,carrier_down_extra,carrier_down_used)
         TYPE(interlayer_mass_exchange_config_type), INTENT(IN) :: config
         TYPE(rheology_config_type), INTENT(IN) :: rheology_l2
         TYPE(mass_exchange_config_type), INTENT(IN) :: mass_l2
@@ -335,6 +340,8 @@ CONTAINS
         REAL(wp), INTENT(IN) :: dt
         REAL(wp), INTENT(OUT) :: source_l1(n_eqns),source_l2(n_eqns)
         LOGICAL, INTENT(OUT) :: valid
+        REAL(wp), INTENT(IN), OPTIONAL :: rate_scale,carrier_down_extra
+        REAL(wp), INTENT(OUT), OPTIONAL :: carrier_down_used
         REAL(wp) :: proposed_s(n_solid),proposed_e(n_solid)
         REAL(wp) :: limited_s(n_solid),limited_e(n_solid)
         REAL(wp) :: solid1(n_solid),solid2(n_solid),carrier1,carrier2
@@ -346,6 +353,7 @@ CONTAINS
         source_l1=0.0_wp
         source_l2=0.0_wp
         valid=.FALSE.
+        IF (PRESENT(carrier_down_used)) carrier_down_used=0.0_wp
         IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
 
         ! The dry-state carrier density is an ambient placeholder, not the
@@ -382,6 +390,41 @@ CONTAINS
             rho_carrier_l1=rho_eval_l1,rho_carrier_l2=rho_eval_l2, &
             candidate_rho_l1=rho_limit_l1,candidate_rho_l2=rho_limit_l2)
         IF (.NOT.valid) RETURN
+        IF (PRESENT(carrier_down_used)) carrier_down_used=down
+
+        ! The optional adjustment is used only after testing the reconstructed
+        ! conservative candidate. It preserves gross donor budgets: even a
+        ! compensating carrier transfer cannot spend simultaneous receipts.
+        IF (PRESENT(rate_scale)) THEN
+            IF (.NOT.ieee_is_finite(rate_scale)) THEN
+                valid=.FALSE.
+                RETURN
+            END IF
+            IF (rate_scale<0.0_wp .OR. rate_scale>1.0_wp) THEN
+                valid=.FALSE.
+                RETURN
+            END IF
+            limited_s=rate_scale*limited_s
+            limited_e=rate_scale*limited_e
+            down=rate_scale*down
+            up=rate_scale*up
+        END IF
+        IF (PRESENT(carrier_down_extra)) THEN
+            IF (.NOT.ieee_is_finite(carrier_down_extra)) THEN
+                valid=.FALSE.
+                RETURN
+            END IF
+            IF (carrier_down_extra<0.0_wp) THEN
+                valid=.FALSE.
+                RETURN
+            END IF
+            down=down+carrier_down_extra
+        END IF
+        IF (dt*down*eval_l2%rho_c>carrier2*limit_l2%rho_c+ &
+            128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,carrier2*limit_l2%rho_c)) THEN
+            valid=.FALSE.
+            RETURN
+        END IF
 
         ! The same interface velocity is debited from L2 and credited to L1.
         chi=config%settling_velocity_weight+(1.0_wp-config%settling_velocity_weight)* &
@@ -496,8 +539,10 @@ CONTAINS
         TYPE(physical_state_real), INTENT(INOUT) :: physical(4)
         INTEGER, INTENT(OUT) :: status
         REAL(wp) :: candidate_q(n_vars,2),candidate_qp(n_vars,2)
-        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns),rate_margin
-        LOGICAL :: ok,roundoff_depletion,has_negative_solid
+        REAL(wp) :: rate_l1(n_eqns),rate_l2(n_eqns),rate_margin,down_baseline
+        REAL(wp) :: best_q(n_vars,2),best_qp(n_vars,2)
+        LOGICAL :: ok,roundoff_depletion,has_negative_solid,packed(2)
+        LOGICAL :: trial_ok
         INTEGER :: layer,i,eq
 
         status=18
@@ -520,7 +565,8 @@ CONTAINS
 
         status=19
         CALL eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2, &
-            physical(1),physical(2),physical(3),physical(4),dt,rate_l1,rate_l2,ok)
+            physical(1),physical(2),physical(3),physical(4),dt,rate_l1,rate_l2,ok, &
+            carrier_down_used=down_baseline)
         IF (.NOT.ok) RETURN
         candidate_q=q
         candidate_q(1:n_eqns,1)=candidate_q(1:n_eqns,1)+dt*rate_l1
@@ -565,9 +611,158 @@ CONTAINS
                 CALL initialize_dry_physical_cell(candidate_qp(:,layer))
             END IF
         END DO
+        CALL evaluate_candidate_packing(candidate_q,candidate_qp,packed,ok)
+        IF (.NOT.ok) RETURN
+        IF (.NOT.ALL(packed)) THEN
+            ! Keep the transaction atomic. First seek extra descending carrier,
+            ! then reduce the original coupled source rates when insufficient.
+            CALL recover_thermodynamic_packing(best_q,best_qp,trial_ok)
+            IF (.NOT.trial_ok) RETURN
+            candidate_q=best_q
+            candidate_qp=best_qp
+        END IF
         q=candidate_q
         qp=candidate_qp
         status=0
+
+    CONTAINS
+
+        !> @brief Check the true post-transfer solid fractions from the canonical EOS.
+        !> @param[in] candidate Conservative paired state after a proposed transfer.
+        !> @param[in] primitive Reconstructed primitive paired state.
+        !> @param[out] fits Packing admissibility for each layer.
+        !> @param[out] accepted Whether thermodynamic reconstruction was valid.
+        SUBROUTINE evaluate_candidate_packing(candidate,primitive,fits,accepted)
+            REAL(wp), INTENT(IN) :: candidate(n_vars,2),primitive(n_vars,2)
+            LOGICAL, INTENT(OUT) :: fits(2),accepted
+            REAL(wp) :: rho_m,inv_rho_m,rho_c,inv_rho_c,alpha(n_solid),alphag(n_add_gas)
+            INTEGER :: k
+
+            fits=.FALSE.
+            accepted=.TRUE.
+            DO k=1,2
+                IF (candidate(idx_totMassEqn,k)<=0.0_wp) THEN
+                    fits(k)=.TRUE.
+                    CYCLE
+                END IF
+                IF (.NOT.ieee_is_finite(primitive(idx_T,k)) .OR. primitive(idx_T,k)<=0.0_wp) THEN
+                    accepted=.FALSE.
+                    RETURN
+                END IF
+                CALL evaluate_mixture_phase_properties(primitive(idx_T,k), &
+                    primitive(idx_solid_first:idx_solid_last,k), &
+                    primitive(idx_add_gas_first:idx_add_gas_last,k), &
+                    rho_m,inv_rho_m,rho_c,inv_rho_c,alpha,alphag)
+                accepted=ieee_is_finite(rho_m) .AND. ieee_is_finite(rho_c) .AND. &
+                    ALL(ieee_is_finite(alpha))
+                IF (.NOT.accepted) RETURN
+                fits(k)=SUM(alpha)<=maximum_solid_packing+ &
+                    128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,maximum_solid_packing)
+            END DO
+        END SUBROUTINE evaluate_candidate_packing
+
+        !> @brief Assemble and validate one candidate without committing either layer.
+        !> @param[in] scale Common factor on the previously accepted physical exchange.
+        !> @param[in] extra Additional L2-to-L1 carrier volume rate [m/s].
+        !> @param[out] trial_q Conservative candidate, unchanged outside this call.
+        !> @param[out] trial_qp Primitive candidate, unchanged outside this call.
+        !> @param[out] fits Layer-wise thermodynamic packing validity.
+        !> @param[out] accepted True when conservative and primitive states are valid.
+        SUBROUTINE trial_transfer(scale,extra,trial_q,trial_qp,fits,accepted)
+            REAL(wp), INTENT(IN) :: scale,extra
+            REAL(wp), INTENT(OUT) :: trial_q(n_vars,2),trial_qp(n_vars,2)
+            LOGICAL, INTENT(OUT) :: fits(2),accepted
+            REAL(wp) :: trial_l1(n_eqns),trial_l2(n_eqns)
+            INTEGER :: k
+
+            fits=.FALSE.
+            CALL eval_interlayer_mass_exchange_explicit(config,rheology_l2,mass_l2, &
+                physical(1),physical(2),physical(3),physical(4),dt,trial_l1,trial_l2,accepted, &
+                rate_scale=scale,carrier_down_extra=extra)
+            IF (.NOT.accepted) RETURN
+            trial_q=q
+            trial_q(1:n_eqns,1)=q(1:n_eqns,1)+dt*trial_l1
+            trial_q(1:n_eqns,2)=q(1:n_eqns,2)+dt*trial_l2
+            DO k=1,2
+                IF (.NOT.conservative_mass_admissible(trial_q(1:n_eqns,k))) THEN
+                    accepted=.FALSE.
+                    RETURN
+                END IF
+            END DO
+            trial_qp=qp
+            DO k=1,2
+                IF (.NOT.ANY(trial_q(:,k)/=q(:,k))) CYCLE
+                IF (trial_q(idx_totMassEqn,k)>0.0_wp) THEN
+                    CALL conservative_to_primitive(trial_q(:,k),trial_qp(:,k),accepted=accepted)
+                    IF (.NOT.accepted) RETURN
+                ELSE
+                    CALL initialize_dry_physical_cell(trial_qp(:,k))
+                END IF
+            END DO
+            CALL evaluate_candidate_packing(trial_q,trial_qp,fits,accepted)
+        END SUBROUTINE trial_transfer
+
+        !> @brief Find a physically admissible correction without sequencing source laws.
+        !> @details Sample carrier increments and refine a feasible transition.
+        !>          No global monotonicity is assumed across different source scales.
+        !> @param[out] final_q Conservative pair for the accepted adjustment.
+        !> @param[out] final_qp Primitive pair for the accepted adjustment.
+        !> @param[out] found Whether a thermodynamically admissible pair was found.
+        SUBROUTINE recover_thermodynamic_packing(final_q,final_qp,found)
+            REAL(wp), INTENT(OUT) :: final_q(n_vars,2),final_qp(n_vars,2)
+            LOGICAL, INTENT(OUT) :: found
+            REAL(wp) :: scale,maximum_extra,extra,previous_extra,lo,hi,mid
+            REAL(wp) :: trial_q(n_vars,2),trial_qp(n_vars,2)
+            LOGICAL :: fits(2),accepted
+            INTEGER :: attempt,j,k
+
+            found=.FALSE.
+            DO attempt=1,13
+                scale=2.0_wp**(1-attempt)
+                ! An extra transfer can use only the post-spatial L2 carrier
+                ! inventory remaining after the original gross downward flux.
+                maximum_extra=physical(4)%h*MAX(0.0_wp,1.0_wp-SUM(physical(4)%alphas))* &
+                    physical(4)%rho_c/(dt*physical(2)%rho_c)-scale*down_baseline
+                maximum_extra=MAX(0.0_wp,maximum_extra*(1.0_wp-64.0_wp*EPSILON(1.0_wp)))
+                previous_extra=0.0_wp
+                DO j=0,16
+                    extra=maximum_extra*REAL(j,wp)/16.0_wp
+                    CALL trial_transfer(scale,extra,trial_q,trial_qp,fits,accepted)
+                    IF (accepted .AND. ALL(fits)) THEN
+                        final_q=trial_q
+                        final_qp=trial_qp
+                        found=.TRUE.
+                        IF (j==0) RETURN
+                        ! Refine the first sampled admissible transition. The
+                        ! complete pair is checked at each trial; failure does
+                        ! not mutate either physical recipient.
+                        lo=previous_extra
+                        hi=extra
+                        DO k=1,32
+                            mid=0.5_wp*(lo+hi)
+                            CALL trial_transfer(scale,mid,trial_q,trial_qp,fits,accepted)
+                            IF (accepted .AND. ALL(fits)) THEN
+                                hi=mid
+                                final_q=trial_q
+                                final_qp=trial_qp
+                            ELSE
+                                lo=mid
+                            END IF
+                        END DO
+                        RETURN
+                    END IF
+                    previous_extra=extra
+                END DO
+            END DO
+
+            ! A zero source is admissible whenever the pre-transfer pair is.
+            CALL trial_transfer(0.0_wp,0.0_wp,trial_q,trial_qp,fits,accepted)
+            IF (accepted .AND. ALL(fits)) THEN
+                final_q=trial_q
+                final_qp=trial_qp
+                found=.TRUE.
+            END IF
+        END SUBROUTINE recover_thermodynamic_packing
     END SUBROUTINE apply_interlayer_lie_group
     !> @brief Reject unsupported semi-implicit treatment for interlayer mass exchange.
     !> @details No candidate state is committed; report the unsupported method.

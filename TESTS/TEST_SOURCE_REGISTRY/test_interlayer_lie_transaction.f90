@@ -10,6 +10,7 @@ PROGRAM test_interlayer_lie_transaction
     USE solid_transport_parameters_2d, ONLY : rho_s,inv_rho_s,sp_heat_s,diam_s,maximum_solid_packing
     USE state_types, ONLY : physical_state_real,initialize_physical_state_real
     USE state_physical, ONLY : build_physical_state_from_qp
+    USE state_mixture, ONLY : evaluate_mixture_from_volume
     USE state_conversions, ONLY : primitive_to_conservative,conservative_to_primitive
     USE interlayer_mass_exchange_2d, ONLY : apply_interlayer_lie_group
     USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
@@ -33,6 +34,8 @@ PROGRAM test_interlayer_lie_transaction
     REAL(wp) :: after_group0(6,2),after_later(6,2)
     REAL(wp) :: after_transfer(6,2),slip_before,slip_after
     REAL(wp) :: dt,exchange_source(6)
+    REAL(wp) :: alpha_test(2),alphag_test(0),xs_test(2),xg_test(0)
+    REAL(wp) :: rho_test,inv_rho_test,rho_c_test,xc_test,cp_c_test,cp_m_test
     LOGICAL :: ok
     INTEGER :: i,status
 
@@ -124,6 +127,32 @@ PROGRAM test_interlayer_lie_transaction
         'first elutriated L2 parcel retains prescribed solid fraction')
     CALL check_conservation(before,q,'hot donor cold-start L2')
     CALL check_admissibility(qp)
+
+    ! A concentrated hot L1 cools under settling from cold L2. The ideal-gas
+    ! carrier contracts, so packing must be checked after energy reconstruction
+    ! rather than with the carrier densities at the start of the group.
+    config%elutriation_flag=.FALSE.
+    CALL make_column(0.5_wp,10.0_wp,0.0_wp,2.0_wp,q,qp)
+    alpha_test=[0.35_wp,0.2499_wp]
+    CALL evaluate_mixture_from_volume(900.0_wp,alphag_test,alpha_test, &
+        rho_test,inv_rho_test,rho_c_test,xs_test,xg_test,xc_test,cp_c_test,cp_m_test)
+    qp(idx_solid_first:idx_solid_last,1)=xs_test
+    qp(idx_T,1)=900.0_wp
+    qp(idx_T,2)=280.0_wp
+    DO i=1,2
+        CALL primitive_to_conservative(qp(:,i),q(:,i),accepted=ok)
+        CALL require(ok,'concentrated thermal donor conservative conversion')
+    END DO
+    CALL build_physical_state_from_qp(qp(:,1),check1,accepted=ok)
+    CALL require(ok,'concentrated thermal recipient initialized')
+    CALL require(ABS(SUM(check1%alphas)-SUM(alpha_test))<1.0E-10_wp, &
+        'concentrated thermal recipient initial packing')
+    before=q; snapshot=qp
+    CALL apply_interlayer_lie_group(config,rheology_l2,mass_l2,snapshot,.FALSE.,dt,q,qp,scratch,status)
+    CALL require(status==0,'thermodynamic packing transaction accepted')
+    CALL check_conservation(before,q,'thermodynamic packing correction')
+    CALL check_admissibility(qp)
+    config%elutriation_flag=.TRUE.
 
     CALL make_column(1.0_wp,1.0_wp,20.0_wp,2.0_wp,q,qp)
     before=q; snapshot=qp
