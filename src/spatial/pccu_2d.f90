@@ -244,12 +244,14 @@ CONTAINS
 
         ! The coupled speed envelope skips each layer whose reconstructed
         ! depth is dry, even if their summed depth slightly exceeds the
-        ! threshold. Use the same layer-wise criterion here: neither layer
-        ! can generate a wave at an all-dry face, while tiny reconstructed
-        ! depths can still produce a roundoff pressure path.
+        ! threshold. Use the same layer-wise criterion here: when either
+        ! layer is dry on both sides there is no interface to carry a wave
+        ! or an interlayer pressure, while tiny reconstructed depths can
+        ! still produce a roundoff pressure path (for instance a resting
+        ! 2.4e-10 m L1 film under a 2.7e-12 m L2 trace, next to a dry cell).
         IF (a_plus-a_minus<=pccu_speed_tolerance) THEN
-            IF (MAX(h1_left,h2_left)<=dry_thickness_tolerance .AND. &
-                MAX(h1_right,h2_right)<=dry_thickness_tolerance) THEN
+            IF (MAX(h1_left,h1_right)<=dry_thickness_tolerance .OR. &
+                MAX(h2_left,h2_right)<=dry_thickness_tolerance) THEN
                 left_l1=0.0_wp
                 right_l1=0.0_wp
                 left_l2=0.0_wp

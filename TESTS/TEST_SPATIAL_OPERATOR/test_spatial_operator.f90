@@ -2375,6 +2375,18 @@ CONTAINS
             ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
             ERROR STOP 'Individually dry layers produced a nonzero interlayer force'
 
+        ! Etna mu(I)-Voellmy regression: a resting 2.4e-10 m L1 film next to a
+        ! dry cell, under a 2.7e-12 m L2 trace. L2 is dry on both sides, so the
+        ! face has no interface and must vanish although L1 is wet on one side.
+        CALL eval_interlayer_oriented_face(1, &
+            0.0_wp,0.0_wp,0.0_wp,3.1758661212499997E+03_wp, &
+            2.4328983272425830E-10_wp,2.7284841053187847E-12_wp, &
+            7.3576748693682252E-10_wp,3.1758661212502461E+03_wp,1.0_wp, &
+            0.0_wp,0.0_wp,l1left,l1right,l2left,l2right)
+        IF (ANY(l1left/=0.0_wp) .OR. ANY(l1right/=0.0_wp) .OR. &
+            ANY(l2left/=0.0_wp) .OR. ANY(l2right/=0.0_wp)) &
+            ERROR STOP 'A layer dry on both sides produced a nonzero interlayer force'
+
         WRITE(*,*) 'PASS: stationary and layer-wise dry interlayer faces'
     END SUBROUTINE check_degenerate_interlayer_face
 
