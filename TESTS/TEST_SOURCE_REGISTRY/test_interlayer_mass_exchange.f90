@@ -113,6 +113,33 @@ PROGRAM test_interlayer_mass_exchange
     CALL execute(.TRUE.)
     CALL require(accepted_s(1)>0.0_wp,'overpacked L2 settles solids to recover packing')
 
+    ! A narrow admissible window lies between successive 1/64 grid points.
+    ! Its exact bounds are 0.125/0.126 <= f_elut <= 0.1255/0.126.
+    ! A fixed-grid search misses the entire feasible interval.
+    config%elutriation_solid_volume_fraction=1.0_wp
+    s1=[0.65_wp,0.0_wp]; carrier1=0.35_wp
+    s2=[0.5498_wp,0.0_wp]; carrier2=0.4502_wp
+    settle=0.0_wp; elut=[0.126_wp,0.0_wp]
+    CALL execute(.TRUE.)
+    CALL require(accepted_e(1)>0.125_wp .AND. accepted_e(1)<=0.1255_wp+1.0E-12_wp, &
+        'narrow overpacked recovery interval found without sampling')
+    config%elutriation_solid_volume_fraction=0.1_wp
+
+    ! The three-dimensional concentrated mode permits stronger solid
+    ! recovery than the prescribed-composition mode under gross donor caps.
+    s1=[0.65_wp,0.0_wp]; carrier1=0.35_wp
+    s2=[0.10_wp,0.0_wp]; carrier2=0.35_wp
+    settle=0.0_wp; elut=[0.30_wp,0.0_wp]
+    config%elutriation_solid_volume_fraction=0.1_wp
+    config%elutriation_carrier_mode='LIMIT_SOLIDS'
+    CALL execute(.TRUE.)
+    strict_lift=accepted_e(1)
+    config%elutriation_carrier_mode='ALLOW_CONCENTRATED'
+    CALL execute(.TRUE.)
+    CALL require(accepted_e(1)>strict_lift,'concentrated lift increases overpacked recovery')
+    CALL require(up<9.0_wp*accepted_e(1),'recovery reduces co-lift independently')
+    config%elutriation_carrier_mode='LIMIT_SOLIDS'
+
     ! Reject an overpacked state when no physical solid transfer can repair it.
     s1=[0.65_wp,0.0_wp]; carrier1=0.35_wp
     s2=[0.65_wp,0.0_wp]; carrier2=0.35_wp

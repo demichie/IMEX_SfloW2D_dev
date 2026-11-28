@@ -123,7 +123,7 @@ CONTAINS
         REAL(wp) :: initial_scale,down_candidate,f_carrier
         REAL(wp) :: settle_total,elut_total,s1,s2,c1,c2
         LOGICAL :: initially_overpacked
-        INTEGER :: i,k,n,j,mode
+        INTEGER :: i,k,n
 
         accepted_settling=0.0_wp
         accepted_elutriation=0.0_wp
@@ -235,77 +235,13 @@ CONTAINS
         ! before sacrificing either solid flux. This never applies to
         ! LIMIT_SOLIDS, whose lifted parcel composition is prescribed.
         IF (initially_overpacked) THEN
-            ! A zero exchange is not feasible here. Search the donor-bounded
-            ! settling/elutriation rectangle directly; each sampled state
-            ! satisfies BOTH final packing constraints before being accepted.
-            ! This path is only used for already overpacked inventories.
-            valid=.FALSE.
-            DO i=64,0,-1
-                IF (valid) EXIT
-                DO j=64,0,-1
-                    f_settle=REAL(i,wp)/64.0_wp
-                    f_elut=REAL(j,wp)/64.0_wp
-                    f_carrier=f_elut
-                    IF (feasible(f_settle,f_elut,f_carrier)) THEN
-                        valid=.TRUE.
-                        EXIT
-                    END IF
-                    IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED') THEN
-                        DO mode=1,8
-                            f_carrier=f_elut*REAL(8-mode,wp)/8.0_wp
-                            IF (feasible(f_settle,f_elut,f_carrier)) THEN
-                                valid=.TRUE.
-                                EXIT
-                            END IF
-                        END DO
-                        IF (valid) EXIT
-                    END IF
-                END DO
-            END DO
+            ! When zero transfer is inadmissible, recover the feasible vertex
+            ! of the linear packing/inventory polytope deterministically.
+            CALL find_overpacked_feasible(f_settle,f_elut,f_carrier,valid)
             IF (.NOT.valid) THEN
                 accepted_settling=0.0_wp
                 accepted_elutriation=0.0_wp
                 RETURN
-            END IF
-            ! Refine each solid process independently without relying on an
-            ! admissible no-transfer endpoint. The feasible segment at fixed
-            ! other process/carrier factors is an interval.
-            IF (f_settle<1.0_wp) THEN
-                lo=f_settle
-                hi=1.0_wp
-                IF (feasible(hi,f_elut,f_carrier)) THEN
-                    lo=hi
-                ELSE
-                    DO k=1,56
-                        mid=0.5_wp*(lo+hi)
-                        IF (feasible(mid,f_elut,f_carrier)) THEN
-                            lo=mid
-                        ELSE
-                            hi=mid
-                        END IF
-                    END DO
-                END IF
-                f_settle=lo
-            END IF
-            IF (f_elut>0.0_wp .AND. f_elut<1.0_wp) THEN
-                lo=f_elut
-                hi=1.0_wp
-                IF (feasible(f_settle,hi,hi*f_carrier/f_elut)) THEN
-                    lo=hi
-                END IF
-                ! Preserve the selected co-lift policy when increasing elutriation.
-                IF (lo==f_elut) THEN
-                    DO k=1,56
-                        mid=0.5_wp*(lo+hi)
-                        IF (feasible(f_settle,mid,mid*f_carrier/f_elut)) THEN
-                            lo=mid
-                        ELSE
-                            hi=mid
-                        END IF
-                    END DO
-                END IF
-                f_carrier=lo*f_carrier/f_elut
-                f_elut=lo
             END IF
         ELSE IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED' .AND. &
             .NOT.feasible(1.0_wp,1.0_wp,1.0_wp) .AND. feasible(1.0_wp,1.0_wp,0.0_wp)) THEN
@@ -399,6 +335,162 @@ CONTAINS
         END IF
 
     CONTAINS
+
+        !> @brief Find an admissible vertex of the fixed-density transfer polytope.
+        !> @details All gross donor and final packing inequalities are affine in
+        !>          settling, elutriation and co-lift scales. Since the bounded
+        !>          feasible polytope has a vertex whenever nonempty, enumerating
+        !>          line and plane intersections cannot miss a narrow feasible region.
+        !>          LIMIT_SOLIDS eliminates the co-lift scale by setting it equal
+        !>          to the elutriation scale; ALLOW_CONCENTRATED retains all three.
+        !> @param[out] settled_scale Accepted settling rate scale.
+        !> @param[out] elutriated_scale Accepted elutriation rate scale.
+        !> @param[out] carrier_scale Accepted upward carrier co-lift rate scale.
+        !> @param[out] found Whether an admissible vertex was identified.
+        PURE SUBROUTINE find_overpacked_feasible(settled_scale,elutriated_scale,carrier_scale,found)
+            REAL(wp), INTENT(OUT) :: settled_scale,elutriated_scale,carrier_scale
+            LOGICAL, INTENT(OUT) :: found
+            REAL(wp) :: coeff(9,3),bound(9),candidate(3),best(3)
+            REAL(wp) :: downward(3),upper(3),ratio,tol,det,norm
+            REAL(wp) :: first(3),second(3),third(3),vertex_tol
+            INTEGER :: count,dimension,i,j,k
+
+            found=.FALSE.
+            settled_scale=0.0_wp
+            elutriated_scale=0.0_wp
+            carrier_scale=0.0_wp
+            coeff=0.0_wp
+            bound=0.0_wp
+            coeff(1,1)=-1.0_wp
+            coeff(2,1)=1.0_wp
+            bound(2)=1.0_wp
+            coeff(3,2)=-1.0_wp
+            coeff(4,2)=1.0_wp
+            bound(4)=1.0_wp
+            count=4
+            dimension=2
+
+            IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED') THEN
+                dimension=3
+                count=6
+                coeff(5,3)=-1.0_wp
+                coeff(6,2)=-1.0_wp
+                coeff(6,3)=1.0_wp
+            END IF
+
+            ! D is the carrier volume deficit in L1 before the positive part:
+            ! dt*down_to_l1*down=MAX(0,D). N is the L2 packing deficit
+            ! evaluated with zero downward carrier.
+            downward=[beta*dt*settle_total,-beta*dt*elut_total,dt*up_to_l1*co_lift]
+            upper=[-beta*dt*settle_total,beta*dt*elut_total,-dt*up_to_l2*co_lift]
+            ratio=down_to_l2/down_to_l1
+            tol=128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,s2+c2)
+
+            ! MAX(0,D) <= cap and MAX(0,D) <= L2 headroom are
+            ! equivalent to three linear inequalities, because both caps
+            ! must also accommodate zero downward carrier.
+            count=count+1
+            coeff(count,:)=upper
+            bound(count)=tol-beta*s2+c2
+            count=count+1
+            coeff(count,:)=upper+ratio*downward
+            bound(count)=tol-beta*s2+c2-ratio*(beta*s1-c1)
+            count=count+1
+            coeff(count,:)=downward
+            bound(count)=dt*down_to_l1*available_down+down_to_l1*tol-beta*s1+c1
+
+            IF (dimension==2) THEN
+                DO i=5,count
+                    coeff(i,2)=coeff(i,2)+coeff(i,3)
+                    coeff(i,3)=0.0_wp
+                END DO
+            END IF
+
+            ! Normalize half-planes for well-scaled vertex intersections.
+            DO i=1,count
+                norm=MAX(MAXVAL(ABS(coeff(i,1:dimension))),ABS(bound(i)))
+                IF (norm<=0.0_wp) CYCLE
+                coeff(i,:)=coeff(i,:)/norm
+                bound(i)=bound(i)/norm
+            END DO
+
+            vertex_tol=1024.0_wp*EPSILON(1.0_wp)
+            best=0.0_wp
+            DO i=1,count-1
+                DO j=i+1,count
+                    IF (dimension==2) THEN
+                        det=coeff(i,1)*coeff(j,2)-coeff(i,2)*coeff(j,1)
+                        IF (ABS(det)<=vertex_tol) CYCLE
+                        candidate(1)=(bound(i)*coeff(j,2)-bound(j)*coeff(i,2))/det
+                        candidate(2)=(coeff(i,1)*bound(j)-coeff(j,1)*bound(i))/det
+                        candidate(3)=candidate(2)
+                        CALL consider_overpacked_vertex(candidate,vertex_tol,found,best)
+                    ELSE
+                        DO k=j+1,count
+                            first=cross3(coeff(j,:),coeff(k,:))
+                            second=cross3(coeff(k,:),coeff(i,:))
+                            third=cross3(coeff(i,:),coeff(j,:))
+                            det=DOT_PRODUCT(coeff(i,:),first)
+                            IF (ABS(det)<=vertex_tol) CYCLE
+                            candidate=(bound(i)*first+bound(j)*second+bound(k)*third)/det
+                            CALL consider_overpacked_vertex(candidate,vertex_tol,found,best)
+                        END DO
+                    END IF
+                END DO
+            END DO
+
+            IF (found) THEN
+                settled_scale=best(1)
+                elutriated_scale=best(2)
+                carrier_scale=best(3)
+            END IF
+
+        END SUBROUTINE find_overpacked_feasible
+
+        !> @brief Check one vertex with the canonical physical feasibility test.
+        !> @param[in] point Candidate (settling, elutriation, co-lift) scales.
+        !> @param[in] vertex_tol Tolerance for bounded vertex coordinates.
+        !> @param[in,out] has_best True if an admissible vertex has been found.
+        !> @param[in,out] selected Preferred admissible scales.
+        PURE SUBROUTINE consider_overpacked_vertex(point,vertex_tol,has_best,selected)
+            REAL(wp), INTENT(IN) :: point(3),vertex_tol
+            LOGICAL, INTENT(INOUT) :: has_best
+            REAL(wp), INTENT(INOUT) :: selected(3)
+            REAL(wp) :: trial(3),tie_tol
+
+            IF (.NOT.ALL(ieee_is_finite(point))) RETURN
+            IF (ANY(point<-vertex_tol) .OR. ANY(point>1.0_wp+vertex_tol)) RETURN
+            IF (point(3)>point(2)+vertex_tol) RETURN
+            trial=MAX(0.0_wp,MIN(1.0_wp,point))
+            IF (.NOT.feasible(trial(1),trial(2),trial(3))) RETURN
+
+            tie_tol=1024.0_wp*EPSILON(1.0_wp)
+            IF (.NOT.has_best) THEN
+                selected=trial
+                has_best=.TRUE.
+            ELSE IF (trial(1)>selected(1)+tie_tol) THEN
+                selected=trial
+            ELSE IF (ABS(trial(1)-selected(1))<=tie_tol) THEN
+                IF (trial(2)>selected(2)+tie_tol) THEN
+                    selected=trial
+                ELSE IF (ABS(trial(2)-selected(2))<=tie_tol) THEN
+                    IF (trial(3)>selected(3)+tie_tol) selected=trial
+                END IF
+            END IF
+        END SUBROUTINE consider_overpacked_vertex
+
+        !> @brief Cross product for three-dimensional plane intersections.
+        !> @param[in] a First three-component vector.
+        !> @param[in] b Second three-component vector.
+        !> @return Cross product of a and b.
+        PURE FUNCTION cross3(a,b) RESULT(c)
+            REAL(wp), INTENT(IN) :: a(3),b(3)
+            REAL(wp) :: c(3)
+
+            c(1)=a(2)*b(3)-a(3)*b(2)
+            c(2)=a(3)*b(1)-a(1)*b(3)
+            c(3)=a(1)*b(2)-a(2)*b(1)
+        END FUNCTION cross3
 
         !> @brief Evaluate simultaneous upward/downward carrier rates at independent process scales.
         !> @param[in] fs Settling reduction factor in [0,1].
