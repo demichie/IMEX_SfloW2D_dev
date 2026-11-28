@@ -456,13 +456,39 @@ CONTAINS
             REAL(wp), INTENT(IN) :: point(3),vertex_tol
             LOGICAL, INTENT(INOUT) :: has_best
             REAL(wp), INTENT(INOUT) :: selected(3)
-            REAL(wp) :: trial(3),tie_tol
+            REAL(wp) :: trial(3),tie_tol,offset
+            INTEGER :: i,j,k,third_limit
 
             IF (.NOT.ALL(ieee_is_finite(point))) RETURN
             IF (ANY(point<-vertex_tol) .OR. ANY(point>1.0_wp+vertex_tol)) RETURN
             IF (point(3)>point(2)+vertex_tol) RETURN
-            trial=MAX(0.0_wp,MIN(1.0_wp,point))
-            IF (.NOT.feasible(trial(1),trial(2),trial(3))) RETURN
+
+            ! A vertex is computed from normalized plane intersections. The
+            ! resulting point can lie a few ULP outside a tight packing face
+            ! even when the exact intersection is feasible. Check neighboring
+            ! representable interior points without relaxing feasible().
+            offset=64.0_wp*EPSILON(1.0_wp)
+            third_limit=1
+            IF (config%elutriation_carrier_mode=='ALLOW_CONCENTRATED') third_limit=3
+            DO i=1,3
+                DO j=1,3
+                    DO k=1,third_limit
+                        trial(1)=point(1)+REAL(i-2,wp)*offset
+                        trial(2)=point(2)+REAL(j-2,wp)*offset
+                        IF (third_limit==1) THEN
+                            trial(3)=trial(2)
+                        ELSE
+                            trial(3)=point(3)+REAL(k-2,wp)*offset
+                        END IF
+                        IF (ANY(trial<0.0_wp) .OR. ANY(trial>1.0_wp)) CYCLE
+                        IF (trial(3)>trial(2)) CYCLE
+                        IF (feasible(trial(1),trial(2),trial(3))) EXIT
+                    END DO
+                    IF (k<=third_limit) EXIT
+                END DO
+                IF (j<=3) EXIT
+            END DO
+            IF (i>3) RETURN
 
             tie_tol=1024.0_wp*EPSILON(1.0_wp)
             IF (.NOT.has_best) THEN
