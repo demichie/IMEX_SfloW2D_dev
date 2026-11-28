@@ -4194,6 +4194,8 @@ CONTAINS
           IF (domain%solve_mask_x(j,k)) CYCLE
           reconstruction%qp_adv_interfaceL(:,j,k)=0.0_wp; reconstruction%qp_adv_interfaceR(:,j,k)=0.0_wp
           reconstruction%eta_interfaceL(j,k)=0.0_wp; reconstruction%eta_interfaceR(j,k)=0.0_wp
+          reconstruction%h_froude_interfaceL(j,k)=0.0_wp
+          reconstruction%h_froude_interfaceR(j,k)=0.0_wp
        END DO
     END DO
     DO k=1,ny+1
@@ -4201,6 +4203,8 @@ CONTAINS
           IF (domain%solve_mask_y(j,k)) CYCLE
           reconstruction%qp_adv_interfaceB(:,j,k)=0.0_wp; reconstruction%qp_adv_interfaceT(:,j,k)=0.0_wp
           reconstruction%eta_interfaceB(j,k)=0.0_wp; reconstruction%eta_interfaceT(j,k)=0.0_wp
+          reconstruction%h_froude_interfaceB(j,k)=0.0_wp
+          reconstruction%h_froude_interfaceT(j,k)=0.0_wp
        END DO
     END DO
   END SUBROUTINE normalize_inactive_face_payloads
