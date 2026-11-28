@@ -106,6 +106,14 @@ PROGRAM test_interlayer_lie_transaction
     CALL require(q(idx_totMassEqn,1)>0.0_wp,'hot donor creates lower-layer mass')
     CALL build_physical_state_from_qp(qp(:,1),check1,accepted=ok)
     CALL require(ok,'hot donor produces a valid lower-layer physical state')
+    IF (ABS(SUM(check1%alphas)-maximum_solid_packing)>=1.0E-8_wp) THEN
+        WRITE(*,'(A,ES24.16)') 'DIAG dry L1 solid fraction: ',SUM(check1%alphas)
+        WRITE(*,'(A,ES24.16)') 'DIAG maximum packing: ',maximum_solid_packing
+        WRITE(*,'(A,ES24.16)') 'DIAG final L1 temperature: ',check1%T
+        WRITE(*,'(A,ES24.16)') 'DIAG final L1 carrier density: ',check1%rho_c
+        WRITE(*,'(A,ES24.16)') 'DIAG donor L2 carrier density: ',check2%rho_c
+        WRITE(*,'(A,ES24.16)') 'DIAG final L1 thickness: ',qp(idx_h,1)
+    END IF
     CALL require(ABS(SUM(check1%alphas)-maximum_solid_packing)<1.0E-8_wp, &
         'first settled L1 deposit uses donor carrier density at packing')
     CALL check_conservation(before,q,'hot donor cold-start L1')
